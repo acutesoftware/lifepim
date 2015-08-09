@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+sdist/
+dist/
+build/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+Thumbs.db
+
+# Unit test / coverage reports
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+.coveralls.yml
