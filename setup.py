@@ -2,13 +2,13 @@ from setuptools import setup
 
 setup(
     name='lifepim',
-    version='0.0.1',
+    version='0.0.2',
     author='Duncan Murray',
     author_email='djmurray@acutesoftware.com.au',
     packages=['lifepim', 'lifepim.web_app'],
     url='https://github.com/acutesoftware/lifepim',
     license='GNU General Public License v3 (GPLv3)',
-    description='Artificial Intelligence Knowledge Information Framework',
+    description='Personal Information Manager for Life',
     long_description=open('README.txt').read(),
     install_requires=[
           'nose >= 1.0',
@@ -25,9 +25,9 @@ setup(
     'Intended Audience :: Developers',
     'Natural Language :: English',
     'Operating System :: OS Independent',
-    'Topic :: Database :: Front-Ends',
     'Topic :: Software Development :: Libraries :: Application Frameworks',
     'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Office/Business :: News/Diary',
     ],
 
 )
