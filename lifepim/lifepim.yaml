@@ -1,0 +1,12 @@
+---
+Event:
+    - date
+    - time
+    - details
+
+Task:
+    - details
+    - due_date
+    - est_time
+    - resources
+    
