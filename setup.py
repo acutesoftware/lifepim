@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='lifepim',
-    version='0.0.2',
+    version='0.0.3',
     author='Duncan Murray',
     author_email='djmurray@acutesoftware.com.au',
     packages=['lifepim', 'lifepim.web_app'],
