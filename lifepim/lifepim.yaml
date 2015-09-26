@@ -9,4 +9,12 @@ Task:
     - due_date
     - est_time
     - resources
-    
+
+Contacts:
+    - name
+    - address
+    - phone
+    - email
+    - twitter
+    - facebook
+
