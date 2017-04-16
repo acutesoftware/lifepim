@@ -10,3 +10,14 @@ Task:
     - est_time
     - resources
     
+Contacts:
+    - name
+    - email
+    - phone
+    - facebook
+    - linkedIn
+    - twitter
+    - Google+
+    - Address
+    - Notes
+    
