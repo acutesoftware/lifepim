@@ -1,19 +1,19 @@
-#LifePIM
+# LifePIM
 
-#####Personal Information Manager for Life (Planning)
+##### Personal Information Manager for Life (Planning)
 
 API and sample web application for long term personal information management.<br />
 
 The web interface will allow you to run local data collection and gathering tools.
  
 
-###Key Programs (NOT YET IMPLEMENTED)
+### Key Programs (NOT YET IMPLEMENTED)
 |Filename | description |
  --- | ---      
 |go_web_lifepim.bat | starts the web server for the LifePIM application|
 |LP_CLI.py		  | Command Line interface to add and query data|
 
-##Quick Start
+## Quick Start
 This github repository [https://github.com/acutesoftware/lifepim](https://github.com/acutesoftware/lifepim) contains the latest code, but the current public release is available via
 
 `pip install lifepim`
@@ -32,5 +32,6 @@ To start the API server use `lifepim/api_main.py` and run the `tests/test_api.py
  
 
 
-###More Information
+### More Information
+
 TODO
