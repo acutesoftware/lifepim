@@ -5,13 +5,8 @@ import os
 
 #------- standard import for all lifepim programs -------
 sys.path.append(os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." ))
-import config_lifepim as config
 import lifepim
-
-# -------------------------------------------------------
-
-
-
+import config_lifepim as config
 
 print ("config.cfg_fldr_lifepim_data = " + config.cfg_fldr_lifepim_data)
 
