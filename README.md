@@ -1,9 +1,10 @@
 #LifePIM
+
 #####Personal Information Manager for Life (Planning)
 
 API and sample web application for long term personal information management.<br />
 
-
+The web interface will allow you to run local data collection and gathering tools.
  
 
 ###Key Programs (NOT YET IMPLEMENTED)
