@@ -9,6 +9,7 @@ Task:
     - due_date
     - est_time
     - resources
+<<<<<<< HEAD
     
 Contacts:
     - name
@@ -21,3 +22,14 @@ Contacts:
     - Address
     - Notes
     
+=======
+
+Contacts:
+    - name
+    - address
+    - phone
+    - email
+    - twitter
+    - facebook
+
+>>>>>>> 3ba9dfe458da4825a9227b1b4f3981b05e68b298
