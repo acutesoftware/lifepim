@@ -28,16 +28,16 @@ def main():
     
     
     # attempt #2 using Core DATA  (TOK) 
-    e = mod_core.Event('Sales Meeting', '2015-04-11', 'Office', 'Meet with client to discuss custom software')
+    e = mod_core.CoreDataWhen('Sales Meeting', ['2015-04-11', 'Office', 'Meet with client to discuss custom software'])
     print(e.format_csv())
 
     # attempt #3 use an Events class to manage it all
     ev = Events(os.getcwd(), 'D', 'DAT')
-    ev.add(mod_core.Event('Sales Meeting', '2014-01-11', 'Office', 'Catchup with client'))
-    ev.add(mod_core.Event('Sales Meeting#3', '2015-03-11', 'Office', 'Catchup with client'))
-    ev.add(mod_core.Event('DEV AIKIF - core data', '2015-05-11', 'Software', 'update TEST - no test for CORE_DATA'))
-    ev.add(mod_core.Event('DEV LifePim - core data', '2015-03-11', 'Software', 'use data for LifePim'))
-    ev.add(mod_core.Event('DEV AIKIF - data tools', '2015-05-11', 'Software', 'fix data tools '))
+    ev.add(mod_core.CoreDataWhen('Sales Meeting', ['2014-01-11', 'Office', 'Catchup with client']))
+    ev.add(mod_core.CoreDataWhen('Sales Meeting#3', ['2015-03-11', 'Office', 'Catchup with client']))
+    ev.add(mod_core.CoreDataWhen('DEV AIKIF - core data', ['2015-05-11', 'Software', 'update TEST - no test for CORE_DATA']))
+    ev.add(mod_core.CoreDataWhen('DEV LifePim - core data', ['2015-03-11', 'Software', 'use data for LifePim']))
+    ev.add(mod_core.CoreDataWhen('DEV AIKIF - data tools', ['2015-05-11', 'Software', 'fix data tools ']))
     print(ev)
     
     ev.save()
@@ -58,7 +58,7 @@ class Events():
         self.user = user
         self.fldr = fldr
         self.events = []    # list of events
-        self.header = mod_core.Event('Name', 'Date', 'Journal', 'Details')
+        self.header = mod_core.CoreDataWhen('Name', ['Date', 'Journal', 'Details'])
         
     def __str__(self):
         res = ''
