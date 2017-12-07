@@ -11,12 +11,12 @@ def main():
     fname = 'journal.csv'
     p = mod_prj.Project('Journal Record')
     print(p.nme)
-    
+
     # Attempt #1 - using DataTable directly (TOK)
     dt = mod_dat.DataTable(fname, ',', col_names=['date', 'category', 'details'])
-    dt.add(['2015-05-11', 'Software', 'creating LP_ADD_DATA.py to record journal to diary'])    
-    dt.add(['2015-05-11', 'Software', 'update readme'])    
-    dt.add(['2015-05-11', 'Shopping', 'bought jeans'])    
+    dt.add(['2017-12-07', 'Software', 'test online version'])
+    dt.add(['2017-06-11', 'Software', 'update readme'])    
+    dt.add(['2015-05-11', 'Shopping', 'bought jeans'])
     print(dt)
     """
     date	category	details
@@ -25,9 +25,9 @@ def main():
     11/05/2015	Shopping	bought jeans
     """
     dt.save_csv(fname)
-    
-    
-    # attempt #2 using Core DATA  (TOK) 
+
+
+    # attempt #2 using Core DATA  (TOK)
     e = mod_core.CoreDataWhen('Sales Meeting', ['2015-04-11', 'Office', 'Meet with client to discuss custom software'])
     print(e.format_csv())
 
@@ -39,10 +39,10 @@ def main():
     ev.add(mod_core.CoreDataWhen('DEV LifePim - core data', ['2015-03-11', 'Software', 'use data for LifePim']))
     ev.add(mod_core.CoreDataWhen('DEV AIKIF - data tools', ['2015-05-11', 'Software', 'fix data tools ']))
     print(ev)
-    
+
     ev.save()
-    
-    
+
+
     txt = 'Catchup' # 'data'
     print('\n Searching for ', txt)
     srch = ev.find(txt)
@@ -59,7 +59,7 @@ class Events():
         self.fldr = fldr
         self.events = []    # list of events
         self.header = mod_core.CoreDataWhen('Name', ['Date', 'Journal', 'Details'])
-        
+
     def __str__(self):
         res = ''
         res += ' basename = ' + self.filename_base + '\n'
@@ -68,13 +68,13 @@ class Events():
         for e in self.events:
             res += e.format_csv()
         return res
-    
+
     def get_filename(self, event):
         """
         returns the old style D201505.user format of filename
         """
-        return self.fldr + os.sep + self.filename_base + '201505' + '.' + self.user 
-    
+        return self.fldr + os.sep + self.filename_base + '201505' + '.' + self.user
+
     def add(self, e):
         self.events.append(e)
 
@@ -85,17 +85,17 @@ class Events():
                 result.append(e)
                 #print(e)
         return result
-    
+
     def save(self):
         """
         save all events to folder in appropriate files
         NOTE - ONLY APPEND AT THIS STAGE - THEN USE DATABASE
         """
-            
-        for e in self.events: 
+
+        for e in self.events:
             fname = self.get_filename(e)
             with open(fname, 'a') as f:
                 f.write(e.format_csv())
-                
+
 if __name__ == '__main__':
-    main()    
+    main()
