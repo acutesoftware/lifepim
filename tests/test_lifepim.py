@@ -11,7 +11,7 @@ sys.path.append(pth)
 
 import lifepim as mod_lp
 
-class TestEnvironment(unittest.TestCase):
+class TestLifePIM(unittest.TestCase):
     
     def test_01_connect(self):
         res = mod_lp.connect()
