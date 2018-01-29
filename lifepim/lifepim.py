@@ -14,15 +14,17 @@ def TEST():
 def connect():
     print('connecing to lifepim...')
     
-    c = LifePimConnect('','')
-    print(c.get_page('/about', 200))
-    
-    return 200
+    c = LifePimConnect('https://www.lifepim.com','')
+    res = c.get_page('/about', 200)
+    if res:
+        return 200
+    else:
+        return 404
 
 
 class LifePimConnect(object):
     def __init__(self, base_url, logon_data):
-        self.url = 'https://www.lifepim.com'
+        self.url = base_url
         self.logon_data =  logon_data
 
 
