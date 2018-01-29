@@ -17,6 +17,21 @@ class TestLifePIM(unittest.TestCase):
         res = mod_lp.connect()
         self.assertEqual(res, 200)
 
+    def test_02_valid_page(self):
+        
+        c = mod_lp.LifePimConnect('https://www.lifepim.com','')
+        res = c.get_page('/about', 200)
+        self.assertTrue(len(res) > 500)
+
+    def test_03_no_such_page(self):
+        
+        c = mod_lp.LifePimConnect('https://www.lifepim.com','')
+        res = c.get_page('/blahBLAH', 200)
+        if res:
+            self.assertEqual('this should have failed', 'YES')
+        else:
+            self.assertEqual(1,1)
+
 
     
 if __name__ == '__main__':
