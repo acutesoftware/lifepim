@@ -6,7 +6,8 @@ import requests
 
 def TEST():
     print('Testing interface to www.lifepim.com')
-
+    res = connect()
+    print(res)
 
 
 
