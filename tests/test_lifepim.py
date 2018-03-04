@@ -23,6 +23,9 @@ class TestLifePIM(unittest.TestCase):
         res = c.get_page('/about', 200)
         self.assertTrue(len(res) > 500)
 
+
+
+
     def test_03_no_such_page(self):
         
         c = mod_lp.LifePimConnect('https://www.lifepim.com','')
@@ -32,6 +35,13 @@ class TestLifePIM(unittest.TestCase):
         else:
             self.assertEqual(1,1)
 
+
+    def test_04_API_public(self):
+        c = mod_lp.LifePimConnect('http://127.0.0.1:5000', '')
+        #print(c)
+        #http://127.0.0.1:5000/API/V1/get_note/fsdf
+        res = c.get_page('/API/V1/get_note/My Note', '200')
+        print(res)
 
     
 if __name__ == '__main__':
