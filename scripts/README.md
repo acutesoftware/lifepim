@@ -21,9 +21,9 @@ Collects PC usage data
 Collects file lists from local hard drives
 
 
-### Log file uploader
+### log_file_uploader
 
-takes a logfile and aggregates to events
+parses logfiles and extracts to events
 
 
 ### photo metadata collector
