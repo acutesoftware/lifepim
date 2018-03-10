@@ -1,9 +1,9 @@
 # LifePIM Scripts
 
-##### Open source data collection scripts for www.lifepim.com
+##### Open source data collection scripts for https://www.lifepim.com
 
-This folde has scripts and processes to help end users collect data
-for importing to www.lifepim.com
+This folder has scripts and processes to help end users collect data
+for importing to LifePIM
 
 This repositority has the latest working versions - some have been copied from
 other projects (AIKIF, rawdata) and customised for lifepim.
@@ -19,6 +19,11 @@ Collects PC usage data
 ### filelister
 
 Collects file lists from local hard drives
+
+
+### Log file uploader
+
+takes a logfile and aggregates to events
 
 
 ### photo metadata collector
@@ -41,4 +46,4 @@ Upload files to lifepim
 
 ### download_lifepim
 
-Downloads all your data from www.lifepim.com
+Downloads all your data from https://www.lifepim.com
