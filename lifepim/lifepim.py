@@ -4,18 +4,17 @@ import os
 import sys
 import requests
 
-def TEST():
-    print('Testing interface to www.lifepim.com')
-    res = connect()
-    print(res)
 
+lp_url = 'https://www.lifepim.com'
+lp_user = 'YOUR_USERNAME'
+lp_pass = 'YOUR_PASSWORD'
 
 
 
 def connect():
     print('connecing to lifepim...')
-    
-    c = LifePimConnect('https://www.lifepim.com','')
+
+    c = LifePimConnect(lp_url,'')
     res = c.get_page('/about', 200)
     if res:
         return 200
