@@ -6,7 +6,7 @@ This document describes overall processes of LifePIM, in terms of
 remote access.
 
 
-For details on using the API see the document :doc:`LifePIM_API.rst`
+For details on using the API see the document :doc:`./LifePIM_API.rst`
 
 .. contents::
 
