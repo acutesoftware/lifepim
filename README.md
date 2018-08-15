@@ -5,7 +5,7 @@
 API and sample web application for long term personal information management.<br />
 
 The web interface will allow you to run local data collection and gathering tools.
- 
+
 
 
 ## Quick Start
@@ -13,21 +13,15 @@ This github repository [https://github.com/acutesoftware/lifepim](https://github
 
 `pip install lifepim`
 
-To start the API server use `lifepim/api_main.py` and run the `tests/test_api.py`
+This application is used to collect local metadata for indexing and allow for
+automatic uploading to https://www.lifepim.com
 
-```
- * Running on http://127.0.0.1:5000/
- * Restarting with reloader
-127.0.0.1 - - [28/May/2015 19:22:49] "GET /facts HTTP/1.1" 200 -
-127.0.0.1 - - [28/May/2015 19:22:49] "GET /help HTTP/1.1" 200 -
-127.0.0.1 - - [28/May/2015 19:22:49] "GET /users/1 HTTP/1.1" 200 -
-```
-
- To start the web interface use `aikif/web_app/web_lifepim.py` or the batch file `lifepim\go_web_lifepim`
- 
+### Music collection
+collects metadata on your music collection, and uploads index to lifepim.
+If your NAS has shared folders you can access your music from lifepim through
+the relative url.
 
 
 ### More Information
 
 You will be able to ADD records only in the first release.
-
