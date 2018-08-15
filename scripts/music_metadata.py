@@ -18,12 +18,15 @@ print(' >  sudo pip3 install mutagenx')
 
 music_folder = '~/Music/Linux Action News/'
 music_folder = '~/Music'
+music_folder = '/home/duncan/Music/Linux Action News'
+#root_folder =  os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + "..")
+root_folder =  os.path.abspath(os.path.dirname(music_folder))
 
 
 print('collecting metadata')
 
 
-aikif_fl = fl.FileList([music_folder], ['*.mp3'], [],  'music_list.csv')
+aikif_fl = fl.FileList([root_folder], ['*.mp3'], [],  'music_list.csv')
 aikif_fl.save_filelist('music_list.csv', ["name", "path", "size", "date"])
 
 print('done')
