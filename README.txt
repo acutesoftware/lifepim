@@ -1,9 +1,14 @@
-Personal Information Manager for Life (Planning)
+LifePIM Desktop
+https://www.lifepim.com is designed to be a Personal Information Manager for
+Life, but not all personal data should be kept online.
+Sure, it's fine to keep shopping lists, ideas, and notes and appointment reminders online  - but things like
+passwords, some photos, that amazing idea for a perpetual motion machine should
+be kept secure.
 
-API and sample web application for long term personal information management.
+This repository contains scripts and an upcoming Desktop version you can run
+on your local PC (to keep sensitive data local).  You can still interface with
+the live site but you get to choose which data gets uploaded to your lifepim
+account.
 
-This github repository https://github.com/acutesoftware/lifepim contains the latest code, but the current public release is available via
-
-pip install lifepim
-
-To start the API server use lifepim/api_main.py and run the tests/test_api.py
+Status
+Planning stage - nothing significant works yet!

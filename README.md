@@ -10,7 +10,7 @@ on your local PC (to keep sensitive data local).  You can still interface with
 the live site but you get to choose which data gets uploaded to your lifepim
 account.
 
-##Status
+## Status
 Planning stage - nothing significant works yet!
 
 ## Quick Start
