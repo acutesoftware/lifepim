@@ -4,10 +4,11 @@ import os
 import sys
 import requests
 
+import config
 
 lp_url = 'https://www.lifepim.com'
-lp_user = 'YOUR_USERNAME'
-lp_pass = 'YOUR_PASSWORD'
+lp_user = config.logon_username
+lp_pass = config.login_password
 
 
 
