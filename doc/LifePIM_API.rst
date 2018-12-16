@@ -4,7 +4,7 @@ LifePIM_API.rst
  LifePIM API
 ====================
 
-Complete API reference for LifePIM. (WORK IN PROGRESS)
+Complete API reference for LifePIM.
 
 
 To see an overview refer to the document LifePIM_overview.rst
