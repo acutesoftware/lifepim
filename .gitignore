@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 sdist/
-dist/
+#dist/
 build/
 var/
 *.egg-info/
@@ -17,3 +17,5 @@ Thumbs.db
 nosetests.xml
 coverage.xml
 .coveralls.yml
+
+venv2/
