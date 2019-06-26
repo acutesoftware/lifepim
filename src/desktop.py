@@ -8,6 +8,7 @@ import tkinter as tk
 import tkinter as ttk
 from tkcalendar import Calendar, DateEntry
 from tkinter import Frame, Label, Entry, Button, font
+from tkinter import LEFT, RIGHT, TOP, BOTTOM
 
 import config
 
@@ -125,10 +126,9 @@ def build_screen_home(root):
     builds the GUI using the home functionality
     """
     # create all of the main containers
-    toolbar_frame = Frame(root, bg='cyan', width=450, height=30, pady=3)
-    center = Frame(root, bg='gray2', width=50, height=40, padx=3, pady=3)
-    btm_frame = Frame(root, bg='black', width=450, height=45, pady=3)
-    status_frame = Frame(root, bg='gray2', width=450, height=20, pady=3)
+    toolbar_frame = Frame(root, bg='gray', width=350, height=20, pady=1)
+    center = Frame(root, bg='gray', width=50, height=40, padx=3, pady=3)
+    status_frame = Frame(root, bg='gray', width=450, height=20, pady=3)
 
     # layout all of the main containers
     root.grid_rowconfigure(1, weight=1)
@@ -136,17 +136,19 @@ def build_screen_home(root):
 
     toolbar_frame.grid(row=0, sticky="ew")
     center.grid(row=1, sticky="nsew")
-    btm_frame.grid(row=3, sticky="ew")
-    status_frame.grid(row=4, sticky="ew")
+    
+    status_frame.grid(row=3, sticky="ew")
+
+
 
 
     # create the center widgets
     center.grid_rowconfigure(0, weight=1)
     center.grid_columnconfigure(1, weight=1)
 
-    ctr_left = Frame(center, bg='blue', width=200, height=390)
-    ctr_mid = Frame(center, bg='yellow', width=250, height=390, padx=3, pady=3)
-    ctr_right = Frame(center, bg='green', width=100, height=390, padx=3, pady=3)
+    ctr_left = Frame(center, bg='gray14', width=220, height=390)
+    ctr_mid = Frame(center, bg='gray10', width=250, height=390, padx=3, pady=3)
+    ctr_right = Frame(center, bg='gray14', width=100, height=390, padx=3, pady=3)
 
     ctr_left.grid(row=0, column=0, sticky="ns")
     ctr_mid.grid(row=0, column=1, sticky="nsew")
@@ -158,17 +160,25 @@ def build_screen_home(root):
     cal = wCalendar(cal_frame)
     cal_frame.grid(row=0, column=0)
 
+
+    console_frame = Frame(ctr_left, bg='black', width=250, height=250, pady=1)
+    console_frame.grid(row=1, column=0, sticky="nw")
+
+
     # add labels (just to indicate how to attach things)
     event_label = Label(ctr_left, text='Events goes here')
-    event_label.grid(row=1, column=0)
+    event_label.grid(row=2, column=0)
     note_label = Label(ctr_mid, text='Notes go here')
     note_label.grid(row=1, column=0)
 
     folder_label = Label(ctr_right, text='Folder list')
     folder_label.grid(row=1, column=0)
-
-    console_label = Label(btm_frame, text='console', bg='black', foreground='green')
+    txt = 'duncan@TREEBEARD:~/dev/src/python/LifePIM/src$ ls -l\ntotal 0\nduncan@TREEBEARD:~/dev/src/python/LifePIM/src$\n'
+    txt = '$pwd\n~/dev/src/python/LifePIM/src/new\nls -l\ntotal 0\n$\n'
+    console_label = Label(console_frame, text=txt, bg='black', foreground='green', justify=LEFT)
     console_label.grid(row=1, column=0)
+    console_entry = Entry(console_frame,  bg='gray12', foreground='green')
+    console_entry.grid(row=2, column=0, sticky="ew")
 
     status_label = Label(status_frame, text='Status Bar')
     status_label.grid(row=1, column=0)
