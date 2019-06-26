@@ -7,16 +7,18 @@ import sys
 import tkinter as tk
 import tkinter as ttk
 from tkcalendar import Calendar, DateEntry
-from tkinter import Frame, Label, Entry, Button
+from tkinter import Frame, Label, Entry, Button, font
 
 import config
 
 def main():
     print('starting desktop via ' + config.base_url)
     app = simpleapp_tk(None)
-    app.title('MDM Desktop')
+    app.title('LifePIM Desktop')
     app.geometry('750x500')
+    app.tk.call('encoding', 'system', 'unicode')
     build_screen_home(app)
+    
 
     app.mainloop()
 
@@ -172,19 +174,147 @@ def build_screen_home(root):
     status_label.grid(row=1, column=0)
 
     # populate the toolbar
-    add_toolbar_button(toolbar_frame, 0, 'Home', click_button)
+    
+    
+
+    add_toolbar_buttons(toolbar_frame)
  
 
-def add_toolbar_button(window, pos, txt, command):
-    btn = Button(window, text=txt, command=command)
-    btn.grid(column=pos, row=0)    
+def add_toolbar_buttons(window):
+    # LifePIM Toolbar definitions for Tkinter
+    tb_font = font.Font(family='Helvetica', size=30, weight='bold')
+
+    btn1 = Button(window, text='❗', command=button_click_tb_home)
+    btn1.font = tb_font
+    btn1.grid(column=0, row=0)
+
+    btn2 = Button(window, text='➀', command=button_click_tb_calendar)
+    btn2.font = tb_font
+    btn2.grid(column=1, row=0)
+
+    btn3 = Button(window, text='✔', command=button_click_tb_tasks)
+    btn3.font = tb_font
+    btn3.grid(column=2, row=0)
+
+    btn4 = Button(window, text='✍', command=button_click_tb_notes)
+    btn4.font = tb_font
+    btn4.grid(column=3, row=0)
+
+    btn5 = Button(window, text='✉', command=button_click_tb_contacts)
+    btn5.font = tb_font
+    btn5.grid(column=4, row=0)
+
+    btn6 = Button(window, text='✈', command=button_click_tb_places)
+    btn6.font = tb_font
+    btn6.grid(column=5, row=0)
+
+    btn7 = Button(window, text='▦', command=button_click_tb_data)
+    btn7.font = tb_font
+    btn7.grid(column=6, row=0)
+
+    btn8 = Button(window, text='✮', command=button_click_tb_badges)
+    btn8.font = tb_font
+    btn8.grid(column=7, row=0)
+
+    btn9 = Button(window, text='$', command=button_click_tb_money)
+    btn9.font = tb_font
+    btn9.grid(column=8, row=0)
+
+    btn10 = Button(window, text='♬', command=button_click_tb_music)
+    btn10.font = tb_font
+    btn10.grid(column=9, row=0)
+
+    btn11 = Button(window, text='✾', command=button_click_tb_images)
+    btn11.font = tb_font
+    btn11.grid(column=10, row=0)
+
+    btn12 = Button(window, text='☑', command=button_click_tb_apps)
+    btn12.font = tb_font
+    btn12.grid(column=11, row=0)
+
+    btn13 = Button(window, text='', command=button_click_tb_files)
+    btn13.font = tb_font
+    btn13.grid(column=12, row=0)
+
+    btn14 = Button(window, text='✋', command=button_click_tb_admin)
+    btn14.font = tb_font
+    btn14.grid(column=13, row=0)
+
+    btn15 = Button(window, text='⚙', command=button_click_tb_options)
+    btn15.font = tb_font
+    btn15.grid(column=14, row=0)
+
+    btn16 = Button(window, text='?', command=button_click_tb_about)
+    btn16.font = tb_font
+    btn16.grid(column=15, row=0)
+
+# Function handling for LifePIM Toolbar clicks
+def button_click_tb_home():
+    """ user clicked toolbar home"""
+    print('user clicked toolbar home')
+
+def button_click_tb_calendar():
+    """ user clicked toolbar calendar"""
+    print('user clicked toolbar calendar')
+
+def button_click_tb_tasks():
+    """ user clicked toolbar tasks"""
+    print('user clicked toolbar tasks')
+
+def button_click_tb_notes():
+    """ user clicked toolbar notes"""
+    print('user clicked toolbar notes')
+
+def button_click_tb_contacts():
+    """ user clicked toolbar contacts"""
+    print('user clicked toolbar contacts')
+
+def button_click_tb_places():
+    """ user clicked toolbar places"""
+    print('user clicked toolbar places')
+
+def button_click_tb_data():
+    """ user clicked toolbar data"""
+    print('user clicked toolbar data')
+
+def button_click_tb_badges():
+    """ user clicked toolbar badges"""
+    print('user clicked toolbar badges')
+
+def button_click_tb_money():
+    """ user clicked toolbar money"""
+    print('user clicked toolbar money')
+
+def button_click_tb_music():
+    """ user clicked toolbar music"""
+    print('user clicked toolbar music')
+
+def button_click_tb_images():
+    """ user clicked toolbar images"""
+    print('user clicked toolbar images')
+
+def button_click_tb_apps():
+    """ user clicked toolbar apps"""
+    print('user clicked toolbar apps')
+
+def button_click_tb_files():
+    """ user clicked toolbar files"""
+    print('user clicked toolbar files')
+
+def button_click_tb_admin():
+    """ user clicked toolbar admin"""
+    print('user clicked toolbar admin')
+
+def button_click_tb_options():
+    """ user clicked toolbar options"""
+    print('user clicked toolbar options')
+
+def button_click_tb_about():
+    """ user clicked toolbar about"""
+    print('user clicked toolbar about')
 
 
-def click_button():
-    print('button clicked')
 
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == '__main__':  

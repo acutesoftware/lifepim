@@ -1,0 +1,67 @@
+# LifePIM Toolbar definitions for Tkinter
+tb_font = tkFont.Font(family='Helvetica', size=36, weight='bold')
+
+btn1 = Button(window, text='🏠', command=button_click_tb_home)
+btn1.font = tb_font
+btn1.grid(column=0, row=0)
+
+btn2 = Button(window, text='🕐', command=button_click_tb_calendar)
+btn2.font = tb_font
+btn2.grid(column=1, row=0)
+
+btn3 = Button(window, text='☑', command=button_click_tb_tasks)
+btn3.font = tb_font
+btn3.grid(column=2, row=0)
+
+btn4 = Button(window, text='📝', command=button_click_tb_notes)
+btn4.font = tb_font
+btn4.grid(column=3, row=0)
+
+btn5 = Button(window, text='👤', command=button_click_tb_contacts)
+btn5.font = tb_font
+btn5.grid(column=4, row=0)
+
+btn6 = Button(window, text='🌏️', command=button_click_tb_places)
+btn6.font = tb_font
+btn6.grid(column=5, row=0)
+
+btn7 = Button(window, text='▦', command=button_click_tb_data)
+btn7.font = tb_font
+btn7.grid(column=6, row=0)
+
+btn8 = Button(window, text='🏆', command=button_click_tb_badges)
+btn8.font = tb_font
+btn8.grid(column=7, row=0)
+
+btn9 = Button(window, text='💲', command=button_click_tb_money)
+btn9.font = tb_font
+btn9.grid(column=8, row=0)
+
+btn10 = Button(window, text='♬', command=button_click_tb_music)
+btn10.font = tb_font
+btn10.grid(column=9, row=0)
+
+btn11 = Button(window, text='🖼', command=button_click_tb_images)
+btn11.font = tb_font
+btn11.grid(column=10, row=0)
+
+btn12 = Button(window, text='🎮', command=button_click_tb_apps)
+btn12.font = tb_font
+btn12.grid(column=11, row=0)
+
+btn13 = Button(window, text='📂', command=button_click_tb_files)
+btn13.font = tb_font
+btn13.grid(column=12, row=0)
+
+btn14 = Button(window, text='⚿', command=button_click_tb_admin)
+btn14.font = tb_font
+btn14.grid(column=13, row=0)
+
+btn15 = Button(window, text='⚙', command=button_click_tb_options)
+btn15.font = tb_font
+btn15.grid(column=14, row=0)
+
+btn16 = Button(window, text='⚙', command=button_click_tb_about)
+btn16.font = tb_font
+btn16.grid(column=15, row=0)
+

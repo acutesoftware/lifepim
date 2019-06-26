@@ -1,0 +1,65 @@
+# Function handling for LifePIM Toolbar clicks
+def button_click_tb_home():
+    """ user clicked toolbar home"""
+    print('user clicked toolbar home')
+
+def button_click_tb_calendar():
+    """ user clicked toolbar calendar"""
+    print('user clicked toolbar calendar')
+
+def button_click_tb_tasks():
+    """ user clicked toolbar tasks"""
+    print('user clicked toolbar tasks')
+
+def button_click_tb_notes():
+    """ user clicked toolbar notes"""
+    print('user clicked toolbar notes')
+
+def button_click_tb_contacts():
+    """ user clicked toolbar contacts"""
+    print('user clicked toolbar contacts')
+
+def button_click_tb_places():
+    """ user clicked toolbar places"""
+    print('user clicked toolbar places')
+
+def button_click_tb_data():
+    """ user clicked toolbar data"""
+    print('user clicked toolbar data')
+
+def button_click_tb_badges():
+    """ user clicked toolbar badges"""
+    print('user clicked toolbar badges')
+
+def button_click_tb_money():
+    """ user clicked toolbar money"""
+    print('user clicked toolbar money')
+
+def button_click_tb_music():
+    """ user clicked toolbar music"""
+    print('user clicked toolbar music')
+
+def button_click_tb_images():
+    """ user clicked toolbar images"""
+    print('user clicked toolbar images')
+
+def button_click_tb_apps():
+    """ user clicked toolbar apps"""
+    print('user clicked toolbar apps')
+
+def button_click_tb_files():
+    """ user clicked toolbar files"""
+    print('user clicked toolbar files')
+
+def button_click_tb_admin():
+    """ user clicked toolbar admin"""
+    print('user clicked toolbar admin')
+
+def button_click_tb_options():
+    """ user clicked toolbar options"""
+    print('user clicked toolbar options')
+
+def button_click_tb_about():
+    """ user clicked toolbar about"""
+    print('user clicked toolbar about')
+
