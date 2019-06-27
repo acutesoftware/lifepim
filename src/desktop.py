@@ -14,7 +14,8 @@ import config
 
 def main():
     print('starting desktop via ' + config.base_url)
-    app = simpleapp_tk(None)
+    #app = simpleapp_tk(None)
+    app = tk.Tk()
     app.title('LifePIM Desktop')
     app.geometry('750x500')
     app.tk.call('encoding', 'system', 'unicode')
@@ -29,21 +30,23 @@ def main():
 
 
     # create all of the main containers
-    left_frame = Frame(app, bg='gray14', width=120, height=600)
-    mid_frame = Frame(app, bg='gray10', width=350, height=600, padx=3, pady=3)
-    right_frame = Frame(app, bg='gray14', width=200, height=600, padx=3, pady=3)
-    status_frame = Frame(app, bg='gray', width=450, height=20, pady=3)
+    left_frame = Frame(app, bg='gray14', width=80, height=600)
+    mid_frame = Frame(app, bg='gray10', width=350, height=600, padx=1, pady=1)
+    right_frame = Frame(app, bg='gray14', width=250, height=600, padx=1, pady=1)
+    status_frame = Frame(app, bg='gray', width=450, height=20, pady=1)
 
     # layout all of the main containers
-    app.grid_rowconfigure(1, weight=1)
-    app.grid_columnconfigure(0, weight=1)
+    app.grid_rowconfigure(0, weight=100)
+    app.grid_rowconfigure(1, weight=0)
+
+    app.grid_columnconfigure(0, weight=0)
+    app.grid_columnconfigure(1, weight=100)
+    app.grid_columnconfigure(2, weight=0)
 
 
     left_frame.grid(row=0, column=0, sticky="ns")
     mid_frame.grid(row=0, column=1, sticky="nsew")
     right_frame.grid(row=0, column=2, sticky="ns")
-
-    # setup the centre part of the screen that is controlled by tabs
     status_frame.grid(row=1, sticky="ew")
     status_label = Label(status_frame, text='Status Bar')
     status_label.grid(row=1, column=0)
@@ -55,7 +58,10 @@ def main():
 
 
     n = ttk.Notebook(mid_frame)
-    n.grid()
+    n.grid_rowconfigure(1, weight=100)
+    n.grid_columnconfigure(1, weight=100)
+     
+    n.grid( sticky="nsew")
     tab1 = ttk.Frame(n)   # first page, which would get widgets gridded into it
     tab2 = ttk.Frame(n)   # second page
     tab3 = ttk.Frame(n)   
@@ -90,22 +96,22 @@ def main():
     tab15.grid(row=0, sticky="nsew")
     tab16.grid(row=0, sticky="nsew")
 
-    n.add(tab1, text='❗')
-    n.add(tab2, text='➀')
-    n.add(tab3, text='✔')
-    n.add(tab4, text='✍')
-    n.add(tab5, text='✉')
-    n.add(tab6, text='✈')
-    n.add(tab7, text='▦')
-    n.add(tab8, text='✮')
-    n.add(tab9, text='$')
-    n.add(tab10, text='♬')
-    n.add(tab11, text='✾')
-    n.add(tab12, text='☑')
-    n.add(tab13, text='')
-    n.add(tab14, text='✋')
-    n.add(tab15, text='⚙')
-    n.add(tab16, text='?')
+    n.add(tab1, text='  ❗  ')
+    n.add(tab2, text='  ➀  ')
+    n.add(tab3, text='  ✔  ')
+    n.add(tab4, text='  ✍  ')
+    n.add(tab5, text='  ✉  ')
+    n.add(tab6, text='  ✈  ')
+    n.add(tab7, text='  ▦  ')
+    n.add(tab8, text='  ✮  ')
+    n.add(tab9, text='  $  ')
+    n.add(tab10, text='  ♬  ')
+    n.add(tab11, text='  ✾  ')
+    n.add(tab12, text='  ☑  ')
+    n.add(tab13, text='    ')
+    n.add(tab14, text='  ✋  ')
+    n.add(tab15, text='  ⚙  ')
+    n.add(tab16, text='  ?  ')
 
 
 
@@ -160,42 +166,6 @@ def main():
     ctr_mid.grid(row=0, column=1, sticky="nsew")
     ctr_right.grid(row=0, column=2, sticky="ns")
     """
-
-
-class simpleapp_tk(tk.Tk):
-    def __init__(self,parent):
-        tk.Tk.__init__(self,parent)
-        self.parent = parent
-        self.screenWidth = 999 # self.winfo_screenwidth()
-        self.screenHeight = 666 # self.winfo_screenheight()
-        self.appWidth = 870
-        self.appHeight = 525
-        
-        self.initialize()
-
-    def initialize(self):
-        #top = tk.Toplevel(self.master)  # wrong - this makes a new window
-
-        #btn = tk.Button(self, text="Click Me", bg="orange", fg="red")   
-        #btn.grid(column=1, row=0) 
-        pass
- 
-
-    def do_popup(self):
-        # display the popup menu
-        self.popup.post(self.screenWidth - self.appWidth + 60, self.screenHeight - self.appHeight - 95)
-
-    def cmd_infolink_help(self):
-        print('help')
-
-    def cmd_infolink_home(self):
-        print('home')
-
-    def cmd_infolink_exit(self):
-        # shutting down logging
-        print('exiting...')
-        sys.exit(0)
-
 
 
 
