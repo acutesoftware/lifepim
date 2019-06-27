@@ -10,6 +10,9 @@ from tkcalendar import Calendar, DateEntry
 from tkinter import Frame, Label, Entry, Button, font
 from tkinter import LEFT, RIGHT, TOP, BOTTOM
 
+from views.home import home as home
+from views.calendar import calendar as calendar
+
 import config
 
 def main():
@@ -17,7 +20,7 @@ def main():
     #app = simpleapp_tk(None)
     app = tk.Tk()
     app.title('LifePIM Desktop')
-    app.geometry('750x500')
+    app.geometry('950x600')
     app.tk.call('encoding', 'system', 'unicode')
 
     """
@@ -51,6 +54,8 @@ def main():
     status_label = Label(status_frame, text='Status Bar')
     status_label.grid(row=1, column=0)
 
+    folder_label = Label(left_frame, text='Folder list')
+    folder_label.grid(row=1, column=0)
 
 
 
@@ -94,27 +99,27 @@ def main():
     tab15.grid(row=0, sticky="nsew")
     tab16.grid(row=0, sticky="nsew")
 
-    n.add(tab1, text='  ❗  ')
-    n.add(tab2, text='  ➀  ')
-    n.add(tab3, text='  ✔  ')
-    n.add(tab4, text='  ✍  ')
-    n.add(tab5, text='  ✉  ')
-    n.add(tab6, text='  ✈  ')
-    n.add(tab7, text='  ▦  ')
-    n.add(tab8, text='  ✮  ')
-    n.add(tab9, text='  $  ')
-    n.add(tab10, text='  ♬  ')
-    n.add(tab11, text='  ✾  ')
-    n.add(tab12, text='  ☑  ')
-    n.add(tab13, text='    ')
-    n.add(tab14, text='  ✋  ')
-    n.add(tab15, text='  ⚙  ')
-    n.add(tab16, text='  ?  ')
+    n.add(tab1, text='   ❗   ')
+    n.add(tab2, text='   ➀   ')
+    n.add(tab3, text='   ✔   ')
+    n.add(tab4, text='   ✍   ')
+    n.add(tab5, text='   ✉   ')
+    n.add(tab6, text='   ✈   ')
+    n.add(tab7, text='   ▦   ')
+    n.add(tab8, text='   ✮   ')
+    n.add(tab9, text='   $   ')
+    n.add(tab10, text='   ♬   ')
+    n.add(tab11, text='   ✾   ')
+    n.add(tab12, text='   ☑   ')
+    n.add(tab13, text='      ')
+    n.add(tab14, text='   ✋   ')
+    n.add(tab15, text='   ⚙   ')
+    n.add(tab16, text='   ?   ')
 
 
 
-
-    build_screen_calendar(tab2)
+    home.build_screen_home(tab1)
+    calendar.build_screen_calendar(tab2)
 
 
     #build_screen_home(tab1)
@@ -166,57 +171,6 @@ def main():
     """
 
 
-
-class wCalendar(object):
-    def __init__(self, top):
-        #self.master = master
-        #top = tk.Toplevel(master)
-        cal = Calendar(top, selectmode='none')
-        date = cal.datetime.today() + cal.timedelta(days=2)
-        cal.calevent_create(date, 'Hello World', 'message')
-        cal.calevent_create(date, 'Reminder 2', 'reminder')
-        cal.calevent_create(date + cal.timedelta(days=-2), 'Reminder 1', 'reminder')
-        cal.calevent_create(date + cal.timedelta(days=3), 'Message', 'message')
-
-        cal.tag_config('reminder', background='red', foreground='yellow')
-        cal.pack(fill="both", expand=True)
-        #cal.pack(fill="none", expand=False)
-        #ttk.Label(top, text="Hover over the events.").pack()
-
-
-
-def build_screen_calendar(root):
-    cal_frame = Frame(root, bg='blue', width=300, height=390)
-    cal = wCalendar(cal_frame)
-    cal_frame.grid(row=0, column=0)
-
-
-
-def build_screen_home(root):
-
-
-
-
-
-
-    console_frame = Frame(ctr_left, bg='black', width=250, height=250, pady=1)
-    console_frame.grid(row=1, column=0, sticky="nw")
-
-
-    # add labels (just to indicate how to attach things)
-    event_label = Label(ctr_left, text='Events goes here')
-    event_label.grid(row=2, column=0)
-    note_label = Label(ctr_mid, text='Notes go here')
-    note_label.grid(row=1, column=0)
-
-    folder_label = Label(ctr_right, text='Folder list')
-    folder_label.grid(row=1, column=0)
-    txt = 'duncan@TREEBEARD:~/dev/src/python/LifePIM/src$ ls -l\ntotal 0\nduncan@TREEBEARD:~/dev/src/python/LifePIM/src$\n'
-    txt = '$pwd\n~/dev/src/python/LifePIM/src/new\nls -l\ntotal 0\n$\n'
-    console_label = Label(console_frame, text=txt, bg='black', foreground='green', justify=LEFT)
-    console_label.grid(row=1, column=0)
-    console_entry = Entry(console_frame,  bg='gray12', foreground='green')
-    console_entry.grid(row=2, column=0, sticky="ew")
 
 
 
