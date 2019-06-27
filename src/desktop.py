@@ -58,10 +58,8 @@ def main():
 
 
     n = ttk.Notebook(mid_frame)
-    n.grid_rowconfigure(1, weight=100)
-    n.grid_columnconfigure(1, weight=100)
-     
-    n.grid( sticky="nsew")
+    n.pack(expand=1, fill='both')
+
     tab1 = ttk.Frame(n)   # first page, which would get widgets gridded into it
     tab2 = ttk.Frame(n)   # second page
     tab3 = ttk.Frame(n)   
