@@ -5,7 +5,7 @@
 import os 
 import sys
 import tkinter as tk
-import tkinter as ttk
+from tkinter import ttk
 from tkcalendar import Calendar, DateEntry
 from tkinter import Frame, Label, Entry, Button, font
 from tkinter import LEFT, RIGHT, TOP, BOTTOM
@@ -18,8 +18,103 @@ def main():
     app.title('LifePIM Desktop')
     app.geometry('750x500')
     app.tk.call('encoding', 'system', 'unicode')
-    build_screen_home(app)
-    
+
+    """
+    # Toolbar (works- IFF you dont use the tabs notebook below
+    toolbar_frame = Frame(app, bg='gray', width=9350, height=20, pady=1)
+    toolbar_frame.grid(row=0, sticky="ew")
+    # populate the toolbar
+    add_toolbar_buttons(toolbar_frame)
+    """
+
+
+    # create all of the main containers
+    left_frame = Frame(app, bg='gray14', width=120, height=600)
+    mid_frame = Frame(app, bg='gray10', width=350, height=600, padx=3, pady=3)
+    right_frame = Frame(app, bg='gray14', width=200, height=600, padx=3, pady=3)
+    status_frame = Frame(app, bg='gray', width=450, height=20, pady=3)
+
+    # layout all of the main containers
+    app.grid_rowconfigure(1, weight=1)
+    app.grid_columnconfigure(0, weight=1)
+
+
+    left_frame.grid(row=0, column=0, sticky="ns")
+    mid_frame.grid(row=0, column=1, sticky="nsew")
+    right_frame.grid(row=0, column=2, sticky="ns")
+
+    # setup the centre part of the screen that is controlled by tabs
+    status_frame.grid(row=1, sticky="ew")
+    status_label = Label(status_frame, text='Status Bar')
+    status_label.grid(row=1, column=0)
+
+
+
+
+
+
+
+    n = ttk.Notebook(mid_frame)
+    n.grid()
+    tab1 = ttk.Frame(n)   # first page, which would get widgets gridded into it
+    tab2 = ttk.Frame(n)   # second page
+    tab3 = ttk.Frame(n)   
+    tab4 = ttk.Frame(n)   
+    tab5 = ttk.Frame(n)   
+    tab6 = ttk.Frame(n)   
+    tab7 = ttk.Frame(n)   
+    tab8 = ttk.Frame(n)   
+    tab9 = ttk.Frame(n)   
+    tab10 = ttk.Frame(n)   
+    tab11 = ttk.Frame(n)   
+    tab12 = ttk.Frame(n)   
+    tab13 = ttk.Frame(n)   
+    tab14 = ttk.Frame(n)   
+    tab15 = ttk.Frame(n)   
+    tab16 = ttk.Frame(n)   
+
+    tab1.grid(row=0, sticky="nsew")
+    tab2.grid(row=0, sticky="nsew")
+    tab3.grid(row=0, sticky="nsew")
+    tab4.grid(row=0, sticky="nsew")
+    tab5.grid(row=0, sticky="nsew")
+    tab6.grid(row=0, sticky="nsew")
+    tab7.grid(row=0, sticky="nsew")
+    tab8.grid(row=0, sticky="nsew")
+    tab9.grid(row=0, sticky="nsew")
+    tab10.grid(row=0, sticky="nsew")
+    tab11.grid(row=0, sticky="nsew")
+    tab12.grid(row=0, sticky="nsew")
+    tab13.grid(row=0, sticky="nsew")
+    tab14.grid(row=0, sticky="nsew")
+    tab15.grid(row=0, sticky="nsew")
+    tab16.grid(row=0, sticky="nsew")
+
+    n.add(tab1, text='❗')
+    n.add(tab2, text='➀')
+    n.add(tab3, text='✔')
+    n.add(tab4, text='✍')
+    n.add(tab5, text='✉')
+    n.add(tab6, text='✈')
+    n.add(tab7, text='▦')
+    n.add(tab8, text='✮')
+    n.add(tab9, text='$')
+    n.add(tab10, text='♬')
+    n.add(tab11, text='✾')
+    n.add(tab12, text='☑')
+    n.add(tab13, text='')
+    n.add(tab14, text='✋')
+    n.add(tab15, text='⚙')
+    n.add(tab16, text='?')
+
+
+
+
+    build_screen_calendar(tab2)
+
+
+    #build_screen_home(tab1)
+    #build_screen_calendar(tab2)
 
     app.mainloop()
 
@@ -121,44 +216,19 @@ class wCalendar(object):
         #ttk.Label(top, text="Hover over the events.").pack()
 
 
-def build_screen_home(root):
-    """
-    builds the GUI using the home functionality
-    """
-    # create all of the main containers
-    toolbar_frame = Frame(root, bg='gray', width=350, height=20, pady=1)
-    center = Frame(root, bg='gray', width=50, height=40, padx=3, pady=3)
-    status_frame = Frame(root, bg='gray', width=450, height=20, pady=3)
 
-    # layout all of the main containers
-    root.grid_rowconfigure(1, weight=1)
-    root.grid_columnconfigure(0, weight=1)
-
-    toolbar_frame.grid(row=0, sticky="ew")
-    center.grid(row=1, sticky="nsew")
-    
-    status_frame.grid(row=3, sticky="ew")
-
-
-
-
-    # create the center widgets
-    center.grid_rowconfigure(0, weight=1)
-    center.grid_columnconfigure(1, weight=1)
-
-    ctr_left = Frame(center, bg='gray14', width=220, height=390)
-    ctr_mid = Frame(center, bg='gray10', width=250, height=390, padx=3, pady=3)
-    ctr_right = Frame(center, bg='gray14', width=100, height=390, padx=3, pady=3)
-
-    ctr_left.grid(row=0, column=0, sticky="ns")
-    ctr_mid.grid(row=0, column=1, sticky="nsew")
-    ctr_right.grid(row=0, column=2, sticky="ns")
-
-
-
-    cal_frame = Frame(ctr_left, bg='blue', width=300, height=390)
+def build_screen_calendar(root):
+    cal_frame = Frame(root, bg='blue', width=300, height=390)
     cal = wCalendar(cal_frame)
     cal_frame.grid(row=0, column=0)
+
+
+
+def build_screen_home(root):
+
+
+
+
 
 
     console_frame = Frame(ctr_left, bg='black', width=250, height=250, pady=1)
@@ -180,15 +250,8 @@ def build_screen_home(root):
     console_entry = Entry(console_frame,  bg='gray12', foreground='green')
     console_entry.grid(row=2, column=0, sticky="ew")
 
-    status_label = Label(status_frame, text='Status Bar')
-    status_label.grid(row=1, column=0)
 
-    # populate the toolbar
-    
-    
 
-    add_toolbar_buttons(toolbar_frame)
- 
 
 def add_toolbar_buttons(window):
     # LifePIM Toolbar definitions for Tkinter
