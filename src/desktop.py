@@ -36,7 +36,7 @@ def main():
     left_frame = Frame(app, bg='gray14', width=80, height=600)
     mid_frame = Frame(app, bg='gray10', width=350, height=600, padx=1, pady=1)
     right_frame = Frame(app, bg='gray14', width=250, height=600, padx=1, pady=1)
-    status_frame = Frame(app, bg='gray', width=450, height=20, pady=1)
+    status_frame = Frame(app, bg='deep sky blue', width=455, height=20, pady=1)
 
     # layout all of the main containers
     app.grid_rowconfigure(0, weight=100)
@@ -51,7 +51,7 @@ def main():
     mid_frame.grid(row=0, column=1, sticky="nsew")
     right_frame.grid(row=0, column=2, sticky="ns")
     status_frame.grid(row=1, sticky="ew")
-    status_label = Label(status_frame, text='Status Bar')
+    status_label = Label(status_frame,  text='Status Bar',  bg='deep sky blue')
     status_label.grid(row=1, column=0)
 
     folder_label = Label(left_frame, text='Folder list')
