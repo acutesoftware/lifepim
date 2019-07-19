@@ -51,7 +51,7 @@ def main():
     mid_frame.grid(row=0, column=1, sticky="nsew")
     right_frame.grid(row=0, column=2, sticky="ns")
     status_frame.grid(row=1, sticky="ew")
-    status_label = Label(status_frame,  text='Status Bar',  bg='deep sky blue')
+    status_label = Label(status_frame, text='Status Bar',  bg='deep sky blue')
     status_label.grid(row=1, column=0)
 
     folder_label = Label(left_frame, text='Folder list')
