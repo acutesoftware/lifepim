@@ -12,6 +12,7 @@ from tkinter import LEFT, RIGHT, TOP, BOTTOM
 
 from views.home import home as home
 from views.calendar import calendar as calendar
+from views.notes import notes as notes
 
 import config
 
@@ -120,6 +121,7 @@ def main():
 
     home.build_screen_home(tab1)
     calendar.build_screen_calendar(tab2)
+    notes.build_screen_notes(tab4)
 
 
     #build_screen_home(tab1)
