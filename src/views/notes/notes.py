@@ -10,7 +10,7 @@ def build_screen_notes(root):
 
 
     txt = 'welcome to notes\n'
-    console_label = Label(root, text=txt, bg='black', foreground='green', justify=LEFT)
+    console_label = Label(root, text=txt, bg='white', foreground='blue', justify=LEFT)
     console_label.grid(row=0, column=0)
     console_entry = Entry(root,  bg='gray12', foreground='green')
     console_entry.grid(row=1, column=0, sticky="ew")
