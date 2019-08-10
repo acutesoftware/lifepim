@@ -21,7 +21,7 @@ class wCalendar(object):
 
 
 
-def build_screen_calendar(root):
+def build_screen(root):
     cal_frame = Frame(root, bg='blue', width=300, height=390)
     cal = wCalendar(cal_frame)
     cal_frame.grid(row=0, column=0)

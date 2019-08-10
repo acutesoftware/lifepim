@@ -12,7 +12,20 @@ from tkinter import LEFT, RIGHT, TOP, BOTTOM
 
 from views.home import home as home
 from views.calendar import calendar as calendar
+from views.tasks import tasks as tasks
 from views.notes import notes as notes
+from views.contacts import contacts as contacts
+from views.places import places as places
+from views.data import data as data
+from views.badges import badges as badges
+from views.money import money as money
+from views.music import music as music
+from views.images import images as images
+from views.apps import apps as apps
+from views.files import files as files
+from views.admin import admin as admin
+from views.options import options as options
+from views.about import about as about
 
 import config
 
@@ -32,7 +45,7 @@ def main():
     add_toolbar_buttons(toolbar_frame)
     """
 
-
+    print('starting desktop...')
     # create all of the main containers
     left_frame = Frame(app, bg='gray14', width=80, height=600)
     mid_frame = Frame(app, bg='gray10', width=350, height=600, padx=1, pady=1)
@@ -118,11 +131,25 @@ def main():
     n.add(tab16, text='   ?   ')
 
 
-
-    home.build_screen_home(tab1)
-    calendar.build_screen_calendar(tab2)
-    notes.build_screen_notes(tab4)
-
+    print('init finished, about to build the tabs')
+    
+    home.build_screen(tab1)
+    calendar.build_screen(tab2)
+    tasks.build_screen(tab3)
+    notes.build_screen(tab4)
+    contacts.build_screen(tab5)
+    places.build_screen(tab6)
+    data.build_screen(tab7)
+    badges.build_screen(tab8)
+    money.build_screen(tab9)
+    music.build_screen(tab10)
+    images.build_screen(tab11)
+    apps.build_screen(tab12)
+    files.build_screen(tab13)
+    admin.build_screen(tab14)
+    options.build_screen(tab15)
+    about.build_screen(tab16)
+    
 
     #build_screen_home(tab1)
     #build_screen_calendar(tab2)

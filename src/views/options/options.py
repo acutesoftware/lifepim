@@ -9,7 +9,7 @@ def build_screen(root):
     print('building screen_notes...')
 
 
-    txt = 'welcome to notes\n'
+    txt = 'Options for LifePIM Desktop\n'
     console_label = Label(root, text=txt, bg='white', foreground='blue', justify=LEFT)
     console_label.grid(row=0, column=0)
     console_entry = Entry(root,  bg='gray12', foreground='green')
