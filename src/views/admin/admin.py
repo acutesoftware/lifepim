@@ -18,6 +18,21 @@ def build_screen(root):
 
 
 def get_local_pc_list():
+    if os.name == 'nt':
+        return get_local_pc_list_windows()
+    else:
+        return get_local_pc_list_linux()
+    
+def get_local_pc_list_windows():
+    txt = ''
+    out = os.popen('net view').read().splitlines()
+    for i, line in  enumerate(out):
+        if i > 2:
+            if line != 'The command completed successfully.':
+                txt += line + "\n"
+    return txt
+    
+def get_local_pc_list_linux():
     txt = ''
     out = os.popen('ip neigh').read().splitlines()
     for i, line in enumerate(out, start=1):
@@ -25,5 +40,6 @@ def get_local_pc_list():
         h = os.popen('host {}'.format(ip)).read()
         hostname = h.split(' ')[-1]
         txt += ip + ' ' + hostname.strip() + '\n'
+    print('txt = ', txt)        
     return txt
     
