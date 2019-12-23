@@ -31,3 +31,5 @@ the relative url.
 ### More Information
 
 You will be able to ADD records only in the first release.
+
+Also see developer notes doc/dev_notes.md
