@@ -96,6 +96,7 @@ class CacheDataSet(object):
         # now force a reload from cache to ensure consistancy
         # (see test_cache_data for oddness with numbers in lists)
         self.reload_data_from_cache()
+        self.time_saved = time.time()
 
     def reload_data_from_cache(self):
         """
