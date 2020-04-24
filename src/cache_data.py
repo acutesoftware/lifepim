@@ -2,7 +2,7 @@
 # coding: utf-8
 # cache_data.py
 
-#import datetime
+import datetime
 import os 
 import sys
 import time 
@@ -14,10 +14,12 @@ class DataDefinition(object):
     """
     defines how data is retrieved
     """
-    def __init__(self, name,  max_age):
+    def __init__(self, cache_manager, name,  max_age):
         self.name = name
+        self.cache_manager = cache_manager
         self.cache_result = self.get_clean_file_name(name)
         self.max_age = max_age
+        
 
     def __str__(self):
         res = ''
@@ -29,7 +31,8 @@ class DataDefinition(object):
 
     def get_clean_file_name(self, txt):
         res = txt.replace(' ', '_').replace('\\', '_').replace('/', '_').replace('.', '_').replace(',', '_')
-        return res + '.csv'
+
+        return os.path.join(self.cache_manager.cache_data_path, res + '.csv')
 
 class CacheManager(object):
     def __init__(self, cache_data_path):
@@ -61,7 +64,8 @@ class CacheDataSet(object):
     def __init__(self, data_def):
         self.data_def = data_def
         self.data = []
-        self.time_saved = time.time() #datetime.datetime.now() #.strftime("%I:%M%p %d-%B-%Y")
+        self.time_saved = time.time() 
+        self.date_refreshed = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S%z")
 
     def __str__(self):
         res = 'Cached Data Set'
@@ -86,6 +90,7 @@ class CacheDataSet(object):
         Can optionally leave it in memory in the self.data list
         """
         self.time_saved = time.time() # datetime.datetime.now() #.strftime("%I:%M%p %d-%B-%Y")
+        self.date_refreshed = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S%z")
         self.data = data_to_save_as_list
         # now save the data to csv 
 
@@ -96,7 +101,6 @@ class CacheDataSet(object):
         # now force a reload from cache to ensure consistancy
         # (see test_cache_data for oddness with numbers in lists)
         self.reload_data_from_cache()
-        self.time_saved = time.time()
 
     def reload_data_from_cache(self):
         """
@@ -112,7 +116,8 @@ class CacheDataSet(object):
                 for col in rec:
                     row_dat.append(col)
                 self.data.append(row_dat)
-                
+        self.time_saved = time.time()  # reset this, as the cache is now current  
+        self.date_refreshed = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S%z")      
 
 
     def get_data(self):
@@ -126,4 +131,7 @@ class CacheDataSet(object):
         
         if self.is_data_dirty():
             self.reload_data_from_cache()
+            print('Data loaded from cache : ' + self.data_def.name)
+        else:
+            print('using cached data for ' + self.data_def.name)
         return self.data
