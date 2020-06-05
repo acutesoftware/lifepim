@@ -1,4 +1,19 @@
+#!/usr/bin/python3
+# coding: utf-8
 # config.py
+
+import os
+
+#user_folder = '\\\\FANGORN\\user\\duncan\\LifePIM_Data'
+user_folder = 'D:\\dev\\src\\lifepim\\lifepim\\SAMPLE_DATA'
+
+display_name = 'Duncan'  # single user server runs on users local file system
+
+
+logon_file = os.path.join(user_folder, 'configuration', 'lifepim.par')
+data_folder = os.path.join(user_folder, 'DATA')
+index_folder = os.path.join(user_folder, 'index')
+
 
 base_url = 'https://www.lifepim.com'    # testing, point to live site for API
 base_url = '127.0.0.1:5000'             # running local (default)
@@ -34,6 +49,17 @@ api_routes = [
     '/files/<filename>',
     '/options',
 ]
+
+def get_conn_str():
+	conn_str = {}
+	with open(logon_file, 'r') as f:
+		conn_str['host'] = f.readline().strip(' ').strip('\n')
+		conn_str['user'] = f.readline().strip(' ').strip('\n')
+		conn_str['pass'] = f.readline().strip(' ').strip('\n')
+		conn_str['db'] = f.readline().strip(' ').strip('\n')
+
+	return conn_str
+
 
 def build_toolbar_file(fname):
     df = '# LifePIM Toolbar definitions for Tkinter\n'
@@ -136,3 +162,7 @@ def add_toolbar_buttons(window):
     btn16.grid(column=15, row=0)
 
 """
+
+
+
+
