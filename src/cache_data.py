@@ -131,7 +131,7 @@ class CacheDataSet(object):
         
         if self.is_data_dirty():
             self.reload_data_from_cache()
-            print('Data loaded from cache : ' + self.data_def.name)
+            print('Data reloaded from cache : ' + self.data_def.name)
         else:
             print('using cached data for ' + self.data_def.name)
         return self.data
