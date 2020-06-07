@@ -31,6 +31,17 @@ class TestIndex(unittest.TestCase):
         self.assertTrue(len(mod_index.extract_hashtags('not every #word has #tags')), 2)
         self.assertEqual(mod_index.extract_hashtags('##Heading with a #tag'), ['tag'])
 
+    def test_04_keywords(self):
+        raw_keywords = mod_index.extract_keywords('hello world. this is a test')
+        #print('RAW_KEYWORDS = ', raw_keywords) #ignores stopwords hello|this|is|a
+        raw_keywords.sort()
+        self.assertEqual(raw_keywords, [('test', 1), ('world', 1)])
+
+        raw_keywords2 = mod_index.extract_keywords('project #BLING release in March. Sandy will manage BLING release')
+        raw_keywords2.sort()
+        #print('RAW_KEYWORDS2 = ', raw_keywords2)
+        self.assertEqual(raw_keywords2, [('BLING', 2), ('March', 1), ('Sandy', 1), ('manage', 1), ('project', 1), ('release', 2), ('will', 1)])
+
 
 if __name__ == '__main__':
     unittest.main()

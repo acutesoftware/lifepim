@@ -143,7 +143,7 @@ def extract_keywords(txt):
     words = txt.split(' ')
     for word in words:
         if word not in stopwords:
-            clean_word = word.strip('\n').strip(' ').strip('.').strip(',').strip('"')
+            clean_word = word.strip('\n').strip(' ').strip('.').strip(',').strip('"').strip('#')
             if clean_word != '':
                 res.append(clean_word)
     """                
