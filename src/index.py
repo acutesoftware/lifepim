@@ -61,20 +61,34 @@ def index_headings(fl):
     all_headings = []  # list of lists [fname, heading_text]
     tot_lines_all_files = 0
     keywords_all_files = []  # list of [fname, keyword, count]
+    hashtags_all_files = []  # list of [fname, keyword, count]
     #print(fl.get_list())
     #return
 
     for fname in fl.get_list():
-        tot_lines, headings, keywords = scan_file(fname)
+        tot_lines, headings, keywords, hashtags = scan_file(fname)
         all_headings.extend(headings)
         tot_lines_all_files += tot_lines
         keywords_all_files.extend(keywords)
+        hashtags_all_files.extend(hashtags)
     #print('headers = ', all_headings)        
     print('Total Files = ', len(fl.get_list()))        
     print('Total headings = ', len(all_headings))        
+    print('Total Hashtags = ', len(hashtags_all_files))        
     print('Total lines = ', tot_lines_all_files)        
     print('Total keywords = ', len(keywords_all_files))
 
+    print('Hashtags = ', print_hashtags(hashtags_all_files))        
+
+
+def print_hashtags(hashtag_list):
+    """
+    hashtag list has set of [fname, hashtag, line_num]
+    """
+    res = []
+    for ht in hashtag_list:
+        res.append(ht[1])
+    return res
 
 def scan_file(fname):
     """
@@ -84,6 +98,7 @@ def scan_file(fname):
     tot_lines = 0
     headings = []
     keywords = []
+    hashtags = []
     print('indexing ', fname)
     all_text = ''
     with open(fname, 'r') as f:
@@ -98,10 +113,16 @@ def scan_file(fname):
     raw_keywords = extract_keywords(all_text)
     for kw in raw_keywords:
         keywords.append([fname, kw[0],kw[1]])
-
     #print(keywords)
 
-    return tot_lines, headings, keywords
+    raw_hashtags = extract_hashtags(all_text)
+    for hashtag in raw_hashtags:
+        #print('hashtag = ', hashtag)
+        hashtags.append([fname, hashtag])
+
+
+
+    return tot_lines, headings, keywords, hashtags
 
 def extract_header(txt):
     """
@@ -136,6 +157,24 @@ def word_freq(lst):
     wordfreq = [lst.count(wrd) for wrd in lst]
     return list(set(zip(lst,wordfreq))) # wordfreq
     return dict(list(zip(lst,wordfreq)))
+
+
+def extract_hashtags(txt):
+    """
+    returns the list of hashtags in text, ignoring
+    headers which start with ## or ###
+    """
+    ht = []
+    all_words = txt.replace('\n', ' ').split(' ')
+    for wrd in all_words:
+        if '#' in wrd:
+            #print('word = ', wrd)
+            if len(wrd) > 2:
+                if wrd[0:1] == '#' and wrd[0:2] != '##':
+                    ht.append(wrd[1:])
+                    #print(ht)
+
+    return ht
 
 
 if __name__ == '__main__':
