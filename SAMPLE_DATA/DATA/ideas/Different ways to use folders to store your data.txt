@@ -31,13 +31,13 @@ People who keep a lot of notes, often have a more detailed folder approach
 my folder structure is below
 ~~~
 Family   - school holidays, fav recipes, clothes sizes
-Home     - room and window sizes, renovations
+Home     - room and window sizes, #renovations
 Car      - maintenance schedules, history of service
 Games    - notes on games
 Web      - links to articles, papers, misc
 Fun      - links to funny youtube videos, jokes, misc
 Study    - class timetables, homework, assignments, online courses
-Health   - log of health issues, fitness tracking, sports
+Health   - log of #health issues, fitness tracking, sports
 Work     - stuff for work
 Business - tax, sales, processes around business, new ideas
 Design   - working out layouts and new features
@@ -73,3 +73,7 @@ Cons
 
 One area this method does work well, is if you are writing a story or doing worldbuilding - you work out the plot in the notes, store character info in the contacts, and use the calendar to store a timeline of events in your world.
 This way, all the fictional data is essentially excluded from your main information store, and it avoids reminders coming up such as "Find the Lost Sword of Algyn - due in 2 days"
+
+
+##Other ideas
+#TODO
