@@ -1,0 +1,100 @@
+
+/*   lifepim.css
+
+
+--------------------------------
+			Typography
+--------------------------------*/
+
+
+pre {
+font-size: 85%;
+}
+
+
+#footer {
+    /*background:blue;*/
+	font-size: 80%;
+
+}
+
+
+
+/*--------------------------------
+			Layout
+----------------------------------*/
+.glyphicon-menu-hamburger {
+  font-size: 12px;
+}
+
+pre {
+	
+	line-height: 1.1;
+
+}
+
+video
+{
+  object-fit: cover;
+  height: 100%;
+  width: 100%;
+}
+
+
+.app_icons  li {
+    float: left;
+    width: 90px;
+    height: 90px;
+    margin: 2px 2px 2px 2px;
+    padding: 6px 6px 6px 6px;
+    border-style: ridge;
+    clear: right;
+    list-style-type: none;
+    border-radius: 15px;
+
+}
+
+.app_icons div {
+    margin: 0 auto;
+}
+
+
+.app_icons ul {
+    padding-inline-start: 0px;
+}
+
+
+
+
+/*--------------------------------
+			Colours
+--------------------------------*/
+
+pre {
+	background-color: #f6f8fa;
+	color: black;
+
+}
+
+
+/*
+TD a {
+
+	color: blue;
+}
+
+
+body {
+    background-color:#868e96;
+}
+
+.row {
+    background-color:#868e96;
+}
+
+
+#lists {
+    background-color:white;
+    }
+
+*/
