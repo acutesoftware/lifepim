@@ -41,6 +41,10 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 app.permanent_session_lifetime = datetime.timedelta(days=365)
 
+def start_server():
+    app.run(threaded=True, host='0.0.0.0', port=9741) 
+
+
 #########################################################
 # Routes 
 
@@ -192,4 +196,4 @@ def show_page(page_name, listname, lst, fltr='All'):
 
 
 if __name__ == '__main__':
-    app.run(threaded=True, host='0.0.0.0', port=9741) 
+    start_server()
