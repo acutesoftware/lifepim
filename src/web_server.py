@@ -24,8 +24,9 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 import web_data as web
+import config as mod_cfg
 
-LifePIM_VERSION_NUM = "version 0.1 Last updated 9th-Jun-2020"
+LifePIM_VERSION_NUM = "version 0.1 Last updated 12th-Jun-2020"
 LifePIM_WEB_VERSION = "Alpha"
 
 
@@ -48,14 +49,85 @@ def start_server():
 #########################################################
 # Routes 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+
+    error = None
+    if request.method == 'POST':
+        try:
+            username = request.form['username']
+            password = request.form['password']
+        except:
+            pass
+        if verify_login(username, password) == False:
+            error = 'Invalid username or password'
+            flash('invalid login')
+
+        else:
+            flash('You are logged in')
+
+            return redirect(url_for('page_home'))
+    return render_template('login.html',
+                            menu_list=[],
+                            menu_selected = 'About',
+                            error=error)
+
+def verify_login(username, password):
+    """
+    checks credentials against database
+    """
+    user_info = mod_cfg.get_conn_str()
+
+    if user_info['user'] != username:
+        flash('Invalid username')
+    elif user_info['pass'] != password:
+        flash('wrong password')
+
+        # need a delay here
+        import time
+        time.sleep(3)
+
+
+    else:
+        session['user_id'] = username
+        session['logged_in'] = True
+        session['username'] = username
+        session['time_offset_hours'] =  10.5
+        
+        return True
+    
+    return False
+
+
+@app.route('/logout')
+def logout():
+    #app.logger.info('logout from ' + session['username'])
+    session.pop('logged_in', None)
+    session.pop('username', None)
+    session.pop('user_id', None)
+    session.pop('cur_folder', None)
+    flash('You were logged out')
+    return redirect(url_for('page_home'))
+
+
 @app.route("/", methods=['GET'])
 def page_home():
     return show_page('home', 'Home', [])
 
-
 @app.route("/notes", methods=['GET'])
 def page_notes():
     return show_page('notes', 'Notes', [])
+
+@app.route("/calendar", methods=['GET'])
+def page_calendar():
+    curr_date = get_today_date_str() 
+    return show_page_calendar( 'calendar' , curr_date, [])
+
+
+
+@app.route("/tasks", methods=['GET'])
+def page_tasks():
+    return show_page('tasks', 'Tasks', [])
 
 @app.route("/options", methods=['GET'])
 def page_options():
@@ -64,6 +136,33 @@ def page_options():
 @app.route("/about", methods=['GET'])
 def page_about():
     return show_page('about', 'About', [])
+
+
+
+@app.route("/view/<listname>/<view_as>")
+def view(listname, view_as):
+    # dont log unicode, may cause issue app.logger.info('view as = ', str(view_as))
+    if view_as == '☷':
+        session['view_as'] = '☷' # 'View as Cards'
+    elif view_as == '▤':
+        session['view_as'] = '▤' # 'View as List' ▤  ☰
+    elif view_as == '⛏':
+        session['view_as'] = '⛏' # 'View Zoomed'
+    else:
+        session['view_as'] = '▤' # 'View as List'
+
+    return redirect(url_for(web.get_function_name(listname)))
+
+
+@app.route('/add/<listname>', methods=['POST'])
+def add_new_record(listname):
+    return 'todo - posting data so save it somewhere'
+
+@app.route('/add/<listname>', methods=['GET'])
+def add(listname):
+    return 'todo show edit form to add a record'
+
+
 
 #########################################################
 # Web server functions
@@ -193,6 +292,33 @@ def show_page(page_name, listname, lst, fltr='All'):
                         username=get_user(),
                         display_name = display_name,
                         footer=get_footer())
+
+
+def show_page_calendar(listname, curr_date, lst, fltr='All'):
+    #import as_calendar
+    #calendar_html = as_calendar.get_calendar_with_data(get_user_id(), curr_date, web, conn_str)
+    calendar_html = 'todo'
+    display_name = get_user()
+
+    return render_template('calendar.html',
+                        is_authenticated = logged_in(),
+                        menu_list=web.get_menu_list(),
+                        menu_selected = 'calendar',
+                        col_types = web.tbl_get_cols_types_as_list(listname),
+                        listname = listname,
+                        selected_date = curr_date,
+                        view_as = get_cur_viewas(),
+                        view_type = '', # calendar_get_type(),
+                        today = get_today_date_str(),
+                        lst = lst,
+                        num_recs = len(lst),
+                        calendar_html = calendar_html,
+                        all_folders=get_folder_list(),
+                        cur_folder=get_cur_folder(),
+                        username=get_user(),
+                        display_name=display_name,
+                        footer=get_footer())
+
 
 
 if __name__ == '__main__':

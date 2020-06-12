@@ -38,16 +38,21 @@ stopwords = [
 "z", "Z", "zero", "zi", "zz"]
 
 
-class Heading(object):
-    """
-    manages a single heading text from a file 'fname'
-    and can update rankings for search results
-    """
-    def __init__(self, fname, heading_text, default_rank=0.5):
-        self.fname = fname
-        self.heading_text = heading_text
-        print('TODO = not yet implemented')
 
+
+def refresh_indexes_if_needed():
+    """
+    top level function called from server. 
+    """
+    if is_index_dirty():
+        build_indexes()
+
+def is_index_dirty():
+    """
+    Checks file dates against index dates and refreshes when needed.
+    For sample data, always refresh on server start.
+    """
+    return True
 
 
 def build_indexes():
@@ -56,6 +61,7 @@ def build_indexes():
     aikif_fl = mod_fl.FileList([mod_cfg.data_folder], ['*.*'], [], filelist )
     aikif_fl.save_filelist(filelist, ["name", "path", "size", "date"])
     index_headings(aikif_fl)
+
 
 def index_headings(fl):
     all_headings = []  # list of lists [fname, heading_text]

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+{% if is_authenticated == 'Y' %}
+
+
+<nav class="navbar navbar-expand-sm navbar-light">
+
+  <form class="form-inline form-group" method="POST">
+
+
+
+    <input type="Hidden" name="date_next" id="date_next">
+    <input type="Hidden" name="date_curr" id="date_curr" value={{selected_date}} >
+    <input type="Hidden" name="date_prev" id="date_prev">
+
+    <input type="Hidden" name="date_now" id="date_now">
+
+
+    <input type="submit" class="btn btn-light btn-sm" name="btn_today" value="TODAY">
+    <B><input type="submit" class="btn btn-light btn-sm" name="btn_prev" value="<"></B>
+    <B><input type="submit" class="btn btn-light btn-sm" name="btn_next" value=">"></B>
+
+
+
+<input type="submit" class="btn-sm d-md-none d-sm-none d-none d-lg-none d-xl-none" name="btn_goto_date" id="btn_goto_date" value="Jump to Date">
+<input name="date_selected" id="meeting" type="date" value={{selected_date}} onchange="date_handler(event);"/>
+
+
+
+<!-- works by right align div class="btn-group ml-auto" role="group" aria-label="Basic example"-->
+<div class="btn-group" role="group" aria-label="Basic example">
+  {% if view_type == 'Day' %}
+    <input type="submit" name = "btn_day" value="Day" class="btn btn-sm">
+    <input type="submit" name = "btn_week" value="Week" class="btn btn-sm disabled">
+    <input type="submit"  name = "btn_month" value="Month" class="btn btn-sm disabled">
+    <input type="submit"  name = "btn_year" value="Year" class="btn btn-sm disabled">
+  {% elif view_type == 'Week' %}
+    <input type="submit" name = "btn_day" value="Day" class="btn btn-sm disabled">
+    <input type="submit" name = "btn_week" value="Week" class="btn btn-sm">
+    <input type="submit"  name = "btn_month" value="Month" class="btn btn-sm disabled">
+    <input type="submit"  name = "btn_year" value="Year" class="btn btn-sm disabled">
+  {% elif view_type == 'Month' %}
+    <input type="submit" name = "btn_day" value="Day" class="btn btn-sm disabled">
+    <input type="submit" name = "btn_week" value="Week" class="btn btn-sm disabled">
+    <input type="submit"  name = "btn_month" value="Month" class="btn btn-sm">
+    <input type="submit"  name = "btn_year" value="Year" class="btn btn-sm disabled">
+  {% elif view_type == 'Year' %}
+    <input type="submit" name = "btn_day" value="Day" class="btn btn-sm disabled">
+    <input type="submit" name = "btn_week" value="Week" class="btn btn-sm disabled">
+    <input type="submit"  name = "btn_month" value="Month" class="btn btn-sm disabled">
+    <input type="submit"  name = "btn_year" value="Year" class="btn btn-sm">
+  {% endif %}
+
+</div>
+
+
+
+
+  <!--a class="nav-link" href={{  url_for('page_calendar_date', date='today') }}>Today</a>
+<a class="nav-link" href={{  url_for('page_calendar_date', date='date_prev') }}><</a>
+<a class="nav-link" href={{  url_for('page_calendar_date', date='date_next') }}>></a-->
+
+</form>
+
+</nav>
+
+
+
+
+<!--div> Events for {{ selected_date }}</div-->
+<div class="card-columns">
+<!--small><span id="timeNow"></span></small-->
+
+<div class="card">
+ <div class="card-body">
+     {{ calendar_html|safe }}
+   </div>
+ </div>
+</div>
+
+
+
+{% if view_as == '▤' %}
+
+<div id="lists">
+  <table>
+    {% for id, dateevent_str, timeevent, details, event_type, folder in lst %}
+    {% if event_type != 'log' %}
+    <tr>
+
+      <td>{{ dateevent_str }}</td>
+      <td>{{ timeevent }}</td>
+      <td><a href="{{ url_for('edit_value', listname='calendar', id_to_update=id )}}">{{ details[0:80] }}</a></td></tr>
+      {% endif %}
+    {% endfor %}
+  </table>
+</div>
+
+{% elif view_as == '⛏' %}
+
+<div id="birdseye" class="text-sm-left">
+<table class="text-sm-left">
+  {% for id, dateevent_str, timeevent, details, event_type, folder in lst %}
+  <tr>
+{% if event_type == 'log' %}
+    <td><small>{{ dateevent_str }}</small></td>
+    <td><small>{{ timeevent }}</small></td>
+    <td><small><a href="{{ url_for('edit_value', listname='calendar', id_to_update=id )}}">{{ details[0:100] }}</small></a></td></tr>
+{% else %}
+    <td>{{ dateevent_str }}</td>
+    <td>{{ timeevent }}</td>
+    <td><a href="{{ url_for('edit_value', listname='calendar', id_to_update=id )}}">{{ details[0:80] }}</a></td></tr>
+{% endif %}
+  {% endfor %}
+</table>
+</div>
+
+{% else %}
+
+
+    {% for id, dateevent_str, timeevent, details, event_type, folder in lst %}
+    {% if event_type != 'log' %}
+      <a href="{{ url_for('edit_value', listname='calendar', id_to_update=id )}}">
+        <div class="card bg-light">
+
+        <div class="card-body">
+          <h4 class="card-title">{{ dateevent_str }}</h4>
+
+            <p class="card-text">{{ timeevent }} = {{ details[0:80] }}</p>
+
+        </div>
+      </div> </a>
+      {% endif %}
+    {% endfor %}
+
+
+
+
+{% endif %}
+
+
+
+{% else %}
+<div class="jumbotron">
+
+<H1>Manage your Time!</H1>
+Plan your day, week, month and year to align with your goals.<BR><BR>
+
+Also track other things, such as public events near you<BR><BR>
+
+
+</div>
+
+	Login <a href="{{ url_for('login') }}">here</a> to here to start using LifePIM<BR><BR>
+
+
+{% endif %}
+
+
+<script>
+function date_handler(e){
+  //alert(e.target.value);
+  $("#btn_goto_date").click();
+
+}
+</script>
+
+
+
+{% endblock %}
