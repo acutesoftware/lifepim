@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+
+{% if is_authenticated == 'Y' %}
+
+{% if view_as == '▤' %}
+
+<div id="lists">
+<TABLE width=95%>
+
+{% for id, title, folder in lst %}
+  <TR>
+    <!--TD>{% if pinned %}📌{% endif %}</td>
+    <TD>{% if important %}<div class="text-danger">❗</div>{% endif %}</TD>
+    <TD>
+        {% if status %}
+          <input type="checkbox" name="complete{{id}}" checked>
+          <a class="text-dark" href="{{ url_for('edit_value', listname='tasks', id_to_update=id )}}"><s>{{ title }}</s></a>
+        {% else %}
+          <input type="checkbox" name="complete{{id}}">
+          <a class="text-dark" href="{{ url_for('edit_value', listname='tasks', id_to_update=id )}}">{{ title }}</a>
+        {% endif %}
+    </TD-->
+    <!--TD>{% if folder %}{{ folder }}{% endif %}</td-->
+
+<TD>
+<a class="text-dark" href="{{ url_for('edit_value', listname='task_templates', id_to_update=id )}}">{{ title }}</a>
+</TD>
+  </TR>
+{% endfor %}
+</TABLE>
+
+
+
+{% elif view_as == '⛏' %}   <!-- show tasks as birdseye view -->
+
+<div class="card-columns">
+
+listing tasks as birdseye
+{% for  id, title, folder in lst %}
+<a class="text-dark" href="{{ url_for('edit_value', listname='task_templates', id_to_update=id )}}">{{ title }}</a><BR>
+{% endfor %}
+
+{% else %}  <!-- show tasks as cards-->
+
+<div class="container">
+<div class="row">
+<div class="col-3">
+
+<a class="text-dark" href="{{ url_for('add', listname='task_templates', id_to_update=id )}}">Add Project</a><BR>
+
+{% for  id, title, folder in lst %}
+<a class="text-dark" href="{{ url_for('edit_value', listname='task_templates', id_to_update=id )}}">{{ title }}</a><BR>
+{% endfor %}
+
+
+</div>
+
+
+{% endif %}
+
+
+
+{% else %}  <!-- end authenticated-->
+
+
+<div class="jumbotron">
+  <H1>Group Tasks into Projects</h1>
+
+
+Use a simple TODO list, or organise your tasks into projects and link them with your long term goals.
+
+<BR><BR>
+
+</div>
+
+	Login <a href="{{ url_for('login') }}">here</a> to here to start using LifePIM<BR><BR>
+    Not registered?<BR>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}" role="button">Sign up here!</a>
+    <BR>
+
+{% endif %}
+
+
+
+{% endblock %}

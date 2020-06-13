@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+
+{% if is_authenticated == 'Y' %}
+
+{% from 'macros.html' import get_hex_color %}
+
+<!--a href="{{ url_for('add', filter=Now, listname=listname) }}">Todo Now</a>
+Todo later
+Completed tasks
+Plans
+Goals
+Add task
+
+-->
+
+{% if username == 'duncan' %}
+
+<div class="btn-group">
+
+  <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      Add
+  </button>
+
+  <div class="dropdown-menu">
+    <a class="dropdown-item" href="{{  url_for('add', listname=listname) }}">Add New Task</a>
+    <a class="dropdown-item" href="#">Add Task from Template</a>
+    <a class="dropdown-item" href="{{  url_for('page_projects', listname=listname) }}">Edit Projects</a>
+    <a class="dropdown-item" href="{{  url_for('page_task_templates', listname=listname) }}">Edit Task Templates</a>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item" href="#">1. Add to Food Shopping</a>
+    <a class="dropdown-item" href="#">2. Add to Shopping List</a>
+    <a class="dropdown-item" href="#">3. Movie to Watch</a>
+  </div>
+</div>
+
+
+{% endif %}
+
+{% if view_as == '▤' %}
+
+<div id="lists">
+<TABLE width=95%>
+
+{% for id, title, pinned, important,  notes, folder, status in lst %}
+  <TR>
+    <TD>{% if pinned %}📌{% endif %}</td>
+    <TD>{% if important %}<div class="text-danger">❗</div>{% endif %}</TD>
+    <TD>
+        {% if status %}
+          <input type="checkbox" id="{{id}}" onchange="uncompleteTask({{ id }})" name="complete" checked>
+          <a class="text-dark" href="{{ url_for('view_task', id_to_update=id )}}"><s>{{ title }}</s></a>
+        {% else %}
+          <input type="checkbox" id="{{id}}" onchange="completeTask({{ id }})" name="complete">
+          <a class="text-dark" href="{{ url_for('view_task', id_to_update=id )}}">{{ title }}</a>
+        {% endif %}
+    </TD>
+    <TD>{% if folder %}{{ folder }}{% endif %}</td>
+
+  </TR>
+{% endfor %}
+</TABLE>
+
+
+
+{% elif view_as == '⛏' %}   <!-- show tasks as birdseye view -->
+
+<div class="card-columns">
+
+
+  {% for id, title, pinned, important,  notes, folder, status in lst %}
+
+  {% set note_col = get_hex_color('yellow') %}
+  <div class="card text-dark" style="background-color:{{ note_col }}">
+  <div class="card-body">
+    <h5 class="card-title">
+      {% if status %}
+          <input type="checkbox" id="{{id}}" onchange="uncompleteTask({{ id }})" name="complete" checked>
+          <a class="text-dark" href="{{ url_for('view_task', id_to_update=id )}}"><s>{{ title }}</s></a>
+      {% else %}
+          <input type="checkbox" id="{{id}}" onchange="completeTask({{ id }})" name="complete">
+          <a class="text-dark" href="{{ url_for('view_task', id_to_update=id )}}">{{ title }}</a>
+      {% endif %}
+      {% if pinned %}📌{% endif %}
+      {% if important %}<div class="text-danger">❗</div>{% endif %}</h5>
+
+    </div>
+    {% if notes %}
+      <small>{{ notes[0:100] }}</small>
+    {% endif %}
+  </div>
+
+
+  {% endfor %}
+  </div>
+
+{% else %}  <!-- show tasks as cards-->
+
+<div class="card-columns">
+
+
+  {% for id, title, pinned, important,  notes, folder, status in lst %}
+
+  <div class="card text-dark">
+  <div class="card-body">
+
+    {% if pinned %}📌{% endif %}
+    {% if important %}❗{% endif %}
+    {% if status %}
+        <input type="checkbox" id="{{id}}" onchange="uncompleteTask({{ id }})" name="complete" checked>
+        <a class="text-dark" href="{{ url_for('view_task', id_to_update=id )}}"><s>{{ title }}</s></a>
+    {% else %}
+        <input type="checkbox" id="{{id}}" onchange="completeTask({{ id }})" name="complete">
+        <a class="text-dark" href="{{ url_for('view_task', id_to_update=id )}}">{{ title }}</a>
+    {% endif %}
+
+   </div>
+
+  </div>
+
+
+  {% endfor %}
+  </div>
+
+{% endif %}
+
+
+
+{% else %}  <!-- end authenticated-->
+
+
+<div class="jumbotron">
+  <H1>Get Stuff Done!</h1>
+
+
+Use a simple TODO list, or organise your tasks into projects and link them with your long term goals.
+<BR><BR>
+
+</div>
+
+	Login <a href="{{ url_for('login') }}">here</a> to here to start using LifePIM<BR><BR>
+    Not registered?<BR>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('register') }}" role="button">Sign up here!</a>
+    <BR>
+
+{% endif %}
+
+
+
+{% endblock %}
