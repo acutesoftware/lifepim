@@ -314,3 +314,54 @@ def secure_filename(filename):
     """
     return filename.strip('../').strip('..\\')
 
+
+
+def get_table_as_list(user_id, cols, tbl, where_clause, params_as_list, conn_str, order_by="1", maxrows='20000'):
+    """
+    This should be the ONLY place that selects for the network diary
+    """
+    res = []
+
+    return res
+
+def get_ref_table_as_list(cols, tbl, conn_str, order_by="1", maxrows='2000'):
+    """
+    Straight select from a reference table, no user passed where clauses
+    SELECT username,  DATE_FORMAT(join_date, '%Y-%m-%d') FROM sys_user ORDER BY join_date desc  LIMIT 5
+
+    """
+
+    res = []
+    return res
+
+
+def get_record_and_header(user_id, listname, id, conn_str):
+    """
+    For edit functionality - returns the list of columns and the single record data
+    """
+    if user_id < 1:
+        print('ERROR trying to access data id#' + str(id) + ' with invalid user_id ', user_id, ' into table ', listname)
+        return [], []
+
+    tbl = get_tbl_name(listname)
+    cols = tbl_get_cols_as_list(listname)
+    cols_str = tbl_get_cols_as_select(listname)
+    #print('returns tbl = ', tbl, ' cols = ', cols)
+
+    res = get_table_as_list(user_id, cols_str, tbl, "id = %s ", [id] , conn_str)
+    #print('get_record_and_header res = ', res)
+    #record[4] = record[4].replace('\n', '<BR>')
+
+    rec = []
+    #if res == []:    # happens when you archive a note
+    #    return [],[]
+    #print('acute_web_data : res = ', res)
+    if res:
+        for r in res[0]:
+            if type(r) == str:
+                rec.append(r)#.replace('\n', '<BR>'))
+            else:
+                rec.append(r)
+
+    return cols, rec
+
