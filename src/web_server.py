@@ -381,7 +381,8 @@ def page_goals():
 
 @app.route('/images')
 def page_images():
-    return 'todo - local images'
+
+    return show_page('images', 'Images', [])
     """
     import lp_images
     user_folder = as_user.get_user_folder(mod_cfg, get_user())
@@ -405,6 +406,45 @@ def send_file(filename):
     """
     MY_UPLOAD_FOLDER = mod_cfg.data_folder
     return send_from_directory(MY_UPLOAD_FOLDER, filename)
+
+
+
+@app.route('/upload_process_file/<listname>', methods=['POST'])
+def upload_process_file(listname):
+    """
+    we get here if user selected a file to be
+    uploaded to the UPLOADS folder
+    """
+    file_to_upload = request.files['file']
+    upload_folder = mod_cfg.data_folder
+    filename = web.secure_filename(file_to_upload.filename)
+    dest_file = os.path.join(upload_folder, filename)
+    try:
+        file_to_upload.save(dest_file)
+    except Exception as ex:
+        flash('Cant access the file - is it open in Excel?  (' + dest_file + ')     ' + str(ex))
+        return render_template('upload.html',
+                            is_authenticated = logged_in(),
+                            listname = listname
+                    )
+
+    flash('Successfully Uploaded ' + file_to_upload.filename )
+
+    if listname == 'images':
+            flash('You can link to this image in your Notes with [img]' + file_to_upload.filename + '[/img]')
+            return redirect(url_for('page_images'))
+
+
+    return render_template('upload.html',
+                        footer=get_footer(),
+                        is_authenticated = logged_in(),
+                        menu_list=web.get_menu_list(get_user_id(), conn_str),
+                        menu_selected = 'Upload',
+                        filelist = as_user.get_users_uploaded_files(mod_cfg, get_user()),
+                        username=get_user(),
+                        listname = listname
+                        )
+
 
 
 @app.route("/options", methods=['GET'])
