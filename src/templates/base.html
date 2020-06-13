@@ -81,6 +81,7 @@
         {% else %}
          Settings for
         {% endif %}
+        {% if is_authenticated == 'Y' %}{{ display_name }}{% else %}Login{% endif %}
     </div>
     </nav>
 
