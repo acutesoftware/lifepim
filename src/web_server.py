@@ -118,12 +118,58 @@ def page_home():
 def page_notes():
     return show_page('notes', 'Notes', [])
 
+
+@app.route("/files", methods=['GET'])
+def page_files():
+    print('getting files...')
+    #from views.files import files as mod_files
+
+    fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
+    print(fldr_list)
+    return show_page('files', 'Files', fldr_list)
+
+@app.route("/file/<fname>", methods=['GET'])
+def page_file_view(fname):
+    print('viewing file ' + fname)
+    #from views.files import files as mod_files
+
+
+    files = web.get_file_list([fname], ['*.*'])
+
+    #print('files = ', files)
+
+    return show_page('files', 'Files', files)
+
+
+@app.route('/images')
+def page_images():
+    fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
+    files = web.get_file_list(fldr_list, mod_cfg.image_xtn_list)
+
+    return show_page('images', 'Images', [])
+
+@app.route('/images/<fname>')
+def page_images_view(fname):
+
+    fullname = os.path.join(mod_cfg.data_folder,fname)
+    with open(fullname, 'rb') as f:
+        bindata = f.read()
+    return 'viewing file ' + fname + '     full path = ' + fullname + ' size is ' + str(len(bindata))
+
+@app.route('/img_view/<filename>')
+def send_file(filename):
+    """
+    returns the users image they selected OR a public image from blog
+    """
+    MY_UPLOAD_FOLDER = mod_cfg.data_folder
+    return send_from_directory(MY_UPLOAD_FOLDER, filename)
+
+
+
 @app.route("/calendar", methods=['GET'])
 def page_calendar():
     curr_date = get_today_date_str() 
     return show_page_calendar( 'calendar' , curr_date, [])
-
-
 
 @app.route("/calendar", methods=['POST'])
 def page_calendar_jump_to_date():
@@ -351,14 +397,12 @@ def page_tasks():
 @app.route("/task_done/<id>", methods=['GET','POST'])
 def page_task_done(id):
     web.update_row(get_user_id(), 'tasks', id, ['Done'], ['Y'], conn_str)
-    web.add_log(get_user_id(), 'tasks', id, 3, 1, 'task completed ' , conn_str)
     lst = get_data_for_tasks()
     return show_page('tasks', 'tasks', lst)
 
 @app.route("/task_uncomplete/<id>", methods=['GET','POST'])
 def page_task_uncomplete(id):
     web.update_row(get_user_id(), 'tasks', id, ['Done'], [''], conn_str)
-    web.add_log(get_user_id(), 'tasks', id, 3, 1, 'task uncompleted ' , conn_str)
     lst = get_data_for_tasks()
     return show_page('tasks', 'tasks', lst)  # 'should not refresh page' #
 
@@ -377,35 +421,6 @@ def page_task_templates():
 def page_goals():
     lst = get_data_for_list('goals')
     return show_page('goals', 'goals', lst)
-
-
-@app.route('/images')
-def page_images():
-
-    return show_page('images', 'Images', [])
-    """
-    import lp_images
-    user_folder = as_user.get_user_folder(mod_cfg, get_user())
-    root_path = mod_cfg.data_folder
-    fullnames = lp_images.get_list(web, root_path, user_folder)
-    return show_page_file('images', root_path, fullnames, fullnames)
-    """
-
-@app.route('/images/<fname>')
-def page_images_view(fname):
-
-    fullname = os.path.join(mod_cfg.data_folder,fname)
-    with open(fullname, 'rb') as f:
-        bindata = f.read()
-    return 'viewing file ' + fname + '     full path = ' + fullname + ' size is ' + str(len(bindata))
-
-@app.route('/img_view/<filename>')
-def send_file(filename):
-    """
-    returns the users image they selected OR a public image from blog
-    """
-    MY_UPLOAD_FOLDER = mod_cfg.data_folder
-    return send_from_directory(MY_UPLOAD_FOLDER, filename)
 
 
 
@@ -670,6 +685,8 @@ def show_page(page_name, listname, lst, fltr='All'):
         viewas = '▤'
     else:
         viewas = get_cur_viewas()
+
+    print('showing page ' + page_name)
 
     return render_template(page_name + '.html',
                         is_authenticated = logged_in(),

@@ -168,6 +168,7 @@ menu_list = [  # [route, display(nme), page]
     ['/tasks',    '☑',  'tasks',    '☑✔📎🔨✘☑ ⛏ ☹ ▤    💻 💹 Tasks for staff'],
     ['/notes',    '📝',  'notes',    '🗒✎📝 ✏ 🗊Team wiki page - ultra simple'], #
     ['/images',    '🖼',  'images',    '🗒 🗊images'],
+    ['/files',    '📂',  'files',    '🗒 🗊images and files'],
     ['/options',    '⚙',  'options',    'Options for LifePIM']
     ]
 
@@ -241,6 +242,18 @@ def get_db_conn(conn_str):
                          charset='utf8')
 
 
+def get_folder_list(fname):
+    """
+    returns the default list of folders
+    """
+    res = []
+    with open(fname, 'r') as f:
+        for line in f:
+            if line != '':
+                if line[0:1] != '#':
+                    res.append(line.strip('\n'))
+    return res
+
 def get_file_list(rootPaths, lstXtn, shortNameOnly='Y'):
     """
     builds a list of files and returns as a list
@@ -252,7 +265,7 @@ def get_file_list(rootPaths, lstXtn, shortNameOnly='Y'):
         for root, dirs, files in os.walk(rootPath):
             #print('found ' + str(len(dirs)) + ' directories')
             for basename in files:
-                #print('basename=', basename)
+                print('basename=', basename)
                 for xtn in lstXtn:
                     if fnmatch.fnmatch(basename, xtn):
                         filename = os.path.join(root, basename)
