@@ -4,8 +4,8 @@
 
 import os
 
-#user_folder = '\\\\FANGORN\\user\\duncan\\LifePIM_Data'
-user_folder = 'D:\\dev\\src\\lifepim\\lifepim\\SAMPLE_DATA'
+#user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
+user_folder = r'D:\dev\src\lifepim\lifepim\SAMPLE_DATA'
 
 display_name = 'Duncan'  # single user server runs on users local file system
 
@@ -14,9 +14,12 @@ logon_file = os.path.join(user_folder, 'configuration', 'lifepim.par')
 data_folder = os.path.join(user_folder, 'DATA')
 index_folder = os.path.join(user_folder, 'index')
 
+folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 
 base_url = 'https://www.lifepim.com'    # testing, point to live site for API
 base_url = '127.0.0.1:5000'             # running local (default)
+
+image_xtn_list = ['*.jpg', '*.JPG', '*.PNG', '*.png']
 
 toolbar_definition =  [  # [icon, name, function, comments]
     ['🏠', 'home',     'tb_home',         '🏠📰 This is the overview page'],
