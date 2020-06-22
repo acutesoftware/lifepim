@@ -116,6 +116,9 @@ def page_home():
 
 @app.route("/notes", methods=['GET'])
 def page_notes():
+    fldr_list = [mod_cfg.data_folder]
+    files = web.get_file_list(fldr_list, '*.*', shortNameOnly='N')
+
     return show_page('notes', 'Notes', [])
 
 
