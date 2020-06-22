@@ -144,9 +144,11 @@ def page_file_view(fname):
 @app.route('/images')
 def page_images():
     fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
-    files = web.get_file_list(fldr_list, mod_cfg.image_xtn_list)
+    files = web.get_file_list(fldr_list, mod_cfg.image_xtn_list, shortNameOnly='N')
 
-    return show_page('images', 'Images', [])
+    print('image list = ')
+    print(files)
+    return show_page_file('images', 'Images', fldr_list[0], files)
 
 @app.route('/images/<fname>')
 def page_images_view(fname):
@@ -694,6 +696,40 @@ def show_page(page_name, listname, lst, fltr='All'):
                         menu_selected = page_name,
                         col_types = web.tbl_get_cols_types_as_list(listname),
                         listname = listname,
+                        groups = [],
+                        current_group='All Groups',
+                        today = get_today_date_str(), 
+                        view_as = viewas,
+                        lst = lst,
+                        users_folder = users_folder,
+                        num_recs = len(lst),
+                        all_folders=get_folder_list(),
+                        cur_folder=get_cur_folder(),
+                        username=get_user(),
+                        display_name = display_name,
+                        footer=get_footer())
+
+
+
+def show_page_file(page_name, listname, folder_name, lst, fltr='All'):
+    """
+    show image
+    """
+
+    users_folder = ''  
+    display_name = get_user()
+
+    viewas = get_cur_viewas()
+
+    print('showing page ' + page_name)
+
+    return render_template(page_name + '.html',
+                        is_authenticated = logged_in(),
+                        menu_list=web.get_menu_list(),
+                        menu_selected = page_name,
+                        col_types = web.tbl_get_cols_types_as_list(listname),
+                        listname = listname,
+                        fullnames = lst,
                         groups = [],
                         current_group='All Groups',
                         today = get_today_date_str(), 
