@@ -68,6 +68,15 @@
                   {% endif %}
               </div>
             </div>
+            <!--  Search / Go form -->
+            {% if is_authenticated == 'Y' %}
+            <form  class="form-inline" action="{{ url_for('search_list' )}}" method=post method="POST" class="form-inline">
+                    <input class="form-control-sm bg-secondary border-0" type="search" type="text" name="search_text">
+                    <input class="form-control-sm text-info bg-light btn-secondary border-0" type="submit" name="my-form" value="Go">
+
+            </form>
+            {% endif %}
+
       </nav>
 
 <div class="container">
