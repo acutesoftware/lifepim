@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+
+
+Showing {{ num_results }} results for {{ search_text }}<BR><BR>
+
+{% if view_as == '▤' %}
+
+
+    <TABLE width=95% valign="Top">
+        <TR>
+           <TD>Result</TD>
+           <TD>Date updated</TD>
+        </TR>
+    {% for res in search_results %}
+
+      <TR>
+		<TD>
+		
+            {{ res[0:160] }}</a>
+
+
+		</TD>
+
+
+      </TR>
+
+
+    {% endfor %}
+    </TABLE>
+
+{% else %}
+  <!-- show as a cards for search results -->
+  <div class="card-columns">
+
+  {% for res in search_results %}
+
+            
+            <div class="card text-dark" style="background-color: #ffff93">
+              <div class="card-body">
+                <h5 class="card-title">📝</h5>
+
+              <small>
+                {{ res[0:160] }}
+              </small>
+
+            </div>
+          </div>
+        
+
+
+
+
+
+  {% endfor %}
+</div>
+
+{% endif %}
+
+
+
+{% endblock %}

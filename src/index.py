@@ -72,20 +72,40 @@ def index_headings(fl):
     #return
 
     for fname in fl.get_list():
-        tot_lines, headings, keywords, hashtags = scan_file(fname)
-        all_headings.extend(headings)
-        tot_lines_all_files += tot_lines
-        keywords_all_files.extend(keywords)
-        hashtags_all_files.extend(hashtags)
+        if is_text_file(fname):
+            print('indexing ' + fname)
+            tot_lines, headings, keywords, hashtags = scan_file(fname)
+            all_headings.extend(headings)
+            tot_lines_all_files += tot_lines
+            keywords_all_files.extend(keywords)
+            hashtags_all_files.extend(hashtags)
     #print('headers = ', all_headings)        
     print('Total Files = ', len(fl.get_list()))        
     print('Total headings = ', len(all_headings))        
     print('Total Hashtags = ', len(hashtags_all_files))        
     print('Total lines = ', tot_lines_all_files)        
-    print('Total keywords = ', len(keywords_all_files))
+    print('Total keywords = ', keywords_all_files)
 
     print('Hashtags = ', print_hashtags(hashtags_all_files))        
 
+    save_list(keywords_all_files, keyword_file)
+    save_list(all_headings, heading_file)
+
+
+def save_list(lst, fname):
+    """
+    saves a list to file
+    """
+    with open(fname, 'w') as f:
+        for line in lst:
+            f.write(str(line) + '\n')
+
+
+def is_text_file(fname):
+    print(fname[-3:].upper())
+    if fname[-3:].upper() == 'TXT':
+        return True
+    return False
 
 def print_hashtags(hashtag_list):
     """
@@ -181,6 +201,36 @@ def extract_hashtags(txt):
                     #print(ht)
 
     return ht
+
+
+def load_file(keyword_file):
+    res = []
+    with open(keyword_file, 'r') as f:
+        for line in f:
+            res.append(line.strip('\n'))
+    return res
+
+def search(search_term):
+    """
+    high level search function called from main route.
+    Output should be:
+    tbl,res, dte_created, dte_updated, id
+    """
+    res = []
+    keywords = load_file(keyword_file)
+    for line in keywords:
+        cols = line.split(',')
+        if search_term in cols[1]:
+            #res.append([col[0], col[1], '', '', ''])
+            res.append(cols[0])
+            print('found - ' + line)
+
+    return list(set(res)) 
+
+    return [['tbl','res', 'dte_created', 'dte_updated', 'id'],
+    ['tbl','res', 'dte_created', 'dte_updated', 'id']
+    ]
+
 
 
 if __name__ == '__main__':
