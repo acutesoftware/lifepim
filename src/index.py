@@ -96,9 +96,12 @@ def save_list(lst, fname):
     """
     saves a list to file
     """
-    with open(fname, 'w') as f:
-        for line in lst:
-            f.write(str(line) + '\n')
+    import csv
+
+    with open(fname, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(lst)
+
 
 
 def is_text_file(fname):
@@ -203,12 +206,18 @@ def extract_hashtags(txt):
     return ht
 
 
-def load_file(keyword_file):
-    res = []
-    with open(keyword_file, 'r') as f:
-        for line in f:
-            res.append(line.strip('\n'))
-    return res
+
+def load_file(fname):
+	"""
+	read a CSV file to list without worrying about odd characters
+	"""
+	import csv
+	rows_to_load = []
+	with open(fname, 'r', encoding='cp1252', errors='ignore') as csvfile:
+		csvreader = csv.reader(csvfile, delimiter = ',' )
+		reader = csv.reader(csvfile)
+		rows_to_load = list(reader)
+	return rows_to_load
 
 def search(search_term):
     """
@@ -216,21 +225,88 @@ def search(search_term):
     Output should be:
     tbl,res, dte_created, dte_updated, id
     """
+
+    notes_list = search_keywords_in_notes(search_term)
+    files_found = search_all_filenames(search_term)
+
+    return notes_list, files_found
+
+def search_keywords_in_notes(search_term):
     res = []
     keywords = load_file(keyword_file)
-    for line in keywords:
-        cols = line.split(',')
-        if search_term in cols[1]:
+    #print('keywords = ', keywords[0:2])
+    for row in keywords:
+        if search_term in row[1]:
             #res.append([col[0], col[1], '', '', ''])
-            res.append(cols[0])
-            print('found - ' + line)
-
+            res.append(row[0])
+            
     return list(set(res)) 
 
-    return [['tbl','res', 'dte_created', 'dte_updated', 'id'],
-    ['tbl','res', 'dte_created', 'dte_updated', 'id']
-    ]
+def search_all_filenames(search_term):
+    """
+    searches the files indexed and returns a list of 
+    files that contain the search term
+    """
+    all_indexes = get_list_index_files()
+    all_results = []
+    for index in all_indexes:
 
+        file_index = read_csv_to_list(index)
+        search_results = search_filenames(file_index, search_term)
+        all_results.extend(search_results)
+    return all_results
+
+
+def read_csv_to_list(filename):
+    """
+    reads a CSV file to a list
+    """
+    import csv
+
+    rows_to_load = []
+    with open(filename, 'r', encoding='cp1252') as csvfile:
+        reader = csv.reader(csvfile)
+        rows_to_load = list(reader)
+    return rows_to_load
+
+
+def search_filenames(lst, txt):
+    """
+    returns a list of files that contain txt in the name
+    """
+    res = []
+    word_list_to_find = txt.upper().split(' ')
+    for line in lst:
+        if line[0:1] == '#':
+            break
+        # make a single uppercase string of all unique content from filelist
+        file_details = '|'.join(line).upper()
+        if do_all_words_appear_in_text(word_list_to_find, file_details):
+            res.append(line)
+    return res
+
+def do_all_words_appear_in_text(word_list, txt):
+    """
+    return true iff all words in word_list are in the string txt
+    """
+    found = False 
+    missing_one = False
+    for word in word_list:
+        if word in txt:
+           found = True
+        else:
+           missing_one = True  
+    if found == True and missing_one == False:
+        return True
+    else:
+        return False
+    
+
+def get_list_index_files():
+
+    res_fl = mod_fl.FileList([mod_cfg.index_folder], ['raw*.csv'], [], 'index_list.txt')
+    print('res_fl.get_list() = ', res_fl.get_list())
+    return res_fl.get_list()
 
 
 if __name__ == '__main__':
