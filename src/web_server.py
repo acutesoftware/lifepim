@@ -128,7 +128,7 @@ def page_files():
     #from views.files import files as mod_files
 
     fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
-    print(fldr_list)
+    #print(fldr_list)
     return show_page('files', 'Files', fldr_list)
 
 @app.route("/file/<fname>", methods=['GET'])
@@ -149,8 +149,8 @@ def page_images():
     fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
     files = web.get_file_list(fldr_list, mod_cfg.image_xtn_list, shortNameOnly='N')
 
-    print('image list = ')
-    print(files)
+    #print('image list = ')
+    #print(files)
     return show_page_file('images', 'Images', fldr_list[0], files)
 
 @app.route('/images/<fname>')
@@ -578,6 +578,34 @@ def add_new_record(listname):
 @app.route('/add/<listname>', methods=['GET'])
 def add(listname):
     return 'todo show edit form to add a record'
+
+
+
+@app.route('/search', methods=['POST'])
+def search_list():
+    # first check to see if this is a login request
+
+    search_text = request.form['search_text']
+    import index 
+
+    search_results, files_found = index.search(search_text)
+    print('SEARCH RESULTS - NOTES ONLY')
+    print(search_results)
+
+    return render_template('search.html',
+                        search_text = search_text,
+                        search_results = search_results,
+                        files_found = files_found,
+                        num_results = len(search_results),
+                        is_authenticated = logged_in(),
+                        menu_list=web.get_menu_list(),
+                        menu_selected = 'About',
+                        view_as = get_cur_viewas(),
+                        all_folders=get_folder_list(),
+                        cur_folder=get_cur_folder(),
+                        username=get_user(),
+                        footer=get_footer())
+
 
 
 

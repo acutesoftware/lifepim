@@ -260,12 +260,11 @@ def get_file_list(rootPaths, lstXtn, shortNameOnly='Y'):
     """
     numFiles = 0
     opFileList = []
+    op_folder_list = []
     for rootPath in rootPaths:
-        #print(' rootPath = ', rootPath)
         for root, dirs, files in os.walk(rootPath):
-            #print('found ' + str(len(dirs)) + ' directories')
+            op_folder_list.append(root)
             for basename in files:
-                print('basename=', basename)
                 for xtn in lstXtn:
                     if fnmatch.fnmatch(basename, xtn):
                         filename = os.path.join(root, basename)
@@ -275,7 +274,7 @@ def get_file_list(rootPaths, lstXtn, shortNameOnly='Y'):
                         else:
                             opFileList.append(filename)
 
-    return sorted(opFileList)
+    return sorted(opFileList), sorted(op_folder_list)
 
 def get_user():
     try:
