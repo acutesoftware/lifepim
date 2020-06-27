@@ -7,9 +7,19 @@ import time
 import config as mod_cfg
 import web_data as web
 
+import aikif.lib.cls_filelist as mod_fl
+
 output_folder = mod_cfg.user_folder
 op_full_list = os.path.join(output_folder, 'full_filelist.csv')
 fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
+
+excluded_files = [
+    'myenv', 
+    '__pycache__', 
+    'htmlcov'
+]
+
+
 
 
 def collect_all():
@@ -25,7 +35,18 @@ def collect_metadata():
     print('todo')
  
 
-def collect_raw_filelists():    
+def collect_raw_filelists():
+    lg('START', 'filelist')
+    for fldr in fldr_list:
+        print('scanning folder ' + fldr)
+        op_fname = os.path.join(output_folder, 'index', 'raw_filelist_' + fldr.replace('\\', '_').replace(':','_') + '.csv')
+        res_fl = mod_fl.FileList([fldr], ['*.*'], excluded_files, op_fname)
+        res_fl.save_filelist(op_fname, ["name", "path", "size", "date"])
+        lg('FOLDER', fldr + ' has ' + str(len(res_fl.get_list())) + ' files')
+    lg('FINISH', 'filelist')
+    
+
+def collect_raw_filelists_old():    
     all_files = []
     lg('START', 'filelist')
     for fldr in fldr_list:
