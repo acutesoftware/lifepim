@@ -98,3 +98,16 @@ body {
     }
 
 */
+
+#nav_title {
+    background-color:yellowgreen;
+    float: left;
+
+}
+
+#nav_title_warning {
+    background-color:red;
+    color:yellow;
+    float: left;
+
+}
