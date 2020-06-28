@@ -252,9 +252,16 @@ def search_all_filenames(search_term):
     for index in all_indexes:
 
         file_index = read_csv_to_list(index)
+        print('reading index file : ' + index.strip('\n'))
         search_results = search_filenames(file_index, search_term)
-        all_results.extend(search_results)
-    return all_results
+        if len(search_results) > 0:
+            all_results.extend(search_results)
+
+    print('FINAL SEARCH RESULTS FOR FILES =  ' + str(len(all_results)) + ' files named like ' + search_term)
+    print(all_results[0:3])
+
+
+    return all_results[0:1000]
 
 
 def read_csv_to_list(filename):
@@ -264,9 +271,13 @@ def read_csv_to_list(filename):
     import csv
 
     rows_to_load = []
-    with open(filename, 'r', encoding='cp1252') as csvfile:
+    with open(filename, 'r',  encoding="utf8", errors='replace') as csvfile:
         reader = csv.reader(csvfile)
-        rows_to_load = list(reader)
+        try:
+            rows_to_load = list(reader)
+        except Exception as ex:
+            print('ERROR = problem loading ' + filename)
+            print(str(ex))
     return rows_to_load
 
 
@@ -283,6 +294,13 @@ def search_filenames(lst, txt):
         file_details = '|'.join(line).upper()
         if do_all_words_appear_in_text(word_list_to_find, file_details):
             res.append(line)
+
+
+
+    # note that this gets called for EACH filelist
+    print('Found ' + str(len(res)) + ' files named like ' + txt)
+    print(res[0:2])
+
     return res
 
 def do_all_words_appear_in_text(word_list, txt):
@@ -304,8 +322,8 @@ def do_all_words_appear_in_text(word_list, txt):
 
 def get_list_index_files():
 
-    res_fl = mod_fl.FileList([mod_cfg.index_folder], ['raw*.csv'], [], 'index_list.txt')
-    print('res_fl.get_list() = ', res_fl.get_list())
+    res_fl = mod_fl.FileList([mod_cfg.index_folder], ['raw_filelist*.csv'], [], 'index_list.txt')
+    #print('res_fl.get_list() = ', res_fl.get_list())
     return res_fl.get_list()
 
 

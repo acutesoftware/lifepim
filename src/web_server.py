@@ -46,6 +46,16 @@ def start_server():
     app.run(threaded=True, host='0.0.0.0', port=9741) 
 
 
+def get_run_location_DEBUG():
+    """
+    quick way to determine if you are working on the data
+    in the public DEV version, or prod version
+    """
+    if mod_cfg.user_folder == r'D:\dev\src\lifepim\lifepim\SAMPLE_DATA':
+        return 'DEV', ''
+    else:
+        return 'PROD', mod_cfg.user_folder
+
 #########################################################
 # Routes 
 
@@ -67,9 +77,13 @@ def login():
             flash('You are logged in')
 
             return redirect(url_for('page_home'))
+
+    nav_title, nav_warn = get_run_location_DEBUG()
     return render_template('login.html',
                             menu_list=[],
                             menu_selected = 'About',
+                            nav_title = nav_title, 
+                            nav_warn =  nav_warn,
                             error=error)
 
 def verify_login(username, password):
@@ -454,7 +468,8 @@ def upload_process_file(listname):
             flash('You can link to this image in your Notes with [img]' + file_to_upload.filename + '[/img]')
             return redirect(url_for('page_images'))
 
-
+    nav_title, nav_warn = get_run_location_DEBUG()
+    
     return render_template('upload.html',
                         footer=get_footer(),
                         is_authenticated = logged_in(),
@@ -462,6 +477,8 @@ def upload_process_file(listname):
                         menu_selected = 'Upload',
                         filelist = as_user.get_users_uploaded_files(mod_cfg, get_user()),
                         username=get_user(),
+                        nav_title = nav_title, 
+                        nav_warn =  nav_warn,
                         listname = listname
                         )
 
@@ -589,14 +606,16 @@ def search_list():
     import index 
 
     search_results, files_found = index.search(search_text)
-    print('SEARCH RESULTS - NOTES ONLY')
-    print(search_results)
+    #print('SEARCH RESULTS - NOTES ONLY')
+    #print(search_results)
+    nav_title, nav_warn = get_run_location_DEBUG()
 
     return render_template('search.html',
                         search_text = search_text,
                         search_results = search_results,
                         files_found = files_found,
                         num_results = len(search_results),
+                        num_files_found = len(files_found),
                         is_authenticated = logged_in(),
                         menu_list=web.get_menu_list(),
                         menu_selected = 'About',
@@ -604,6 +623,8 @@ def search_list():
                         all_folders=get_folder_list(),
                         cur_folder=get_cur_folder(),
                         username=get_user(),
+                        nav_title = nav_title, 
+                        nav_warn =  nav_warn,
                         footer=get_footer())
 
 
@@ -720,6 +741,7 @@ def show_page(page_name, listname, lst, fltr='All'):
         viewas = get_cur_viewas()
 
     print('showing page ' + page_name)
+    nav_title, nav_warn = get_run_location_DEBUG()
 
     return render_template(page_name + '.html',
                         is_authenticated = logged_in(),
@@ -738,6 +760,8 @@ def show_page(page_name, listname, lst, fltr='All'):
                         cur_folder=get_cur_folder(),
                         username=get_user(),
                         display_name = display_name,
+                        nav_title = nav_title, 
+                        nav_warn =  nav_warn,
                         footer=get_footer())
 
 
@@ -753,6 +777,7 @@ def show_page_file(page_name, listname, folder_name, lst, fltr='All'):
     viewas = get_cur_viewas()
 
     print('showing page ' + page_name)
+    nav_title, nav_warn = get_run_location_DEBUG()
 
     return render_template(page_name + '.html',
                         is_authenticated = logged_in(),
@@ -772,6 +797,8 @@ def show_page_file(page_name, listname, folder_name, lst, fltr='All'):
                         cur_folder=get_cur_folder(),
                         username=get_user(),
                         display_name = display_name,
+                        nav_title = nav_title, 
+                        nav_warn =  nav_warn,
                         footer=get_footer())
 
 
@@ -780,6 +807,7 @@ def show_page_calendar(listname, curr_date, lst, fltr='All'):
     #calendar_html = as_calendar.get_calendar_with_data(get_user_id(), curr_date, web, conn_str)
     calendar_html = 'todo'
     display_name = get_user()
+    nav_title, nav_warn = get_run_location_DEBUG()
 
     return render_template('calendar.html',
                         is_authenticated = logged_in(),
@@ -798,6 +826,8 @@ def show_page_calendar(listname, curr_date, lst, fltr='All'):
                         cur_folder=get_cur_folder(),
                         username=get_user(),
                         display_name=display_name,
+                        nav_title = nav_title, 
+                        nav_warn =  nav_warn,
                         footer=get_footer())
 
 

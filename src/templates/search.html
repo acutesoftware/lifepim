@@ -62,12 +62,12 @@ Showing {{ num_results }} results for {{ search_text }}<BR><BR>
 
   <!-- now show the list of files found underneath (or on the side) -->
 
-  <H3>Files Found</H3>
-  List of files found named like {{ search_text }}
+  <BR>
+  {{ num_files_found }} files found named like {{ search_text }}
 
   <div id="files_found">
   {% for res in files_found %}
-    <a href="{{ res }}">{{ res }}</a><BR>
+    <a href="{{ res[0] }}">{{ res[1] }}</a><BR>
   {% endfor %}
 </div>
 {% endblock %}
