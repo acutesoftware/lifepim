@@ -64,6 +64,34 @@ video
 }
 
 
+.as-table {
+    border: solid 1px #EEF7EE;
+    border-collapse: collapse;
+    border-spacing: 0;
+    font: normal 12px Arial, sans-serif;
+    }
+    .as-table thead th {
+    background-color: #EEF7EE;
+    padding: 1px;
+    text-align: left;
+    text-shadow: 1px 1px 1px #fff;
+    }
+    .as-table tbody td {
+    /*color: #333;*/
+    padding: 2px;
+    text-shadow: 1px 1px 1px #fff;
+    }
+    .as-table-zebra tbody tr:nth-child(odd) {
+    background-color: #fff;
+    }
+    .as-table-zebra tbody tr:nth-child(even) {
+    background-color: #EEF7EE;
+    }
+    .as-table-horizontal tbody td {
+    border-left: none;
+    border-right: none;
+    }
+    
 
 
 /*--------------------------------
@@ -76,28 +104,6 @@ pre {
 
 }
 
-
-/*
-TD a {
-
-	color: blue;
-}
-
-
-body {
-    background-color:#868e96;
-}
-
-.row {
-    background-color:#868e96;
-}
-
-
-#lists {
-    background-color:white;
-    }
-
-*/
 
 #nav_title {
     background-color:yellowgreen;
