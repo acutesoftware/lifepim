@@ -21,7 +21,7 @@
   <TR>
     <TD>{% if pinned %}📌{% endif %}</td>
     <TD>{% if important %}<div class="text-danger">❗</div>{% endif %}</TD>
-    <TD><a class="text-dark" href="{{ url_for('view_note', id_to_update=id )}}">{{ title }}</a></TD>
+    <TD><a class="text-dark" href="{{ url_for('page_note', id_to_update=id )}}">{{ title }}</a></TD>
 
     <!--<TD bgcolor="{{ note_col }}"><a class="text-dark" href="{{ url_for('edit_value', listname='notes', id_to_update=id )}}">EDIT</a></TD>-->
   </TR>
@@ -43,7 +43,7 @@
 {% else %}
   {% set note_col = get_hex_color(color) %}
 
-  <a href="{{ url_for('view_note',  id_to_update=id )}}">
+  <a href="{{ url_for('page_note',  id_to_update=id )}}">
   <div class="card text-dark" style="background-color:{{ note_col }}">
   <div class="card-body">
   <h5 class="card-title">
@@ -125,7 +125,7 @@
   {% set note_col = get_hex_color(color) %}
 
 
-  <a href="{{ url_for('view_note',  id_to_update=id )}}">
+  <a href="{{ url_for('page_note',  id_to_update=id )}}">
 
   <div class="card text-dark" style="background-color:{{ note_col }}">
 

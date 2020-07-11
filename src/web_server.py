@@ -130,11 +130,95 @@ def page_home():
 
 @app.route("/notes", methods=['GET'])
 def page_notes():
-    fldr_list = [mod_cfg.data_folder]
-    files = web.get_file_list(fldr_list, '*.*', shortNameOnly='N')
+    notes_list = load_notes_from_folders(mod_cfg.data_folder)
 
-    return show_page('notes', 'Notes', [])
 
+    return show_page('notes', 'Notes', notes_list)
+
+def load_notes_from_folders(fldr):
+    """
+    reads all text files in a folder on the NAS and converts 
+    them into notes list
+    """
+    #aikif_fl = mod_fl.FileList([mod_cfg.data_folder], ['*.*'], [], filelist )
+    #aikif_fl.save_filelist(filelist, ["name", "path", "size", "date"])
+    res = []
+
+    files = web.get_file_list([fldr], '*.txt', shortNameOnly='N')
+    #print('files found = ', files)
+    for fname in files[0]:
+        #print('reading note, ', fname)
+        res.append(extract_note_summary(fname))
+
+    return res
+
+def extract_note_summary(fname):
+    """
+    takes a single file on the NAS and builds a list
+    of the required parameters. At first these are default
+    but later this will be held in a local lifepim database
+    (or perhaps from metadata or business rules?)
+    [id, title, pinned, important, is_archived, color, content, folder]
+    """
+
+    id, title, pinned, important, is_archived, color, folder = get_note_metadata(fname)
+    content = 'todo - read first 200 chars'
+    return [id, title, pinned, important, is_archived, color, content, folder]
+
+
+def get_note_metadata(fname):
+    """
+    reads the metadata
+    """
+    id = fname.replace('/', '|').replace('\\','|').replace(':','=')
+    title = fname.replace(mod_cfg.data_folder, '')
+    pinned = 'N'
+    important = 'N'
+    is_archived = ''
+    color = 'Green'
+    folder = fname
+
+    return id, title, pinned, important, is_archived, color, folder
+
+
+
+@app.route("/note/<id_to_update>", methods=['GET'])
+def page_note(id_to_update):
+    res = load_notes_from_folders(mod_cfg.data_folder)
+    #res = load_single_note(id_to_update)
+    fname = id_to_update.replace('|', '\\').replace('=', ':')
+    id, title, pinned, important, is_archived, color, folder = get_note_metadata(fname)
+
+    print('reading note = ', fname)
+    content = ''
+    with open(fname, 'r') as fip:
+        for line in fip:
+            content += line + '\n'
+
+    headers = []
+    record = [id, title, pinned, important, is_archived, color, content, folder]
+
+    #print('VIEWING NOTE - record = ', record)
+
+    return render_template('note.html',
+                        footer=get_footer(),
+                        is_authenticated = logged_in(),
+                        menu_list=web.get_menu_list(),
+                        headers = headers,
+                        record = record,
+                        id_to_update=id_to_update,
+                        id=id_to_update,  # duplicate var, needed to hide NEW button - FIX THIS
+                        menu_selected = 'note',
+                        listname='notes',
+                        username=get_user()
+                        )
+
+
+
+
+@app.route("/edit/<id_to_update>/<listname>", methods=['GET'])
+def edit_value(id_to_update, listname):
+    return 'todo = edit this item'
 
 @app.route("/files", methods=['GET'])
 def page_files():
@@ -144,6 +228,13 @@ def page_files():
     fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
     #print(fldr_list)
     return show_page('files', 'Files', fldr_list)
+
+@app.route("/filefind/<fname>", methods=['GET'])
+def page_file_find(fname):
+    print('searching for file ' + fname)
+    #from views.files import files as mod_files
+
+
 
 @app.route("/file/<fname>", methods=['GET'])
 def page_file_view(fname):
@@ -165,7 +256,7 @@ def page_images():
 
     #print('image list = ')
     #print(files)
-    return show_page_file('images', 'Images', fldr_list[0], files)
+    return show_page_file('images', 'Images', fldr_list[0][0:10], files[0][0:6])
 
 @app.route('/images/<fname>')
 def page_images_view(fname):
@@ -626,6 +717,8 @@ def search_list():
                         nav_title = nav_title, 
                         nav_warn =  nav_warn,
                         footer=get_footer())
+
+
 
 
 
