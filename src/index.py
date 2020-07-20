@@ -250,15 +250,16 @@ def search_all_filenames(search_term):
     all_indexes = get_list_index_files()
     all_results = []
     for index in all_indexes:
-
-        file_index = read_csv_to_list(index)
-        print('reading index file : ' + index.strip('\n'))
-        search_results = search_filenames(file_index, search_term)
-        if len(search_results) > 0:
-            all_results.extend(search_results)
+        #print('INDEX FILE = ', index)
+        if index[0:1] != '#':
+            file_index = read_csv_to_list(index)
+            #print('reading index file : ' + index.strip('\n'))
+            search_results = search_filenames(file_index, search_term)
+            if len(search_results) > 0:
+                all_results.extend(search_results)
 
     print('FINAL SEARCH RESULTS FOR FILES =  ' + str(len(all_results)) + ' files named like ' + search_term)
-    print(all_results[0:3])
+    #print(all_results[0:3])
 
 
     return all_results[0:1000]
@@ -298,8 +299,9 @@ def search_filenames(lst, txt):
 
 
     # note that this gets called for EACH filelist
-    print('Found ' + str(len(res)) + ' files named like ' + txt)
-    print(res[0:2])
+    if len(res) > 0:
+        print('Found ' + str(len(res)) + ' files named like ' + txt)
+    #print(res[0:2])
 
     return res
 
@@ -323,9 +325,20 @@ def do_all_words_appear_in_text(word_list, txt):
 def get_list_index_files():
 
     res_fl = mod_fl.FileList([mod_cfg.index_folder], ['raw_filelist*.csv'], [], 'index_list.txt')
-    #print('res_fl.get_list() = ', res_fl.get_list())
+    print('res_fl.get_list() = ', res_fl.get_list())
     return res_fl.get_list()
 
+def get_list_and_names_index_files():
+    res = []
+    raw_list = get_list_index_files()
+    for fname in raw_list:
+        # remove the index_folder from start and .csv from end
+        
+        display_name = mod_cfg.get_path_from_index_filename(fname)
+        res.append([fname, display_name])
+        print('fname : ', fname, ' display= ', display_name)
+
+    return res
 
 if __name__ == '__main__':
     build_indexes()

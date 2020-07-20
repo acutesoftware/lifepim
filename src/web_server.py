@@ -229,12 +229,6 @@ def page_files():
     #print(fldr_list)
     return show_page('files', 'Files', fldr_list)
 
-@app.route("/filefind/<fname>", methods=['GET'])
-def page_file_find(fname):
-    print('searching for file ' + fname)
-    #from views.files import files as mod_files
-
-
 
 @app.route("/file/<fname>", methods=['GET'])
 def page_file_view(fname):
@@ -687,6 +681,38 @@ def add_new_record(listname):
 def add(listname):
     return 'todo show edit form to add a record'
 
+@app.route("/filefind/<fname>", methods=['GET'])
+def page_file_find(fname):
+    print('searching for file ' + fname)
+    #from views.files import files as mod_files
+    search_text = fname
+    print('FILEFIND : fname = ', fname)
+
+
+    import index 
+    index_list = index.get_list_and_names_index_files()
+
+    search_results, files_found = index.search(search_text)
+    nav_title, nav_warn = get_run_location_DEBUG()
+
+    return render_template('search.html',
+                        search_text = search_text,
+                        search_results = search_results,
+                        index_list = index_list,
+                        files_found = files_found,
+                        num_results = len(search_results),
+                        num_files_found = len(files_found),
+                        is_authenticated = logged_in(),
+                        menu_list=web.get_menu_list(),
+                        menu_selected = 'About',
+                        view_as = get_cur_viewas(),
+                        all_folders=get_folder_list(),
+                        cur_folder=get_cur_folder(),
+                        username=get_user(),
+                        nav_title = nav_title, 
+                        nav_warn =  nav_warn,
+                        footer=get_footer())
+
 
 
 @app.route('/search', methods=['POST'])
@@ -695,15 +721,15 @@ def search_list():
 
     search_text = request.form['search_text']
     import index 
+    index_list = index.get_list_and_names_index_files()
 
     search_results, files_found = index.search(search_text)
-    #print('SEARCH RESULTS - NOTES ONLY')
-    #print(search_results)
     nav_title, nav_warn = get_run_location_DEBUG()
 
     return render_template('search.html',
                         search_text = search_text,
                         search_results = search_results,
+                        index_list = index_list,
                         files_found = files_found,
                         num_results = len(search_results),
                         num_files_found = len(files_found),
