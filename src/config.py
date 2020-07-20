@@ -4,8 +4,8 @@
 
 import os
 
-#user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
-user_folder = r'D:\docs\LIFEPIM_DATA_CACHE'
+user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
+#user_folder = r'D:\docs\LIFEPIM_DATA_CACHE'
 #user_folder = r'D:\dev\src\lifepim\lifepim\SAMPLE_DATA'
 
 display_name = 'Duncan'  # single user server runs on users local file system
@@ -63,6 +63,22 @@ def get_conn_str():
 		conn_str['db'] = f.readline().strip(' ').strip('\n')
 
 	return conn_str
+
+def get_index_filename_from_path(fldr):
+    """
+    mod_cfg.get_index_filename_from_path
+    """
+    clean_name =  fldr.replace('\\', '_').replace(':',';')
+    return os.path.join(user_folder, 'index', 'raw_filelist_' + clean_name + '.csv')
+
+def get_path_from_index_filename(fname):
+    """
+    mod_cfg.get_path_from_index_filename
+    """
+    clean_name =  fname.replace('_', '\\').replace(';', ':',)
+    display_name = clean_name[len(index_folder)+14:][:-4]
+    return display_name
+
 
 
 def build_toolbar_file(fname):

@@ -2,6 +2,14 @@
 {% block content %}
 
 
+<div id="filelist">
+  {% if index_list %}
+    {% for res in index_list %}
+      <small><A href="{{ res[0] }}">{{ res[1] }}</A></small><BR>
+    {% endfor %}
+  {% endif %}
+
+</div>
 
 
 Showing {{ num_results }} results for {{ search_text }}<BR><BR>

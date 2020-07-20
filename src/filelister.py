@@ -39,7 +39,8 @@ def collect_raw_filelists():
     lg('START', 'filelist')
     for fldr in fldr_list:
         print('scanning folder ' + fldr)
-        op_fname = os.path.join(output_folder, 'index', 'raw_filelist_' + fldr.replace('\\', '_').replace(':','_') + '.csv')
+        #op_fname = os.path.join(output_folder, 'index', 'raw_filelist_' + fldr.replace('\\', '_').replace(':','_') + '.csv')
+        op_fname = mod_cfg.get_index_filename_from_path(fldr)
         res_fl = mod_fl.FileList([fldr], ['*.*'], excluded_files, op_fname)
         res_fl.save_filelist(op_fname, ["name", "path", "size", "date"])
         lg('FOLDER', fldr + ' has ' + str(len(res_fl.get_list())) + ' files')
