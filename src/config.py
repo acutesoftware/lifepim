@@ -14,7 +14,7 @@ display_name = 'Duncan'  # single user server runs on users local file system
 logon_file = os.path.join(user_folder, 'configuration', 'lifepim.par')
 data_folder = os.path.join(user_folder, 'DATA')
 index_folder = os.path.join(user_folder, 'index')
-
+calendar_folder = os.path.join(user_folder, 'calendar')
 folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 
 base_url = 'https://www.lifepim.com'    # testing, point to live site for API
