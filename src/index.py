@@ -16,6 +16,8 @@ c) return search results based on file rankings from index results
 """
 
 import os
+import shutil
+import glob
 import config as mod_cfg
 import aikif.lib.cls_filelist as mod_fl
 
@@ -321,6 +323,55 @@ def do_all_words_appear_in_text(word_list, txt):
     else:
         return False
     
+def ensure_dir(d):
+	try:
+		os.makedirs(d, exist_ok=True)
+	except Exception as ex:
+		pass
+
+
+def delete_file(f, ignore_errors=False):
+	"""
+	delete a single file
+	"""
+	try:
+		os.remove(f)
+	except Exception as ex:
+		if ignore_errors:
+			return
+		print('ERROR deleting file ' + str(ex))
+
+def delete_files_in_folder(fldr, filespec):
+	"""
+	delete all files in folder 'fldr'
+	"""
+	fl = glob.glob(fldr + os.sep + filespec)
+	for f in fl:
+		delete_file(f, True)
+ 
+def copy_file(src, dest):
+	"""
+	copy single file
+	"""
+	try:
+		shutil.copy2(src , dest)
+	except Exception as ex:
+		print('ERROR copying file' + str(ex))
+	
+def copy_files_to_folder(src, dest, xtn='*.txt'):
+	"""
+	copies all the files from src to dest folder
+	""" 
+	
+	try:
+		all_files = glob.glob(os.path.join(src,xtn))
+		for f in all_files:
+			copy_file(f, dest)
+	except Exception as ex:
+		print('ERROR copy_files_to_folder - ' + str(ex))
+
+		
+	
 
 def get_list_index_files():
 
