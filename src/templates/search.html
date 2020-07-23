@@ -4,9 +4,11 @@
 
 <div id="filelist">
   {% if index_list %}
-    {% for res in index_list %}
+   {% for res in index_list %}
+    {% if res %}
       <small><A href="{{ res[0] }}">{{ res[1] }}</A></small><BR>
-    {% endfor %}
+    {% endif %}
+   {% endfor %}
   {% endif %}
 
 </div>
@@ -84,12 +86,16 @@ Showing {{ num_results }} results for {{ search_text }}<BR><BR>
 
       </TR>
       {% for row in files_found[0:] %}
+      {% if row %}
+       {% if row|length > 0 %}
       <TR>
         <TD><a href="{{ url_for('page_file_find', fname=row[2]) }}">{{ row[2] }}</a></TD>
         <TD><a href="{{ url_for('page_file_find', fname=row[1]) }}">{{ row[1] }}</a></TD>
         <TD>{{ row[3] }}</small></TD>
         <TD><a href="{{ url_for('page_file_find', fname=row[4][0:10]) }}">{{ row[4][0:10] }}</a>{{ row[4][11:] }}</TD>
       </TR>
+       {% endif %}
+       {% endif %}
       {% endfor %}
     </table>
 </div>
