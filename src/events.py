@@ -38,6 +38,10 @@ def dte_get_YYYY_MM(dte_as_string):
 
 def get_events_for_date(dte):
     print('returning events for date ', dte)
+    fname = get_calendar_filename_for_date(dte)
+
+    print('loading events from ' + fname)
+
     return []
 
 
