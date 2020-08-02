@@ -25,6 +25,7 @@ from logging.handlers import RotatingFileHandler
 
 import web_data as web
 import config as mod_cfg
+import events
 
 LifePIM_VERSION_NUM = "version 0.1 Last updated 12th-Jun-2020"
 LifePIM_WEB_VERSION = "Alpha"
@@ -272,8 +273,11 @@ def send_file(filename):
 
 @app.route("/calendar", methods=['GET'])
 def page_calendar():
+    
     curr_date = get_today_date_str() 
-    return show_page_calendar( 'calendar' , curr_date, [])
+    res = events.get_events_for_date(curr_date)
+    print('calendar results = ', res)
+    return show_page_calendar( 'calendar' , curr_date, res)
 
 @app.route("/calendar", methods=['POST'])
 def page_calendar_jump_to_date():
