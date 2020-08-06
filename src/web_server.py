@@ -30,7 +30,6 @@ import events
 LifePIM_VERSION_NUM = "version 0.1 Last updated 12th-Jun-2020"
 LifePIM_WEB_VERSION = "Alpha"
 
-
 app = Flask(__name__)
 
 app.secret_key = "KLr4757375fdjhshjSDFHDHFVS"
@@ -44,7 +43,12 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.permanent_session_lifetime = datetime.timedelta(days=365)
 
 def start_server():
-    app.run(threaded=True, host='0.0.0.0', port=9741) 
+    if mod_cfg.WEB_VERSION == "DEV":
+        print("WARNING - DEBUG MODE ACTIVE")
+        app.debug = True	# TURN THIS OFF IN PRODUCTION
+        app.run(threaded=True, host='0.0.0.0', port=mod_cfg.port_num)
+    else:
+        app.run(threaded=True, host='0.0.0.0', port=mod_cfg.port_num) 
 
 
 def get_run_location_DEBUG():
@@ -53,7 +57,7 @@ def get_run_location_DEBUG():
     in the public DEV version, or prod version
     """
     if mod_cfg.user_folder == r'D:\dev\src\lifepim\lifepim\SAMPLE_DATA':
-        return 'DEV', ''
+        return 'DEV', mod_cfg.user_folder
     else:
         return 'PROD', mod_cfg.user_folder
 
@@ -728,6 +732,13 @@ def search_list():
     index_list = index.get_list_and_names_index_files()
 
     search_results, files_found = index.search(search_text)
+
+    index.save_list(files_found, os.path.join(mod_cfg.user_folder, 'files_found.csv'))
+    index.save_list(search_results, os.path.join(mod_cfg.user_folder, 'search_results.csv'))
+    
+
+
+
     nav_title, nav_warn = get_run_location_DEBUG()
 
     return render_template('search.html',

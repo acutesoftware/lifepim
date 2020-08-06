@@ -11,6 +11,9 @@ user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
 display_name = 'Duncan'  # single user server runs on users local file system
 
 
+port_num=9741           # port to browse to, eg. http://127.0.0.1:9741/
+WEB_VERSION = "DEV"     # to show debug lines in web server
+
 logon_file = os.path.join(user_folder, 'configuration', 'lifepim.par')
 data_folder = os.path.join(user_folder, 'DATA')
 index_folder = os.path.join(user_folder, 'index')
