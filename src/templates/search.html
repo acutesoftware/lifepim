@@ -58,12 +58,6 @@ Showing {{ num_results }} results for {{ search_text }}<BR><BR>
 
             </div>
           </div>
-        
-
-
-
-
-
   {% endfor %}
 </div>
 
@@ -87,7 +81,7 @@ Showing {{ num_results }} results for {{ search_text }}<BR><BR>
       </TR>
       {% for row in files_found[0:] %}
       {% if row %}
-       {% if row|length > 0 %}
+       {% if row|length > 4 %}
       <TR>
         <TD><a href="{{ url_for('page_file_find', fname=row[2]) }}">{{ row[2] }}</a></TD>
         <TD><a href="{{ url_for('page_file_find', fname=row[1]) }}">{{ row[1] }}</a></TD>
