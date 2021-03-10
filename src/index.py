@@ -231,6 +231,7 @@ def search(search_term):
     notes_list = search_keywords_in_notes(search_term)
     files_found = search_all_filenames(search_term)
 
+  
     return notes_list, files_found
 
 def search_keywords_in_notes(search_term):
@@ -261,7 +262,7 @@ def search_all_filenames(search_term):
                 all_results.extend(search_results)
 
     print('FINAL SEARCH RESULTS FOR FILES =  ' + str(len(all_results)) + ' files named like ' + search_term)
-    #print(all_results[0:3])
+    #print(all_results[0:30])
 
 
     return all_results[0:1000]
@@ -384,10 +385,12 @@ def get_list_and_names_index_files():
     raw_list = get_list_index_files()
     for fname in raw_list:
         # remove the index_folder from start and .csv from end
-        
         display_name = mod_cfg.get_path_from_index_filename(fname)
-        res.append([fname, display_name])
-        print('fname : ', fname, ' display= ', display_name)
+
+        # only include CURRENT filelists from config
+        if display_name in mod_cfg.current_index_list:
+            res.append([fname, display_name])
+            #print('fname : ', fname, ' display= ', display_name)
 
     return res
 

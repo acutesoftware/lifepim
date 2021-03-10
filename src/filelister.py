@@ -5,20 +5,33 @@
 import os
 import time 
 import config as mod_cfg
-import web_data as web
 
 import aikif.lib.cls_filelist as mod_fl
 
+
+
+def get_folder_list(fname):
+    """
+    returns the default list of folders
+    """
+    res = []
+    with open(fname, 'r') as f:
+        for line in f:
+            if line != '':
+                if line[0:1] != '#':
+                    res.append(line.strip('\n'))
+    return res
+
+
 output_folder = mod_cfg.user_folder
 op_full_list = os.path.join(output_folder, 'full_filelist.csv')
-fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
+fldr_list = get_folder_list(mod_cfg.folder_list_file)
 
 excluded_files = [
     'myenv', 
     '__pycache__', 
     'htmlcov'
 ]
-
 
 
 

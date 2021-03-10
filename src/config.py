@@ -57,6 +57,22 @@ api_routes = [
     '/options',
 ]
 
+
+current_index_list = [
+    r'\\FANGORN\user\duncan\LifePIM\Data',
+    r'\\FANGORN\user\duncan\C\user\docs',
+    r'\\FANGORN\user\duncan\C\user\dev',
+    r'\\FANGORN\user\duncan\C\user\AIKIF',
+    r'\\FANGORN\user\duncan\C\user\acute',
+    r'\\FANGORN\user\DATA\photos',
+    r'\\FANGORN\user\DATA\eBooks',
+    r'\\FANGORN\user\DATA\3D',
+    r'\\FANGORN\photo',
+    r'\\FANGORN\music',
+    r'D:\docs\Unreal Projects',
+    r'D:\dev\src',
+]
+
 def get_conn_str():
 	conn_str = {}
 	with open(logon_file, 'r') as f:
