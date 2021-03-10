@@ -86,7 +86,7 @@ Showing {{ num_results }} results for {{ search_text }}<BR><BR>
         <TD><a href="{{ url_for('page_file_find', fname=row[2]) }}">{{ row[2] }}</a></TD>
         <TD><a href="{{ url_for('page_file_find', fname=row[1]) }}">{{ row[1] }}</a></TD>
         <TD>{{ row[3] }}</small></TD>
-        <TD><a href="{{ url_for('page_file_find', fname=row[4][0:10]) }}">{{ row[4][0:10] }}</a>{{ row[4][11:] }}</TD>
+        <TD><a href="{{ url_for('page_file_find', fname=row[4][0:10]) }}">{{ row[4][0:10] }}</a> {{ row[4][11:] }}</TD>
       </TR>
        {% endif %}
        {% endif %}
