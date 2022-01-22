@@ -4,52 +4,61 @@
 
 import os 
 import sys
-import tkinter as tk
-from tkinter import ttk
-from tkcalendar import Calendar, DateEntry
-from tkinter import Frame, Label, Entry, Button, font
-from tkinter import LEFT, RIGHT, TOP, BOTTOM
+import sys
+from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import  QAction 
+from PyQt5.QtWidgets import  QTextEdit 
+from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtGui import QIcon
 
-#from tkinter import Menu
 
-from views.home import home as home
-from views.calendar import calendar as calendar
-from views.tasks import tasks as tasks
-from views.notes import notes as notes
-from views.contacts import contacts as contacts
-from views.places import places as places
-from views.data import data as data
-from views.badges import badges as badges
-from views.money import money as money
-from views.music import music as music
-from views.images import images as images
-from views.apps import apps as apps
-from views.files import files as files
-from views.admin import admin as admin
-from views.options import options as options
-from views.about import about as about
+
 
 from interfaces import lp_screen
+import config as mod_cfg
 
-import config
+
 
 def main():
-    print('starting desktop via ' + config.base_url)
-    #app = simpleapp_tk(None)
-    app = tk.Tk()
-    app.title('LifePIM Desktop')
-    app.geometry('950x600')
-    app.tk.call('encoding', 'system', 'unicode')
+    app = QApplication(sys.argv)
+    ex = LifePIM_GUI()
+    sys.exit(app.exec_())
 
 
-    print('starting desktop...')
+class LifePIM_GUI(QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+        self.build_gui()
 
 
-    lp_screen.init_screen(app)
+    def build_gui(self):
+        self.setGeometry(100, 100, 900, 600)
+        self.setWindowTitle('LifePIM Desktop')
+        self.setWindowIcon(QIcon('static/favicon.ico'))
 
 
+        textEdit = QTextEdit()
+        self.setCentralWidget(textEdit)
 
-    app.mainloop()
+        exitAct = QAction(QIcon('exit24.png'), 'Exit', self)
+        exitAct.setShortcut('Ctrl+Q')
+        exitAct.setStatusTip('Exit application')
+        exitAct.triggered.connect(self.close)
+
+
+        self.statusBar().showMessage('Ready')
+
+
+        menubar = self.menuBar()
+        fileMenu = menubar.addMenu('&File')
+        fileMenu.addAction(exitAct)
+
+        toolbar = self.addToolBar('Exit')
+        toolbar.addAction(exitAct)
+
+        self.show()
 
 
 
