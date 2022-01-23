@@ -1,0 +1,14 @@
+#icons for toolbar - djm
+exit=P:\__Purchases\humble_bundle\GUI1\icons\medieval\101.png
+cut=P:\__Purchases\humble_bundle\GUI1\icons\medieval\129.png
+fix=P:\__Purchases\humble_bundle\GUI1\icons\medieval\130.png
+dig=P:\__Purchases\humble_bundle\GUI1\icons\medieval\128.png
+help=P:\__Purchases\humble_bundle\GUI1\icons\medieval\104.png
+
+cal=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Calendar_Month View.png
+addr=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Address_Book.png
+bell=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Bell.png
+book=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Book.png
+bookshelf=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Bookshelf.png
+chalkboard=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Chalkboard.png
+camera=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Camera.png

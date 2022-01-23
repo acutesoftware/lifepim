@@ -1,17 +1,14 @@
 #!/usr/bin/python3
 # coding: utf-8
 # lp_screen.py 
-
+# Icons for QT5 are stored
+# C:\Python37-32\Lib\site-packages\PyQt5\Qt5\qml\QtQuick3D\designer\images
+# C:\Python37-32\Lib\site-packages\PyQt5\Qt5\qml\QtQuick\Controls\Styles\Base\images
+# C:\Python37-32\Lib\site-packages\PyQt5\Qt5\qml\QtQuick\Controls.2\designer\images
+# C:\Python37-32\Lib\site-packages\PyQt5\Qt5\qml\QtQuick3D\designer\images
+# N:\DATA\3D\PURCHASED\GUI_user_interface\humble_bundle_2021_GUI\guiiconspack1\icon set 700\icon (80 Х 80)\101-200
 import os 
 import sys
-import tkinter as tk
-from tkinter import ttk
-from tkcalendar import Calendar, DateEntry
-from tkinter import Frame, Label, Entry, Button, font
-from tkinter import LEFT, RIGHT, TOP, BOTTOM
-
-from tkinter import Menu
-
 
 from views.home import home as home
 from views.calendar import calendar as calendar
@@ -32,130 +29,59 @@ from views.about import about as about
 
 
 
+
 def init_screen(app):
     """
     High level function called to build the main GUI in tkinter
     """
+    icon_files_djm = load_theme_icons('theme_djm.txt')
+    print(get_theme_icon(icon_files_djm, 'exit'))
     build_main_layout(app)
-    print('finished building layout')
-    #screen_build_menu(app)
+    screen_build_menu(app)
+
     
 def donothing():
    filewin = Toplevel(app)
    button = Button(filewin, text="Do nothing button")
    button.pack()
 
+def load_theme_icons(theme_name):
+    icons = {}
+    with open(theme_name, 'r') as fip:
+        for line in fip:
+            #print(' line = ' + line)
+            if line.strip() != '':
+                if line[0:1] != '#':
+                    nme, icon = line.strip('\n').split('=')
+                    #print('nme=' + nme + ', icon = ' + icon)
+                    icons[nme] = icon
+    #print('loaded theme : ' + theme_name)
+    #print(icons)
+    return icons
+
+def get_theme_icon(theme_list, icon_name):
+    try:
+        return theme_list[icon_name]
+    except:
+        print('Icon ' + icon_name + ' does not exist in theme' )
+        return ''
+
+
+def build_main_layout(app):
+    pass
 
 def screen_build_menu(app):
 
     ##############################################################################
     ## MENU 
-
-    menubar = Menu(app)
-    filemenu = Menu(menubar, tearoff=0)
-    filemenu.add_command(label="New", command=donothing)
-    filemenu.add_command(label="Open", command=donothing)
-    filemenu.add_command(label="Save", command=donothing)
-    filemenu.add_command(label="Save as...", command=donothing)
-    filemenu.add_command(label="Close", command=donothing)
-
-    filemenu.add_separator()
-
-    filemenu.add_command(label="Exit", command=app.quit)
-    menubar.add_cascade(label="File", menu=filemenu)
-    editmenu = Menu(menubar, tearoff=0)
-    editmenu.add_command(label="Undo", command=donothing)
-
-    editmenu.add_separator()
-
-    editmenu.add_command(label="Cut", command=donothing)
-    editmenu.add_command(label="Copy", command=donothing)
-    editmenu.add_command(label="Paste", command=donothing)
-    editmenu.add_command(label="Delete", command=donothing)
-    editmenu.add_command(label="Select All", command=donothing)
-
-    menubar.add_cascade(label="Edit", menu=editmenu)
-    helpmenu = Menu(menubar, tearoff=0)
-    helpmenu.add_command(label="Help Index", command=donothing)
-    helpmenu.add_command(label="About...", command=donothing)
-    menubar.add_cascade(label="Help", menu=helpmenu)
-
-    app.config(menu=menubar)
-    app.configure(menu = menubar)
+    pass
 
     ##############################################################################
 
-def build_main_layout(app):
-
-    
-
+def build_main_layout_OLD(app):
     # create all of the main containers
-    left_frame = Frame(app, bg='gray14', width=80, height=600)
-    mid_frame = Frame(app, bg='gray10', width=350, height=600, padx=1, pady=1)
-    right_frame = Frame(app, bg='gray14', width=250, height=600, padx=1, pady=1)
-    status_frame = Frame(app, bg='deep sky blue', width=455, height=20, pady=1)
-
-    # layout all of the main containers
-    app.grid_rowconfigure(0, weight=100)
-    app.grid_rowconfigure(1, weight=0)
-
-    app.grid_columnconfigure(0, weight=0)
-    app.grid_columnconfigure(1, weight=100)
-    app.grid_columnconfigure(2, weight=0)
-
-
-    left_frame.grid(row=0, column=0, sticky="ns")
-    mid_frame.grid(row=0, column=1, sticky="nsew")
-    right_frame.grid(row=0, column=2, sticky="ns")
-    status_frame.grid(row=1, sticky="ew")
-    status_label = Label(status_frame, text='Status Bar',  bg='deep sky blue')
-    status_label.grid(row=1, column=0)
-
-    folder_label = Label(left_frame, text='Folder list')
-    folder_label.grid(row=1, column=0)
-
-
-
-
-
-
-    n = ttk.Notebook(mid_frame)
-    n.pack(expand=1, fill='both')
-
-    tab1 = ttk.Frame(n)   # first page, which would get widgets gridded into it
-    tab2 = ttk.Frame(n)   # second page
-    tab3 = ttk.Frame(n)   
-    tab4 = ttk.Frame(n)   
-    tab5 = ttk.Frame(n)   
-    tab6 = ttk.Frame(n)   
-    tab7 = ttk.Frame(n)   
-    tab8 = ttk.Frame(n)   
-    tab9 = ttk.Frame(n)   
-    tab10 = ttk.Frame(n)   
-    tab11 = ttk.Frame(n)   
-    tab12 = ttk.Frame(n)   
-    tab13 = ttk.Frame(n)   
-    tab14 = ttk.Frame(n)   
-    tab15 = ttk.Frame(n)   
-    tab16 = ttk.Frame(n)   
-
-    tab1.grid(row=0, sticky="nsew")
-    tab2.grid(row=0, sticky="nsew")
-    tab3.grid(row=0, sticky="nsew")
-    tab4.grid(row=0, sticky="nsew")
-    tab5.grid(row=0, sticky="nsew")
-    tab6.grid(row=0, sticky="nsew")
-    tab7.grid(row=0, sticky="nsew")
-    tab8.grid(row=0, sticky="nsew")
-    tab9.grid(row=0, sticky="nsew")
-    tab10.grid(row=0, sticky="nsew")
-    tab11.grid(row=0, sticky="nsew")
-    tab12.grid(row=0, sticky="nsew")
-    tab13.grid(row=0, sticky="nsew")
-    tab14.grid(row=0, sticky="nsew")
-    tab15.grid(row=0, sticky="nsew")
-    tab16.grid(row=0, sticky="nsew")
-
+    n = []
+    """
     n.add(tab1, text='   ❗   ')
     n.add(tab2, text='   ➀   ')
     n.add(tab3, text='   ✔   ')
@@ -168,15 +94,14 @@ def build_main_layout(app):
     n.add(tab10, text='   ♬   ')
     n.add(tab11, text='   ✾   ')
     n.add(tab12, text='   ☑   ')
-    n.add(tab13, text='      ')
+    n.add(tab13, text='   F   ')
     n.add(tab14, text='   ✋   ')
     n.add(tab15, text='   ⚙   ')
     n.add(tab16, text='   ?   ')
 
-
-
-    print('init finished, about to build the tabs')
-    
+    # Note that there is probably no point having a dynamic list
+    # of tabs because each tab has specific code that needs to 
+    # work with other tabs.
     home.build_screen(tab1)
     calendar.build_screen(tab2)
     tasks.build_screen(tab3)
@@ -198,3 +123,4 @@ def build_main_layout(app):
     #build_screen_home(tab1)
     #build_screen_calendar(tab2)
 
+    """
