@@ -67,8 +67,12 @@ def get_theme_icon(theme_list, icon_name):
         return ''
 
 
-def build_main_layout(app):
-    pass
+def build_main_layout(rootWidget):
+    print('building main screen into ' + str(rootWidget))
+    
+    
+
+    
 
 def screen_build_menu(app):
 

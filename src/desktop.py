@@ -33,7 +33,7 @@ def main():
     sys.exit(app.exec_())
 
 
-class LifePIM_GUI(QMainWindow):
+class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
     def __init__(self):
         super().__init__()
@@ -44,6 +44,18 @@ class LifePIM_GUI(QMainWindow):
         self.setGeometry(100, 100, 900, 600)
         self.setWindowTitle('LifePIM Desktop')
         self.setWindowIcon(QIcon('static/favicon.ico'))
+
+
+        # WORKS        textEdit = QTextEdit()
+        # self.setCentralWidget(textEdit)
+        #rootWidget = QHBoxLayout(self) # doesnt work QWidget()   # 
+        rootWidget = QWidget() 
+        self.setCentralWidget(rootWidget)
+
+
+
+
+        self.build_main_layout(rootWidget)
 
         theme = lp_screen.load_theme_icons(os.path.join(mod_cfg.local_folder_theme, 'theme_djm.txt'))
     
@@ -133,6 +145,53 @@ class LifePIM_GUI(QMainWindow):
 
 
         self.show()
+
+
+
+    def build_main_layout(self, rootWidget):
+        print('building main screen into ' + str(rootWidget))
+
+        """ BELOW 3 lines work - attaches a text editor in a widget under main window
+        textEdit = QTextEdit()
+        lay = QVBoxLayout(rootWidget)
+        lay.addWidget(textEdit)
+
+        """
+        # Step 1 - make the splitter interface
+        hbox = QHBoxLayout(self)
+
+        topleft = QFrame(self)
+        topleft.setFrameShape(QFrame.StyledPanel)
+
+        topright = QFrame(self)
+        topright.setFrameShape(QFrame.StyledPanel)
+
+        bottom = QFrame(self)
+        bottom.setFrameShape(QFrame.StyledPanel)
+
+
+        
+        #textEdit = QTextEdit()
+        #bottom.addWidget(textEdit)        
+
+        splitter1 = QSplitter(Qt.Horizontal)
+        splitter1.addWidget(topleft)
+        splitter1.addWidget(topright)
+
+        
+
+        splitter2 = QSplitter(Qt.Vertical)
+        splitter2.addWidget(splitter1)
+        splitter2.addWidget(bottom)
+
+        hbox.addWidget(splitter2)
+        rootWidget.setLayout(hbox)    
+        
+
+
+    def build_frame_left(self):
+        pass
+
 
     def showDate(self, date):
         self.lbl.setText(date.toString())

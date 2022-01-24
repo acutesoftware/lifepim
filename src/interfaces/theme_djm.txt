@@ -1,5 +1,5 @@
 #icons for toolbar - djm
-exit=P:\__Purchases\humble_bundle\GUI1\icons\medieval\101.png
+exit=
 cut=P:\__Purchases\humble_bundle\GUI1\icons\medieval\129.png
 fix=P:\__Purchases\humble_bundle\GUI1\icons\medieval\130.png
 dig=P:\__Purchases\humble_bundle\GUI1\icons\medieval\128.png
