@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import QAction
 from PyQt5.QtWidgets import QTextEdit 
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QCalendarWidget
 
@@ -65,22 +66,27 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         ########################################################################
         #   TOOLBAR
         ########################################################################
-        tbar2 = self.addToolBar('PIM')
-        calAct = self.make_toolbar_button(tbar2, theme, 'cal', 'cal', 'cal', 'Ctrl+1', 'Calendar')
-        addrAct = self.make_toolbar_button(tbar2, theme, 'addr', 'addr', 'addr', 'Ctrl+2', 'Address Book')
-        taskAct = self.make_toolbar_button(tbar2, theme, 'bell', 'bell', 'bell', 'Ctrl+3', 'Todo List and Reminders')
-        noteAct = self.make_toolbar_button(tbar2, theme, 'book', 'book', 'book', 'Ctrl+4', 'Add Note')
-        shelfAct = self.make_toolbar_button(tbar2, theme, 'bookshelf', 'bookshelf', 'bookshelf', 'Ctrl+4', 'All Notes')
+        tbarPim = self.addToolBar('PIM')
+        calAct = self.make_toolbar_button(tbarPim, theme, 'cal', 'cal', 'cal', 'Ctrl+1', 'Calendar')
+        addrAct = self.make_toolbar_button(tbarPim, theme, 'addr', 'addr', 'addr', 'Ctrl+2', 'Address Book')
+        taskAct = self.make_toolbar_button(tbarPim, theme, 'bell', 'bell', 'bell', 'Ctrl+3', 'Todo List and Reminders')
+        noteAct = self.make_toolbar_button(tbarPim, theme, 'book', 'book', 'book', 'Ctrl+4', 'Add Note')
+        shelfAct = self.make_toolbar_button(tbarPim, theme, 'bookshelf', 'bookshelf', 'bookshelf', 'Ctrl+4', 'All Notes')
 
-        drawAct = self.make_toolbar_button(tbar2, theme, 'chalkboard', 'chalkboard', 'chalkboard', 'Ctrl+5', 'Drawings and Ideas')
-        imgAct = self.make_toolbar_button(tbar2, theme, 'camera', 'camera', 'camera', 'Ctrl+7', 'Images')
+        drawAct = self.make_toolbar_button(tbarPim, theme, 'chalkboard', 'chalkboard', 'chalkboard', 'Ctrl+5', 'Drawings and Ideas')
+        imgAct = self.make_toolbar_button(tbarPim, theme, 'camera', 'camera', 'camera', 'Ctrl+7', 'Images')
 
-        toolbar = self.addToolBar('Data')
-        exitAct = self.make_toolbar_button(toolbar, theme, 'Exit', 'exit', 'quit', 'Ctrl+Q', 'Exit application')
-        cutAct = self.make_toolbar_button(toolbar, theme, 'Cut', 'cut', 'cut', 'Ctrl+W', 'Cut data')
-        fixAct = self.make_toolbar_button(toolbar, theme, 'Fix', 'fix', 'fix', 'Ctrl+G', 'Fix data')
-        digAct = self.make_toolbar_button(toolbar, theme, 'Dig', 'dig', 'dig', 'Ctrl+D', 'Dig into data')
+        # Search in Toolbar
+        tbarSearch = self.addToolBar('Search')
+        search = QLineEdit()
+        tbarSearch.addWidget(search)
+        searchAct = self.make_toolbar_button(tbarSearch, theme, 'Search', 'search', 'search', 'Ctrl+F', 'Search for data')
 
+        toolbarFile = self.addToolBar('Data')
+        exitAct = self.make_toolbar_button(toolbarFile, theme, 'Exit', 'exit', 'quit', 'Ctrl+Q', 'Exit application')
+        cutAct = self.make_toolbar_button(toolbarFile, theme, 'Cut', 'cut', 'cut', 'Ctrl+W', 'Cut data')
+        fixAct = self.make_toolbar_button(toolbarFile, theme, 'Fix', 'fix', 'fix', 'Ctrl+G', 'Fix data')
+        digAct = self.make_toolbar_button(toolbarFile, theme, 'Dig', 'dig', 'dig', 'Ctrl+D', 'Dig into data')
 
 
         #=====================================================================================
@@ -106,7 +112,9 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         dataMenu.addAction(cutAct)
         dataMenu.addAction(fixAct)
         dataMenu.addAction(digAct)
-    
+        dataMenu.addAction(searchAct)
+
+
 
         # ------------------------------------------------------------------------------------
         #   [ S T A T U S    B A R ]
@@ -149,43 +157,53 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
 
     def build_main_layout(self, rootWidget):
-        print('building main screen into ' + str(rootWidget))
 
-        """ BELOW 3 lines work - attaches a text editor in a widget under main window
-        textEdit = QTextEdit()
-        lay = QVBoxLayout(rootWidget)
-        lay.addWidget(textEdit)
-
-        """
         # Step 1 - make the splitter interface
-        hbox = QHBoxLayout(self)
+        rootBox = QHBoxLayout(self)
 
-        topleft = QFrame(self)
-        topleft.setFrameShape(QFrame.StyledPanel)
+        #leftBox = QVBoxLayout(self)
+        #leftBox.addWidget(QLabel('Left Main'))
 
-        topright = QFrame(self)
-        topright.setFrameShape(QFrame.StyledPanel)
-
-        bottom = QFrame(self)
-        bottom.setFrameShape(QFrame.StyledPanel)
-
-
+        leftTop = QFrame(self)
+        leftTop.setFrameShape(QFrame.StyledPanel)
+        leftTop.resize(300,300)
         
-        #textEdit = QTextEdit()
-        #bottom.addWidget(textEdit)        
-
-        splitter1 = QSplitter(Qt.Horizontal)
-        splitter1.addWidget(topleft)
-        splitter1.addWidget(topright)
-
+        leftMid = QFrame(self)
+        leftMid.setFrameShape(QFrame.StyledPanel)
+        leftMid.resize(300,400)
+        
+        leftBottom = QFrame(self)
+        leftBottom.setFrameShape(QFrame.StyledPanel)
+        leftBottom.resize(300,501)
         
 
-        splitter2 = QSplitter(Qt.Vertical)
+        mid = QFrame(self)
+        mid.setFrameShape(QFrame.StyledPanel)
+        mid.resize(500,800)
+
+        right = QFrame(self)
+        right.setFrameShape(QFrame.StyledPanel)
+        right.resize(100,700)
+
+        
+        textEdit = QTextEdit()
+        #rootBox.addWidget(textEdit)        # doesnt work adding to rootBox
+
+        splitter1 = QSplitter(Qt.Vertical)  # splitter1 = QSplitter(Qt.Horizontal)
+        splitter1.resize(300,300)
+        splitter1.addWidget(leftTop)
+        splitter1.addWidget(leftMid)
+        splitter1.addWidget(leftBottom)
+
+    
+        splitter2 = QSplitter(Qt.Horizontal)
         splitter2.addWidget(splitter1)
-        splitter2.addWidget(bottom)
+        splitter2.addWidget(mid)
+        splitter2.addWidget(right)
 
-        hbox.addWidget(splitter2)
-        rootWidget.setLayout(hbox)    
+        # finally add the main horiz splitter to the root
+        rootBox.addWidget(splitter2)
+        rootWidget.setLayout(rootBox)    
         
 
 
