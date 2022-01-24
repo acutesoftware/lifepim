@@ -53,9 +53,6 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         rootWidget = QWidget() 
         self.setCentralWidget(rootWidget)
 
-
-
-
         self.build_main_layout(rootWidget)
 
         theme = lp_screen.load_theme_icons(os.path.join(mod_cfg.local_folder_theme, 'theme_djm.txt'))
@@ -161,34 +158,39 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         # Step 1 - make the splitter interface
         rootBox = QHBoxLayout(self)
 
-        #leftBox = QVBoxLayout(self)
-        #leftBox.addWidget(QLabel('Left Main'))
+        lblLeftTop = QLabel(' Left Top - FileLists')
+        lblLeftMid = QLabel(' Left Mid - Folders')
+        lblLeftBottom = QLabel(' Left Bottom - Files')
+        lblCentre = QLabel(' Centre - NOTES')
+        lblRight = QLabel(' Right - quick jump')
+        textEdit = QTextEdit()
 
         leftTop = QFrame(self)
         leftTop.setFrameShape(QFrame.StyledPanel)
         leftTop.resize(300,300)
-        
+        lblLeftTop.setParent(leftTop)
+
         leftMid = QFrame(self)
         leftMid.setFrameShape(QFrame.StyledPanel)
         leftMid.resize(300,400)
-        
+        lblLeftMid.setParent(leftMid)
+          
         leftBottom = QFrame(self)
         leftBottom.setFrameShape(QFrame.StyledPanel)
         leftBottom.resize(300,501)
-        
+        lblLeftBottom.setParent(leftBottom)
 
         mid = QFrame(self)
         mid.setFrameShape(QFrame.StyledPanel)
         mid.resize(500,800)
+        lblCentre.setParent(mid)
+        textEdit.setParent(mid)
 
         right = QFrame(self)
         right.setFrameShape(QFrame.StyledPanel)
         right.resize(100,700)
-
+        lblRight.setParent(right)
         
-        textEdit = QTextEdit()
-        #rootBox.addWidget(textEdit)        # doesnt work adding to rootBox
-
         splitter1 = QSplitter(Qt.Vertical)  # splitter1 = QSplitter(Qt.Horizontal)
         splitter1.resize(300,300)
         splitter1.addWidget(leftTop)
