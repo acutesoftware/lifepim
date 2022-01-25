@@ -12,3 +12,4 @@ book=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Book.png
 bookshelf=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Bookshelf.png
 chalkboard=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Chalkboard.png
 camera=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Camera.png
+home=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\House.png

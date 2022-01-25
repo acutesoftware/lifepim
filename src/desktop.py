@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QCalendarWidget
+from PyQt5.QtWidgets import (QTreeWidget, QTreeWidgetItem)
 
 from PyQt5.QtGui import QIcon
 
@@ -42,36 +43,48 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
 
     def build_gui(self):
-        self.setGeometry(100, 100, 900, 600)
-        self.setWindowTitle('LifePIM Desktop')
+
+        self.setWindowTitle(mod_cfg.read_user_setting('window_title'))
         self.setWindowIcon(QIcon('static/favicon.ico'))
 
+        # Load themes and data needed
+        theme = lp_screen.load_theme_icons(os.path.join(mod_cfg.local_folder_theme, 'theme_djm.txt'))
 
-        # WORKS        textEdit = QTextEdit()
-        # self.setCentralWidget(textEdit)
-        #rootWidget = QHBoxLayout(self) # doesnt work QWidget()   # 
+        window_location = mod_cfg.read_user_setting('window_location_main')
+        x, y, width, height = window_location.split(' ')
+        self.setGeometry(int(x), int(y), int(width), int(height))
+    
+
+        # set up the root widget and assign to main Window
         rootWidget = QWidget() 
         self.setCentralWidget(rootWidget)
 
+        self._build_menu_and_toolbar(theme)
+
         self.build_main_layout(rootWidget)
+        self.statusBar().showMessage('Ready')
 
-        theme = lp_screen.load_theme_icons(os.path.join(mod_cfg.local_folder_theme, 'theme_djm.txt'))
-    
-    
+      
+       
 
 
+
+        self.show()
+
+    def _build_menu_and_toolbar(self, theme):
         ########################################################################
         #   TOOLBAR
         ########################################################################
         tbarPim = self.addToolBar('PIM')
-        calAct = self.make_toolbar_button(tbarPim, theme, 'cal', 'cal', 'cal', 'Ctrl+1', 'Calendar')
-        addrAct = self.make_toolbar_button(tbarPim, theme, 'addr', 'addr', 'addr', 'Ctrl+2', 'Address Book')
-        taskAct = self.make_toolbar_button(tbarPim, theme, 'bell', 'bell', 'bell', 'Ctrl+3', 'Todo List and Reminders')
-        noteAct = self.make_toolbar_button(tbarPim, theme, 'book', 'book', 'book', 'Ctrl+4', 'Add Note')
-        shelfAct = self.make_toolbar_button(tbarPim, theme, 'bookshelf', 'bookshelf', 'bookshelf', 'Ctrl+4', 'All Notes')
+        homeAct = self.make_toolbar_button(tbarPim, theme, 'home', 'home', 'home', 'Ctrl+1', 'Overview')
+        calAct = self.make_toolbar_button(tbarPim, theme, 'cal', 'cal', 'cal', 'Ctrl+2', 'Calendar')
+        addrAct = self.make_toolbar_button(tbarPim, theme, 'addr', 'addr', 'addr', 'Ctrl+3', 'Address Book')
+        taskAct = self.make_toolbar_button(tbarPim, theme, 'bell', 'bell', 'bell', 'Ctrl+4', 'Todo List and Reminders')
+        noteAct = self.make_toolbar_button(tbarPim, theme, 'book', 'book', 'book', 'Ctrl+5', 'Add Note')
+        shelfAct = self.make_toolbar_button(tbarPim, theme, 'bookshelf', 'bookshelf', 'bookshelf', 'Ctrl+6', 'All Notes')
 
-        drawAct = self.make_toolbar_button(tbarPim, theme, 'chalkboard', 'chalkboard', 'chalkboard', 'Ctrl+5', 'Drawings and Ideas')
-        imgAct = self.make_toolbar_button(tbarPim, theme, 'camera', 'camera', 'camera', 'Ctrl+7', 'Images')
+        drawAct = self.make_toolbar_button(tbarPim, theme, 'chalkboard', 'chalkboard', 'chalkboard', 'Ctrl+7', 'Drawings and Ideas')
+        imgAct = self.make_toolbar_button(tbarPim, theme, 'camera', 'camera', 'camera', 'Ctrl+8', 'Images')
 
         # Search in Toolbar
         tbarSearch = self.addToolBar('Search')
@@ -95,6 +108,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         fileMenu.addAction(exitAct)
 
         pimMenu = menubar.addMenu('&PIM')
+        pimMenu.addAction(homeAct)
         pimMenu.addAction(calAct)
         pimMenu.addAction(addrAct)
         pimMenu.addAction(taskAct)
@@ -113,46 +127,6 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
 
 
-        # ------------------------------------------------------------------------------------
-        #   [ S T A T U S    B A R ]
-        # ------------------------------------------------------------------------------------
-        self.statusBar().showMessage('Ready')
-
-        
-
-        #[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
-        #   G R I D    L A Y O U T 
-        #[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
-
-        gridMainArea = QHBoxLayout()  #QFrame(self)
-        """
-
-        # should we add this to gridMainArea
-        
-        # Add a calendar widget to the top left
-        vbox = QVBoxLayout(self)
-
-        cal = QCalendarWidget(self)
-        cal.setGridVisible(True)
-        cal.clicked[QDate].connect(self.showDate)
-
-        vbox.addWidget(cal)
-
-        self.lbl = QLabel(self)
-        date = cal.selectedDate()
-        self.lbl.setText(date.toString())
-
-        vbox.addWidget(self.lbl)
-
-        self.setLayout(vbox)
-        #gridMainArea.setLayout(vbox)
-        """
-
-
-        self.show()
-
-
-
     def build_main_layout(self, rootWidget):
 
         # Step 1 - make the splitter interface
@@ -167,17 +141,17 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
         leftTop = QFrame(self)
         leftTop.setFrameShape(QFrame.StyledPanel)
-        leftTop.resize(300,300)
+        leftTop.resize(350,540)
         lblLeftTop.setParent(leftTop)
-
+        
         leftMid = QFrame(self)
         leftMid.setFrameShape(QFrame.StyledPanel)
-        leftMid.resize(300,400)
+        leftMid.resize(350,400)
         lblLeftMid.setParent(leftMid)
           
         leftBottom = QFrame(self)
         leftBottom.setFrameShape(QFrame.StyledPanel)
-        leftBottom.resize(300,501)
+        leftBottom.resize(350,501)
         lblLeftBottom.setParent(leftBottom)
 
         mid = QFrame(self)
@@ -192,7 +166,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         lblRight.setParent(right)
         
         splitter1 = QSplitter(Qt.Vertical)  # splitter1 = QSplitter(Qt.Horizontal)
-        splitter1.resize(300,300)
+        splitter1.resize(350,350)
         splitter1.addWidget(leftTop)
         splitter1.addWidget(leftMid)
         splitter1.addWidget(leftBottom)
@@ -202,6 +176,12 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         splitter2.addWidget(splitter1)
         splitter2.addWidget(mid)
         splitter2.addWidget(right)
+
+
+        # add the components to the layout
+        self.create_widget_calendar().setParent(leftTop)
+        self.create_widget_treeview().setParent(leftMid)
+        #my_cal.setParent(leftTop)     
 
         # finally add the main horiz splitter to the root
         rootBox.addWidget(splitter2)
@@ -213,8 +193,6 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         pass
 
 
-    def showDate(self, date):
-        self.lbl.setText(date.toString())
 
     def make_toolbar_button(self, toolbar, theme, name, icon_name, cmd_name, shortcut, tooltip):
         thisAct = QAction(QIcon(lp_screen.get_theme_icon(theme, icon_name)), name, self)
@@ -238,6 +216,50 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
     def dummy(self):  
         print('running dummy command ' )  
+
+
+    def create_widget_calendar(self):
+        # should we add this to gridMainArea
+        
+        # Add a calendar widget to the top left
+        vbox = QVBoxLayout(self)
+
+        cal = QCalendarWidget(self)
+        cal.setGridVisible(True)
+        cal.clicked[QDate].connect(self.showDate)
+
+        vbox.addWidget(cal)
+
+        date = cal.selectedDate()
+        #self.lbl = QLabel(self)
+        #self.lbl.setText(date.toString())
+        #vbox.addWidget(self.lbl)
+        return cal
+        #return vbox
+    def showDate(self, date):
+        self.lbl.setText(date.toString())
+        print('todo')
+        
+
+    def create_widget_treeview(self):
+        tree    = QTreeWidget (self)
+        headerItem  = QTreeWidgetItem()
+        item    = QTreeWidgetItem()
+
+        for i in range(3):
+            parent = QTreeWidgetItem(tree)
+            parent.setText(0, "Parent {}".format(i))
+            parent.setFlags(parent.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
+            for x in range(5):
+                child = QTreeWidgetItem(parent)
+                child.setFlags(child.flags() | Qt.ItemIsUserCheckable)
+                child.setText(0, "Child {}".format(x))
+                child.setCheckState(0, Qt.Unchecked)
+        tree.show()         
+        
+        return tree
+
+
 
 
 if __name__ == '__main__':  

@@ -27,6 +27,7 @@ from views.admin import admin as admin
 from views.options import options as options
 from views.about import about as about
 
+import config as mod_cfg
 
 
 
@@ -63,16 +64,9 @@ def get_theme_icon(theme_list, icon_name):
     try:
         return theme_list[icon_name]
     except:
-        print('Icon ' + icon_name + ' does not exist in theme' )
+        #print('Icon ' + icon_name + ' does not exist in theme' )
         return ''
 
-
-def build_main_layout(rootWidget):
-    print('building main screen into ' + str(rootWidget))
-    
-    
-
-    
 
 def screen_build_menu(app):
 

@@ -60,6 +60,7 @@ api_routes = [
 ]
 
 
+
 current_index_list = [
     r'\\FANGORN\user\duncan\LifePIM\Data',
     r'\\FANGORN\user\duncan\C\user\docs',
@@ -204,6 +205,10 @@ def add_toolbar_buttons(window):
 
 """
 
-
+def read_user_setting(setting):
+    with open('settings.cfg', 'r') as fip:
+        for line in fip:
+            if setting == line[0:len(setting)]:
+                return line[len(setting)+1:]
 
 
