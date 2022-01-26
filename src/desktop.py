@@ -44,41 +44,50 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
     def __init__(self):
         super().__init__()
 
-        # global references across all focus modes
+        # global references for Widgets created here (across all focus modes - may not be used)
         self.MainTextEditor = None
         self.MainWidgetFilelist = None
         self.currentFile = ''
+        self.curTab = 'home'
+        # create the components that might be used in the layout
+        self.lpWidgetCalendar = self.create_widget_calendar()
+        self.lpWidgetTreeview = self.create_widget_treeview()
+        self.lpWidgetTextEdit = self.create_widget_text_editor()
+        self.lpWidgetFilelist = self.create_widget_filelist()
 
+        self.load_settings_data()
         self.build_gui()
 
 
+    def load_settings_data(self):
+        """
+        loads basic settings data (themes, default folders) as well
+        as cached info to allow for quick display of window while
+        full data set loads in background (should be seconds anyway)
+        """
+        self.setting_window_title = mod_cfg.read_user_setting('window_title')
+        self.setting_window_location = mod_cfg.read_user_setting('window_location_main')
+        self.setting_window_icon =  mod_cfg.read_user_setting('window_icon')
+        self.filename_theme_default =  mod_cfg.read_user_setting('filename_theme_default')
+
+        self.theme = lp_screen.load_theme_icons(os.path.join(mod_cfg.local_folder_theme, self.filename_theme_default))
+        
 
 
     def build_gui(self):
 
-        self.setWindowTitle(mod_cfg.read_user_setting('window_title'))
-        self.setWindowIcon(QIcon('static/favicon.ico'))
-
-        # Load themes and data needed
-        theme = lp_screen.load_theme_icons(os.path.join(mod_cfg.local_folder_theme, 'theme_djm.txt'))
-
-        window_location = mod_cfg.read_user_setting('window_location_main')
-        x, y, width, height = window_location.split(' ')
+        self.setWindowTitle(self.setting_window_title)
+        self.setWindowIcon(QIcon(self.setting_window_icon))
+        x, y, width, height =self.setting_window_location.split(' ')
         self.setGeometry(int(x), int(y), int(width), int(height))
-    
 
         # set up the root widget and assign to main Window
         rootWidget = QWidget() 
         self.setCentralWidget(rootWidget)
 
-        self._build_menu_and_toolbar(theme)
+        self._build_menu_and_toolbar(self.theme)
         self._build_main_layout(rootWidget)
         self.statusBar().showMessage('Ready')
-
-      
-       
-
-
 
         self.show()
 
@@ -142,61 +151,70 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
         # Step 1 - make the splitter interface
         rootBox = QHBoxLayout(self)
-
+        """
         lblLeftTop = QLabel(' Left Top - FileLists')
         lblLeftMid = QLabel(' Left Mid - Folders')
         lblLeftBottom = QLabel(' Left Bottom - Files')
         lblCentre = QLabel(' Centre - NOTES')
         lblRight = QLabel(' Right - quick jump')
-        
+        """
 
-        leftTop = QFrame(self)
-        leftTop.setFrameShape(QFrame.StyledPanel)
-        leftTop.resize(350,540)
-        lblLeftTop.setParent(leftTop)
+
+
+        self.UIleftTop = QFrame(self)
+        self.UIleftTop.setFrameShape(QFrame.StyledPanel)
+        self.UIleftTop.resize(350,540)
+
         
-        leftMid = QFrame(self)
-        leftMid.setFrameShape(QFrame.StyledPanel)
-        leftMid.resize(350,400)
-        lblLeftMid.setParent(leftMid)
+        self.UIleftMid = QFrame(self)
+        self.UIleftMid.setFrameShape(QFrame.StyledPanel)
+        self.UIleftMid.resize(350,400)
+        #lblLeftMid.setParent(leftMid)
           
-        leftBottom = QFrame(self)
-        leftBottom.setFrameShape(QFrame.StyledPanel)
-        leftBottom.resize(350,501)
-        lblLeftBottom.setParent(leftBottom)
+        self.UIleftBottom = QFrame(self)
+        self.UIleftBottom.setFrameShape(QFrame.StyledPanel)
+        self.UIleftBottom.resize(350,501)
+        #lblLeftBottom.setParent(leftBottom)
 
-        mid = QFrame(self)
-        mid.setFrameShape(QFrame.StyledPanel)
-        mid.resize(500,800)
-        lblCentre.setParent(mid)
+        self.UImid = QFrame(self)
+        self.UImid.setFrameShape(QFrame.StyledPanel)
+        self.UImid.resize(500,800)
+        #lblCentre.setParent(mid)
         
 
-        right = QFrame(self)
-        right.setFrameShape(QFrame.StyledPanel)
-        right.resize(100,700)
-        lblRight.setParent(right)
+        self.UIright = QFrame(self)
+        self.UIright.setFrameShape(QFrame.StyledPanel)
+        self.UIright.resize(100,700)
+        #lblRight.setParent(right)
         
         splitter1 = QSplitter(Qt.Vertical)  # splitter1 = QSplitter(Qt.Horizontal)
         splitter1.resize(350,350)
-        splitter1.addWidget(leftTop)
-        splitter1.addWidget(leftMid)
-        splitter1.addWidget(leftBottom)
+        splitter1.addWidget(self.UIleftTop)
+        splitter1.addWidget(self.UIleftMid)
+        splitter1.addWidget(self.UIleftBottom)
 
     
         splitter2 = QSplitter(Qt.Horizontal)
         splitter2.addWidget(splitter1)
-        splitter2.addWidget(mid)
-        splitter2.addWidget(right)
+        splitter2.addWidget(self.UImid)
+        splitter2.addWidget(self.UIright)
 
         # ------------------------------------------------------------------------------------
-        # add the components to the layout
-        self.create_widget_calendar().setParent(leftTop)
-        self.create_widget_treeview().setParent(leftMid)
-        self.create_widget_text_editor().setParent(mid)
-        self.create_widget_filelist().setParent(leftBottom)
+        # add components to layout depending on focus mode or toolbar
+
+        self.lpWidgetCalendar.setParent(self.UIleftTop)
+        self.lpWidgetTreeview.setParent(self.UIleftMid)
+        self.lpWidgetTextEdit.setParent(self.UImid)
+        self.lpWidgetFilelist.setParent(self.UIleftBottom)
+
+        self.update_layout(self.curTab)
+
 
         # -----------------------------------------------------------------------------------
         #my_cal.setParent(leftTop)     
+
+
+
 
         # finally add the main horiz splitter to the root
         rootBox.addWidget(splitter2)
@@ -239,7 +257,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             'dig':self.actDig,
             'cal':self.actCal
         }
-
+        self.curTab = cmd_name
         return valid_commands[cmd_name]
 
 
@@ -256,46 +274,68 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
     def actDummy(self):  
         print('running dummy command ' )  
+        self.curTab = 'dummy'
+        self.update_layout(self.curTab)
+
     def actCal(self):  
         print('running calendar command ' )  
+        self.curTab = 'cal'
+        self.update_layout(self.curTab)
+
     def actHome(self):  
         print('running home command ' )  
-    def actAddr(self):  
-        print('running Addr command ' )  
+        self.curTab = 'home'
+        self.update_layout(self.curTab)
 
     def actAddr(self):  
         print('running Addr command ' )  
+        self.update_layout(self.curTab)
 
     def actAddr(self):  
         print('running Addr command ' )  
+        self.update_layout(self.curTab)
+
+    def actAddr(self):  
+        print('running Addr command ' )  
+        self.update_layout(self.curTab)
 
     def actBell(self):  
         print('running Bell command ' )  
+        self.update_layout(self.curTab)
 
     def actBook(self):  
         print('running Book command ' )  
+        self.update_layout(self.curTab)
+        self.update_layout(self.curTab)
 
     def actBookshelf(self):  
         print('running Bookshelf command ' )  
+        self.update_layout(self.curTab)
 
     def actChalkboard(self):  
         print('running Chalkboard command ' )  
+        self.update_layout(self.curTab)
 
     def actCamera(self):  
         print('running Image command ' )  
+        self.update_layout(self.curTab)
 
     def actSearch(self):  
         print('running Search command ' )  
+        self.update_layout(self.curTab)
 
     def actCut(self):  
         print('running Data Cut command ' )  
+        self.update_layout(self.curTab)
 
     def actFix(self):  
         print('running Data Fix command ' )  
+        self.update_layout(self.curTab)
 
     def actDig(self):  
         print('running Data Dig command ' )  
         self.statusBar().showMessage(str(glbMainTextEditor))
+        self.update_layout(self.curTab)
 
 
 
@@ -353,6 +393,36 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.MainWidgetFilelist.attach_parent_reference(self)
 
         return self.MainWidgetFilelist
+
+
+    def update_layout(self, tabName):
+        """
+        High level function called when use switches mode eg
+        from Calendar to Notes, Tasks, Apps etc.
+        This changes the screen layout and sets the ALREADY CREATED 
+        widgets in the window location that is specified.
+        """
+        print('TAB MODE - is now ' + tabName)
+        if tabName == 'home':
+            self.lpWidgetCalendar.setParent(None)
+            self.lpWidgetTreeview.setParent(self.UIleftMid)
+            self.lpWidgetTextEdit.setParent(self.UImid)
+            self.lpWidgetFilelist.setParent(self.UIleftBottom)
+
+        elif tabName == 'cal':
+            self.lpWidgetCalendar.setParent(self.UIleftTop)
+            self.lpWidgetTreeview.setParent(self.UIleftMid)
+            self.lpWidgetTextEdit.setParent(None)
+            self.lpWidgetFilelist.setParent(self.UIleftBottom)
+
+        elif tabName == 'book':
+            #self.lpWidgetCalendar.setParent(self.UIleftTop)
+            #self.lpWidgetTreeview.setParent(self.UIleftMid)
+            self.lpWidgetTextEdit.setParent(self.UImid)
+            self.lpWidgetFilelist.setParent(self.UIleftBottom)
+        else:
+            self.lpWidgetTextEdit.setParent(self.UImid)
+
 
 
 class FileWidget(QWidget):
