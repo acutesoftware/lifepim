@@ -23,10 +23,32 @@ from PyQt5.QtWidgets import QCalendarWidget
 from PyQt5.QtWidgets import (QTreeWidget, QTreeWidgetItem)
 from PyQt5.QtWidgets import QMessageBox
 
+from PyQt5.QtWidgets import QTableView
+from PyQt5.QtWidgets import QTableWidget
+
+from PyQt5.QtGui import QPixmap
+
 from PyQt5.QtWidgets import (QFileSystemModel)
 from PyQt5.QtWidgets import (QTreeView, QListView)
 
 from PyQt5.QtGui import QIcon
+
+from views.home import home as home
+from views.calendar import calendar as calendar
+from views.tasks import tasks as tasks
+from views.notes import notes as notes
+from views.contacts import contacts as contacts
+from views.places import places as places
+from views.data import data as data
+from views.badges import badges as badges
+from views.money import money as money
+from views.music import music as music
+from views.images import images as images
+from views.apps import apps as apps
+from views.files import files as files
+from views.admin import admin as admin
+from views.options import options as options
+from views.about import about as about
 
 
 from interfaces import lp_screen
@@ -47,6 +69,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         # global references for Widgets created here (across all focus modes - may not be used)
         self.MainTextEditor = None
         self.MainWidgetFilelist = None
+        self.MainWidgetDataview = None
         self.currentFile = ''
         self.curTab = 'home'
         # create the components that might be used in the layout
@@ -54,9 +77,18 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpWidgetTreeview = self.create_widget_treeview()
         self.lpWidgetTextEdit = self.create_widget_text_editor()
         self.lpWidgetFilelist = self.create_widget_filelist()
+        self.lpWidgetDataview = self.create_widget_dataview()
+        self.lpWidgetImageview = self.create_widget_imageview()
+        
 
         self.load_settings_data()
         self.build_gui()
+
+        # load modules used in the application
+        self.lpFileManager = files.cFileManager()
+
+        # populate user data for first time (from cache)
+
 
 
     def load_settings_data(self):
@@ -206,8 +238,10 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpWidgetTreeview.setParent(self.UIleftMid)
         self.lpWidgetTextEdit.setParent(self.UImid)
         self.lpWidgetFilelist.setParent(self.UIleftBottom)
+        self.lpWidgetDataview.setParent(self.UImid)
+        self.lpWidgetImageview.setParent(self.UImid)
 
-        self.update_layout(self.curTab)
+        self.update_layout()
 
 
         # -----------------------------------------------------------------------------------
@@ -257,7 +291,6 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             'dig':self.actDig,
             'cal':self.actCal
         }
-        self.curTab = cmd_name
         return valid_commands[cmd_name]
 
 
@@ -273,69 +306,59 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.close
 
     def actDummy(self):  
-        print('running dummy command ' )  
         self.curTab = 'dummy'
-        self.update_layout(self.curTab)
+        self.update_layout()
 
     def actCal(self):  
-        print('running calendar command ' )  
         self.curTab = 'cal'
-        self.update_layout(self.curTab)
+        self.update_layout()
 
     def actHome(self):  
-        print('running home command ' )  
         self.curTab = 'home'
-        self.update_layout(self.curTab)
+        self.update_layout()
 
     def actAddr(self):  
-        print('running Addr command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'addr'
+        self.update_layout()
 
-    def actAddr(self):  
-        print('running Addr command ' )  
-        self.update_layout(self.curTab)
-
-    def actAddr(self):  
-        print('running Addr command ' )  
-        self.update_layout(self.curTab)
 
     def actBell(self):  
-        print('running Bell command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'bell'  
+        self.update_layout()
 
     def actBook(self):  
-        print('running Book command ' )  
-        self.update_layout(self.curTab)
-        self.update_layout(self.curTab)
+        self.curTab = 'book'  
+
+
+        self.update_layout()
 
     def actBookshelf(self):  
-        print('running Bookshelf command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'bookshelf'  
+        self.update_layout()
 
     def actChalkboard(self):  
-        print('running Chalkboard command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'chalkboard'  
+        self.update_layout()
 
     def actCamera(self):  
-        print('running Image command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'camera'  
+        self.update_layout()
 
     def actSearch(self):  
-        print('running Search command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'search'  
+        self.update_layout()
 
     def actCut(self):  
-        print('running Data Cut command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'cut'
+        self.update_layout()
 
     def actFix(self):  
-        print('running Data Fix command ' )  
-        self.update_layout(self.curTab)
+        self.curTab = 'fix'
+        self.update_layout()
 
     def actDig(self):  
-        print('running Data Dig command ' )  
-        self.statusBar().showMessage(str(glbMainTextEditor))
-        self.update_layout(self.curTab)
+        self.curTab = 'dig'  
+        self.update_layout()
 
 
 
@@ -394,28 +417,63 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
         return self.MainWidgetFilelist
 
+    def create_widget_dataview(self):
+        self.MainWidgetDataview =  QTableView() #QTableWidget #
+        return self.MainWidgetDataview
 
-    def update_layout(self, tabName):
+    def create_widget_imageview(self):
+        self.MainWidgetImageview =  QLabel()
+        self.lpPixelMap = QPixmap()
+        return self.MainWidgetImageview
+
+    def set_one_widget_visible(self, widName):
+        """
+        This is called when user clicks a file and only affects 
+        which MID (main one) widget gets shown based on the filetype
+        """
+        if widName == 'text':
+            self.lpWidgetTextEdit.setVisible(True)
+            self.lpWidgetDataview.setVisible(False)
+            self.lpWidgetImageview.setVisible(False)
+        elif widName == 'data':
+            self.lpWidgetTextEdit.setVisible(False)
+            self.lpWidgetDataview.setVisible(True)
+            self.lpWidgetImageview.setVisible(False)
+        elif widName == 'image':
+            self.lpWidgetTextEdit.setVisible(False)
+            self.lpWidgetDataview.setVisible(False)
+            self.lpWidgetImageview.setVisible(True)
+        else:
+            self.lpWidgetTextEdit.setVisible(True)
+            self.lpWidgetDataview.setVisible(True)
+            self.lpWidgetImageview.setVisible(True)
+
+
+
+    def update_layout(self):
         """
         High level function called when use switches mode eg
         from Calendar to Notes, Tasks, Apps etc.
         This changes the screen layout and sets the ALREADY CREATED 
         widgets in the window location that is specified.
         """
-        print('TAB MODE - is now ' + tabName)
-        if tabName == 'home':
-            self.lpWidgetCalendar.setParent(None)
+        print('TAB MODE - is now ' + self.curTab)
+        
+        if self.curTab == 'home':
+            self.lpWidgetCalendar.setVisible(False)
             self.lpWidgetTreeview.setParent(self.UIleftMid)
             self.lpWidgetTextEdit.setParent(self.UImid)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
+            self.lpWidgetTextEdit.setVisible(True)
 
-        elif tabName == 'cal':
+        elif self.curTab == 'cal':
+            self.lpWidgetCalendar.setVisible(True)
             self.lpWidgetCalendar.setParent(self.UIleftTop)
             self.lpWidgetTreeview.setParent(self.UIleftMid)
-            self.lpWidgetTextEdit.setParent(None)
+            self.lpWidgetTextEdit.setVisible(False)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
 
-        elif tabName == 'book':
+        elif self.curTab == 'book':
             #self.lpWidgetCalendar.setParent(self.UIleftTop)
             #self.lpWidgetTreeview.setParent(self.UIleftMid)
             self.lpWidgetTextEdit.setParent(self.UImid)
@@ -467,12 +525,12 @@ class FileWidget(QWidget):
 
     def on_clicked_file(self, index):
         self.MainGUI.currentFile = self.fileModel.filePath(index)
-        print('view ing ' + self.MainGUI.currentFile)
-        text=open(self.MainGUI.currentFile).read()
-        self.MainGUI.MainTextEditor.setText(text)
-        
-        
+        print('viewing ' + self.MainGUI.currentFile)
 
+        
+        self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
+ 
+        
 
 
 if __name__ == '__main__':  
