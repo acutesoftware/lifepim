@@ -38,7 +38,7 @@ class cFileManager(object):
         tpe = self.identify_file_type(fname)
         # TODO - make ONE widget in 'mid' visible and others hidden 
         # rootGui.set_display_mode('text')
-        print('fname ' + fname + ' is file_type ' + tpe)
+        #print('fname ' + fname + ' is file_type ' + tpe)
         if tpe in [ 'text', 'markdown','code','web' ]:
             self.display_as_text(rootGui, fname)
         elif tpe == 'data':
@@ -48,9 +48,6 @@ class cFileManager(object):
         elif tpe == 'picture':
             print('todo - show image')
             self.display_as_image(rootGui, fname)
-
-
-
 
 
         elif tpe == 'video':
@@ -75,27 +72,37 @@ class cFileManager(object):
     def identify_file_type(self, fname):
         xtn = self.get_file_extension(fname)
         for k,v in self.file_types.items():
-            print(k,v)
+            #print(k,v)
             if xtn in v:
-                print('fname is type ' + k)
+                #print('fname is type ' + k)
                 return k
         return 'text'
 
     def get_file_extension(self, fname):
         parts = fname.split('.')
         xtn = parts[-1].upper()
-        print('XTN = ' + xtn)
+        #print('XTN = ' + xtn)
         return xtn
 
     def display_as_text(self, rootGui, fname):
-        text=open(fname).read()
-        rootGui.MainGUI.MainTextEditor.setText(text)      
-        rootGui.MainGUI.set_one_widget_visible('text')  
+        try:
+            text=open(fname).read()
+            rootGui.MainGUI.MainTextEditor.setText(text)      
+            rootGui.MainGUI.set_one_widget_visible('text')  
+            print('display_as_text(self, rootGui, fname) TOK ')
+        except:
+            text = 'Cant display ' + fname
+            rootGui.MainGUI.MainTextEditor.setText(text)      
+            rootGui.MainGUI.set_one_widget_visible('text')  
+
 
     def display_as_data(self, rootGui, fname):
-        csv_viewer = mod_data.lpData(rootGui.MainGUI)
-        csv_viewer.show_file(fname)
+        #csv_viewer = mod_data.lpData(rootGui.MainGUI)
+        #csv_viewer.show_file(fname)
+        rootGui.MainGUI.lpWidgetDataview.show_file(fname)
+        print(rootGui.MainGUI.lpWidgetDataview.get_data())
         rootGui.MainGUI.set_one_widget_visible('data')
+        print('display_as_data(self, rootGui, fname) TOK ')
 
     def display_as_image(self, rootGui, fname):
         #rootGui.MainGUI.lpWidgetDataview.setParent(self.UImid)

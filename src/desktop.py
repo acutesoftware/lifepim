@@ -39,7 +39,7 @@ from views.tasks import tasks as tasks
 from views.notes import notes as notes
 from views.contacts import contacts as contacts
 from views.places import places as places
-from views.data import data as data
+from views.data import data as mod_data
 from views.badges import badges as badges
 from views.money import money as money
 from views.music import music as music
@@ -77,8 +77,11 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpWidgetTreeview = self.create_widget_treeview()
         self.lpWidgetTextEdit = self.create_widget_text_editor()
         self.lpWidgetFilelist = self.create_widget_filelist()
-        self.lpWidgetDataview = self.create_widget_dataview()
+        #self.lpWidgetDataview = self.create_widget_dataview()
         self.lpWidgetImageview = self.create_widget_imageview()
+        
+
+        self.lpWidgetDataview = mod_data.lpDataWidget(self)
         
 
         self.load_settings_data()
@@ -88,7 +91,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpFileManager = files.cFileManager()
 
         # populate user data for first time (from cache)
-
+        
 
 
     def load_settings_data(self):
@@ -195,12 +198,12 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
         self.UIleftTop = QFrame(self)
         self.UIleftTop.setFrameShape(QFrame.StyledPanel)
-        self.UIleftTop.resize(350,540)
+        self.UIleftTop.resize(350,340)
 
         
         self.UIleftMid = QFrame(self)
         self.UIleftMid.setFrameShape(QFrame.StyledPanel)
-        self.UIleftMid.resize(350,400)
+        self.UIleftMid.resize(350,200)
         #lblLeftMid.setParent(leftMid)
           
         self.UIleftBottom = QFrame(self)
@@ -236,9 +239,9 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
         self.lpWidgetCalendar.setParent(self.UIleftTop)
         self.lpWidgetTreeview.setParent(self.UIleftMid)
+        self.lpWidgetDataview.tbl.setParent(self.UImid)   # testing
         self.lpWidgetTextEdit.setParent(self.UImid)
         self.lpWidgetFilelist.setParent(self.UIleftBottom)
-        self.lpWidgetDataview.setParent(self.UImid)
         self.lpWidgetImageview.setParent(self.UImid)
 
         self.update_layout()
@@ -417,9 +420,13 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
         return self.MainWidgetFilelist
 
+    """
     def create_widget_dataview(self):
+        
         self.MainWidgetDataview =  QTableView() #QTableWidget #
+        self.MainWidgetDataview.resize(900,900)
         return self.MainWidgetDataview
+    """
 
     def create_widget_imageview(self):
         self.MainWidgetImageview =  QLabel()
@@ -433,19 +440,19 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         """
         if widName == 'text':
             self.lpWidgetTextEdit.setVisible(True)
-            self.lpWidgetDataview.setVisible(False)
+            self.lpWidgetDataview.tbl.setVisible(False)
             self.lpWidgetImageview.setVisible(False)
         elif widName == 'data':
             self.lpWidgetTextEdit.setVisible(False)
-            self.lpWidgetDataview.setVisible(True)
+            self.lpWidgetDataview.tbl.setVisible(True)
             self.lpWidgetImageview.setVisible(False)
         elif widName == 'image':
             self.lpWidgetTextEdit.setVisible(False)
-            self.lpWidgetDataview.setVisible(False)
+            self.lpWidgetDataview.tbl.setVisible(False)
             self.lpWidgetImageview.setVisible(True)
         else:
             self.lpWidgetTextEdit.setVisible(True)
-            self.lpWidgetDataview.setVisible(True)
+            self.lpWidgetDataview.tbl.setVisible(True)
             self.lpWidgetImageview.setVisible(True)
 
 
@@ -465,6 +472,8 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetTextEdit.setParent(self.UImid)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpWidgetTextEdit.setVisible(True)
+            self.lpWidgetDataview.setVisible(True)
+            #self.lpWidgetDataview.setParent(self.UImid)  # TODO - fix
 
         elif self.curTab == 'cal':
             self.lpWidgetCalendar.setVisible(True)
@@ -486,10 +495,17 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 class FileWidget(QWidget):
     def __init__(self, *args, **kwargs):
         QWidget.__init__(self, *args, **kwargs)
-        hlay = QHBoxLayout(self)
+
+        pth = mod_cfg.file_startup_path  # r"D:\dev"
+        
+        hlay = QVBoxLayout(self)  # was HBox
+        hlay.addStretch(6)
+        #hlay.showMaximized(True) 
         self.treeview = QTreeView()
         self.listview = QListView()
-        
+        self.lblCurFolder = QLineEdit(pth)
+        self.lblCurFolder.setText(pth)
+        hlay.addWidget(self.lblCurFolder)
         hlay.addWidget(self.treeview)
         hlay.addWidget(self.listview)
 
@@ -497,7 +513,6 @@ class FileWidget(QWidget):
 
         self.dirModel = QFileSystemModel()
 
-        pth = mod_cfg.file_startup_path  # r"D:\dev"
         self.dirModel.setRootPath(pth)
         self.dirModel.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs)
 
@@ -512,6 +527,7 @@ class FileWidget(QWidget):
 
         self.treeview.clicked.connect(self.on_clicked_folder)
         self.listview.clicked.connect(self.on_clicked_file)
+        self.lblCurFolder.editingFinished.connect(self.on_editingFinished)
 
     def attach_parent_reference(self, parentGui):
         """
@@ -522,13 +538,24 @@ class FileWidget(QWidget):
     def on_clicked_folder(self, index):
         path = self.dirModel.fileInfo(index).absoluteFilePath()
         self.listview.setRootIndex(self.fileModel.setRootPath(path))
+        self.lblCurFolder.setText(path)
 
     def on_clicked_file(self, index):
         self.MainGUI.currentFile = self.fileModel.filePath(index)
         print('viewing ' + self.MainGUI.currentFile)
-
-        
+        self.lblCurFolder.setText( self.MainGUI.currentFile)
         self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
+
+    def on_editingFinished(self):
+        new_path = self.lblCurFolder.text()
+        print('left text edit - new url is ' + new_path)
+        try:
+            self.dirModel.setRootPath(new_path)
+            #self.fileModel.setRootPath(new_path)
+            #self.listview.setRootIndex(new_path)        
+            self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
+        except:
+            print('invalid path to set folder to')
  
         
 
