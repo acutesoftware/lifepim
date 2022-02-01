@@ -76,6 +76,10 @@ current_index_list = [
     r'D:\dev\src',
 ]
 
+
+file_startup_path = r"D:\dev\src\worldbuild"
+file_startup_path = r"D:\dev\src\lifepim\lifepim\SAMPLE_DATA"
+
 def get_conn_str():
 	conn_str = {}
 	with open(logon_file, 'r') as f:
@@ -209,6 +213,6 @@ def read_user_setting(setting):
     with open('settings.cfg', 'r') as fip:
         for line in fip:
             if setting == line[0:len(setting)]:
-                return line[len(setting)+1:]
+                return line.strip('\n')[len(setting)+1:]
 
 

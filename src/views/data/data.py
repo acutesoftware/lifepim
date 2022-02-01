@@ -39,7 +39,7 @@ class lpDataWidget(QWidget):
         
 
         self.tbl.resize(900,900)
-        self.settings = QSettings('Axel Schneider', 'QTableViewPandas')
+        self.settings = QSettings('LifePIM_Desktop', 'QTableViewPandas')
         self.table = self.tbl # parentUI.MainWidgetDataview
 
         self.data = [
@@ -56,7 +56,7 @@ class lpDataWidget(QWidget):
         self.tbl.setEditTriggers(QAbstractItemView.DoubleClicked)
         self.tbl.setSelectionBehavior(self.tbl.SelectRows)
         self.tbl.setSelectionMode(self.tbl.SingleSelection)
-
+        # self.tbl.setRowHeight(15, 15)
 
         self.tbl.verticalHeader().setVisible(True)
         self.tbl.setGridStyle(1)
@@ -103,8 +103,9 @@ class lpDataWidget(QWidget):
             self.tbl.setModel(self.tbl.model)
             self.tbl.resizeColumnsToContents()
             self.tbl.selectRow(0)
-        print('loaded pandas model')    
-        print(str(self.tbl))
+        #print('loaded pandas model')    
+        self.tbl.resizeRowsToContents()
+        #print(str(self.tbl))
 
 
     def load_csv_OLD_works(self, filename):
@@ -239,8 +240,8 @@ def stylesheet(self):
     QHeaderView
         {
          background: qlineargradient( y1: 0, y2: 1,
-                                 stop: 0 #E1E1E1, stop: 0.4 #DDDDDD,
-                                 stop: 0.5 #D8D8D8, stop: 1.0 #D3D3D3);
+                                 stop: 0 #E1E1E1, stop: 0.3 #DDDDDD,
+                                 stop: 0.4 #D8D8D8, stop: 0.4 #D3D3D3);
         color: #888a85;
         }
     QToolBar

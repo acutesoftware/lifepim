@@ -53,9 +53,8 @@ class cFileManager(object):
         elif tpe == 'video':
             print('todo - play video')
             self.display_as_text(rootGui, fname)
-        elif tpe == 'sound':
-            print('todo - play sound')
-            self.display_as_text(rootGui, fname)
+        elif tpe == 'audio':
+            self.display_as_music(rootGui, fname)
         elif tpe == '3D':
             print('todo - show 3D image')
             self.display_as_text(rootGui, fname)
@@ -113,7 +112,9 @@ class cFileManager(object):
         #rootGui.MainGUI.lpWidgetDataview.setPixmap(rootGui.MainGUI.lpPixelMap)
         rootGui.MainGUI.set_one_widget_visible('image')
 
-
+    def display_as_music(self, rootGui, fname):
+        rootGui.MainGUI.lpMusicWidget.setVisible(True)
+        rootGui.MainGUI.lpMusicWidget.play_music_file(fname)
 
 
 class FileView(object):

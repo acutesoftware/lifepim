@@ -5,9 +5,8 @@
 import os 
 import sys
 
-from PyQt5.QtCore import QDate
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QDir
+from PyQt5.QtCore import *
+
 from PyQt5.QtWidgets import QFrame
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QSplitter
@@ -42,7 +41,7 @@ from views.places import places as places
 from views.data import data as mod_data
 from views.badges import badges as badges
 from views.money import money as money
-from views.music import music as music
+from views.music import music as mod_music
 from views.images import images as images
 from views.apps import apps as apps
 from views.files import files as files
@@ -79,6 +78,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpWidgetFilelist = self.create_widget_filelist()
         #self.lpWidgetDataview = self.create_widget_dataview()
         self.lpWidgetImageview = self.create_widget_imageview()
+        self.lpMusicWidget = self.create_wiget_musicview()
         
 
         self.lpWidgetDataview = mod_data.lpDataWidget(self)
@@ -238,11 +238,12 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         # add components to layout depending on focus mode or toolbar
 
         self.lpWidgetCalendar.setParent(self.UIleftTop)
-        self.lpWidgetTreeview.setParent(self.UIleftMid)
+        #self.lpWidgetTreeview.setParent(self.UIleftMid)
         self.lpWidgetDataview.tbl.setParent(self.UImid)   # testing
         self.lpWidgetTextEdit.setParent(self.UImid)
         self.lpWidgetFilelist.setParent(self.UIleftBottom)
         self.lpWidgetImageview.setParent(self.UImid)
+        self.lpMusicWidget.visWidget.setParent(self.UImid)
 
         self.update_layout()
 
@@ -433,6 +434,13 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpPixelMap = QPixmap()
         return self.MainWidgetImageview
 
+    def create_wiget_musicview(self):
+        self.lpMusicWidget =  mod_music.lpMusicWidget(self)
+        self.lpMusicWidget.setParent(self)
+        
+        return self.lpMusicWidget
+
+
     def set_one_widget_visible(self, widName):
         """
         This is called when user clicks a file and only affects 
@@ -442,18 +450,29 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetTextEdit.setVisible(True)
             self.lpWidgetDataview.tbl.setVisible(False)
             self.lpWidgetImageview.setVisible(False)
+            #self.lpMusicWidget.visWidget.setVisible(False)
         elif widName == 'data':
             self.lpWidgetTextEdit.setVisible(False)
             self.lpWidgetDataview.tbl.setVisible(True)
             self.lpWidgetImageview.setVisible(False)
+            #self.lpMusicWidget.visWidget.setVisible(False)
         elif widName == 'image':
             self.lpWidgetTextEdit.setVisible(False)
             self.lpWidgetDataview.tbl.setVisible(False)
             self.lpWidgetImageview.setVisible(True)
+            #self.lpMusicWidget.visWidget.setVisible(False)
+        elif widName in ['sound', 'music']:
+            self.lpWidgetTextEdit.setVisible(False)
+            self.lpWidgetDataview.tbl.setVisible(False)
+            self.lpWidgetImageview.setVisible(False)
+
+            #self.lpMusicWidget.visWidget.setVisible(True)
+
         else:
             self.lpWidgetTextEdit.setVisible(True)
             self.lpWidgetDataview.tbl.setVisible(True)
             self.lpWidgetImageview.setVisible(True)
+            #self.lpMusicWidget.visWidget.setVisible(True)
 
 
 
@@ -473,6 +492,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpWidgetTextEdit.setVisible(True)
             self.lpWidgetDataview.setVisible(True)
+            self.lpMusicWidget.setVisible(True)
             #self.lpWidgetDataview.setParent(self.UImid)  # TODO - fix
 
         elif self.curTab == 'cal':
@@ -481,12 +501,14 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetTreeview.setParent(self.UIleftMid)
             self.lpWidgetTextEdit.setVisible(False)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
+            self.lpMusicWidget.setVisible(False)
 
         elif self.curTab == 'book':
             #self.lpWidgetCalendar.setParent(self.UIleftTop)
             #self.lpWidgetTreeview.setParent(self.UIleftMid)
             self.lpWidgetTextEdit.setParent(self.UImid)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
+            self.lpMusicWidget.setVisible(True)
         else:
             self.lpWidgetTextEdit.setParent(self.UImid)
 
@@ -499,7 +521,7 @@ class FileWidget(QWidget):
         pth = mod_cfg.file_startup_path  # r"D:\dev"
         
         hlay = QVBoxLayout(self)  # was HBox
-        hlay.addStretch(6)
+        #hlay.addStretch(6)
         #hlay.showMaximized(True) 
         self.treeview = QTreeView()
         self.listview = QListView()
