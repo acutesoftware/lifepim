@@ -27,8 +27,7 @@ from PyQt5.QtWidgets import QTableWidget
 
 from PyQt5.QtGui import QPixmap
 
-from PyQt5.QtWidgets import (QFileSystemModel)
-from PyQt5.QtWidgets import (QTreeView, QListView)
+
 
 from PyQt5.QtGui import QIcon
 
@@ -44,7 +43,7 @@ from views.money import money as money
 from views.music import music as mod_music
 from views.images import images as images
 from views.apps import apps as apps
-from views.files import files as files
+from views.files import files as mod_files
 from views.admin import admin as admin
 from views.options import options as options
 from views.about import about as about
@@ -76,7 +75,6 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpWidgetTreeview = self.create_widget_treeview()
         self.lpWidgetTextEdit = self.create_widget_text_editor()
         self.lpWidgetFilelist = self.create_widget_filelist()
-        #self.lpWidgetDataview = self.create_widget_dataview()
         self.lpWidgetImageview = self.create_widget_imageview()
         self.lpMusicWidget = self.create_wiget_musicview()
         
@@ -88,7 +86,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.build_gui()
 
         # load modules used in the application
-        self.lpFileManager = files.cFileManager()
+        self.lpFileManager = mod_files.cFileManager()
 
         # populate user data for first time (from cache)
         
@@ -131,15 +129,28 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         #   TOOLBAR
         ########################################################################
         tbarPim = self.addToolBar('PIM')
-        homeAct = self.make_toolbar_button(tbarPim, theme, 'home', 'home', 'home', 'Ctrl+1', 'Overview')
-        calAct = self.make_toolbar_button(tbarPim, theme, 'cal', 'cal', 'cal', 'Ctrl+2', 'Calendar')
-        addrAct = self.make_toolbar_button(tbarPim, theme, 'addr', 'addr', 'addr', 'Ctrl+3', 'Address Book')
-        taskAct = self.make_toolbar_button(tbarPim, theme, 'bell', 'bell', 'bell', 'Ctrl+4', 'Todo List and Reminders')
-        noteAct = self.make_toolbar_button(tbarPim, theme, 'book', 'book', 'book', 'Ctrl+5', 'Add Note')
-        shelfAct = self.make_toolbar_button(tbarPim, theme, 'bookshelf', 'bookshelf', 'bookshelf', 'Ctrl+6', 'All Notes')
+        actHome = self.make_toolbar_button(tbarPim, theme, 'home', 'home', 'home', 'Ctrl+1', 'Overview')
+        actCal = self.make_toolbar_button(tbarPim, theme, 'Events', 'events', 'events', 'Ctrl+2', 'Calendar')
+        actTasks = self.make_toolbar_button(tbarPim, theme, 'Tasks', 'tasks', 'tasks', 'Ctrl+3', 'Tasks List')
+        actNotes = self.make_toolbar_button(tbarPim, theme, 'Notes', 'notes', 'notes', 'Ctrl+4', 'Notes')
+        actData = self.make_toolbar_button(tbarPim, theme, 'Data', 'data', 'data', 'Ctrl+4', 'Data Tables')
+        actFiles = self.make_toolbar_button(tbarPim, theme, 'files', 'files', 'files', 'Ctrl+4', 'Files')
+        actInfo = self.make_toolbar_button(tbarPim, theme, 'info', 'info', 'info', 'Ctrl+4', 'info')
+        actMedia = self.make_toolbar_button(tbarPim, theme, 'media', 'media', 'media', 'Ctrl+4', 'media')
+        actApps = self.make_toolbar_button(tbarPim, theme, 'apps', 'apps', 'apps', 'Ctrl+4', 'apps')
+        actBadges = self.make_toolbar_button(tbarPim, theme, 'badges', 'badges', 'badges', 'Ctrl+4', 'badges')
+        act3D = self.make_toolbar_button(tbarPim, theme, '3D', '3D', '3D', 'Ctrl+4', '3D')
+        actComms = self.make_toolbar_button(tbarPim, theme, 'comms', 'comms', 'comms', 'Ctrl+4', 'comms')
+        actAudio = self.make_toolbar_button(tbarPim, theme, 'music', 'audio', 'music', 'Ctrl+4', 'music')
+        
 
-        drawAct = self.make_toolbar_button(tbarPim, theme, 'chalkboard', 'chalkboard', 'chalkboard', 'Ctrl+7', 'Drawings and Ideas')
-        imgAct = self.make_toolbar_button(tbarPim, theme, 'camera', 'camera', 'camera', 'Ctrl+8', 'Images')
+
+        # make_toolbar_button(self, toolbar, theme, name, icon_name, cmd_name, shortcut, tooltip)
+        # Projects (Focus) Toolbar - this is mainly user generated
+        tbarProj = self.addToolBar('Project')
+        projAllAct = self.make_toolbar_button(tbarProj, theme, 'All', '', 'all', '', 'Show all projects')
+        projFilterAct = self.make_toolbar_button(tbarProj, theme, 'Proj1', '', 'proj_filter', '', 'Filtered projects')
+
 
         # Search in Toolbar
         tbarSearch = self.addToolBar('Search')
@@ -147,37 +158,38 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         tbarSearch.addWidget(search)
         searchAct = self.make_toolbar_button(tbarSearch, theme, 'Search', 'search', 'search', 'Ctrl+F', 'Search for data')
 
+        actExit = self.make_toolbar_button(tbarSearch, theme, 'Exit', 'exit', 'quit', 'Ctrl+Q', 'Exit application')
+
+        """
+        # Data Toolbar (in fact - dont put this in yet)
         toolbarFile = self.addToolBar('Data')
         exitAct = self.make_toolbar_button(toolbarFile, theme, 'Exit', 'exit', 'quit', 'Ctrl+Q', 'Exit application')
         cutAct = self.make_toolbar_button(toolbarFile, theme, 'Cut', 'cut', 'cut', 'Ctrl+W', 'Cut data')
         fixAct = self.make_toolbar_button(toolbarFile, theme, 'Fix', 'fix', 'fix', 'Ctrl+G', 'Fix data')
         digAct = self.make_toolbar_button(toolbarFile, theme, 'Dig', 'dig', 'dig', 'Ctrl+D', 'Dig into data')
-
+        """
 
         #=====================================================================================
         #=  MENU
         #=====================================================================================
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
-        fileMenu.addAction(digAct)
-        fileMenu.addAction(exitAct)
+        fileMenu.addAction(actExit)
 
         pimMenu = menubar.addMenu('&PIM')
-        pimMenu.addAction(homeAct)
-        pimMenu.addAction(calAct)
-        pimMenu.addAction(addrAct)
-        pimMenu.addAction(taskAct)
-        pimMenu.addAction(noteAct)
-        pimMenu.addAction(shelfAct)
-        pimMenu.addAction(drawAct)
-        pimMenu.addAction(imgAct)
-
+        pimMenu.addAction(actHome)
+        pimMenu.addAction(actCal)
+        pimMenu.addAction(actTasks)
+        pimMenu.addAction(actNotes)
+        pimMenu.addAction(actData)
+        pimMenu.addAction(actFiles)
+        pimMenu.addAction(actInfo)
+        pimMenu.addAction(actBadges)
+        pimMenu.addAction(actMedia)
+        pimMenu.addAction(actAudio)
+        pimMenu.addAction(actComms)
 
         dataMenu = menubar.addMenu('&Data')
-        dataMenu.addAction(digAct)
-        dataMenu.addAction(cutAct)
-        dataMenu.addAction(fixAct)
-        dataMenu.addAction(digAct)
         dataMenu.addAction(searchAct)
 
 
@@ -271,6 +283,9 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         return thisAct
 
 
+    ######################################################################################################
+    ######################################################################################################
+
     def get_run_command(self, cmd_name, param=[]):
         """
         high level function to parse commands to correct module.
@@ -280,21 +295,33 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         action commands
         """
         valid_commands = {
-            'quit':self.actExit,
-            'dummy':self.actDummy,
             'home':self.actHome,
-            'addr':self.actAddr,
-            'bell':self.actBell,
-            'book':self.actBook,
-            'bookshelf':self.actBookshelf,
-            'chalkboard':self.actChalkboard,
-            'camera':self.actCamera,
+            'events':self.actCal,
+            'tasks':self.actTasks,
+            'notes':self.actNotes,
+            'data':self.actData,
+            'files':self.actFiles,
+            'info':self.actInfo,
+            'media':self.actMedia,
+            'apps':self.actApps,
+            'badges':self.actBadges,
+            '3D':self.act3D,
+            'comms':self.actComms,
+            'music':self.actAudio,
             'search':self.actSearch,
-            'cut':self.actCut,
-            'fix':self.actFix,
-            'dig':self.actDig,
-            'cal':self.actCal
+            'quit':self.actExit,
+            'all':self.projAllAct,
+            'proj_filter':self.projFilterAct,
+            'dummy':self.actDummy
+
+
+        #projAllAct = self.make_toolbar_button(tbarProj, theme, 'All', '', 'all', '', 'Show all projects')
+        #projFilterAct = self.make_toolbar_button(tbarProj, theme, 'Proj1', '', 'proj_filter', '', 'Filtered projects')
+
+
         }
+
+        self.curTab = cmd_name
         return valid_commands[cmd_name]
 
 
@@ -313,58 +340,77 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.curTab = 'dummy'
         self.update_layout()
 
-    def actCal(self):  
-        self.curTab = 'cal'
-        self.update_layout()
-
     def actHome(self):  
         self.curTab = 'home'
         self.update_layout()
 
-    def actAddr(self):  
-        self.curTab = 'addr'
+    def actCal(self):  
+        self.curTab = 'cal'
         self.update_layout()
 
-
-    def actBell(self):  
-        self.curTab = 'bell'  
+    def actTasks(self):  
+        self.curTab = 'tasks'  
         self.update_layout()
 
-    def actBook(self):  
-        self.curTab = 'book'  
-
-
+    def actNotes(self):  
+        self.curTab = 'notes'
         self.update_layout()
 
-    def actBookshelf(self):  
-        self.curTab = 'bookshelf'  
+    def actData(self):  
+        self.curTab = 'data'
         self.update_layout()
 
-    def actChalkboard(self):  
-        self.curTab = 'chalkboard'  
+    def actFiles(self):  
+        self.curTab = 'files'
         self.update_layout()
 
-    def actCamera(self):  
-        self.curTab = 'camera'  
+    def actInfo(self):  
+        self.curTab = 'info'
+        self.update_layout()
+
+    def actMedia(self):  
+        self.curTab = 'media'
+        self.update_layout()
+
+    def actApps(self):  
+        self.curTab = 'apps'
+        self.update_layout()
+
+    def actBadges(self):  
+        self.curTab = 'badges'
+        self.update_layout()
+
+    def act3D(self):  
+        self.curTab = '3D'
+        self.update_layout()
+
+    def actComms(self):  
+        self.curTab = 'comms'
+        self.update_layout()
+
+    def actAudio(self):  
+        self.curTab = 'audio'
         self.update_layout()
 
     def actSearch(self):  
         self.curTab = 'search'  
         self.update_layout()
 
-    def actCut(self):  
-        self.curTab = 'cut'
+    def projAllAct(self):  
+        print('TODO - change project to all')  
         self.update_layout()
 
-    def actFix(self):  
-        self.curTab = 'fix'
-        self.update_layout()
-
-    def actDig(self):  
-        self.curTab = 'dig'  
+    def projFilterAct(self):  
+        print('TODO - FILTER project based on combo box or selection from list')    
         self.update_layout()
 
 
+       #projAllAct = self.make_toolbar_button(tbarProj, theme, 'All', '', 'all', '', 'Show all projects')
+        #projFilterAct = self.make_toolbar_button(tbarProj, theme, 'Proj1', '', 'proj_filter', '', 'Filtered projects')
+
+
+    ######################################################################################################
+    ######################################################################################################
 
     def create_widget_calendar(self):
         # should we add this to gridMainArea
@@ -415,7 +461,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         return self.MainTextEditor
 
     def create_widget_filelist(self):
-        self.MainWidgetFilelist = FileWidget()
+        self.MainWidgetFilelist = mod_files.FileWidget()
         #self.MainWidgetFilelist.resize(600,600)
         self.MainWidgetFilelist.attach_parent_reference(self)
 
@@ -503,83 +549,24 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpMusicWidget.setVisible(False)
 
-        elif self.curTab == 'book':
+        elif self.curTab == 'notes':
+            #self.lpWidgetCalendar.setParent(self.UIleftTop)
+            #self.lpWidgetTreeview.setParent(self.UIleftMid)
+            self.lpWidgetTextEdit.setParent(self.UImid)
+            self.lpWidgetFilelist.setParent(self.UIleftBottom)
+            self.lpMusicWidget.setVisible(False)
+            self.lpWidgetTextEdit.setVisible(True)
+
+        elif self.curTab == 'audio':
             #self.lpWidgetCalendar.setParent(self.UIleftTop)
             #self.lpWidgetTreeview.setParent(self.UIleftMid)
             self.lpWidgetTextEdit.setParent(self.UImid)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpMusicWidget.setVisible(True)
+            self.lpWidgetTextEdit.setVisible(False)
         else:
             self.lpWidgetTextEdit.setParent(self.UImid)
 
-
-
-class FileWidget(QWidget):
-    def __init__(self, *args, **kwargs):
-        QWidget.__init__(self, *args, **kwargs)
-
-        pth = mod_cfg.file_startup_path  # r"D:\dev"
-        
-        hlay = QVBoxLayout(self)  # was HBox
-        #hlay.addStretch(6)
-        #hlay.showMaximized(True) 
-        self.treeview = QTreeView()
-        self.listview = QListView()
-        self.lblCurFolder = QLineEdit(pth)
-        self.lblCurFolder.setText(pth)
-        hlay.addWidget(self.lblCurFolder)
-        hlay.addWidget(self.treeview)
-        hlay.addWidget(self.listview)
-
-        path = QDir.rootPath()
-
-        self.dirModel = QFileSystemModel()
-
-        self.dirModel.setRootPath(pth)
-        self.dirModel.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs)
-
-        self.fileModel = QFileSystemModel()
-        self.fileModel.setFilter(QDir.NoDotAndDotDot |  QDir.Files)
-
-        self.treeview.setModel(self.dirModel)
-        self.listview.setModel(self.fileModel)
-
-        self.treeview.setRootIndex(self.dirModel.index(pth))  # was path but defaults to C:
-        self.listview.setRootIndex(self.fileModel.index(pth)) # was path but defaults to C:
-
-        self.treeview.clicked.connect(self.on_clicked_folder)
-        self.listview.clicked.connect(self.on_clicked_file)
-        self.lblCurFolder.editingFinished.connect(self.on_editingFinished)
-
-    def attach_parent_reference(self, parentGui):
-        """
-        TODO - this is a terrible idea, but I havent worked out PyQT signals yet
-        """
-        self.MainGUI = parentGui
-
-    def on_clicked_folder(self, index):
-        path = self.dirModel.fileInfo(index).absoluteFilePath()
-        self.listview.setRootIndex(self.fileModel.setRootPath(path))
-        self.lblCurFolder.setText(path)
-
-    def on_clicked_file(self, index):
-        self.MainGUI.currentFile = self.fileModel.filePath(index)
-        print('viewing ' + self.MainGUI.currentFile)
-        self.lblCurFolder.setText( self.MainGUI.currentFile)
-        self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
-
-    def on_editingFinished(self):
-        new_path = self.lblCurFolder.text()
-        print('left text edit - new url is ' + new_path)
-        try:
-            self.dirModel.setRootPath(new_path)
-            #self.fileModel.setRootPath(new_path)
-            #self.listview.setRootIndex(new_path)        
-            self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
-        except:
-            print('invalid path to set folder to')
- 
-        
 
 
 if __name__ == '__main__':  

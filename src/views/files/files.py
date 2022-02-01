@@ -6,7 +6,84 @@ import config as mod_cfg
 
 from views.data import data as mod_data
 
+from PyQt5.QtCore import *
+
 from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QTextEdit 
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import (QFileSystemModel)
+from PyQt5.QtWidgets import (QTreeView, QListView)
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QLabel
+
+
+class FileWidget(QWidget):
+    def __init__(self, *args, **kwargs):
+        QWidget.__init__(self, *args, **kwargs)
+
+        pth = mod_cfg.file_startup_path  # r"D:\dev"
+        
+        hlay = QVBoxLayout(self)  # was HBox
+        #hlay.addStretch(6)
+        #hlay.showMaximized(True) 
+        self.treeview = QTreeView()
+        self.listview = QListView()
+        self.lblCurFolder = QLineEdit(pth)
+        self.lblCurFolder.setText(pth)
+        hlay.addWidget(self.lblCurFolder)
+        hlay.addWidget(self.treeview)
+        hlay.addWidget(self.listview)
+
+        path = QDir.rootPath()
+
+        self.dirModel = QFileSystemModel()
+
+        self.dirModel.setRootPath(pth)
+        self.dirModel.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs)
+
+        self.fileModel = QFileSystemModel()
+        self.fileModel.setFilter(QDir.NoDotAndDotDot |  QDir.Files)
+
+        self.treeview.setModel(self.dirModel)
+        self.listview.setModel(self.fileModel)
+
+        self.treeview.setRootIndex(self.dirModel.index(pth))  # was path but defaults to C:
+        self.listview.setRootIndex(self.fileModel.index(pth)) # was path but defaults to C:
+
+        self.treeview.clicked.connect(self.on_clicked_folder)
+        self.listview.clicked.connect(self.on_clicked_file)
+        self.lblCurFolder.editingFinished.connect(self.on_editingFinished)
+
+    def attach_parent_reference(self, parentGui):
+        """
+        TODO - this is a terrible idea, but I havent worked out PyQT signals yet
+        """
+        self.MainGUI = parentGui
+
+    def on_clicked_folder(self, index):
+        path = self.dirModel.fileInfo(index).absoluteFilePath()
+        self.listview.setRootIndex(self.fileModel.setRootPath(path))
+        self.lblCurFolder.setText(path)
+
+    def on_clicked_file(self, index):
+        self.MainGUI.currentFile = self.fileModel.filePath(index)
+        print('viewing ' + self.MainGUI.currentFile)
+        self.lblCurFolder.setText( self.MainGUI.currentFile)
+        self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
+
+    def on_editingFinished(self):
+        new_path = self.lblCurFolder.text()
+        print('left text edit - new url is ' + new_path)
+        try:
+            self.dirModel.setRootPath(new_path)
+            #self.fileModel.setRootPath(new_path)
+            #self.listview.setRootIndex(new_path)        
+            self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
+        except:
+            print('invalid path to set folder to')
+ 
 
 class cFileManager(object):
     def __init__(self):
