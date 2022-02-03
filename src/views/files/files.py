@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QFileSystemModel)
 from PyQt5.QtWidgets import (QTreeView, QListView)
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QLineEdit
-from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QComboBox
 
 
 class FileWidget(QWidget):
@@ -28,10 +28,26 @@ class FileWidget(QWidget):
         hlay = QVBoxLayout(self)  # was HBox
         #hlay.addStretch(6)
         #hlay.showMaximized(True) 
+
+        self.cmbDrive = QComboBox(self)
+        self.cmbDrive.addItem('C:/')
+        self.cmbDrive.addItem('D:/')
+        self.cmbDrive.addItem('E:/')
+        self.cmbDrive.addItem('M:/')
+        self.cmbDrive.addItem('N:/')
+        self.cmbDrive.addItem('P:/')
+        self.cmbDrive.addItem('T:/')
+
+
+
+        self.cmbDrive.activated[str].connect(self.onDriveChanged)
+
+
         self.treeview = QTreeView()
         self.listview = QListView()
         self.lblCurFolder = QLineEdit(pth)
         self.lblCurFolder.setText(pth)
+        hlay.addWidget(self.cmbDrive)
         hlay.addWidget(self.lblCurFolder)
         hlay.addWidget(self.treeview)
         hlay.addWidget(self.listview)
@@ -56,11 +72,22 @@ class FileWidget(QWidget):
         self.listview.clicked.connect(self.on_clicked_file)
         self.lblCurFolder.editingFinished.connect(self.on_editingFinished)
 
+    def _set_folder_to_list_files(self, path):
+        self.dirModel.setRootPath(path)
+        self.listview.setRootIndex(self.fileModel.setRootPath(path))
+        self.treeview.setModel(self.dirModel)
+        self.lblCurFolder.setText(path)
+
     def attach_parent_reference(self, parentGui):
         """
         TODO - this is a terrible idea, but I havent worked out PyQT signals yet
         """
         self.MainGUI = parentGui
+
+    def onDriveChanged(self, index):
+        print('you changed the drive to ' + str(index))
+        self._set_folder_to_list_files(index)
+
 
     def on_clicked_folder(self, index):
         path = self.dirModel.fileInfo(index).absoluteFilePath()
@@ -77,10 +104,7 @@ class FileWidget(QWidget):
         new_path = self.lblCurFolder.text()
         print('left text edit - new url is ' + new_path)
         try:
-            self.dirModel.setRootPath(new_path)
-            #self.fileModel.setRootPath(new_path)
-            #self.listview.setRootIndex(new_path)        
-            self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
+            self._set_folder_to_list_files(new_path)
         except:
             print('invalid path to set folder to')
  
