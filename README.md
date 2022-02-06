@@ -11,7 +11,7 @@ the live site but you get to choose which data gets uploaded to your lifepim
 account.
 
 ## Status
-Planning stage - nothing significant works yet!
+Under development - nothing significant works yet!
 
 ## Quick Start
 This github repository [https://github.com/acutesoftware/lifepim](https://github.com/acutesoftware/lifepim) contains the latest code, but the current public release is available via
@@ -20,6 +20,15 @@ This github repository [https://github.com/acutesoftware/lifepim](https://github
 
 This application is used to collect local metadata for indexing and allow for
 automatic uploading to https://www.lifepim.com
+
+To run the local web server, use
+`python web_server.py`
+
+To run the desktop application, use
+`python desktop.py`
+
+![Desktop Layout](https://github.com/acutesoftware/lifepim/tree/master/doc/lifepim_desktop_layout.PNG)
+
 
 ### Music collection
 collects metadata on your music collection for local use.

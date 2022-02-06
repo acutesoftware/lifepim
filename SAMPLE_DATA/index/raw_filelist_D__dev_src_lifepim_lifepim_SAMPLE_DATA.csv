@@ -1,16 +1,20 @@
-# D:\dev\src\lifepim\lifepim\SAMPLE_DATA
-\DATA\blogs\07_landscape_initial_start_point14_beach1.PNG
-\DATA\blogs\07_landscape_initial_start_point6.PNG
-\DATA\blogs\Checklist for building a business website.txt
-\DATA\blogs\Different ways to use folders to store your data.txt
-\DATA\ideas\Different ways to use folders to store your data.txt
-\DATA\recipes\Sausage Rolls with Shortcrust Pastry.txt
-\DATA\work\TODO - setup wiki pages.txt
-\configuration\folders.lis
-\configuration\lifepim.par
-\filelist.log
-\index\filelist.csv
-\index\raw_filelist_D__dev_src_lifepim_lifepim_SAMPLE_DATA.csv
-\index\raw_filelist_D__dev_src_lifepim_lifepim_src.csv
-\index\raw_folderlist_D__dev_src_lifepim_lifepim_SAMPLE_DATA.csv
-\index\raw_folderlist_D__dev_src_lifepim_lifepim_src.csv
+fullFilename,name,path,size,date,
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\filelist.log","filelist.log","D:\dev\src\lifepim\lifepim\SAMPLE_DATA","586","2020-07-20 00:29:12",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration\all files.pro","all files.pro","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration","721","2020-06-26 21:43:32",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration\folders.lis","folders.lis","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration","70","2020-06-22 18:24:15",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration\lifepim.par","lifepim.par","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration","37","2020-06-05 21:01:00",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration\test.pro","test.pro","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\configuration","721","2020-06-26 21:43:32",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs\07_landscape_initial_start_point14_beach1.PNG","07_landscape_initial_start_point14_beach1.PNG","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs","1061157","2019-07-17 19:26:47",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs\07_landscape_initial_start_point6.PNG","07_landscape_initial_start_point6.PNG","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs","930273","2019-07-15 23:02:54",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs\Checklist for building a business website.txt","Checklist for building a business website.txt","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs","5122","2020-06-05 21:46:35",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs\Different ways to use folders to store your data.txt","Different ways to use folders to store your data.txt","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\blogs","4505","2020-06-05 21:45:04",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\ideas\Different ways to use folders to store your data.txt","Different ways to use folders to store your data.txt","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\ideas","4531","2020-06-07 09:56:42",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\recipes\Sausage Rolls with Shortcrust Pastry.txt","Sausage Rolls with Shortcrust Pastry.txt","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\recipes","1931","2020-06-05 21:54:30",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\work\TODO - setup wiki pages.txt","TODO - setup wiki pages.txt","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\DATA\work","318","2020-06-05 21:50:40",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index\filelist.csv","filelist.csv","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index","1610","2020-06-27 23:41:23",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index\headings.csv","headings.csv","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index","2614","2020-06-27 23:41:23",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index\keywords.csv","keywords.csv","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index","110020","2020-06-27 23:41:23",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index\raw_filelist_D__dev_src_lifepim_lifepim_SAMPLE_DATA.csv","raw_filelist_D__dev_src_lifepim_lifepim_SAMPLE_DATA.csv","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index","0","2020-07-20 00:29:12",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index\raw_filelist_D__dev_src_lifepim_lifepim_src.csv","raw_filelist_D__dev_src_lifepim_lifepim_src.csv","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index","11738","2020-07-20 00:29:12",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index\raw_folderlist_D__dev_src_lifepim_lifepim_SAMPLE_DATA.csv","raw_folderlist_D__dev_src_lifepim_lifepim_SAMPLE_DATA.csv","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index","128","2020-06-26 10:42:52",
+"D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index\raw_folderlist_D__dev_src_lifepim_lifepim_src.csv","raw_folderlist_D__dev_src_lifepim_lifepim_src.csv","D:\dev\src\lifepim\lifepim\SAMPLE_DATA\index","871","2020-06-26 10:42:52",
