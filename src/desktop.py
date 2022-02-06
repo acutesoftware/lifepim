@@ -48,10 +48,10 @@ from views.admin import admin as admin
 from views.options import options as options
 from views.about import about as about
 
-
-from interfaces import lp_screen
+ 
+from interfaces import lp_screen  # make a copy of this for different interfaces (lp_web, lp_console, etc)
 import config as mod_cfg
-
+import lp_core as mod_lp_core
 
 def main():
     app = QApplication(sys.argv)
@@ -63,6 +63,9 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
     def __init__(self):
         super().__init__()
+
+        # initial basic functions for LifePIM application
+        self.lp_core = mod_lp_core.LifePIM_Core()
 
         # global references for Widgets created here (across all focus modes - may not be used)
         self.MainTextEditor = None
@@ -255,7 +258,8 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpWidgetTextEdit.setParent(self.UImid)
         self.lpWidgetFilelist.setParent(self.UIleftBottom)
         self.lpWidgetImageview.setParent(self.UImid)
-        self.lpMusicWidget.visWidget.setParent(self.UImid)
+        self.lpMusicWidget.setParent(self.UImid)
+        # works but in very toip left under menu        self.lpMusicWidget.visWidget.setParent(self.UImid)
 
         self.update_layout()
 
