@@ -6,7 +6,7 @@ import os
 import time 
 import config as mod_cfg
 import index as mod_index
-
+import interfaces.web.web_server as web_server
 def start_server():
     """
     run server locally for a single user
@@ -22,7 +22,6 @@ def start_server():
     TEST()
 
     # start web server
-    import web_server
     web_server.start_server()
 
 

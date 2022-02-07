@@ -9,7 +9,7 @@ Each view will "probably" have passed a
 - interface object = how to interact with data
 
 
-###Checklist of progress
+### Checklist of progress
 
 Areas with Desktop Widget and basic functionality
 ```

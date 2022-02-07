@@ -23,8 +23,8 @@ from flask import send_from_directory
 import logging
 from logging.handlers import RotatingFileHandler
 
-import web_data as web
-import web_config as mod_cfg
+from . import web_data as web
+from . import web_config as mod_cfg
 
 #from ... src import index 
 #import lifepim.src.index as index
