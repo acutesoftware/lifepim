@@ -3,10 +3,18 @@
 # filelister.py
 
 import os
+import sys
 import time 
+
+
+path_root =  os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + ".." ) 
+print('path root = ' + str(path_root) )
+sys.path.append(str(path_root))
+
 import config as mod_cfg
 
 import aikif.lib.cls_filelist as mod_fl
+
 
 
 
@@ -94,4 +102,5 @@ def dte():
 
 if __name__ == '__main__':
     collect_all()
+    #print('hello from filelister')
 
