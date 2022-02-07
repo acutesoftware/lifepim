@@ -49,7 +49,7 @@ from views.options import options as options
 from views.about import about as about
 
  
-from interfaces import lp_screen  # make a copy of this for different interfaces (lp_web, lp_console, etc)
+from views import lp_screen  # make a copy of this for different interfaces (lp_web, lp_console, etc)
 import config as mod_cfg
 import lp_core as mod_lp_core
 

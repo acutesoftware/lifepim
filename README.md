@@ -27,7 +27,7 @@ To run the local web server, use
 To run the desktop application, use
 `python desktop.py`
 
-![Desktop Layout](https://github.com/acutesoftware/lifepim/tree/master/doc/lifepim_desktop_layout.PNG)
+![Desktop Layout](https://github.com/acutesoftware/lifepim/blob/master/doc/lifepim_desktop_layout.PNG)
 
 
 ### Music collection

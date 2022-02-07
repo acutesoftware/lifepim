@@ -8,7 +8,7 @@ def build_screen(root):
     print('building screen_admin...')
 
 
-    txt = 'Admin Page\n' + get_local_pc_list()
+    txt = 'Admin Page\n' #+ get_local_pc_list()
 
     console_label = Label(root, text=txt, bg='white', foreground='blue', justify=LEFT)
     console_label.grid(row=0, column=0)

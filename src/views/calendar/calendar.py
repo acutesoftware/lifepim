@@ -1,4 +1,4 @@
-# homcalendar.py
+# calendar.py
 
 from tkinter import Frame, Label, Entry, Button, font
 from tkcalendar import Calendar, DateEntry
