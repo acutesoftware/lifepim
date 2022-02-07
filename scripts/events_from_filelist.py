@@ -17,7 +17,7 @@ import web_data as web
 import events
 
 def generate_events():
-    print('Generating events from filelist')
+    print(dte() + ' Generating events from filelist')
     #fldr_list = web.get_folder_list(mod_cfg.folder_list_file)
     #print(fldr_list)
     init_calendar_folders()
@@ -26,7 +26,7 @@ def generate_events():
     for row in index_list:
         create_events_for_index_file(row[0], row[1]) #fname, display_name
     
-    #print(index_list)
+    print(dte() + ' Finished')
 
 
 def create_events_for_index_file(fname, display_name):
@@ -52,6 +52,8 @@ def append_event_to_file(line, op_file):
         fop.write(txt)
 
 
+def dte():
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 
 def init_calendar_folders():

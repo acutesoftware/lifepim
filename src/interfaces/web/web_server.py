@@ -24,8 +24,18 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 import web_data as web
-import config as mod_cfg
-import events
+import web_config as mod_cfg
+
+#from ... src import index 
+#import lifepim.src.index as index
+
+
+
+path_root =  os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + ".." ) 
+print('path root = ' + str(path_root) )
+sys.path.append(str(path_root))
+
+import index  as index
 
 LifePIM_VERSION_NUM = "version 0.1 Last updated 12th-Jun-2020"
 LifePIM_WEB_VERSION = "Alpha"
@@ -279,7 +289,7 @@ def send_file(filename):
 def page_calendar():
     
     curr_date = get_today_date_str() 
-    res = events.get_events_for_date(curr_date)
+    res = [] # events.get_events_for_date(curr_date)
     print('calendar results = ', res)
     return show_page_calendar( 'calendar' , curr_date, res)
 
@@ -697,7 +707,7 @@ def page_file_find(fname):
     print('FILEFIND : fname = ', fname)
 
 
-    import index 
+
     index_list = index.get_list_and_names_index_files()
 
     search_results, files_found = index.search(search_text)
