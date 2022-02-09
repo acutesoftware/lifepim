@@ -189,11 +189,16 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         pimMenu.addAction(actInfo)
         pimMenu.addAction(actBadges)
         pimMenu.addAction(actMedia)
+        pimMenu.addAction(act3D)
+        pimMenu.addAction(actApps)
         pimMenu.addAction(actAudio)
         pimMenu.addAction(actComms)
 
         dataMenu = menubar.addMenu('&Data')
         dataMenu.addAction(searchAct)
+
+        dataMenu = menubar.addMenu('&Apps')
+        dataMenu.addAction(actApps)
 
 
 

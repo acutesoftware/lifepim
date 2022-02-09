@@ -6,16 +6,16 @@ dig=P:\__Purchases\humble_bundle\GUI1\icons\medieval\128.png
 help=P:\__Purchases\humble_bundle\GUI1\icons\medieval\104.png
 
 
-addr=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Address_Book.png
-bookshelf=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Bookshelf.png
-chalkboard=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Chalkboard.png
-camera=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Camera.png
-clipboard=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Clipboard.png
-search=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\
-timer=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Stopwatch_On.png
-money=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Money.png
-website=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Website.png
-dashboard=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Dashboard.png
+addr=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Address_Book.png
+bookshelf=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Bookshelf.png
+chalkboard=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Chalkboard.png
+camera=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Camera.png
+clipboard=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Clipboard.png
+search=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG
+timer=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Stopwatch_On.png
+money=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Money.png
+website=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Website.png
+dashboard=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Dashboard.png
 
 # Original LifePIM Areas - one per TYPE of information being managed
 # Home
@@ -28,16 +28,16 @@ dashboard=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Dashboard.png
 # Apps 
 # Badges 
 
-home=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\House.png
-events=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Calendar_Month View.png
-tasks=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Bell.png
-notes=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Note_Yellow.png
-data=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Bookshelf.png
-files=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Folder_Yellow.png
-info=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Library.png
-media=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Photo.png
-apps=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Applications.png
-badges=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Pie_Chart.png
-3D=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Design_Blueprint.png
-comms=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Instant_Messaging.png
-audio=D:\dev\src\lifepim\lifepim\src\static\img\icons\PNG\Musical_Note.png
+home=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\House.png
+events=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Calendar_Month View.png
+tasks=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Bell.png
+notes=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Note_Yellow.png
+data=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Bookshelf.png
+files=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Folder_Yellow.png
+info=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Library.png
+media=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Photo.png
+apps=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Applications.png
+badges=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Pie_Chart.png
+3D=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Design_Blueprint.png
+comms=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Instant_Messaging.png
+audio=D:\dev\src\lifepim\lifepim\src\assets\icons\PNG\Musical_Note.png
