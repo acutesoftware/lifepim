@@ -24,7 +24,10 @@ class TestLifePIM(unittest.TestCase):
         import infolink
         self.assertEqual(200, 200)
 
- 
+    def test_02_import_config(self):
+        import config 
+        self.assertTrue(len(config.user_folder) > 1)
+
 
 if __name__ == '__main__':
     unittest.main()
