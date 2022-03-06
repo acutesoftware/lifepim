@@ -20,6 +20,9 @@ index_folder = os.path.join(user_folder, 'index')
 calendar_folder = os.path.join(user_folder, 'calendar')
 folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 
+db_name = os.path.join(user_folder, 'DATA', 'lifepim.db')
+
+
 local_folder_theme = os.path.join(os.getcwd(), 'interfaces')
 
 base_url = 'https://www.lifepim.com'    # testing, point to live site for API
