@@ -42,13 +42,7 @@ class lpDataWidget(QWidget):
         self.settings = QSettings('LifePIM_Desktop', 'QTableViewPandas')
         self.table = self.tbl # parentUI.MainWidgetDataview
 
-        self.data = [
-          [4, 9, 2],
-          [1, 0, 0],
-          [3, 5, 0],
-          [3, 3, 2],
-          [7, 8, 9],
-        ]
+        self.data = [[1, 2, 3],['a', 'b', 'c']]
 
 
         self.tbl.model =  PandasModel()

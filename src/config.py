@@ -4,9 +4,9 @@
 
 import os
 
-user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
-#user_folder = r'D:\docs\LIFEPIM_DATA_CACHE'
-#user_folder = r'D:\dev\src\lifepim\lifepim\SAMPLE_DATA'
+user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'       # use this for live data on local PC during dev (Duncan)
+#user_folder = r'D:\docs\LIFEPIM_DATA_CACHE'          
+#user_folder = r'D:\dev\src\lifepim\lifepim\SAMPLE_DATA'  # use this when releasing public version
 
 display_name = 'Duncan'  # single user server runs on users local file system
 
