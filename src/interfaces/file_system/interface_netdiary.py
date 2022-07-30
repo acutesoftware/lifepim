@@ -3,6 +3,7 @@
 # interface_netdiary.py
 # This module is for importing data files from Acute Softwares Diary
 # into the standard LifePIM database.
+from codecs import ignore_errors
 import os
 import sys
 import time 
@@ -19,8 +20,14 @@ import config as mod_cfg
 
 path_diary = r"U:\acute\netDiary\data"
 output_folder = mod_cfg.user_folder
+output_log = os.path.join(output_folder, 'load_diary.log')
 db_name = mod_cfg.db_name
 
+db_table_raw_data = 'raw_EVENTS'
+
+"""
+TODO - import different format logfiles from N:\lnz\tar\home\duncan\aikif\diary
+"""
 def TEST():
     load_diary_to_raw_tables()
     ETL_raw_diary()
@@ -31,33 +38,37 @@ def query_diary():
     db = DataBase(db_name)
 
     # Reference = [('Edit', 464261), ('PCFile', 358052), ('', 13469), ('View', 11530), ('Autobackup', 2640), ('general', 1164), ('Note', 776), ('Meeting', 144), ('Public', 82),
-    sql = 'select Reference, count(*) , max(date) from diary_raw GROUP BY Reference  having count(*) > 3 ORDER BY 2 desc'
+    sql = 'select Reference, count(*) , max(date) from ' + db_table_raw_data + ' GROUP BY Reference  having count(*) > 3 ORDER BY 2 desc'
 
     # ActionID = [('PCFile', 404636), ('Usage', 313051), ('', 13768), ('Batch', 2349), ('General Reminder', 343), ('Timer', 49), ('General Multiday Event', 38),
-    sql = 'select ActionID, count(*) from diary_raw GROUP BY ActionID  having count(*) > 3 ORDER BY 2 desc'
+    sql = 'select ActionID, count(*) from ' + db_table_raw_data + ' GROUP BY ActionID  having count(*) > 3 ORDER BY 2 desc'
 
     # Year = [('2005', 142451), ('2007', 132632), ('2006', 109286), ('2003', 94206), ('2002', 90337), ('2004', 88333),
-    sql = 'select substr(date, 1,4) as YR, count(*) from diary_raw GROUP BY substr(date, 1,4)  having count(*) > 3 ORDER BY 1 desc'
+    sql = 'select substr(date, 1,4) as YR, count(*) from ' + db_table_raw_data + ' GROUP BY substr(date, 1,4)  having count(*) > 3 ORDER BY 1 desc'
 
     # ContactID = [('', 373435), ('C:\\Program Files\\acute\\autobackupPro\\events.log', 1376), ('C:\\Program Files\\acute\\autobackupPro\\copied.txt', 1068), 
-    sql = 'select ContactID, count(*) from diary_raw GROUP BY ContactID ORDER BY 2 desc limit 10'
+    sql = 'select ContactID, count(*) from ' + db_table_raw_data + ' GROUP BY ContactID ORDER BY 2 desc limit 10'
 
     # UrlID = [('', 852734),
-    sql = 'select UrlID, count(*) from diary_raw GROUP BY UrlID ORDER BY 2 desc limit 10'
+    sql = 'select UrlID, count(*) from ' + db_table_raw_data + ' GROUP BY UrlID ORDER BY 2 desc limit 10'
 
     # JobToDoID = [('', 850723), ('20020422', 24), ('20020421', 18), ('20020425', 18), 
-    sql = 'select JobToDoID, count(*) from diary_raw GROUP BY JobToDoID ORDER BY 2 desc limit 10'
+    sql = 'select JobToDoID, count(*) from ' + db_table_raw_data + ' GROUP BY JobToDoID ORDER BY 2 desc limit 10'
 
     # Priority = [('', 734419), ('1', 67), ('3', 6), ('2', 4), 
-    sql = 'select Priority, count(*) from diary_raw GROUP BY Priority ORDER BY 2 desc limit 10'
+    sql = 'select Priority, count(*) from ' + db_table_raw_data + ' GROUP BY Priority ORDER BY 2 desc limit 10'
 
     # status = [('', 733203), ('Private', 842), ('Public', 367), ('Completed', 85), 
-    sql = 'select status, count(*) from diary_raw GROUP BY status ORDER BY 2 desc limit 10'
+    sql = 'select status, count(*) from ' + db_table_raw_data + ' GROUP BY status ORDER BY 2 desc limit 10'
 
     # ActionToPerform = [('', 733978), ('Multiday Reminder', 245), ('Multiday Event', 153), ('Home Office', 21), 
-    sql = 'select ActionToPerform, count(*) from diary_raw GROUP BY ActionToPerform ORDER BY 2 desc limit 10'
+    sql = 'select ActionToPerform, count(*) from ' + db_table_raw_data + ' GROUP BY ActionToPerform ORDER BY 2 desc limit 10'
 
     #sql = "select * from diary_raw WHERE reference = 'PCFile' and length(ContactID) < 2 limit 10"
+
+
+    # Latest events
+    sql = 'select date, time, details from ' + db_table_raw_data + ' WHERE date like "202205%" ORDER BY 1, 2 limit 100'
 
     # Run the SQL
     db.exec(sql)
@@ -97,13 +108,13 @@ def ETL_raw_diary():
     """
     db = DataBase(db_name)
     db.exec('''DELETE FROM diary_pc_usage''')
-    db.exec('''INSERT INTO diary_pc_usage SELECT 'na', date, time, length, details FROM diary_raw WHERE ActionID = 'Usage' ''')
+    db.exec('''INSERT INTO diary_pc_usage SELECT 'na', date, time, length, details FROM raw_EVENTS WHERE ActionID = 'Usage' ''')
 
     db.exec('''DELETE FROM diary_file_usage''')
-    db.exec('''INSERT INTO diary_file_usage SELECT 'na', date, time, UrlID, details FROM diary_raw WHERE ActionID = 'PCFile' ''')
+    db.exec('''INSERT INTO diary_file_usage SELECT 'na', date, time, UrlID, details FROM raw_EVENTS WHERE ActionID = 'PCFile' ''')
  
     db.exec('''DELETE FROM diary_events''')
-    db.exec('''INSERT INTO diary_events SELECT * FROM diary_raw WHERE ActionID NOT IN ('PCFile', 'Usage') ''')
+    db.exec('''INSERT INTO diary_events SELECT * FROM raw_EVENTS WHERE ActionID NOT IN ('PCFile', 'Usage') ''')
 
 
  
@@ -172,12 +183,22 @@ class NetDiaryFile(object):
         self.raw_data =[]
         col_data = []
         try:
-            with open(self.fname, 'r',encoding="utf8") as fip:
+            with open(self.fname, 'r',encoding="latin-1",errors=None) as fip:
                 for line in fip:
                     line = line.strip('\n')
-                    col_data = line.split(chr(31))
-                    #print(col_data)
-                    self.raw_data.append(col_data[:-1])   # 
+                    if len(line) > 30:
+                        col_data = line.split(chr(31))
+                        #print(col_data)
+                        if len(col_data) == 15:
+                            col_data.append('dummy')
+                            print('fixing old lifepim entry - ' + str(line))
+
+
+                        if len(col_data) == 16:
+                            self.raw_data.append(col_data[:-1])   # 
+                        else:
+                            print('wrong num columns - ' + line)
+                            print(str(len(col_data)) + ' cols in : ' + str(col_data))
         except Exception as ex:
             print(self.fname + ' couldnt be read : ' + str(ex))
 
@@ -191,7 +212,7 @@ class NetDiaryFile(object):
 
         #print(self.raw_data[0:1])
         try:
-            db.cur.executemany("insert into diary_raw values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", self.raw_data)
+            db.cur.executemany("insert into " + db_table_raw_data + " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.raw_data ))
             db.exec('commit')
         except Exception as ex:
             print(self.fname + ' couldnt be loaded : ' + str(ex))
