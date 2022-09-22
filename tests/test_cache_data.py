@@ -13,15 +13,19 @@ pth = os.path.join(root_folder, '..', 'lifepim', 'src')
 sys.path.append(pth)
 import cache_data as mod_data
 
+cache_path = os.path.abspath(os.path.dirname(os.path.abspath(__file__))) #'.'
+my_cache = mod_data.CacheManager(cache_path)
+
+
 class TestCacheData(unittest.TestCase):
     def test_01_data_definition(self):
-        dt = mod_data.DataDefinition( 'test data', 30)
+        dt = mod_data.DataDefinition(my_cache,  'test data', 30)
         self.assertEqual(dt.name, 'test data')
         self.assertEqual(dt.cache_result, 'test_data.csv')
         self.assertEqual(dt.max_age, 30)
 
     def test_02_data_cache(self):
-        dt = mod_data.DataDefinition( 'test2', 1)
+        dt = mod_data.DataDefinition(my_cache,  'test2', 1)
         test_data = [['hi','there'],['this is a field, WITH a comma','3']]
 
         my_data = mod_data.CacheDataSet(dt)
@@ -34,7 +38,7 @@ class TestCacheData(unittest.TestCase):
         self.assertEqual(res,test_data)
  
     def test_03_data_cache_WATCH_NUMBERS(self):
-        dt = mod_data.DataDefinition( 'test3', 1)
+        dt = mod_data.DataDefinition(my_cache, 'test3', 1)
 
         test_data = [['hi','there'],[345.331,12000]]
         my_data = mod_data.CacheDataSet(dt)
@@ -52,16 +56,14 @@ class TestCacheData(unittest.TestCase):
 
 
     def test_04_cache_manager(self):
-        cache_path = os.path.abspath(os.path.dirname(os.path.abspath(__file__))) #'.'
-        my_cache = mod_data.CacheManager(cache_path)
 
         # recreate objects above 
-        dt1 = mod_data.DataDefinition( 'test2', 1)
+        dt1 = mod_data.DataDefinition(my_cache,  'test2', 1)
         test_data1 = [['hi','there'],['this is a field, WITH a comma','3']]
         my_data1 = mod_data.CacheDataSet(dt1)
         my_data1.refresh_data(test_data1)
 
-        dt2 = mod_data.DataDefinition( 'test3', 1)
+        dt2 = mod_data.DataDefinition(my_cache,  'test3', 1)
         test_data2 = [['hi','there'],[345.331,12000]]
         my_data2 = mod_data.CacheDataSet(dt2)
         my_data2.refresh_data(test_data2)
@@ -73,7 +75,7 @@ class TestCacheData(unittest.TestCase):
         #print(my_cache)
         
     def test_05_check_valid_cache_names(self):
-        dt = mod_data.DataDefinition( 'BLAH', 99)
+        dt = mod_data.DataDefinition(my_cache,  'BLAH', 99)
         self.assertEqual(dt.get_clean_file_name('ABC/DEF'), 'ABC_DEF.csv')
         self.assertEqual(dt.get_clean_file_name('ABC,DEF'), 'ABC_DEF.csv')
         self.assertEqual(dt.get_clean_file_name('ABC\DEF'), 'ABC_DEF.csv')

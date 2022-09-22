@@ -134,6 +134,11 @@ sql = 'select substr(date, 1,4) as YR, count(*) as num_recs from diary_pc_usage 
  ('2006', 37837), ('2005', 37411), ('2004', 37963), ('2003', 44840), ('2002', 32706), ('2001', 32784), ('2000', 37046), ('1999', 2784), ('', 2)]
 """
 
+sql = 'select substr(date, 1,4) as YR, count(*) as num_recs from diary_pc_usage WHERE details like "%AIKIF%" and length > 0 group by substr(date, 1,4) order by 1 desc'
+
+# Blender = [('2022', 270), ('2021', 106), ('2017', 1), ('2013', 112), ('2012', 1), ('2006', 1)]
+# Unreal Editor = [('2022', 7714), ('2021', 2370), ('2020', 1)]
+# AIKIF = [('2022', 141), ('2021', 6), ('2017', 1790), ('2013', 264)]
 def main():
     db = DataBase(db_name)
     # Run the SQL

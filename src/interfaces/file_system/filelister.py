@@ -23,11 +23,13 @@ def get_folder_list(fname):
     returns the default list of folders
     """
     res = []
+    print('FOLDER LIST = ' + fname)
     with open(fname, 'r') as f:
         for line in f:
             if line != '':
                 if line[0:1] != '#':
                     res.append(line.strip('\n'))
+    print(res)                    
     return res
 
 
