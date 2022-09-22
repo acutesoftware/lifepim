@@ -13,12 +13,16 @@ def start_server():
     """
     run server locally for a single user
     """
+
+    """
+    dont need auth here - done elsewhere
     print('Welcome', mod_cfg.get_conn_str()['user'])
     if not is_authorised():
         print('Sorry, wrong password')
         exit(1)
     print('server started...')
-
+    """
+    
     # startup tasks
     mod_index.refresh_indexes_if_needed()
     TEST()

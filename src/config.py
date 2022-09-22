@@ -17,6 +17,12 @@ WEB_VERSION = "DEV"     # to show debug lines in web server
 logon_file = os.path.join(user_folder, 'configuration', 'lifepim.par')
 data_folder = os.path.join(user_folder, 'DATA')
 index_folder = os.path.join(user_folder, 'index')
+
+
+index_folder = os.path.join(r'D:\lifepim_cache', 'index')
+print('WARNING - cache folder used - updates not copied')
+
+
 calendar_folder = os.path.join(user_folder, 'calendar')
 folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 
@@ -65,18 +71,14 @@ api_routes = [
 
 
 current_index_list = [
-    r'\\FANGORN\user\duncan\LifePIM\Data',
-    r'\\FANGORN\user\duncan\C\user\docs',
-    r'\\FANGORN\user\duncan\C\user\dev',
-    r'\\FANGORN\user\duncan\C\user\AIKIF',
-    r'\\FANGORN\user\duncan\C\user\acute',
-    r'\\FANGORN\user\DATA\photos',
-    r'\\FANGORN\user\DATA\eBooks',
-    r'\\FANGORN\user\DATA\3D',
+    r'\\FANGORN\user\duncan',
+    r'\\FANGORN\user\DATA',
+    r'\\FANGORN\user\lnz',
     r'\\FANGORN\photo',
     r'\\FANGORN\music',
-    r'D:\docs\Unreal Projects',
-    r'D:\dev\src',
+    r'D:\docs',
+    r'E:\UE4_proj',
+    r'D:\dev',
 ]
 
 

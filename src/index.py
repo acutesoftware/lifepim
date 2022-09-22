@@ -86,9 +86,8 @@ def index_headings(fl):
     print('Total headings = ', len(all_headings))        
     print('Total Hashtags = ', len(hashtags_all_files))        
     print('Total lines = ', tot_lines_all_files)        
-    print('Total keywords = ', keywords_all_files)
+    print('Total keywords = ', len(keywords_all_files))
 
-    print('Hashtags = ', print_hashtags(hashtags_all_files))        
 
     save_list(keywords_all_files, keyword_file)
     save_list(all_headings, heading_file)
