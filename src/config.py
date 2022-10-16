@@ -85,6 +85,26 @@ current_index_list = [
 file_startup_path = r"D:\dev\src\worldbuild"
 file_startup_path = r"D:\dev\src\lifepim\lifepim\SAMPLE_DATA"
 
+
+proj_list = [
+'Dev',
+'Design',
+'Fun',
+'Games',
+'Family',
+'Car',
+'Business',
+'Web',
+'Home',
+'Study',
+'Health',
+'Work',
+'RasbPI',
+'AI',
+'Support',
+'Pers'
+]
+
 def get_conn_str():
 	conn_str = {}
 	with open(logon_file, 'r') as f:

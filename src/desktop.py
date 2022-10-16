@@ -152,8 +152,12 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         # Projects (Focus) Toolbar - this is mainly user generated
         tbarProj = self.addToolBar('Project')
         projAllAct = self.make_toolbar_button(tbarProj, theme, 'All', '', 'all', '', 'Show all projects')
-        projFilterAct = self.make_toolbar_button(tbarProj, theme, 'Proj1', '', 'proj_filter', '', 'Filtered projects')
-
+        
+        projFilterAct = []
+        for pnum, prj in enumerate(mod_cfg.proj_list):
+            #projFilterAct = self.make_toolbar_button(tbarProj, theme, 'Proj1', '', 'proj_filter', '', 'Filtered projects')
+            newAction = self.make_toolbar_button(tbarProj, theme, prj, '', 'proj_filter', '', prj + ' projects')
+            projFilterAct.append(newAction)
 
         # Search in Toolbar
         tbarSearch = self.addToolBar('Search')
