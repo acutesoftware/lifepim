@@ -525,8 +525,8 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetDataview.tbl.setVisible(False)
             self.lpWidgetImageview.setVisible(False)
 
-            #self.lpMusicWidget.visWidget.setVisible(True)
-
+            self.lpMusicWidget.visWidget.setVisible(True)
+            print('activating music widget')
         else:
             self.lpWidgetTextEdit.setVisible(True)
             self.lpWidgetDataview.tbl.setVisible(True)
@@ -577,6 +577,9 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpMusicWidget.setVisible(True)
             self.lpWidgetTextEdit.setVisible(False)
+
+            #self.lpMusicWidget.visWidget.setVisible(True)
+            print('activating music widget')            
         else:
             self.lpWidgetTextEdit.setParent(self.UImid)
 

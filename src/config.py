@@ -84,7 +84,8 @@ current_index_list = [
 
 file_startup_path = r"D:\dev\src\worldbuild"
 file_startup_path = r"D:\dev\src\lifepim\lifepim\SAMPLE_DATA"
-
+file_startup_path = r"D:\dev\src\LIFEPIM_WEB\USER_DATA\duncan\notes"
+file_startup_path = r"N:\duncan\LifePIM_Data"
 
 proj_list = [
 'Dev',
