@@ -61,7 +61,7 @@ class simpleapp_tk(Tkinter.Tk):
 
         # label for toolbar
         self.labelVariable = Tkinter.StringVar()
-        label = Tkinter.Label(self,textvariable=self.labelVariable, anchor="w",fg="black",bg="white", font=("Helvetica", 12))
+        label = Tkinter.Label(self,textvariable=self.labelVariable, anchor="w",fg="darkblue",bg="white", font=("Arial", 9, "bold"))
         label.grid(column=1,row=1,sticky='EW')
         self.labelVariable.set(u"                            ")
         try:
@@ -103,7 +103,15 @@ class simpleapp_tk(Tkinter.Tk):
             
         """
     
-        current = time.strftime("%H:%M:%S")
+        #current = time.strftime("%H:%M:%S")
+
+        #current = time.strftime("%a %d-%b %-I:%M:%S %p")   # leading hour zero removal not OS portable
+        dte = time.strftime("%a %d-%b") 
+        tme = time.strftime("%I:%M:%S %p")
+        if tme[0:1] == '0':
+            tme = tme[1:] 
+        current = dte + '  ' + tme
+        
         
         self.labelVariable.set(current)
         if self.TodayAsString()[-3:] == ':00':
