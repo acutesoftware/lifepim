@@ -136,15 +136,15 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         actCal = self.make_toolbar_button(tbarPim, theme, 'Events', 'events', 'events', 'Ctrl+2', 'Calendar')
         actTasks = self.make_toolbar_button(tbarPim, theme, 'Tasks', 'tasks', 'tasks', 'Ctrl+3', 'Tasks List')
         actNotes = self.make_toolbar_button(tbarPim, theme, 'Notes', 'notes', 'notes', 'Ctrl+4', 'Notes')
-        actData = self.make_toolbar_button(tbarPim, theme, 'Data', 'data', 'data', 'Ctrl+4', 'Data Tables')
-        actFiles = self.make_toolbar_button(tbarPim, theme, 'files', 'files', 'files', 'Ctrl+4', 'Files')
-        actInfo = self.make_toolbar_button(tbarPim, theme, 'info', 'info', 'info', 'Ctrl+4', 'info')
-        actMedia = self.make_toolbar_button(tbarPim, theme, 'media', 'media', 'media', 'Ctrl+4', 'media')
-        actApps = self.make_toolbar_button(tbarPim, theme, 'apps', 'apps', 'apps', 'Ctrl+4', 'apps')
-        actBadges = self.make_toolbar_button(tbarPim, theme, 'badges', 'badges', 'badges', 'Ctrl+4', 'badges')
-        act3D = self.make_toolbar_button(tbarPim, theme, '3D', '3D', '3D', 'Ctrl+4', '3D')
-        actComms = self.make_toolbar_button(tbarPim, theme, 'comms', 'comms', 'comms', 'Ctrl+4', 'comms')
-        actAudio = self.make_toolbar_button(tbarPim, theme, 'music', 'audio', 'music', 'Ctrl+4', 'music')
+        actData = self.make_toolbar_button(tbarPim, theme, 'Data', 'data', 'data', 'Ctrl+5', 'Data Tables')
+        actFiles = self.make_toolbar_button(tbarPim, theme, 'files', 'files', 'files', 'Ctrl+6', 'Files')
+        actInfo = self.make_toolbar_button(tbarPim, theme, 'info', 'info', 'info', 'Ctrl+7', 'info')
+        actMedia = self.make_toolbar_button(tbarPim, theme, 'media', 'media', 'media', 'Ctrl+8', 'media')
+        actApps = self.make_toolbar_button(tbarPim, theme, 'apps', 'apps', 'apps', 'Ctrl+9', 'apps')
+        actBadges = self.make_toolbar_button(tbarPim, theme, 'badges', 'badges', 'badges', 'Ctrl+0', 'badges')
+        act3D = self.make_toolbar_button(tbarPim, theme, '3D', '3D', '3D', 'Ctrl+-', '3D')
+        actComms = self.make_toolbar_button(tbarPim, theme, 'comms', 'comms', 'comms', 'Ctrl+=', 'comms')
+        actAudio = self.make_toolbar_button(tbarPim, theme, 'music', 'audio', 'music', 'Ctrl+m', 'music')
         
 
 
@@ -262,7 +262,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         # add components to layout depending on focus mode or toolbar
 
         self.lpWidgetCalendar.setParent(self.UIleftTop)
-        #self.lpWidgetTreeview.setParent(self.UIleftMid)
+        self.lpWidgetTreeview.setParent(self.UIleftMid)
         self.lpWidgetDataview.tbl.setParent(self.UImid)   # testing
         self.lpWidgetTextEdit.setParent(self.UImid)
         self.lpWidgetFilelist.setParent(self.UIleftBottom)
@@ -465,6 +465,9 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
                 child.setCheckState(0, Qt.Unchecked)
         tree.show()         
         self.glbTree = tree
+
+        #print('TREEVIEW CREATED')
+
         return tree
 
     def create_widget_text_editor(self):
@@ -563,12 +566,14 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpMusicWidget.setVisible(False)
 
         elif self.curTab == 'notes':
+            notes.build_screen(self.lpWidgetTextEdit)
             #self.lpWidgetCalendar.setParent(self.UIleftTop)
             #self.lpWidgetTreeview.setParent(self.UIleftMid)
             self.lpWidgetTextEdit.setParent(self.UImid)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpMusicWidget.setVisible(False)
             self.lpWidgetTextEdit.setVisible(True)
+            self.lpWidgetTextEdit.adjustSize()
 
         elif self.curTab == 'audio':
             #self.lpWidgetCalendar.setParent(self.UIleftTop)
