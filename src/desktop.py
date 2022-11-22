@@ -118,11 +118,11 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.setGeometry(int(x), int(y), int(width), int(height))
 
         # set up the root widget and assign to main Window
-        rootWidget = QWidget() 
-        self.setCentralWidget(rootWidget)
+        self.rootWidget = QWidget() 
+        self.setCentralWidget(self.rootWidget)
 
         self._build_menu_and_toolbar(self.theme)
-        self._build_main_layout(rootWidget)
+        self._build_main_layout(self.rootWidget)
         self.statusBar().showMessage('Ready')
 
         self.show()
@@ -209,7 +209,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
     def _build_main_layout(self, rootWidget):
 
         # Step 1 - make the splitter interface
-        rootBox = QHBoxLayout(self)
+        self.rootBox = QHBoxLayout(self)
         """
         lblLeftTop = QLabel(' Left Top - FileLists')
         lblLeftMid = QLabel(' Left Mid - Folders')
@@ -238,6 +238,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.UImid = QFrame(self)
         self.UImid.setFrameShape(QFrame.StyledPanel)
         self.UImid.resize(500,800)
+        
         #lblCentre.setParent(mid)
         
 
@@ -270,6 +271,8 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.lpMusicWidget.setParent(self.UImid)
         # works but in very toip left under menu        self.lpMusicWidget.visWidget.setParent(self.UImid)
 
+        self.rootBox.setSpacing(20)
+
         self.update_layout()
 
 
@@ -280,8 +283,8 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
 
         # finally add the main horiz splitter to the root
-        rootBox.addWidget(splitter2)
-        rootWidget.setLayout(rootBox)    
+        self.rootBox.addWidget(splitter2)
+        rootWidget.setLayout(self.rootBox)    
         
 
 
@@ -451,9 +454,31 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
     def create_widget_treeview(self):
         tree    = QTreeWidget (self)
-        headerItem  = QTreeWidgetItem()
-        item    = QTreeWidgetItem()
+        #headerItem  = QTreeWidgetItem()
+        #item    = QTreeWidgetItem()
 
+        
+        parent = QTreeWidgetItem(tree)
+        parent.setText(0, "Inbox")
+        parent.setFlags(parent.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
+        parent.setCheckState(0, Qt.Checked)
+        parent2 = QTreeWidgetItem(tree)
+        parent2.setText(0, "Archive")
+        parent2.setCheckState(0, Qt.Unchecked)
+        parent3 = QTreeWidgetItem(tree)
+        parent3.setText(0, "Folders")
+        parent3.setFlags(parent3.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
+
+        child = QTreeWidgetItem(parent3)
+        child.setFlags(child.flags() | Qt.ItemIsUserCheckable)
+        child.setText(0, "House")
+        child.setCheckState(0, Qt.Unchecked)
+        child2 = QTreeWidgetItem(parent3)
+        child2.setFlags(child2.flags() | Qt.ItemIsUserCheckable)
+        child2.setText(0, "Work")
+        child2.setCheckState(0, Qt.Unchecked)
+
+        """
         for i in range(3):
             parent = QTreeWidgetItem(tree)
             parent.setText(0, "Parent {}".format(i))
@@ -463,6 +488,8 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
                 child.setFlags(child.flags() | Qt.ItemIsUserCheckable)
                 child.setText(0, "Child {}".format(x))
                 child.setCheckState(0, Qt.Unchecked)
+        """
+
         tree.show()         
         self.glbTree = tree
 
@@ -473,6 +500,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
     def create_widget_text_editor(self):
         self.MainTextEditor = QTextEdit(self)
         self.MainTextEditor.resize(600,600)
+        
         
         return self.MainTextEditor
 
