@@ -59,6 +59,21 @@ class OntologyItem (object):
         res += self.reference_info
         return res
 
+    def get_node_details_as_list(self):
+        """
+        returns a list containing the columns of the original export
+        (which may have been fixed in some other process)
+        """
+        return [
+            self.graph_depth, 
+            self.sort_order, 
+            self.node_id, 
+            self.parent_id, 
+            self.node_name, 
+            self.detail, 
+            self.reference_info            
+        ]
+
 class Ontology (object):
     def __init__(self, folder_csv_import, export_csv_file):
         self.dat = []
@@ -185,9 +200,24 @@ class Ontology (object):
 
         if tot_errors > 0:
             print("FAILED VERIFCATION - " + str(tot_errors) + " errors")
+            return False
         else:
             print("Success - Ontology is good")
+            return True
  
+    def write_export(self):
+        """
+        output the ontology into 1 large CSV file for quick loading by Desktop
+        """
+        import csv
+        print("writing export file to " + self.export_csv_file)
+        with open(self.export_csv_file, 'w', newline='') as csvfile:
+            csvop = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            for node in self.dat:
+                csvop.writerow(node.get_node_details_as_list())
+
+
+
 
 def pprint_raw(lst):
     """
@@ -217,7 +247,9 @@ if __name__ == '__main__':
     if sys.argv[1] == '-c':
         print('checking file...')
         o = Ontology(folder_ontology, file_ontology_export)
-        o.verify()        
+        if o.verify():
+            o.write_export()
+
     if sys.argv[1] == '-f':
         #print('finding ' + sys.argv[2])
         ont_find(sys.argv[2].upper())

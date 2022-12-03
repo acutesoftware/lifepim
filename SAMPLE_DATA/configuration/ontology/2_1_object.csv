@@ -1,4 +1,39 @@
 graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
-1,1,root,,Root,Main root node,
-2,1,object,root,Object,"WHAT - any object, physical or virtual",
-3,2,database_table,object,Database table,Database table,
+3,1100,o_ph,object,Item,A physical thing or asset (something in a house or car which physical properties),
+4,1110,o_ph_furn,o_ph,Furniture,Furniture,
+5,1111,o_ph_furn_bed,o_ph_furn,Bed,Furniture - Bed,
+5,1112,o_ph_furn_cupb,o_ph_furn,Cupboard,Furniture - Cupboard,
+5,1113,o_ph_furn_table,o_ph_furn,Table,Furniture - Table,
+5,1114,o_ph_furn_chair,o_ph_furn,Chair,Furniture - Chair,
+5,1115,o_ph_furn_lounge,o_ph_furn,Lounge,Lounge suite Furniture,
+5,1116,o_ph_furn_misc,o_ph_furn,Misc Furniture,Other Furniture,
+4,1120,o_ph_tool,o_ph,Tool,A tool to build things,
+4,1121,o_ph_testgear,o_ph,Test Gear,Test Gear,
+
+3,1200,o_db,object,Database,A Database or collection of tables,
+4,1201,o_db_table,o_db,Database table,Database table,
+4,1202,o_db_view,o_db,Database View,Database View,
+4,1203,o_db_col,o_db,Database Column,Column in a database,
+
+
+3,1300,o_prop,object,Properites of Items,Details of properties that an item can have,"storage size, store item count, weight, Height Length Depth, Colour"
+4,1311,o_prop_size,o_prop,Size,Size of object (Width x Length x Depth),
+4,1312,o_prop_weight,o_prop,Weight,Weight of object (grams),
+4,1313,o_prop_store,o_prop,Storage capacity,How many items can this item store in it,"used for chests, cupboards, fridge, etc. any unit"
+
+4,1320,o_prop_mat,o_prop,Material,Material the item is made from,can use multiples obviously
+5,1321,o_prop_mat_types,o_prop_mat,Material Types,High level types of Materials,"basic groupings like cloth, metal, paint, wood, plastic, organic"
+
+
+3,1400,o_file,object,Electronic File,An electronic file on PC or phone,
+4,1410,o_file_type,o_file,File Types (Extensions),types of files - music|video|text|code|document|etc,
+5,1411,o_file_type_text,o_file_type,Text File,Text file - can be code files config items or markdown,
+5,1412,o_file_type_bin,o_file_type,Binary File,Binary file - any binary file such as EXE XLS DOC ,
+5,1413,o_file_type_music,o_file_type,Music File,Music file - any format such as MP3 OGG ,
+5,1414,o_file_type_video,o_file_type,Video File,Video file - MP4 ASF AVI,
+5,1415,o_file_type_csv,o_file_type,CSV File,CSV File that can be imported,
+5,1416,o_file_type_json,o_file_type,JSON File,JSON File that can be imported,
+
+
+
+

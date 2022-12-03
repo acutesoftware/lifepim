@@ -1,7 +1,39 @@
 graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
-2,2,process,root,Process,HOW - a process to do,
-3,1,project,process,Project,Project with one or many tasks,
-3,1,task,process,Task,Task to do - either automated by PC or manual,
-3,2,program,process,Program,"run a program (any languange) on PC, phone or database",
-3,4,table_import,process,Database Import,Import data to table,
-3,5,table_export,process,Database Export,Export data from table,
+3,2001,p_project,process,Project,Project with one or many tasks,
+3,2200,p_task,process,Task,Task to do - either automated by PC or manual,
+
+4,2201,p_task_type,p_task,Types of tasks,Types of tasks,
+5,2202,p_task_type_res,p_task_type,Research task,A task that involves researching or reading,
+5,2203,p_task_type_shop,p_task_type,Shopping task,"A task that involves purchasing materials, shopping",
+5,2204,p_task_type_plan,p_task_type,Planning task,planning stage of task,
+5,2205,p_task_type_work,p_task_type,Actual Task Work,actually doing the task (used for time logging),
+5,2206,p_task_type_test,p_task_type,Test task,Testing or inspecting the output of the task,
+5,2207,p_task_type_publish,p_task_type,Publish task,"Publishing the output of the task - this can be git commit, email spreadsheet or publish a book",
+
+4,2301,p_task_res,p_task,Task Resources,"Resources for tasks - can be money, time, people, objects, anything",tbl_p_task_res.sql
+5,2302,p_task_res_money,p_task_res,Money needed for tasks,"Money needed for a task",
+5,2303,p_task_res_time,p_task_res,Time required for tasks,"Time needed for a task",
+5,2304,p_task_res_skill,p_task_res,Skill needed for tasks,"Skills needed for a task",
+5,2305,p_task_res_location,p_task_res,Location for tasks,"Location needed for a task",w_
+
+4,2320,p_task_area,p_task,Areas for tasks,A grouping to spilt tasks into areas,
+5,2321,p_task_area_car,p_task_area,Car tasks,tasks for car maintenance - renovations,
+5,2322,p_task_area_home,p_task_area,Home tasks,tasks for home maintenance - renovations,
+
+3,2500,p_job,process,Software Job,"run a program (any languange) on PC, phone or database",
+4,2510,p_job_db,p_job,Database Job,software job on a database,
+4,2511,p_job_db_run,p_job_db,Database Job,Run a package or script (PLSQL or DDL) job on a database,
+5,2512,p_job_db_export,p_job_db,Database Export,Export data from database table,
+5,2503,p_job_db_import,p_job_db,Database Import,Import data to database table,
+
+3,2520,p_job_type,p_job,Types of Software Jobs,"Types of software","TODO - list of software cat"
+4,2521,p_job_type_data,p_job_type,Data Processing,"software job to process data - generic",
+4,2522,p_job_type_clean,p_job_type,Data Cleaning,"software job to clean data",
+4,2523,p_job_type_map,p_job_type,Data Mapping,"software job to map data from OLD_NAME to NEW_NAME",
+4,2524,p_job_type_mon,p_job_type,Monitor,"software job to Monitor events",
+4,2525,p_job_type_simul,p_job_type,Simulation,"Simulation software job",
+4,2526,p_job_type_procgen,p_job_type,Procedural Generation job,"software job to procedurally generate stuff",
+
+
+
+

@@ -1,14 +1,29 @@
 graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
-2,7,where,root,Where,A location in the world or virtual system,
-3,3,url,where,"URL to Website, Folder or File","A link to a File, Folder or Website (UNC)",
-3,3,file,where,File,File on computer or phone,
-3,3,folder,where,Folder,Folder on computer or phone,
-3,8,game_location,where,Game Location,Virtual location in a game,
-4,8,gameloc_knownas,game_location,Game locations Friendly names,List of friendly (known as) names in a game,https://github.com/acutesoftware/worldbuild/blob/master/worldbuild/data/locations.csv
-3,8,earth,where,Earth,World (all of Earth),
-3,8,alrona,where,Alrona,Alrona (world in Sanct Game),
-3,8,middle_earth,where,Middle Earth,Middle Earth (world in Tolkiens Lord of the Rings),
-4,8,me_shire,middle_earth,The Shire,The Shire in Middle Earth,Top left of Middle Earth - nice to visit
-4,8,me_mordor,middle_earth,Mordor,Mordor in Middle Earth,Bottom right of Middle Earth - not very pleasant
-3,8,azeroth,where,Azeroth,Azeroth (location in World of Warcraft game),
-4,8,country_locations,earth,Country Locations,Datase of Country GPS Coords,todo - download GPS coords
+3,6100,w_url,where,"URL to Website, Folder or File","A link to a File, Folder or Website (UNC)",
+3,6110,w_file,where,File,File on computer or phone,
+3,6120,w_folder,where,Folder,Folder on computer or phone,
+
+3,6200,w_alias,where,Alias for Locations,List of friendly (known as) names,
+4,6210,w_alias_alrona,w_alias,Alias for Sanct Game Locations,List of friendly (known as) names,https://github.com/acutesoftware/worldbuild/blob/master/worldbuild/data/locations.csv
+4,6220,w_alias_my,w_alias,Alias for MY Home Locations,List of friendly (known as) names that I use,"Shops, Pub, Work, Home, - linked to actual addresses"
+5,6221,w_alias_my_home,w_alias_my,Home,"Glenelg, South Australia","todo - gps coords"
+5,6222,w_alias_my_work,w_alias_my,Work,"University in Town","todo - gps coords"
+5,6223,w_alias_my_shop,w_alias_my,Shop,"Coles down the street","todo - gps coords"
+5,6224,w_alias_my_cafe,w_alias_my,Coffee Shop,Local Cafe,"todo - gps coords"
+5,6225,w_alias_my_pub,w_alias_my,Pub,Local Pub,"todo - gps coords"
+5,6226,w_alias_my_foodchinese,w_alias_my,Chinese Takeway,Local Chinese Takeway,"todo - gps coords"
+5,6227,w_alias_my_foodindian,w_alias_my,Indian Restaurant,Local Indian Restaurant,"todo - gps coords"
+5,6228,w_alias_my_dr,w_alias_my,Doctors,Local Doctor,"todo - gps coords"
+
+3,6400,w_virt,where,Virtual Location,"Virtual location in a game, or fantsy world",
+4,6410,w_virt_alrona,w_virt,Alrona,Alrona (world in Sanct Game),
+4,6420,w_virt_mearth,w_virt,Middle Earth,Middle Earth (world in Tolkiens Lord of the Rings),
+5,6421,w_virt_mearth_shire,w_virt_mearth,The Shire,The Shire in Middle Earth,Top left of Middle Earth - nice to visit
+5,6422,w_virt_mearth_mordor,w_virt_mearth,Mordor,Mordor in Middle Earth,Bottom right of Middle Earth - not very pleasant
+4,6430,w_virt_azeroth,w_virt,Azeroth,Azeroth (location in World of Warcraft game),
+
+
+3,6500,w_earth,where,Earth,World (all of Earth),
+4,6502,w_earth_country,w_earth,Country Locations,Datase of Country GPS Coords,todo - download GPS coords
+4,6503,w_earth_address,w_earth,Address,An Address,Street - Suburb - Postcode - Country
+

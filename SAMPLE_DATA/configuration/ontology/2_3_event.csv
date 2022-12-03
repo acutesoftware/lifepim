@@ -1,8 +1,15 @@
 graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
-2,3,event,root,Event,"WHEN something occurs - scheduled ETL jobs, key dates",
-3,1,e_date,event,Date,Date, date in YYYY-MM-DD format
-4,2,e_date_holiday,e_date,Public Holiday,Public Holiday,https://github.com/acutesoftware/rawdata/blob/master/rawdata/data/world/holidays.csv
-3,3,e_time,event,Time,Time of day, any time of day 0000 - 2359
-4,4,e_time_daily_reminders,e_time,Daily Reminders,Reminders to do throughout a day,"6am get up, work 7am, lunch 12pm, home 4pm"
-3,5,e_datetime,event,Date Time,Time of day, a date time (default YYYY-MM-DD hh:mm:ss )
-4,6,pcusage,e_datetime,PC Usage,Log of PC Usage on computer,N:\data\pc_usage.dat
+3,3100,e_date,event,Date,Date,date in YYYY-MM-DD format
+4,3101,e_date_dayyear,e_date,Annual Reminders,Any Annual event like Birthdays or Public Holidays (MM-DD),https://github.com/acutesoftware/rawdata/blob/master/rawdata/data/world/holidays.csv
+
+3,3200,e_time,event,Time,Time of day, any time of day 0000 - 2359
+4,3201,e_time_reminder,e_time,Daily Reminders,Reminders to do throughout a day (0000 - 2359),"6am get up, work 7am, lunch 12pm, home 4pm"
+
+3,3210,e_wkday,event,Day of Week,Day of Week,"Mon, Tue, Wed, Thu, Fri, Sat, Sun"
+4,3211,e_wkday_reminder,e_wkday,Weekly Reminders,Reminders to do throughout a week,"Mon, Tue, Thu - office, Fri PM Izzy"
+
+3,3300,e_dtime,event,Date Time,Time of day,a date time (default YYYY-MM-DD hh:mm:ss )
+4,3310,e_dtime_pcusage,e_dtime,PC Usage,Log of PC Usage on computer,N:\data\pc_usage.dat
+4,3320,e_dtime_diary,e_dtime,Diary Entry,A written journal or diary entry,N:\data\diary.dat
+4,3330,e_dtime_fileusage,e_dtime,File Usage,Log of when a file was last updated,N:\data\fileusage.dat
+4,3340,e_dtime_reminder,e_dtime,Reminder for specific date time,Reminder to do something at a certain Date at certain time,N:\data\reminder_date.dat

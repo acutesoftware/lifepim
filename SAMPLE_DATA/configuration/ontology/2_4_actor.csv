@@ -1,6 +1,5 @@
 graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
-2,4,actor,root,Actor,"WHO - a person, user, owner of running task",
-3,1,a_person,actor,Person,"a person",
-3,2,a_user,actor,User,"a digital user on a system, usually with logon credentials - may be person, bot",
-3,3,a_software,actor,Software Agent,"a program that runs tasks",
+3,4100,a_person,actor,Person,"a person",
+3,4200,a_user,actor,User,"a digital user on a system, usually with logon credentials - may be person, bot",
+3,4300,a_software,actor,Software Agent,"a program that runs tasks",
 

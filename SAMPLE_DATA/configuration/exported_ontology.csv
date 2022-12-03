@@ -1,0 +1,122 @@
+1,1,root,,Root,Main root node,
+2,1000,object,root,Object,"WHAT - any object, physical or virtual",
+3,1100,o_ph,object,Item,A physical thing or asset (something in a house or car which physical properties),
+4,1110,o_ph_furn,o_ph,Furniture,Furniture,
+5,1111,o_ph_furn_bed,o_ph_furn,Bed,Furniture - Bed,
+5,1112,o_ph_furn_cupb,o_ph_furn,Cupboard,Furniture - Cupboard,
+5,1113,o_ph_furn_table,o_ph_furn,Table,Furniture - Table,
+5,1114,o_ph_furn_chair,o_ph_furn,Chair,Furniture - Chair,
+5,1115,o_ph_furn_lounge,o_ph_furn,Lounge,Lounge suite Furniture,
+5,1116,o_ph_furn_misc,o_ph_furn,Misc Furniture,Other Furniture,
+4,1120,o_ph_tool,o_ph,Tool,A tool to build things,
+4,1121,o_ph_testgear,o_ph,Test Gear,Test Gear,
+3,1200,o_db,object,Database,A Database or collection of tables,
+4,1201,o_db_table,o_db,Database table,Database table,
+4,1202,o_db_view,o_db,Database View,Database View,
+4,1203,o_db_col,o_db,Database Column,Column in a database,
+3,1300,o_prop,object,Properites of Items,Details of properties that an item can have,"storage size, store item count, weight, Height Length Depth, Colour"
+4,1311,o_prop_size,o_prop,Size,Size of object (Width x Length x Depth),
+4,1312,o_prop_weight,o_prop,Weight,Weight of object (grams),
+4,1313,o_prop_store,o_prop,Storage capacity,How many items can this item store in it,"used for chests, cupboards, fridge, etc. any unit"
+4,1320,o_prop_mat,o_prop,Material,Material the item is made from,can use multiples obviously
+5,1321,o_prop_mat_types,o_prop_mat,Material Types,High level types of Materials,"basic groupings like cloth, metal, paint, wood, plastic, organic"
+3,1400,o_file,object,Electronic File,An electronic file on PC or phone,
+4,1410,o_file_type,o_file,File Types (Extensions),types of files - music|video|text|code|document|etc,
+5,1411,o_file_type_text,o_file_type,Text File,Text file - can be code files config items or markdown,
+5,1412,o_file_type_bin,o_file_type,Binary File,Binary file - any binary file such as EXE XLS DOC ,
+5,1413,o_file_type_music,o_file_type,Music File,Music file - any format such as MP3 OGG ,
+5,1414,o_file_type_video,o_file_type,Video File,Video file - MP4 ASF AVI,
+5,1415,o_file_type_csv,o_file_type,CSV File,CSV File that can be imported,
+5,1416,o_file_type_json,o_file_type,JSON File,JSON File that can be imported,
+2,2000,process,root,Process,HOW - a process to do,
+3,2001,p_project,process,Project,Project with one or many tasks,
+3,2200,p_task,process,Task,Task to do - either automated by PC or manual,
+4,2201,p_task_type,p_task,Types of tasks,Types of tasks,
+5,2202,p_task_type_res,p_task_type,Research task,A task that involves researching or reading,
+5,2203,p_task_type_shop,p_task_type,Shopping task,"A task that involves purchasing materials, shopping",
+5,2204,p_task_type_plan,p_task_type,Planning task,planning stage of task,
+5,2205,p_task_type_work,p_task_type,Actual Task Work,actually doing the task (used for time logging),
+5,2206,p_task_type_test,p_task_type,Test task,Testing or inspecting the output of the task,
+5,2207,p_task_type_publish,p_task_type,Publish task,"Publishing the output of the task - this can be git commit, email spreadsheet or publish a book",
+4,2301,p_task_res,p_task,Task Resources,"Resources for tasks - can be money, time, people, objects, anything",tbl_p_task_res.sql
+5,2302,p_task_res_money,p_task_res,Money needed for tasks,Money needed for a task,
+5,2303,p_task_res_time,p_task_res,Time required for tasks,Time needed for a task,
+5,2304,p_task_res_skill,p_task_res,Skill needed for tasks,Skills needed for a task,
+5,2305,p_task_res_location,p_task_res,Location for tasks,Location needed for a task,w_
+4,2320,p_task_area,p_task,Areas for tasks,A grouping to spilt tasks into areas,
+5,2321,p_task_area_car,p_task_area,Car tasks,tasks for car maintenance - renovations,
+5,2322,p_task_area_home,p_task_area,Home tasks,tasks for home maintenance - renovations,
+3,2500,p_job,process,Software Job,"run a program (any languange) on PC, phone or database",
+5,2503,p_job_db_import,p_job_db,Database Import,Import data to database table,
+4,2510,p_job_db,p_job,Database Job,software job on a database,
+4,2511,p_job_db_run,p_job_db,Database Job,Run a package or script (PLSQL or DDL) job on a database,
+5,2512,p_job_db_export,p_job_db,Database Export,Export data from database table,
+3,2520,p_job_type,p_job,Types of Software Jobs,Types of software,TODO - list of software cat
+4,2521,p_job_type_data,p_job_type,Data Processing,software job to process data - generic,
+4,2522,p_job_type_clean,p_job_type,Data Cleaning,software job to clean data,
+4,2523,p_job_type_map,p_job_type,Data Mapping,software job to map data from OLD_NAME to NEW_NAME,
+4,2524,p_job_type_mon,p_job_type,Monitor,software job to Monitor events,
+4,2525,p_job_type_simul,p_job_type,Simulation,Simulation software job,
+4,2526,p_job_type_procgen,p_job_type,Procedural Generation job,software job to procedurally generate stuff,
+2,3000,event,root,Event,"WHEN something occurs - scheduled ETL jobs, key dates",
+3,3100,e_date,event,Date,Date,date in YYYY-MM-DD format
+4,3101,e_date_dayyear,e_date,Annual Reminders,Any Annual event like Birthdays or Public Holidays (MM-DD),https://github.com/acutesoftware/rawdata/blob/master/rawdata/data/world/holidays.csv
+3,3200,e_time,event,Time,Time of day, any time of day 0000 - 2359
+4,3201,e_time_reminder,e_time,Daily Reminders,Reminders to do throughout a day (0000 - 2359),"6am get up, work 7am, lunch 12pm, home 4pm"
+3,3210,e_wkday,event,Day of Week,Day of Week,"Mon, Tue, Wed, Thu, Fri, Sat, Sun"
+4,3211,e_wkday_reminder,e_wkday,Weekly Reminders,Reminders to do throughout a week,"Mon, Tue, Thu - office, Fri PM Izzy"
+3,3300,e_dtime,event,Date Time,Time of day,a date time (default YYYY-MM-DD hh:mm:ss )
+4,3310,e_dtime_pcusage,e_dtime,PC Usage,Log of PC Usage on computer,N:\data\pc_usage.dat
+4,3320,e_dtime_diary,e_dtime,Diary Entry,A written journal or diary entry,N:\data\diary.dat
+4,3330,e_dtime_fileusage,e_dtime,File Usage,Log of when a file was last updated,N:\data\fileusage.dat
+4,3340,e_dtime_reminder,e_dtime,Reminder for specific date time,Reminder to do something at a certain Date at certain time,N:\data\reminder_date.dat
+2,4000,actor,root,Actor,"WHO - a person, user, owner of running task",
+3,4100,a_person,actor,Person,a person,
+3,4200,a_user,actor,User,"a digital user on a system, usually with logon credentials - may be person, bot",
+3,4300,a_software,actor,Software Agent,a program that runs tasks,
+2,5000,fact,root,Fact,"WHY - information such as filters, areas, descriptive details - to show reasons things are done",
+3,5100,f_fltr,fact,Filter,A Filter applied to data (usually from category),
+3,5200,f_ref,fact,Reference List,A list of information for reference files,
+3,5300,f_info,fact,Information,"A piece of information - can be a word, sentence, paragraph",
+3,5400,f_cat,fact,Category,a list of categories to allow for filtering / grouping,
+4,5410,f_cat_country,f_cat,Country,Database of countries in the world,https://github.com/acutesoftware/rawdata/blob/master/rawdata/data/world/country.csv
+4,5420,f_cat_color,f_cat,Colours,List of colours,https://github.com/acutesoftware/rawdata/blob/master/rawdata/data/TODO_colour.csv
+3,5500,f_pim,fact,Personal Information,"data in a PIM (Personal Information Mananger) - notes, tasks, events, etc",
+4,5510,f_pim_note,f_pim,PIM - Notes,Notes in a PIM,tbl_notes
+4,5520,f_pim_task,f_pim,PIM - Tasks,Tasks in a PIM,tbl_tasks  
+4,5530,f_pim_event,f_pim,PIM - Calendar,Calendar events in a PIM ,tbl_events
+4,5540,f_pim_place,f_pim,PIM - Places,Locations in a PIM,tbl_locations
+4,5550,f_pim_data,f_pim,PIM - Data,Data tables in a PIM,tbl_data  
+4,5560,f_pim_badge,f_pim,PIM - Badges,Badges and Achievements in a PIM,tbl_achievements
+4,5570,f_pim_money,f_pim,PIM - Money,Money in a PIM ,tbl_money
+4,5580,f_pim_media,f_pim,PIM - Media,Music in a PIM,tbl_media
+4,5590,f_pim_file,f_pim,PIM - Files,Files in a PIM ,tbl_files
+4,5600,f_pim_app,f_pim,PIM - Apps,Apps in a PIM,tbl_apps
+4,5610,f_pim_cont,f_pim,PIM - Contacts,Contacts in a PIM,tbl_contacts
+4,5620,f_pim_opt,f_pim,PIM - Options,Settings and Options for a PIM,tbl_options
+2,6000,where,root,Where,A location in the world or virtual system,
+3,6100,w_url,where,"URL to Website, Folder or File","A link to a File, Folder or Website (UNC)",
+3,6110,w_file,where,File,File on computer or phone,
+3,6120,w_folder,where,Folder,Folder on computer or phone,
+3,6200,w_alias,where,Alias for Locations,List of friendly (known as) names,
+4,6210,w_alias_alrona,w_alias,Alias for Sanct Game Locations,List of friendly (known as) names,https://github.com/acutesoftware/worldbuild/blob/master/worldbuild/data/locations.csv
+4,6220,w_alias_my,w_alias,Alias for MY Home Locations,List of friendly (known as) names that I use,"Shops, Pub, Work, Home, - linked to actual addresses"
+5,6221,w_alias_my_home,w_alias_my,Home,"Glenelg, South Australia",todo - gps coords
+5,6222,w_alias_my_work,w_alias_my,Work,University in Town,todo - gps coords
+5,6223,w_alias_my_shop,w_alias_my,Shop,Coles down the street,todo - gps coords
+5,6224,w_alias_my_cafe,w_alias_my,Coffee Shop,Local Cafe,todo - gps coords
+5,6225,w_alias_my_pub,w_alias_my,Pub,Local Pub,todo - gps coords
+5,6226,w_alias_my_foodchinese,w_alias_my,Chinese Takeway,Local Chinese Takeway,todo - gps coords
+5,6227,w_alias_my_foodindian,w_alias_my,Indian Restaurant,Local Indian Restaurant,todo - gps coords
+5,6228,w_alias_my_dr,w_alias_my,Doctors,Local Doctor,todo - gps coords
+3,6400,w_virt,where,Virtual Location,"Virtual location in a game, or fantsy world",
+4,6410,w_virt_alrona,w_virt,Alrona,Alrona (world in Sanct Game),
+4,6420,w_virt_mearth,w_virt,Middle Earth,Middle Earth (world in Tolkiens Lord of the Rings),
+5,6421,w_virt_mearth_shire,w_virt_mearth,The Shire,The Shire in Middle Earth,Top left of Middle Earth - nice to visit
+5,6422,w_virt_mearth_mordor,w_virt_mearth,Mordor,Mordor in Middle Earth,Bottom right of Middle Earth - not very pleasant
+4,6430,w_virt_azeroth,w_virt,Azeroth,Azeroth (location in World of Warcraft game),
+3,6500,w_earth,where,Earth,World (all of Earth),
+4,6502,w_earth_country,w_earth,Country Locations,Datase of Country GPS Coords,todo - download GPS coords
+4,6503,w_earth_address,w_earth,Address,An Address,Street - Suburb - Postcode - Country
+2,7000,link,root,Link,"(glue) A Link or relationship between any ontology item (uses, updates, related)",
+3,7100,l_soft_job,link,Link Software apps to Running Tasks,A Link of software programs and links to the running tasks they process,"eg MySQL Workbench > load_raw.csv, Blender > Export FBX to Uasset"
