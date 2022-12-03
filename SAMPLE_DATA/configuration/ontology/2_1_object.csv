@@ -7,8 +7,12 @@ graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
 5,1114,o_ph_furn_chair,o_ph_furn,Chair,Furniture - Chair,
 5,1115,o_ph_furn_lounge,o_ph_furn,Lounge,Lounge suite Furniture,
 5,1116,o_ph_furn_misc,o_ph_furn,Misc Furniture,Other Furniture,
+
 4,1120,o_ph_tool,o_ph,Tool,A tool to build things,
-4,1121,o_ph_testgear,o_ph,Test Gear,Test Gear,
+5,1121,o_ph_tool_hand,o_ph_tool,Hand Tool,A hand tool to build things,
+5,1125,o_ph_tool_power,o_ph_tool,Power Tool,A power tool to build things,
+
+4,1130,o_ph_testgear,o_ph,Test Gear,Test Gear,
 
 3,1200,o_db,object,Database,A Database or collection of tables,
 4,1201,o_db_table,o_db,Database table,Database table,
@@ -34,6 +38,39 @@ graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
 5,1415,o_file_type_csv,o_file_type,CSV File,CSV File that can be imported,
 5,1416,o_file_type_json,o_file_type,JSON File,JSON File that can be imported,
 
+3,1500,o_food,object,Food,Food - any consumable item,
+4,1510,o_food_meal,o_food,Meal,A meal to eat,
+5,1511,o_food_meal_type,o_food_meal,Meal type,Type of meal to eat,
+6,1512,o_food_meal_type_snack,o_food_meal_type,Snack,meal to eat on the go,
+6,1513,o_food_meal_type_breakfast,o_food_meal_type,Breakfast,,
+6,1514,o_food_meal_type_lunch,o_food_meal_type,Lunch,,
+6,1515,o_food_meal_type_dinner,o_food_meal_type,Dinner / Tea,,
+
+5,1520,o_food_meal_cuisine,o_food_meal,Meal Cuisine,Cuisine of Meal,
+6,1521,o_food_meal_cuisine_oz,o_food_meal_cuisine,Australian food,,
+6,1522,o_food_meal_cuisine_brit,o_food_meal_cuisine,British food,,
+6,1523,o_food_meal_cuisine_indian,o_food_meal_cuisine,Indian food,,
+6,1524,o_food_meal_cuisine_asian,o_food_meal_cuisine,Asian food,,
+6,1525,o_food_meal_cuisine_african,o_food_meal_cuisine,African food,,
+6,1526,o_food_meal_cuisine_french,o_food_meal_cuisine,French food,,
+6,1527,o_food_meal_cuisine_greek,o_food_meal_cuisine,Greek food,,
+6,1528,o_food_meal_cuisine_italian,o_food_meal_cuisine,Italian food,,
+
+4,1620,o_food_ingred,o_food,Ingredient,An food ingredient,
+5,1621,o_food_ingred_herb,o_food_ingred,Herb ingredient,A herb as ingredient for cooking,
+5,1622,o_food_ingred_protien,o_food_ingred,Protien ingredient,A protien as ingredient for cooking,
+5,1623,o_food_ingred_carb,o_food_ingred,Carb ingredient,A carb ingredient for cooking,
+5,1624,o_food_ingred_sour,o_food_ingred,Sour ingredient,A sweet ingredient for cooking,
+5,1625,o_food_ingred_sweet,o_food_ingred,Sweet ingredient,A sweet ingredient for cooking,
+
+4,1630,o_food_type,o_food,Food Type,A type of food,
+5,1631,o_food_type_fruit,o_food_type,Fruit,type of food,
+5,1632,o_food_type_veg,o_food_type,Vegetable,type of food,
+5,1633,o_food_type_grain,o_food_type,Grain,type of food,
+5,1634,o_food_type_meat,o_food_type,Meat,type of food,
+5,1635,o_food_type_fish,o_food_type,Fish,type of food,
+
+4,1650,o_food_recipe,o_food,Recipe,(wait - this belongs in fact?),
 
 
 

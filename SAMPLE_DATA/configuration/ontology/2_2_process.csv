@@ -20,6 +20,20 @@ graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
 5,2321,p_task_area_car,p_task_area,Car tasks,tasks for car maintenance - renovations,
 5,2322,p_task_area_home,p_task_area,Home tasks,tasks for home maintenance - renovations,
 
+3,2400,p_skill,process,Skill,Skill or base knowledge needed to do a task,
+4,2410,p_skill_prof,p_skill,Professions,Professions,
+5,2411,p_skill_prof_it,p_skill_prof,IT Profession,"Professions in IT - programming, etc",
+5,2412,p_skill_prof_eng,p_skill_prof,Engineering Profession,"Professions in Engineering",
+5,2413,p_skill_prof_teach,p_skill_prof,Teaching Profession,"Professions in Teaching",
+5,2414,p_skill_prof_cust,p_skill_prof,Customer Service Profession,"Professions in Customer Service",
+5,2415,p_skill_prof_art,p_skill_prof,Artistic Profession,"Artistic Professions",
+5,2416,p_skill_prof_trade,p_skill_prof,Trade Profession,"Trade Professions",
+
+4,2420,p_skill_type,p_skill,Skill Types,Skill Types,
+5,2421,p_skill_type_1,p_skill_type,TODO - Skill types 1,"a category of skill types - see notes",
+5,2422,p_skill_type_2,p_skill_type,TODO - Skill types 2,"a category of skill types - see notes",
+
+
 3,2500,p_job,process,Software Job,"run a program (any languange) on PC, phone or database",
 4,2510,p_job_db,p_job,Database Job,software job on a database,
 4,2511,p_job_db_run,p_job_db,Database Job,Run a package or script (PLSQL or DDL) job on a database,
