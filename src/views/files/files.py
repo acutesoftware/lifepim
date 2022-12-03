@@ -37,6 +37,7 @@ class FileWidget(QWidget):
         self.cmbDrive.addItem('N:/')
         self.cmbDrive.addItem('P:/')
         self.cmbDrive.addItem('T:/')
+        self.cmbDrive.addItem('U:/')
 
 
 
@@ -78,6 +79,12 @@ class FileWidget(QWidget):
         self.treeview.setModel(self.dirModel)
         self.lblCurFolder.setText(path)
 
+        self.treeview.setRootIndex(self.dirModel.index(path)) 
+
+        self.showMaximized()
+        self.listview.showMaximized()
+        # error self.dirModel.showMaximized()
+
     def attach_parent_reference(self, parentGui):
         """
         TODO - this is a terrible idea, but I havent worked out PyQT signals yet
@@ -87,6 +94,7 @@ class FileWidget(QWidget):
     def onDriveChanged(self, index):
         print('you changed the drive to ' + str(index))
         self._set_folder_to_list_files(index)
+        #print('does this work? - _set_folder_to_list_files(self, path)')
 
 
     def on_clicked_folder(self, index):

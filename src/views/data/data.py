@@ -87,11 +87,11 @@ class lpDataWidget(QWidget):
     def load_csv(self, filename):
         self.csv_text = open(filename, "r").read()
         self.data = []
-        delimiter = ","
-
+        delim = ","
+        quote = '"'
         f = open(filename, 'r+b')
         with f:
-            df = pd.read_csv(f, delimiter = ',', keep_default_na = False, low_memory=False, header=None)
+            df = pd.read_csv(f, delimiter = delim,quotechar=quote, keep_default_na = False, low_memory=False, header=None)
             f.close()
             self.tbl.model = PandasModel(df)
             self.tbl.setModel(self.tbl.model)

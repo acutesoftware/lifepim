@@ -305,6 +305,20 @@ def get_date_from_str(datestring):
     return dateutil.parser.parse(datestring)
 
 
+def read_csv_to_list2(filename):
+    """
+    reads a CSV file to a list
+    """
+    import csv
+
+    rows_to_load = []
+    with open(filename, 'r', encoding='cp1252') as csvfile: # sort of works with , encoding='cp65001'
+        #csvreader = csv.reader(csvfile, delimiter = ',' )
+
+        reader = csv.reader(csvfile)
+
+        rows_to_load = list(reader)
+    return rows_to_load[1:]
 
 def read_csv_to_list(filename):
     """

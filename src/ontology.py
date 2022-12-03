@@ -34,22 +34,29 @@ class OntologyItem (object):
     graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
     """
     def __init__(self, csv_line):
-        self.graph_depth	= int(csv_line[0])
-        self.sort_order	= int(csv_line[1])
-        self.node_id	= csv_line[2]
-        self.parent_id = csv_line[3]
-        self.node_name = csv_line[4]
-        self.detail = csv_line[5]
-        self.full_path = ''
-        self.prefix_for_child_nodes = self.node_id + '_'
-        self.reference_info = csv_line[6]
+        try:
+            self.graph_depth	= int(csv_line[0])
+            self.sort_order	= int(csv_line[1])
+            self.node_id	= csv_line[2]
+            self.parent_id = csv_line[3]
+            self.node_name = csv_line[4]
+            self.detail = csv_line[5]
+            self.full_path = ''
+            self.prefix_for_child_nodes = self.node_id + '_'
+            self.reference_info = csv_line[6]
+        except Exception as ex:
+            print("Problem parsing ontology raw data - " + str(csv_line))
+            print("ERROR = " + str(ex))
+            sys.exit()
 
     def __str__(self):
         res = ''
+        res += str(self.graph_depth) + ' - '
+        res += str(self.sort_order) + ' - '
         res += self.parent_id + ' - '
         res += self.node_id + ' ['
-        res += self.detail + '] full_path = '
-        res += self.full_path
+        res += self.detail + ']'
+        res += self.reference_info
         return res
 
 class Ontology (object):
@@ -69,12 +76,16 @@ class Ontology (object):
                 self.dat.append(OntologyItem(row))
         self.num_nodes = len(self.dat)
 
+
+
+
     def __str__(self):
         op = 'Ontology from - ' + self.folder_csv_import + '\n'
         for o in self.dat:
             op += str(o) + '\n'
         op += 'Total nodes = ' + str(self.num_nodes)
         return op
+
 
     def load_ontology_files(self):
         """
@@ -86,21 +97,28 @@ class Ontology (object):
         all_ont_files = glob.glob(self.folder_csv_import + os.sep + '*.csv') 
         curr_data = []  # holds the current raw CSV from current file
         
-        # start off with the root node added manually
-        #all_data = [['1','1','root','','Root','Main root node','root','','root','']]
         all_data = []
 
 
         # append each CSV file in ontology folder
         for cur_file in all_ont_files:
             curr_data = web.read_csv_to_list2(cur_file)
-            print(len(curr_data))
+            print('loaded ' + str(len(curr_data)) + ' rows from ' + cur_file)
             all_data.extend(curr_data)
-            print('loaded ' + cur_file)
+            
 
-        pprint_raw(all_data)
+        #pprint_raw(all_data)
 
-        return all_data
+        clean_data = []
+        for row in all_data:
+            if row != []:
+                clean_data.append(row)
+
+        import operator
+        srt_list = sorted(clean_data, key = operator.itemgetter(1,0))
+        #pprint_raw(srt_list)
+        return srt_list
+
 
     def find(self, txt):
         res = []
@@ -116,10 +134,60 @@ class Ontology (object):
         #sorted_ont = self.dat.sort(key=lambda x:str(x[1]))
         
         for node in self.dat:
-            spaces = ' ' * node.graph_depth * 8
+            spaces = ' ' * node.graph_depth * 4
             
-            print(spaces + node.node_name + ' ' + node.detail)
+            print(str(node.sort_order) + spaces + node.node_name + ' ' + node.detail)
             #print('-' + node.node_name.rjust(spaces))
+
+    def verify(self):
+        print("Verifying ontology...")
+        tot_errors = 0
+        for test_node in self.dat:
+            num_node_id = 0
+            num_sort_order = 0
+            has_parent = 'N'
+            node_id_parts = test_node.node_id.split('_')
+            node_id_base = node_id_parts[0:len(node_id_parts)-1]
+            calc_parent= '_'.join(n for n in node_id_base)
+            if calc_parent != test_node.parent_id and test_node.graph_depth > 3:
+                print("ERROR - node ID does not match parent [" + calc_parent + "] if calculated - " + str(test_node))
+                tot_errors += 1
+            #print("Checking node " + str(test_node))
+            for inner_node in self.dat:
+
+                # check for unique sort order (sounds a bit manual but leave for now)
+                if test_node.sort_order == inner_node.sort_order:
+                    num_sort_order += 1
+
+                # check for unique node id
+                if test_node.node_id == inner_node.node_id:
+                    num_node_id += 1
+
+                # Check that all nodes have a parent (and ignore root)                    
+                if test_node.parent_id == inner_node.node_id:
+                    has_parent = 'Y'
+
+                if test_node.node_id == 'root':
+                    has_parent = 'Y'
+
+
+            if num_sort_order != 1:
+                print("Error - duplicate sort order in " + str(test_node))
+                tot_errors += 1
+
+            if num_node_id != 1:
+                print("Error - duplicate node_id in " + str(test_node))
+                tot_errors += 1
+
+            if has_parent != 'Y':
+                print("Error - node_id has no parent " + str(test_node))
+                tot_errors += 1
+
+        if tot_errors > 0:
+            print("FAILED VERIFCATION - " + str(tot_errors) + " errors")
+        else:
+            print("Success - Ontology is good")
+ 
 
 def pprint_raw(lst):
     """
@@ -148,10 +216,15 @@ if __name__ == '__main__':
         exit(0)
     if sys.argv[1] == '-c':
         print('checking file...')
+        o = Ontology(folder_ontology, file_ontology_export)
+        o.verify()        
     if sys.argv[1] == '-f':
         #print('finding ' + sys.argv[2])
         ont_find(sys.argv[2].upper())
     if sys.argv[1] == '-t':
+        if len(sys.argv) > 2:
+            fltr = sys.argv[2].upper()
+            print("TODO - filter tree on this = " + fltr)
         o = Ontology(folder_ontology, file_ontology_export)
         o.tree_view()
 
