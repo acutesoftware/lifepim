@@ -1,0 +1,4 @@
+graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
+1,1,root,,Root,Main root node,
+2,1,object,root,Object,"WHAT - any object, physical or virtual",
+3,2,database_table,object,Database table,Database table,

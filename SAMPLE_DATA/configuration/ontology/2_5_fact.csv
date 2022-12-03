@@ -1,0 +1,12 @@
+graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
+2,5,fact,root,Fact,"WHY - information such as filters, areas, descriptive details - to show reasons things are done",
+3,1,filter,fact,Filter,A Filter applied to data (usually from category),
+3,2,reference,fact,Reference List,A list of information for reference files,
+3,2,information,fact,Information,"A piece of information - can be a word, sentence, paragraph",
+3,6,category,fact,Category,a list of categories to allow for filtering / grouping,
+4,7,country,category,Country,A country in the world,
+5,8,country_names,country,Country Dataset,Datase of Country Names,https://github.com/acutesoftware/rawdata/blob/master/rawdata/data/world/country.csv
+5,9,spain,country,Spain,Spain - Country,
+5,10,japan,country,Japan,Japan - Country,
+4,20,colours,category,Colours,List of Colours,
+5,21,colour_red,colours,Red,Colour Red,

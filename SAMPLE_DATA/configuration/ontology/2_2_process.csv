@@ -1,0 +1,7 @@
+graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
+2,2,process,root,Process,HOW - a process to do,
+3,1,project,process,Project,Project with one or many tasks,
+3,1,task,process,Task,Task to do - either automated by PC or manual,
+3,2,program,process,Program,"run a program (any languange) on PC, phone or database",
+3,4,table_import,process,Database Import,Import data to table,
+3,5,table_export,process,Database Export,Export data from table,

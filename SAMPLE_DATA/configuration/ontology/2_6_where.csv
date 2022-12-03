@@ -1,0 +1,14 @@
+graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
+2,7,where,root,Where,A location in the world or virtual system,
+3,3,url,where,"URL to Website, Folder or File","A link to a File, Folder or Website (UNC)",
+3,3,file,where,File,File on computer or phone,
+3,3,folder,where,Folder,Folder on computer or phone,
+3,8,game_location,where,Game Location,Virtual location in a game,
+4,8,gameloc_knownas,game_location,Game locations Friendly names,List of friendly (known as) names in a game,https://github.com/acutesoftware/worldbuild/blob/master/worldbuild/data/locations.csv
+3,8,earth,where,Earth,World (all of Earth),
+3,8,alrona,where,Alrona,Alrona (world in Sanct Game),
+3,8,middle_earth,where,Middle Earth,Middle Earth (world in Tolkiens Lord of the Rings),
+4,8,me_shire,middle_earth,The Shire,The Shire in Middle Earth,Top left of Middle Earth - nice to visit
+4,8,me_mordor,middle_earth,Mordor,Mordor in Middle Earth,Bottom right of Middle Earth - not very pleasant
+3,8,azeroth,where,Azeroth,Azeroth (location in World of Warcraft game),
+4,8,country_locations,earth,Country Locations,Datase of Country GPS Coords,todo - download GPS coords

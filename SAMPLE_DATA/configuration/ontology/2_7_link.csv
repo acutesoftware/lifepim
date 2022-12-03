@@ -1,0 +1,2 @@
+graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
+2,6,link,root,Link,"(glue) A Link or relationship between any ontology item (uses, updates, related)",

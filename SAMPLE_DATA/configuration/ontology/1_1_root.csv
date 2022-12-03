@@ -1,0 +1,9 @@
+graph_depth,sort_order,node_id,parent_id,node_name,detail,reference_info
+1,1,root,,Root,Main root node,
+2,1,object,root,Object,"WHAT - any object, physical or virtual",
+2,2,process,root,Process,HOW - a process to do,
+2,3,event,root,Event,"WHEN something occurs - scheduled ETL jobs, key dates",
+2,4,actor,root,Actor,"WHO - a person, user, owner of running task",
+2,5,fact,root,Fact,"WHY - information such as filters, areas, descriptive details - to show reasons things are done",
+2,6,where,root,Where,A location in the world or virtual system,
+2,7,link,root,Link,"(glue) A Link or relationship between any ontology item (uses, updates, related)",

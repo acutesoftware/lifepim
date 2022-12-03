@@ -17,7 +17,8 @@ WEB_VERSION = "DEV"     # to show debug lines in web server
 logon_file = os.path.join(user_folder, 'configuration', 'lifepim.par')
 data_folder = os.path.join(user_folder, 'DATA')
 index_folder = os.path.join(user_folder, 'index')
-
+ontology_file = os.path.join(user_folder, 'configuration', 'exported_ontology.csv')
+ontology_folder = os.path.join(user_folder, 'configuration', 'ontology')
 
 index_folder = os.path.join(r'D:\lifepim_cache', 'index')
 print('WARNING - cache folder used - updates not copied')
