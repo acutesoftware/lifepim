@@ -36,7 +36,7 @@ class OntologyItem (object):
     def __init__(self, csv_line):
         try:
             self.graph_depth	= int(csv_line[0])
-            self.sort_order	= int(csv_line[1])
+            self.sort_order	= float(csv_line[1])
             self.node_id	= csv_line[2]
             self.parent_id = csv_line[3]
             self.node_name = csv_line[4]
@@ -210,12 +210,81 @@ class Ontology (object):
         output the ontology into 1 large CSV file for quick loading by Desktop
         """
         import csv
+        
         print("writing export file to " + self.export_csv_file)
         with open(self.export_csv_file, 'w', newline='') as csvfile:
             csvop = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            for node in self.dat:
-                csvop.writerow(node.get_node_details_as_list())
+            for new_sort_order, node in enumerate(self.dat):
+                cur_node_details = node.get_node_details_as_list()
+                cur_node_details[0] = new_sort_order
+                csvop.writerow(cur_node_details)
+        generate_tags_from_ids(self.dat)                
 
+
+
+def generate_tags_from_ids(node_list):
+    """
+    takes the ontology file and creates a tag list as follows
+    - each part of the id (minus the start o_, e_ etc)
+    - each node_name
+    - removes garbage words
+    - saves to tags.txt as starting point for tages
+    """
+    #from collections import Counter
+
+    tag_file = os.path.join(config.user_folder, 'configuration', 'exported_tags.csv')
+
+    all_words = []
+    tags = []
+    stop_words = ['', '/', '-', 'a', 'or', ',', ';', ':']
+    
+    print('about to extract tags from ' + str(len(node_list)) + ' nodes')
+
+    for node in node_list:
+        cur_node = node.get_node_details_as_list()
+        id_parts = cur_node[2].split('_')[1:]
+        all_words.extend(id_parts)
+
+        # Option 1 - add the node name if it is one word
+        #if ' ' not in cur_node[4]:
+        #    all_words.append(cur_node[4].lower().translate({ord(ch): None for ch in '0123456789'}))
+
+
+        # Option 2 - add the node name split into words
+        name_parts = cur_node[4].split(' ')
+        for prt in name_parts:
+            clean_word = get_clean_tag(prt)
+            if clean_word not in stop_words:
+                all_words.append(clean_word)
+
+
+
+    #print(all_words)
+
+    for wrd in all_words:
+        clean_word = get_clean_tag(wrd)
+        if clean_word not in tags:
+            if clean_word != '':
+                tags.append(clean_word)
+
+    tags.sort()
+
+    print(tags)
+    print('extracted ' + str(len(all_words)) + ' tags')
+    print('summary ' + str(len(tags)) + ' tags')
+    
+    #counts = Counter(all_words)
+    #print(counts)
+    with open(tag_file, 'w') as fop:
+        for tag in tags:
+            fop.write(tag + '\n')
+
+
+def get_clean_tag(txt):
+    """
+    removes numbers and parenthisis from a word to get a clean name
+    """
+    return txt.lower().translate({ord(ch): None for ch in '0123456789()'})
 
 
 
