@@ -28,6 +28,14 @@ def ont_find(txt):
         print(line)
     print('Found ' + str(len(res)) + ' ontology nodes')
 
+def get_ontology():
+    """
+    called by LifePIM Desktop this sets up the class and 
+    loads the ontology without the parent needing to know
+    where the data file lives. May or may not be a good idea
+    """
+    o = Ontology(folder_ontology, file_ontology_export)
+    return o
 
 class OntologyItem (object):
     """
@@ -284,7 +292,7 @@ def get_clean_tag(txt):
     """
     removes numbers and parenthisis from a word to get a clean name
     """
-    return txt.lower().translate({ord(ch): None for ch in '0123456789()'})
+    return txt.lower().translate({ord(ch): None for ch in '0123456789(),"''/'})
 
 
 

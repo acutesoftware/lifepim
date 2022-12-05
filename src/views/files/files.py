@@ -3,9 +3,8 @@
 import os
 import sys
 import config as mod_cfg
-
 from views.data import data as mod_data
-
+from interfaces.web import web_data as web
 from PyQt5.QtCore import *
 
 from PyQt5.QtGui import QPixmap
@@ -92,9 +91,9 @@ class FileWidget(QWidget):
         self.MainGUI = parentGui
 
     def onDriveChanged(self, index):
-        print('you changed the drive to ' + str(index))
+        #web.lg('you changed the drive to ' + str(index))
         self._set_folder_to_list_files(index)
-        #print('does this work? - _set_folder_to_list_files(self, path)')
+        
 
 
     def on_clicked_folder(self, index):
@@ -104,17 +103,17 @@ class FileWidget(QWidget):
 
     def on_clicked_file(self, index):
         self.MainGUI.currentFile = self.fileModel.filePath(index)
-        print('viewing ' + self.MainGUI.currentFile)
+        web.lg('viewing ' + self.MainGUI.currentFile)
         self.lblCurFolder.setText( self.MainGUI.currentFile)
         self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
 
     def on_editingFinished(self):
         new_path = self.lblCurFolder.text()
-        print('left text edit - new url is ' + new_path)
+        web.lg('left text edit - new url is ' + new_path)
         try:
             self._set_folder_to_list_files(new_path)
         except:
-            print('invalid path to set folder to')
+            web.lg_err('on_editingFinished - invalid path to set folder, new_path = ' + new_path)
  
 
 class cFileManager(object):
@@ -155,26 +154,26 @@ class cFileManager(object):
            
 
         elif tpe == 'picture':
-            print('todo - show image')
+            web.lg('todo - show image')
             self.display_as_image(rootGui, fname)
 
 
         elif tpe == 'video':
-            print('todo - play video')
+            web.lg('todo - play video')
             self.display_as_text(rootGui, fname)
         elif tpe == 'audio':
             self.display_as_music(rootGui, fname)
         elif tpe == '3D':
-            print('todo - show 3D image')
+            web.lg('todo - show 3D image')
             self.display_as_text(rootGui, fname)
         elif tpe == 'strings':
-            print('todo - extract strings from binary file')
+            web.lg('todo - extract strings from binary file')
             self.display_as_text(rootGui, fname)
         elif tpe == 'metadata':
-            print('todo - show metadata - first and last 10 lines of file with num lines, etc')
+            web.lg('todo - show metadata - first and last 10 lines of file with num lines, etc')
             self.display_as_text(rootGui, fname)
         else:
-            print('todo - show file in image or media player')
+            web.lg('todo - show file in image or media player')
             self.display_as_text(rootGui, fname)
 
     def identify_file_type(self, fname):
@@ -197,20 +196,24 @@ class cFileManager(object):
             text=open(fname).read()
             rootGui.MainGUI.MainTextEditor.setText(text)      
             rootGui.MainGUI.set_one_widget_visible('text')  
-            print('display_as_text(self, rootGui, fname) TOK ')
+            web.lg('display_as_text(self, rootGui, fname) TOK ')
         except:
             text = 'Cant display ' + fname
             rootGui.MainGUI.MainTextEditor.setText(text)      
             rootGui.MainGUI.set_one_widget_visible('text')  
+            web.lg_err('files: display_as_text - ' + text)
 
 
     def display_as_data(self, rootGui, fname):
         #csv_viewer = mod_data.lpData(rootGui.MainGUI)
         #csv_viewer.show_file(fname)
-        rootGui.MainGUI.lpWidgetDataview.show_file(fname)
-        print(rootGui.MainGUI.lpWidgetDataview.get_data())
-        rootGui.MainGUI.set_one_widget_visible('data')
-        print('display_as_data(self, rootGui, fname) TOK ')
+        try:
+            rootGui.MainGUI.lpWidgetDataview.show_file(fname)
+            #web.lg(rootGui.MainGUI.lpWidgetDataview.get_data())
+            rootGui.MainGUI.set_one_widget_visible('data')
+            web.lg('display_as_data: fname = ' + fname)
+        except Exception as ex:
+            web.lg_err('display_as_data: fname = ' + fname + ', err = ' + str(ex))
 
     def display_as_image(self, rootGui, fname):
         #rootGui.MainGUI.lpWidgetDataview.setParent(self.UImid)

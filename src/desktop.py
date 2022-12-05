@@ -51,6 +51,7 @@ from views.about import about as about
  
 from views import lp_screen  # make a copy of this for different interfaces (lp_web, lp_console, etc)
 import config as mod_cfg
+from interfaces.web import web_data as web
 import lp_core as mod_lp_core
 
 def main():
@@ -63,7 +64,10 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
     def __init__(self):
         super().__init__()
-
+        web.lg('------------------------------------------------------------')
+        web.lg('---STARTING LIFEPIM')
+        web.lg('------------------------------------------------------------')
+        
         # initial basic functions for LifePIM application
         self.lp_core = mod_lp_core.LifePIM_Core()
 
@@ -347,7 +351,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
 
         if reply == QMessageBox.Yes:
             self.close()
-            print('Window closed')
+            web.lg('Window closed')
         else:
             pass
         self.close
@@ -413,11 +417,11 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.update_layout()
 
     def projAllAct(self):  
-        print('TODO - change project to all')  
+        web.lg('TODO - change project to all')  
         self.update_layout()
 
     def projFilterAct(self):  
-        print('TODO - FILTER project based on combo box or selection from list')    
+        web.lg('TODO - FILTER project based on combo box or selection from list')    
         self.update_layout()
 
 
@@ -449,15 +453,38 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         #return vbox
     def showDate(self, date):
         self.lbl.setText(date.toString())
-        print('todo')
+        web.lg('todo')
         
 
     def create_widget_treeview(self):
-        tree    = QTreeWidget (self)
-        #headerItem  = QTreeWidgetItem()
-        #item    = QTreeWidgetItem()
+        tree = QTreeWidget (self)
+        #NOTE - the ontology file MUST be sorted by node (which it is)
 
-        
+        #tree.setText(0, "Ontology")
+        import ontology as mod_ont
+        ont = mod_ont.get_ontology()
+        node_ids_added = []
+        tree_nodes_added = []
+        for cur_node in ont.dat:
+            print(cur_node)
+            if cur_node.graph_depth == 2:  # this is the real root
+                cur_parent = QTreeWidgetItem(tree)
+                cur_parent.setText(0, cur_node.node_name)
+                tree_nodes_added.append(cur_parent)
+            if cur_node.graph_depth == 3:  # this is the real root
+                cur_tree2 = QTreeWidgetItem(cur_parent)
+                cur_tree2.setText(0, cur_node.node_name)
+                tree_nodes_added.append(cur_tree2)
+            if cur_node.graph_depth == 4:  # this is the real root
+                cur_tree3 = QTreeWidgetItem(cur_tree2)
+                cur_tree3.setText(0, cur_node.node_name)
+                tree_nodes_added.append(cur_tree3)
+            if cur_node.graph_depth == 5:  # this is the real root
+                cur_tree4 = QTreeWidgetItem(cur_tree3)
+                cur_tree4.setText(0, cur_node.node_name)
+                tree_nodes_added.append(cur_tree4)
+
+        """
         parent = QTreeWidgetItem(tree)
         parent.setText(0, "Inbox")
         parent.setFlags(parent.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
@@ -468,7 +495,6 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         parent3 = QTreeWidgetItem(tree)
         parent3.setText(0, "Folders")
         parent3.setFlags(parent3.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
-
         child = QTreeWidgetItem(parent3)
         child.setFlags(child.flags() | Qt.ItemIsUserCheckable)
         child.setText(0, "House")
@@ -478,7 +504,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         child2.setText(0, "Work")
         child2.setCheckState(0, Qt.Unchecked)
 
-        """
+        # v1
         for i in range(3):
             parent = QTreeWidgetItem(tree)
             parent.setText(0, "Parent {}".format(i))
@@ -557,7 +583,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetImageview.setVisible(False)
 
             self.lpMusicWidget.visWidget.setVisible(True)
-            print('activating music widget')
+            web.lg('activating music widget')
         else:
             self.lpWidgetTextEdit.setVisible(True)
             self.lpWidgetDataview.tbl.setVisible(True)
@@ -573,7 +599,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         This changes the screen layout and sets the ALREADY CREATED 
         widgets in the window location that is specified.
         """
-        print('TAB MODE - is now ' + self.curTab)
+        web.lg('TAB MODE - is now ' + self.curTab)
         
         if self.curTab == 'home':
             self.lpWidgetCalendar.setVisible(False)
@@ -612,7 +638,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetTextEdit.setVisible(False)
 
             #self.lpMusicWidget.visWidget.setVisible(True)
-            print('activating music widget')            
+            web.lg('activating music widget')            
         else:
             self.lpWidgetTextEdit.setParent(self.UImid)
 

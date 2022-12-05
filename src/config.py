@@ -20,6 +20,8 @@ index_folder = os.path.join(user_folder, 'index')
 ontology_file = os.path.join(user_folder, 'configuration', 'exported_ontology.csv')
 ontology_folder = os.path.join(user_folder, 'configuration', 'ontology')
 
+log_file = os.path.join(user_folder, 'lifepim_desktop.log')
+
 index_folder = os.path.join(r'D:\lifepim_cache', 'index')
 print('WARNING - cache folder used - updates not copied')
 
@@ -131,8 +133,6 @@ def get_path_from_index_filename(fname):
     clean_name =  fname.replace('_', '\\').replace(';', ':',)
     display_name = clean_name[len(index_folder)+14:][:-4]
     return display_name
-
-
 
 def build_toolbar_file(fname):
     df = '# LifePIM Toolbar definitions for Tkinter\n'
