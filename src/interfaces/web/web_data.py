@@ -9,7 +9,7 @@ import datetime
 import pymysql
 pymysql.install_as_MySQLdb()
 import MySQLdb
-
+import config as mod_cfg
 
 all_tables = [
     {'nme':'as_folder',
@@ -282,6 +282,24 @@ def get_user():
     except:
         user = ''
     return user
+
+def lg(txt):
+    """
+    adds a normal log entry to the standard logfile
+    """
+    log_entry = today_as_string() + ',' + get_user() + ',OK,' + txt + '\n'
+    with open(mod_cfg.log_file, 'a') as fop:
+        fop.write(log_entry)
+
+def lg_err(txt):
+    """
+    adds an Error log entry to the standard logfile
+    """
+    log_entry = today_as_string() + ',' + get_user() + ',ERROR,' + txt + '\n'
+    with open(mod_cfg.log_file, 'a') as fop:
+        fop.write(log_entry)
+
+
 
 
 def today_as_string():

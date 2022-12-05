@@ -483,6 +483,14 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
                 cur_tree4 = QTreeWidgetItem(cur_tree3)
                 cur_tree4.setText(0, cur_node.node_name)
                 tree_nodes_added.append(cur_tree4)
+            if cur_node.graph_depth == 6:  # this is the real root
+                cur_tree5 = QTreeWidgetItem(cur_tree4)
+                cur_tree5.setText(0, cur_node.node_name)
+                tree_nodes_added.append(cur_tree5)
+            if cur_node.graph_depth == 7:  # this is the real root
+                cur_tree6 = QTreeWidgetItem(cur_tree5)
+                cur_tree6.setText(0, cur_node.node_name)
+                tree_nodes_added.append(cur_tree6)
 
         """
         parent = QTreeWidgetItem(tree)
