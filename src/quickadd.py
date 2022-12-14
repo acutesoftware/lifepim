@@ -61,7 +61,7 @@ class Main_GUI(QMainWindow):
         # Set the central widget of the Window.
         self.setCentralWidget(container)
 
-        self.setFixedSize(QSize(400, 300))
+        #self.setFixedSize(QSize(400, 300))
 
     def mouseMoveEvent(self, e):
         self.qLabel.setText("mouseMoveEvent")

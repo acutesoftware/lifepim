@@ -536,6 +536,7 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
         self.MainTextEditor.resize(600,600)
         
         
+        
         return self.MainTextEditor
 
     def create_widget_filelist(self):
@@ -631,11 +632,15 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             notes.build_screen(self.lpWidgetTextEdit)
             #self.lpWidgetCalendar.setParent(self.UIleftTop)
             #self.lpWidgetTreeview.setParent(self.UIleftMid)
+            self.UImid.adjustSize()
             self.lpWidgetTextEdit.setParent(self.UImid)
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpMusicWidget.setVisible(False)
             self.lpWidgetTextEdit.setVisible(True)
             self.lpWidgetTextEdit.adjustSize()
+            
+            #self.lpWidgetTextEdit.resize(900,900)
+            #self.lpWidgetTextEdit.autoResize()
 
         elif self.curTab == 'audio':
             #self.lpWidgetCalendar.setParent(self.UIleftTop)
