@@ -4,6 +4,7 @@ __pycache__/
 sdist/
 #dist/
 build/
+src/build/
 var/
 *.egg-info/
 .installed.cfg

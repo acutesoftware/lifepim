@@ -236,8 +236,8 @@ class simpleapp_tk(Tkinter.Tk):
                     curDiaryEntry = [startTime, tme, txt]  
                 diaryRecs.append(curDiaryEntry)   # write the last line	
 
-        except:
-            self.logErr('ERROR - could not read raw logfile')
+        except Exception as ex:
+            self.logErr('ERROR - could not read raw logfile = ' + str(ex) )
             
         try:	# SAVE THE AGGREGATED LIST TO DIARY FILE
             with open(self.diary_file, "a") as f:
