@@ -277,7 +277,7 @@ def generate_tags_from_ids(node_list):
 
     tags.sort()
 
-    print(tags)
+    #print(tags)
     print('extracted ' + str(len(all_words)) + ' tags')
     print('summary ' + str(len(tags)) + ' tags')
     

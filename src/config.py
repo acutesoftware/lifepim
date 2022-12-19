@@ -22,6 +22,12 @@ ontology_folder = os.path.join(user_folder, 'configuration', 'ontology')
 
 log_file = os.path.join(user_folder, 'lifepim_desktop.log')
 
+# diary and infolink
+diary_pcusage_base_fname = os.path.join(data_folder, 'diary','pc_usage_')
+diary_base_fname =  os.path.join(data_folder, 'diary', 'diary_' )
+diary_base_error_fname =  os.path.join(data_folder, 'diary', 'error_' )
+icon_file = os.path.join(os.getcwd(), 'assets','icons','PNG',  'Stopwatch_On.ico')
+
 index_folder = os.path.join(r'D:\lifepim_cache', 'index')
 print('WARNING - cache folder used - updates not copied')
 
