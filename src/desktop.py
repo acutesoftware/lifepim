@@ -637,8 +637,8 @@ class LifePIM_GUI(QMainWindow):   # works for menu and toolbar as QMainWindow
             self.lpWidgetFilelist.setParent(self.UIleftBottom)
             self.lpMusicWidget.setVisible(False)
             self.lpWidgetTextEdit.setVisible(True)
-            self.lpWidgetTextEdit.adjustSize()
-            
+            #self.lpWidgetTextEdit.adjustSize()
+            self.MainTextEditor.setMarkdown()  # TODO
             #self.lpWidgetTextEdit.resize(900,900)
             #self.lpWidgetTextEdit.autoResize()
 

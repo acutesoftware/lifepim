@@ -28,6 +28,11 @@ diary_base_fname =  os.path.join(data_folder, 'diary', 'diary_' )
 diary_base_error_fname =  os.path.join(data_folder, 'diary', 'error_' )
 icon_file = os.path.join(os.getcwd(), 'assets','icons','PNG',  'Stopwatch_On.ico')
 
+
+# data folder for individual exports
+export_data_folder_base =  os.path.join(data_folder, 'notes','_data')
+
+
 index_folder = os.path.join(r'D:\lifepim_cache', 'index')
 print('WARNING - cache folder used - updates not copied')
 

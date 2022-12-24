@@ -23,9 +23,9 @@ def start_server():
     print('server started...')
     """
     
-    # startup tasks
-    mod_index.refresh_indexes_if_needed()
-    TEST()
+    # startup tasks - no, do this manually
+    #mod_index.refresh_indexes_if_needed()
+    #TEST()
 
     # start web server
     web_server.start_server()
