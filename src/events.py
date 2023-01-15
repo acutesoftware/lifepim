@@ -8,6 +8,8 @@ import sys
 import time
 import config as mod_cfg
 
+
+
 ###############################################
 #  Public Functions to manage data
 ###############################################
@@ -18,14 +20,14 @@ def get_root_event_folder():
     """
     return mod_cfg.calendar_folder
 
-def get_calendar_filename_for_date(dte_as_string):
+def get_calendar_filename_for_date(dte_as_string, prefix='events'):
     """
     returns the filename where a calendar event should be kept
     format is events_YYYY_MM.csv
     """
     YYYY, MM = dte_get_YYYY_MM(dte_as_string)
 
-    fname = 'events_' + YYYY + '_' + MM + '.csv'
+    fname = prefix + '_' + YYYY + '_' + MM + '.csv'
     full_name = os.path.join(get_root_event_folder(), fname)
     return full_name
 
@@ -192,4 +194,5 @@ def TEST():
     process_pc_usage(r'N:\duncan\LifePIM_Data\DATA\diary\diary_sapling_duncan.txt')
 
 
-TEST()
+if __name__ == '__main__':
+    TEST()

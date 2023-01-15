@@ -376,7 +376,7 @@ def copy_files_to_folder(src, dest, xtn='*.txt'):
 def get_list_index_files():
 
     search_lists = ['raw_filelist*.csv']  # searches ALL indexes in folder
-    search_lists = ['raw_filelist*duncan*.csv', 'raw_filelist*_D*.csv']  # searches subset indexes in folder
+    #search_lists = ['raw_filelist*duncan*.csv', 'raw_filelist*_D*.csv']  # searches subset indexes in folder
     
     res_fl = mod_fl.FileList([mod_cfg.index_folder], search_lists, [], 'index_list.txt')
     print('res_fl.get_list() = ', res_fl.get_list())
