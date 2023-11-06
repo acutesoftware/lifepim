@@ -312,7 +312,7 @@ def ont_help():
     print(' -t = show as tree ')
     print(' -c = checks for mismatched entries ')
     print(' -f [txt] = lists entries containing "txt" ')
-    
+    print('WARNING - this reads the .CSV files in the folder but does NOT update the output CSV')
 
     
 

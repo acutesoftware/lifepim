@@ -57,6 +57,8 @@ export_data_folder_base =  os.path.join(data_folder, 'notes','_data')
 calendar_folder = os.path.join(user_folder, 'calendar')
 folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 
+folder_list_file_EXT_HD =  os.path.join(user_folder, 'configuration', 'folders_EXT_HD.lis')
+
 db_name = os.path.join(user_folder, 'DATA', 'lifepim.db')
 
 
