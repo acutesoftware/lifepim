@@ -1,3 +1,19 @@
+# ----------------------------------------------------------------------------
+# FILE: views/calendar.py
+# ----------------------------------------------------------------------------
+import tkinter as tk
+from tkinter import ttk
+
+class CalendarView(ttk.Frame):
+    def __init__(self, master, services=None, **kwargs):
+        super().__init__(master, **kwargs)
+        ttk.Label(self, text='Calendar (compact view)').pack(anchor='w')
+        cal = ttk.Treeview(self, columns=('date','event'), show='headings', height=20)
+        cal.heading('date', text='Date')
+        cal.heading('event', text='Event')
+        cal.pack(fill='both', expand=True)
+
+"""
 # calendar.py
 
 from tkinter import Frame, Label, Entry, Button, font
@@ -26,4 +42,4 @@ def build_screen(root):
     cal = wCalendar(cal_frame)
     cal_frame.grid(row=0, column=0)
 
-
+"""

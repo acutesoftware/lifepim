@@ -1,1 +1,1 @@
-python .\desktop.py
+python .\main.py
