@@ -28,7 +28,7 @@ TABS = [
     { 'icon': '☑', 'id': 'tasks', 'label': 'Tasks', 'module': 'views.tasks', 'class': 'TasksView'},
     { 'icon': '🕐', 'id': 'calendar', 'label': 'Calendar', 'module': 'views.calendar', 'class': 'CalendarView'},
     { 'icon': '▦', 'id': 'data', 'label': 'Data', 'module': 'views.data', 'class': 'DataView'},
-    { 'icon': '📂', 'id': 'files', 'label': 'Files', 'module': 'views.files', 'class': 'FilesView'},
+    { 'icon': '📂', 'id': 'files', 'label': 'Files', 'module': 'views.files', 'class': 'FileView'},
     { 'icon': '🖼️', 'id': 'images', 'label': 'Images', 'module': 'views.images', 'class': 'ImagesView'},
     { 'icon': '♬', 'id': 'music', 'label': 'Music', 'module': 'views.music', 'class': 'MusicView'},
     { 'icon': '🎥', 'id': 'video', 'label': 'Video', 'module': 'views.video', 'class': 'VideoView'},

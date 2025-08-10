@@ -1,240 +1,155 @@
-# files.py
-
 import os
-import sys
-import config as mod_cfg
-from views.data import data as mod_data
-from interfaces.web import web_data as web
-from PyQt5.QtCore import *
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
 
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QTextEdit 
-from PyQt5.QtWidgets import QVBoxLayout
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtWidgets import (QFileSystemModel)
-from PyQt5.QtWidgets import (QTreeView, QListView)
-from PyQt5.QtWidgets import QVBoxLayout
-from PyQt5.QtWidgets import QLineEdit
-from PyQt5.QtWidgets import QComboBox
+class FileView(ttk.Frame):
+    def __init__(self, master, services=None, **kwargs):
+        super().__init__(master, **kwargs)
+        paned = ttk.Panedwindow(self, orient='horizontal')
+        paned.pack(fill='both', expand=True)
 
+        # --- Left: Folder Tree ---
+        left = ttk.Frame(paned, width=250)
+        paned.add(left, weight=1)
 
-class FileWidget(QWidget):
-    def __init__(self, *args, **kwargs):
-        QWidget.__init__(self, *args, **kwargs)
+        # Folder tree vertical scrollbar
+        folder_scroll = ttk.Scrollbar(left, orient='vertical')
+        folder_scroll.pack(side='right', fill='y')
 
-        pth = mod_cfg.file_startup_path  # r"D:\dev"
-        
-        hlay = QVBoxLayout(self)  # was HBox
-        #hlay.addStretch(6)
-        #hlay.showMaximized(True) 
+        self.folder_tree = ttk.Treeview(left, show='tree', yscrollcommand=folder_scroll.set)
+        self.folder_tree.pack(side='left', fill='both', expand=True, padx=2, pady=2)
+        folder_scroll.config(command=self.folder_tree.yview)
 
-        self.cmbDrive = QComboBox(self)
-        self.cmbDrive.addItem('C:/')
-        self.cmbDrive.addItem('D:/')
-        self.cmbDrive.addItem('E:/')
-        self.cmbDrive.addItem('M:/')
-        self.cmbDrive.addItem('N:/')
-        self.cmbDrive.addItem('P:/')
-        self.cmbDrive.addItem('T:/')
-        self.cmbDrive.addItem('U:/')
+        self.folder_tree.bind('<<TreeviewOpen>>', self.on_treeview_open)
+        self.folder_tree.bind('<<TreeviewClose>>', self.on_treeview_close)
+        self.folder_tree.bind('<<TreeviewSelect>>', self.on_folder_select)
 
+        self.populate_folder_tree()
 
+        # --- Middle: File List ---
+        mid = ttk.Frame(paned, width=500)
+        paned.add(mid, weight=3)
+        files_frame = ttk.LabelFrame(mid, text='Files')
+        files_frame.pack(fill='both', expand=True, padx=2, pady=2)
 
-        self.cmbDrive.activated[str].connect(self.onDriveChanged)
+        # File list vertical scrollbar
+        file_scroll = ttk.Scrollbar(files_frame, orient='vertical')
+        file_scroll.pack(side='right', fill='y')
 
+        self.file_list = ttk.Treeview(
+            files_frame, columns=('name', 'size', 'type'), show='tree headings', yscrollcommand=file_scroll.set
+        )
+        self.file_list.heading('name', text='Name')
+        self.file_list.heading('size', text='Size')
+        self.file_list.heading('type', text='Type')
+        self.file_list.column('name', width=250, anchor='w')
+        self.file_list.column('size', width=80, anchor='e')
+        self.file_list.column('type', width=80, anchor='w')
+        self.file_list.pack(side='left', fill='both', expand=True)
+        file_scroll.config(command=self.file_list.yview)
 
-        self.treeview = QTreeView()
-        self.listview = QListView()
-        self.lblCurFolder = QLineEdit(pth)
-        self.lblCurFolder.setText(pth)
-        hlay.addWidget(self.cmbDrive)
-        hlay.addWidget(self.lblCurFolder)
-        hlay.addWidget(self.treeview)
-        hlay.addWidget(self.listview)
+        # --- Right: Metadata (optional) ---
+        right = ttk.Frame(paned, width=150)
+        paned.add(right, weight=1)
+        stats = ttk.LabelFrame(right, text='Metadata')
+        stats.pack(fill='both', expand=True, padx=2, pady=1)
+        self.word_count = ttk.Label(stats, text='Size: 0')
+        self.word_count.pack(anchor='w', padx=2, pady=1)
 
-        path = QDir.rootPath()
-
-        self.dirModel = QFileSystemModel()
-
-        self.dirModel.setRootPath(pth)
-        self.dirModel.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs)
-
-        self.fileModel = QFileSystemModel()
-        self.fileModel.setFilter(QDir.NoDotAndDotDot |  QDir.Files)
-
-        self.treeview.setModel(self.dirModel)
-        self.listview.setModel(self.fileModel)
-
-        self.treeview.setRootIndex(self.dirModel.index(pth))  # was path but defaults to C:
-        self.listview.setRootIndex(self.fileModel.index(pth)) # was path but defaults to C:
-
-        self.treeview.clicked.connect(self.on_clicked_folder)
-        self.listview.clicked.connect(self.on_clicked_file)
-        self.lblCurFolder.editingFinished.connect(self.on_editingFinished)
-
-    def _set_folder_to_list_files(self, path):
-        self.dirModel.setRootPath(path)
-        self.listview.setRootIndex(self.fileModel.setRootPath(path))
-        self.treeview.setModel(self.dirModel)
-        self.lblCurFolder.setText(path)
-
-        self.treeview.setRootIndex(self.dirModel.index(path)) 
-
-        self.showMaximized()
-        self.listview.showMaximized()
-        # error self.dirModel.showMaximized()
-
-    def attach_parent_reference(self, parentGui):
-        """
-        TODO - this is a terrible idea, but I havent worked out PyQT signals yet
-        """
-        self.MainGUI = parentGui
-
-    def onDriveChanged(self, index):
-        #web.lg('you changed the drive to ' + str(index))
-        self._set_folder_to_list_files(index)
-        
-
-
-    def on_clicked_folder(self, index):
-        path = self.dirModel.fileInfo(index).absoluteFilePath()
-        self.listview.setRootIndex(self.fileModel.setRootPath(path))
-        self.lblCurFolder.setText(path)
-
-    def on_clicked_file(self, index):
-        self.MainGUI.currentFile = self.fileModel.filePath(index)
-        web.lg('viewing ' + self.MainGUI.currentFile)
-        self.lblCurFolder.setText( self.MainGUI.currentFile)
-        self.MainGUI.lpFileManager.show_file(self, self.MainGUI.currentFile)
-
-    def on_editingFinished(self):
-        new_path = self.lblCurFolder.text()
-        web.lg('left text edit - new url is ' + new_path)
-        try:
-            self._set_folder_to_list_files(new_path)
-        except:
-            web.lg_err('on_editingFinished - invalid path to set folder, new_path = ' + new_path)
- 
-
-class cFileManager(object):
-    def __init__(self):
-        #print('initialising file manager')
-        self.file_types = {}
-        self.load_file_types()
-        #print('xtns = ' + str(self.file_types))
-
-    def load_file_types(self):
-        """
-        reads settings.cfg to work out how to show different files
-        """
-        raw_setting = mod_cfg.read_user_setting('index_file_types')
-        index_file_types = raw_setting.split(',')
-        for file_type in index_file_types:
-            cur_xtn_list = mod_cfg.read_user_setting('file_type_' + file_type)
-            xtns = cur_xtn_list.split(',')
-            #print(cur_type)
-            self.file_types[file_type] = xtns
-       
-
-    def show_file(self, rootGui, fname):
-        """
-        high level function called when user clicks a file to have it shown in 
-        its native format - for text, edit it - for images show image view, etc
-        rootGui = main lifepim root window
-        fname = name of file to display  (gui will make visible the approp widget)
-        """
-        tpe = self.identify_file_type(fname)
-        # TODO - make ONE widget in 'mid' visible and others hidden 
-        # rootGui.set_display_mode('text')
-        #print('fname ' + fname + ' is file_type ' + tpe)
-        if tpe in [ 'text', 'markdown','code','web' ]:
-            self.display_as_text(rootGui, fname)
-        elif tpe == 'data':
-            self.display_as_data(rootGui, fname)
-           
-
-        elif tpe == 'picture':
-            web.lg('todo - show image')
-            self.display_as_image(rootGui, fname)
-
-
-        elif tpe == 'video':
-            web.lg('todo - play video')
-            self.display_as_text(rootGui, fname)
-        elif tpe == 'audio':
-            self.display_as_music(rootGui, fname)
-        elif tpe == '3D':
-            web.lg('todo - show 3D image')
-            self.display_as_text(rootGui, fname)
-        elif tpe == 'strings':
-            web.lg('todo - extract strings from binary file')
-            self.display_as_text(rootGui, fname)
-        elif tpe == 'metadata':
-            web.lg('todo - show metadata - first and last 10 lines of file with num lines, etc')
-            self.display_as_text(rootGui, fname)
+    def populate_folder_tree(self):
+        if os.name == 'nt':
+            import string
+            drives = [f"{d}:\\" for d in string.ascii_uppercase if os.path.exists(f"{d}:\\")]
+            for drive in drives:
+                node = self.folder_tree.insert(
+                    '', 'end', text="📁 " + drive, values=[drive], open=False)
+                if self.has_subfolders(drive):
+                    self.folder_tree.insert(node, 'end')  # dummy child for expand arrow
         else:
-            web.lg('todo - show file in image or media player')
-            self.display_as_text(rootGui, fname)
+            node = self.folder_tree.insert(
+                '', 'end', text="📁 /", values=['/'], open=False)
+            if self.has_subfolders('/'):
+                self.folder_tree.insert(node, 'end')  # dummy child
 
-    def identify_file_type(self, fname):
-        xtn = self.get_file_extension(fname)
-        for k,v in self.file_types.items():
-            #print(k,v)
-            if xtn in v:
-                #print('fname is type ' + k)
-                return k
-        return 'text'
+    def on_treeview_open(self, event):
+        node = self.folder_tree.focus()
+        path = self.folder_tree.item(node, 'values')[0]
+        label = self.folder_tree.item(node, 'text')
+        # Always replace first two chars with open folder emoji
+        if label.startswith("📁 ") or label.startswith("📂 "):
+            self.folder_tree.item(node, text="📂 " + label[2:])
+        else:
+            self.folder_tree.item(node, text="📂 " + label)
+        # Only populate if the first child is a dummy (no values)
+        children = self.folder_tree.get_children(node)
+        if children:
+            first_child = children[0]
+            if not self.folder_tree.item(first_child, 'values'):
+                self.folder_tree.delete(first_child)
+                self.insert_subfolders(node, path)
 
-    def get_file_extension(self, fname):
-        parts = fname.split('.')
-        xtn = parts[-1].upper()
-        #print('XTN = ' + xtn)
-        return xtn
+    def on_treeview_close(self, event):
+        node = self.folder_tree.focus()
+        label = self.folder_tree.item(node, 'text')
+        if label.startswith("📁 ") or label.startswith("📂 "):
+            self.folder_tree.item(node, text="📁 " + label[2:])
+        else:
+            self.folder_tree.item(node, text="📁 " + label)
 
-    def display_as_text(self, rootGui, fname):
+    def insert_subfolders(self, parent, path):
         try:
-            text=open(fname).read()
-            rootGui.MainGUI.MainTextEditor.setText(text)      
-            rootGui.MainGUI.set_one_widget_visible('text')  
-            web.lg('display_as_text(self, rootGui, fname) TOK ')
-        except:
-            text = 'Cant display ' + fname
-            rootGui.MainGUI.MainTextEditor.setText(text)      
-            rootGui.MainGUI.set_one_widget_visible('text')  
-            web.lg_err('files: display_as_text - ' + text)
+            subfolders = []
+            for name in os.listdir(path):
+                fullpath = os.path.join(path, name)
+                if os.path.isdir(fullpath):
+                    subfolders.append((name, fullpath))
+            subfolders.sort()
+            for name, fullpath in subfolders:
+                try:
+                    node = self.folder_tree.insert(
+                        parent, 'end', text="📁 " + name, values=[fullpath], open=False)
+                    if self.has_subfolders(fullpath):
+                        self.folder_tree.insert(node, 'end')  # dummy child for expand arrow
+                except Exception:
+                    continue
+        except Exception as e:
+            print('cant insert subfolders:', e)
 
-
-    def display_as_data(self, rootGui, fname):
-        #csv_viewer = mod_data.lpData(rootGui.MainGUI)
-        #csv_viewer.show_file(fname)
+    def has_subfolders(self, path):
         try:
-            rootGui.MainGUI.lpWidgetDataview.show_file(fname)
-            #web.lg(rootGui.MainGUI.lpWidgetDataview.get_data())
-            rootGui.MainGUI.set_one_widget_visible('data')
-            web.lg('display_as_data: fname = ' + fname)
-        except Exception as ex:
-            web.lg_err('display_as_data: fname = ' + fname + ', err = ' + str(ex))
+            for name in os.listdir(path):
+                if os.path.isdir(os.path.join(path, name)):
+                    return True
+        except Exception:
+            return False
+        return False
 
-    def display_as_image(self, rootGui, fname):
-        #rootGui.MainGUI.lpWidgetDataview.setParent(self.UImid)
-        rootGui.MainGUI.lpPixelMap = QPixmap(fname)
-        rootGui.MainGUI.MainWidgetImageview.setPixmap(rootGui.MainGUI.lpPixelMap)
-        # rootGui.MainGUI.lpPixelMap
-        rootGui.MainGUI.MainWidgetImageview.resize(rootGui.MainGUI.lpPixelMap.width(), rootGui.MainGUI.lpPixelMap.height())
-        #rootGui.MainGUI.lpWidgetDataview.setPixmap(rootGui.MainGUI.lpPixelMap)
-        rootGui.MainGUI.set_one_widget_visible('image')
+    def on_folder_select(self, event):
+        selected = self.folder_tree.selection()
+        if not selected:
+            return
+        node = selected[0]
+        path = self.folder_tree.item(node, 'values')[0]
+        self.list_files(path)
 
-    def display_as_music(self, rootGui, fname):
-        rootGui.MainGUI.lpMusicWidget.setVisible(True)
-        rootGui.MainGUI.lpMusicWidget.play_music_file(fname)
+    def list_files(self, folder):
+        self.file_list.delete(*self.file_list.get_children())
+        try:
+            for name in os.listdir(folder):
+                fullpath = os.path.join(folder, name)
+                if os.path.isfile(fullpath):
+                    size = os.path.getsize(fullpath)
+                    ext = os.path.splitext(name)[1][1:].upper()
+                    self.file_list.insert(
+                        '', 'end', text="📄",  # file emoji
+                        values=(name, self.format_size(size), ext))
+        except Exception as e:
+            messagebox.showerror("Error", f"Cannot list files in {folder}\n{e}")
 
-
-class FileView(object):
-    def __init__(self, fname):
-        self.filename = fname
-    
-    def display_in_widget(self, gui):
-        """
-        
-        """
-        pass
+    def format_size(self, size):
+        for unit in ['B','KB','MB','GB','TB']:
+            if size < 1024.0:
+                return f"{size:.0f} {unit}"
+            size /= 1024.0
+        return f"{size:.0f} PB"
