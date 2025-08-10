@@ -21,12 +21,29 @@ toolbar_definition = [
     ['⚙',  'about',   'tb_about',        'About',    'N']
 ]
 
-# Tabs configuration - order, label, view module path (importable) and ability to hide if new column 'hide' == 'Y'
+
 TABS = [
-    { 'id': 'home', 'label': 'Overview', 'module': 'views.home', 'class': 'HomeView' },
-    { 'id': 'calendar', 'label': 'Calendar', 'module': 'views.calendar', 'class': 'CalendarView' },
-    { 'id': 'tasks', 'label': 'Tasks', 'module': 'views.tasks', 'class': 'TasksView' },
-    { 'id': 'notes', 'label': 'Notes', 'module': 'views.notes', 'class': 'NotesView' },
+    { 'icon': '🏠', 'id': 'home', 'label': 'Overview', 'module': 'views.home', 'class': 'HomeView'},
+    { 'icon': '📝', 'id': 'notes', 'label': 'Notes', 'module': 'views.notes', 'class': 'NotesView'},
+    { 'icon': '☑', 'id': 'tasks', 'label': 'Tasks', 'module': 'views.tasks', 'class': 'TasksView'},
+    { 'icon': '🕐', 'id': 'calendar', 'label': 'Calendar', 'module': 'views.calendar', 'class': 'CalendarView'},
+    { 'icon': '▦', 'id': 'data', 'label': 'Data', 'module': 'views.data', 'class': 'DataView'},
+    { 'icon': '📂', 'id': 'files', 'label': 'Files', 'module': 'views.files', 'class': 'FilesView'},
+    { 'icon': '🖼️', 'id': 'images', 'label': 'Images', 'module': 'views.images', 'class': 'ImagesView'},
+    { 'icon': '♬', 'id': 'music', 'label': 'Music', 'module': 'views.music', 'class': 'MusicView'},
+    { 'icon': '🎥', 'id': 'video', 'label': 'Video', 'module': 'views.video', 'class': 'VideoView'},
+    { 'icon': '🏆', 'id': 'badges', 'label': 'Badges', 'module': 'views.badges', 'class': 'BadgesView'},
+    { 'icon': '💲', 'id': 'money', 'label': 'Money', 'module': 'views.money', 'class': 'MoneyView'},
+    { 'icon': '👤', 'id': 'contacts', 'label': 'Contacts', 'module': 'views.contacts', 'class': 'ContactsView'},
+    { 'icon': '🌏', 'id': 'places', 'label': 'Places', 'module': 'views.places', 'class': 'PlacesView'},
+    { 'icon': '💻', 'id': 'system', 'label': 'System', 'module': 'views.system', 'class': 'SystemView'},
+    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps', 'module': 'views.apps', 'class': 'AppsView'},
+    { 'icon': '⚙', 'id': 'etl', 'label': 'ETL', 'module': 'views.etl', 'class': 'EtlView'},
+    { 'icon': '📜', 'id': 'journal', 'label': 'Journal / Logs', 'module': 'views.journal', 'class': 'JournalView'},
+    { 'icon': '⚿', 'id': 'admin', 'label': 'Admin', 'module': 'views.admin', 'class': 'AdminView'},
+    { 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'module': 'views.agent', 'class': 'AgentView'},
+
+
 ]
 
 # Project list default
@@ -44,9 +61,26 @@ CACHE_FILE = 'life_pim_cache.pickle'
 # Visual density settings - very compact
 UI = {
     'font_family': 'TkDefaultFont',
-    'font_size': 9,
+    'font_size': 9,  # was 9 , 11 looks ok as well
     'padding': 2,
     'toolbar_button_padx': 3,
     'toolbar_button_pady': 2,
 }
+
+style_name = 'clam'  # 'clam' for light mode, 'dark' for dark mode
+
+
+# large icons
+tab_font_name = 'Segoe UI Emoji'
+tab_font_size = 14
+tab_font_bold = 'bold'
+
+# medium icons
+tab_font_name = 'Segoe UI Emoji'
+tab_font_size = 10
+tab_font_bold = ''
+
+
+# ----------------------------------------------------------------------------
+
 

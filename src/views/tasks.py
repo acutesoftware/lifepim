@@ -11,11 +11,22 @@ class TasksView(ttk.Frame):
         lbl = ttk.Label(self, text='Tasks List')
         lbl.pack(anchor='w')
         columns = ('id','title','project','status')
-        tv = ttk.Treeview(self, columns=columns, show='headings', height=25)
+        self.tv = ttk.Treeview(self, columns=columns, show='headings', height=25)
         for c in columns:
-            tv.heading(c, text=c)
-            tv.column(c, width=80, anchor='w')
-        tv.pack(fill='both', expand=True)
+            self.tv.heading(c, text=c)
+            self.tv.column(c, width=80, anchor='w')
+        self.tv.pack(fill='both', expand=True)
+        # Example: Add some sample data
+        sample_tasks = [
+            (1, 'Buy groceries', 'Personal', 'Open'),
+            (2, 'Finish report', 'Work', 'In Progress'),
+            (3, 'Call plumber', 'Home', 'Done'),
+        ]
+        for task in sample_tasks:
+            self.add_task(*task)
+
+    def add_task(self, id, title, project, status):
+        self.tv.insert('', 'end', values=(id, title, project, status))
 
 
 """
