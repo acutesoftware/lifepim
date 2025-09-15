@@ -6,8 +6,8 @@ from src import config as mod_cfg
 
 def main():
     show_layout()
-
-
+    print(mod_cfg.ui_actions)
+    print(mod_cfg.filters)
 
 def get_table_name(top_menu, sub_menu):
     if sub_menu == '':

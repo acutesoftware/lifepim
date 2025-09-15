@@ -98,6 +98,30 @@ sub_menus = [
     {'root':'video', 'name':'Recordings'},
 ]
 
+filters = [
+      ['notes', 'type', ['Idea', 'Meeting Note', 'Project Info', 'Research']],
+        ['tasks', 'status', ['Not Started', 'In Progress', 'Completed', 'Deferred', 'Waiting on someone else']],
+        ['tasks', 'priority', ['Low', 'Medium', 'High', 'Urgent']],
+        ['calendar', 'type', ['Appointment', 'Event', 'Reminder']],
+        ['data', 'type', ['Database', 'Spreadsheet', 'Checklist']],
+        ['files', 'type', ['Document', 'PDF', 'Presentation']],
+        ['images', 'type', ['Photo', 'Screenshot', 'Drawing']],
+        ['music', 'type', ['Song', 'Album', 'Playlist']],
+        ['video', 'type', ['Movie', 'Clip', 'Recording']], 
+]   
+
+for tab in TABS:
+    sub_menus.append({'root':tab['id'], 'name':'Add'})
+	
+
+ui_actions = []    # these are the clickable links that appear per tab / submenu
+for tab in TABS:
+    ui_actions.append([tab['id'], 'Add', 'fn_' + tab['id'] + '_add'])
+    #ui_actions.append([tab['id'], 'Import', 'fn_' + tab['id'] + '_import'])
+    #ui_actions.append([tab['id'], 'Generate', 'fn_' + tab['id'] + '_gen'])
+
+
+
 api_routes = [
     '/',
     '/notes',
