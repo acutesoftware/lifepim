@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+{% if is_authenticated == 'Y' %}
+
+
+{% if view_as == '▤' %}
+<div id="lists">
+<TABLE width=95%>
+
+{% for fname in lst %}
+  <TR>
+    <TD><a href="{{ url_for('page_file_view',  fname=fname )}}">{{ fname }}</a>
+  </TD>
+
+
+  </TR>
+{% endfor %}
+</TABLE>
+</div>
+
+
+{% else %}
+
+<div class="card-columns">
+
+{% for fname in lst %}
+
+<a href="{{ url_for('page_file_view',   fname=fname )}}">
+  <div class="card text-dark" style="background-color: #ffff93">
+    <div class="card-body">
+        <h5 class="card-title">{{ fname }}</h5>
+        <small>
+
+        </small>
+      </div>
+
+  </div>
+  </a>
+{% endfor %}
+</div>
+
+{% endif %}
+
+
+{{ num_recs }} files<BR>
+
+{% else %}
+
+<div class="jumbotron">
+  <H1>Upload files</h1>
+upload files to LifePIM (subscribers only)
+
+
+</div>
+
+
+	Login <a href="{{ url_for('login') }}">here</a> to here to start using LifePIM<BR><BR>
+
+
+{% endif %}
+
+
+
+
+{% endblock %}

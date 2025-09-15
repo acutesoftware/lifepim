@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<H1>LifePIM Logon</H1>
+<BR><BR>
+
+      <br>
+      <form action="" method="post">
+        <input type="text" placeholder="Username" name="username" value=""><BR>
+         <input type="password" placeholder="Password" name="password" value=""><BR>
+        <input class="btn btn-default" type="submit" value="Login"><BR>
+      </form>
+      <BR>
+
+      {% if error %}
+        <p class="error"><strong>Error:</strong> {{ error }}
+      {% endif %}
+
+<BR>
+
+
+{% endblock %}

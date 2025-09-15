@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if is_authenticated != 'Y' %}
+
+    You do not have access to this page<BR><BR>
+
+
+    Login <a href="{{ url_for('login') }}">here</a> to here to start using LifePIM<BR><BR>
+
+	Not registered? <a href="{{ url_for('register') }}">sign up here</a><BR>
+
+
+    <BR>
+
+{% else %}
+
+    <form class="form-group" method="POST">
+
+
+
+    {% if record[6] %}
+      <input type="checkbox" id="{{ record[0] }}" onchange="uncompleteTask({{  record[0]  }})" name="complete" checked>
+      <a class="text-dark" href="{{ url_for('view_task', id_to_update=id )}}">Completed</a>
+    {% else %}
+      <input type="checkbox" id="{{ record[0] }}" onchange="completeTask({{  record[0]  }})" name="complete">
+      <a class="text-dark" href="{{ url_for('view_task', id_to_update= record[0]  )}}">Completed</a>
+    {% endif %}
+
+    <!--input type="submit" class="form-group" name="btn_cancel" value="Cancel"-->
+    <h2><a href="{{ url_for('edit_value', listname='tasks', id_to_update=record[0]) }}">{{ record[1] }}</a></h2>
+    <p>
+    <!--input type="checkbox" class="form-group" name="Pinned" checked> {{headers[2]}}
+    <input type="checkbox" class="form-group" name="Important" checked> {{headers[3]}}-->
+    {% if record[4] %}
+      {% set paragraphs = record[4].split('\n') %}
+    {% else %}
+      {% set paragraphs = [] %}
+    {% endif %}
+    {% set mode = 'P' %}
+    {% for paragraph in paragraphs %}
+      {% if paragraph[0:3] == '###' %}
+        </pre></p><H5>{{ paragraph[3:] }}</H5><p>
+      {% elif paragraph[0:2] == '##' %}
+        </pre></p><H4>{{ paragraph[2:] }}</H4><p>
+      {% elif paragraph[1:9] == 'img src=' %}
+        </pre></p>
+        <img src=" {{ paragraph[9:]|replace(">", "") }} "  class="img-fluid" alt="Responsive image"><p>
+      {% elif paragraph[0:5] == '[img]' %}
+        </pre></p>
+        <!--showing image<BR>
+        {{ paragraph[5:]|replace("[/img]", "") }}-->
+        <!--img src="https://www.lifepim.com/img_view/{{paragraph[5:]|replace("[/img]", "")}}"  class="img-fluid" alt="Responsive image"><p>-->
+        <img src="/img_view/{{paragraph[5:]|replace("[/img]", "")}}"  class="img-fluid" alt="Responsive image"><p>
+
+      {% elif paragraph[0:17] == 'https://www.youtu' %}  <!--# was 'iframe src=' now https://www.youtu -->
+          </pre></p>
+          <div class="embed-responsive embed-responsive-16by9">
+            {% if 'embed' in paragraph %}
+              #| replace("|", "<br/>")
+              <iframe class="embed-responsive-item" src="{{ paragraph }}" allowfullscreen></iframe>
+            {% else %}
+              #"watch?v=", "embed/"
+              <iframe class="embed-responsive-item" src="{{ paragraph | replace("watch?v=", "embed/") }}" allowfullscreen></iframe>
+              <!--- also show the URL to utube untouched -->
+
+            {% endif %}
+
+          </div>{{ paragraph|urlize(80, target='_blank') }}<BR>{% elif paragraph[0:3] == '~~~' %}{% if mode == 'P' %}</p><pre>{% set mode = 'PRE' %}
+          {% else %}
+            </pre><p>{% set mode = 'P' %}
+          {% endif %}
+      {% elif paragraph[1:13] == 'iframe src="' %}
+        <div class="embed-responsive embed-responsive-16by9">
+        <iframe class="embed-responsive-item" src="{{ paragraph[13:] }}" allowfullscreen></iframe>
+      </div>
+      {%- else -%}{{ paragraph|urlize(80, target='_blank') }}{% if mode == 'P' %}<BR>{% endif %}
+      {% endif %}
+
+    {% endfor %}
+
+
+
+
+
+<!-- div class="btn-group"-->
+  <a class="btn btn-secondary" href="{{ url_for('edit_value', listname='tasks', id_to_update=record[0]) }}" role="button">Edit</a>
+  <!--a class="btn btn-secondary" href="{{ url_for('edit_value', listname='notes', id_to_update=record[0]) }}" role="button">Copy</a>
+  <a class="btn btn-secondary" href="{{ url_for('edit_value', listname='notes', id_to_update=record[0]) }}" role="button">Archive</a-->
+  <div class="dropdown">
+    <button class="btn btn-secondary dropdown-toggle" type="button"
+            id="dropdownLogonButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            More
+    </button>
+    <div class="dropdown-menu" aria-labelledby="dropdownLogonButton">
+        <a class="dropdown-item" href="{{ url_for('edit_value', listname='tasks', id_to_update=record[0] )}}">Edit</a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item" href="{{ url_for('delete_val', listname='tasks', item_to_delete=record[0] )}}">Delete</a>
+   </div>
+ </div>
+<!--/div-->
+
+</form>
+
+
+
+{% endif %}
+
+{% endblock %}

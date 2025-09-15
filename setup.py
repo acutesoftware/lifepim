@@ -2,14 +2,14 @@ from setuptools import setup
 
 setup(
     name='lifepim',
-    version='0.0.3',
+    version='0.0.4',
     author='Duncan Murray',
-    author_email='djmurray@acutesoftware.com.au',
+    author_email='djmurray@gmail.com',
     packages=['lifepim', 'lifepim.web_app'],
     url='https://github.com/acutesoftware/lifepim',
     license='GNU General Public License v3 (GPLv3)',
     description='Personal Information Manager for Life',
-    long_description=open('README.txt').read(),
+    long_description='lets you quickly manage and find everything - all lists, ideas, and notes, tasks, calendar events, logs, ETL jobs, images, music, videos, programs, etc.',
     install_requires=[
           'nose >= 1.0',
           'AIKIF >= 0.1.3',

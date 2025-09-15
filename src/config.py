@@ -4,23 +4,46 @@
 
 import os
 
+# ----------------------------------------------------------------------------
+# Folder Locations
+# 
+
+user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
+
+logon_file = os.path.join(user_folder, 'configuration', 'lifepim.par')
+data_folder = os.path.join(user_folder, 'DATA')
+index_folder = os.path.join(user_folder, 'index')
+calendar_folder = os.path.join(user_folder, 'calendar')
+folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
+
 
 # ----------------------------------------------------------------------------
-# FILE: config.py
-# ----------------------------------------------------------------------------
+# Interface configuration
 
-toolbar_definition = [
-    # [icon, name, function, comments, hide(optional)]
-    ['🏠', 'home',     'tb_home',         'Overview'],
-    ['🕐', 'calendar', 'tb_calendar',     'Calendar'],
-    ['☑',  'tasks',   'tb_tasks',        'Tasks'],
-    ['📝', 'notes',   'tb_notes',        'Notes'],
-    ['👤', 'contacts','tb_contacts',     'Contacts', 'N'],
-    ['🌏', 'places',  'tb_places',       'Places',   'N'],
-    ['⚙',  'options', 'tb_options',      'Options',  'N'],
-    ['⚙',  'about',   'tb_about',        'About',    'N']
-]
+# Project list default
+proj_list = ['Dev','Design','Fun','Games','Family','Car',
+             'Business','Web','Home','Study','Health','Work',
+             'RasbPI','AI','Support','Pers']
 
+
+toolbar_definition_OLD =  [  # [icon, name, function, comments]
+    ['🏠', 'home',     'tb_home',         '🏠📰 This is the overview page'],
+    ['🕐', 'calendar', 'tb_calendar', '⌚📅 🕐 Project overview showing current list of tasks being worked on'],
+    ['☑',  'tasks',    'tb_tasks',    '☑✔📎🔨✘☑ ⛏ ☹     💻 💹 Tasks'],
+    ['📝', 'notes',    'tb_notes',    '🗒✎📝 ✏ 🗊Team wiki page - ultra simple'], #
+    ['👤', 'contacts', 'tb_contacts',     '☎👱  👤  Contacts view'],
+    ['🌏️', 'places',   'tb_places',    '🌏🛰️⛟ ⌖ ⛰    💻 💹Locations - maps, people finder'],
+    ['▦',  'data',     'tb_data',    '▧🗒 🗊data tables'],
+    ['🏆', 'badges',   'tb_badges',     '★ ⛤ ✵ ✭ ⚜'],
+    ['💲', 'money',    'tb_money',      ''],
+    ['♬',  'music',    'tb_music',     '🗒 🗊music'],
+    ['🖼',  'images',  'tb_images',      '🗒 🗊images'],
+    ['🎮', 'apps',     'tb_apps',     '👍 👎 '],
+    ['📂',  'files',   'tb_files',     '🗒 🗊images and files'],
+    ['⚿',  'admin',   'tb_admin',      'passwords'],
+    ['⚙',  'options', 'tb_options',     'Options for LifePIM'],
+    ['⚙',  'about',   'tb_about',    'About LifePIM']
+    ]
 
 TABS = [
     { 'icon': '🏠', 'id': 'home', 'label': 'Overview', 'module': 'views.home', 'class': 'HomeView'},
@@ -43,44 +66,84 @@ TABS = [
     { 'icon': '⚿', 'id': 'admin', 'label': 'Admin', 'module': 'views.admin', 'class': 'AdminView'},
     { 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'module': 'views.agent', 'class': 'AgentView'},
 
-
 ]
 
-# Project list default
-proj_list = ['Dev','Design','Fun','Games','Family','Car',
-             'Business','Web','Home','Study','Health','Work',
-             'RasbPI','AI','Support','Pers']
 
-# Favorites
-FAV_FOLDERS = [r"D:\dev\src\LIFEPIM_WEB\USER_DATA\duncan\notes", 
-               r"N:\duncan\LifePIM_Data"]
+sub_menus = [
+    {'root':'notes', 'name':'Ideas'},
+    {'root':'notes', 'name':'Meeting Notes'},
+    {'root':'notes', 'name':'Project Info'},
+    {'root':'notes', 'name':'Research'},
+    {'root':'tasks', 'name':'Today'},
+    {'root':'tasks', 'name':'This Week'},
+    {'root':'tasks', 'name':'This Month'},
+    {'root':'tasks', 'name':'Completed'},
+    {'root':'calendar', 'name':'Appointments'},
+    {'root':'calendar', 'name':'Events'},
+    {'root':'calendar', 'name':'Reminders'},
+    {'root':'data', 'name':'Databases'},
+    {'root':'data', 'name':'Spreadsheets'},
+    {'root':'data', 'name':'Checklists'},
+    {'root':'files', 'name':'Documents'},
+    {'root':'files', 'name':'PDFs'},
+    {'root':'files', 'name':'Presentations'},
+    {'root':'images', 'name':'Photos'},
+    {'root':'images', 'name':'Screenshots'},
+    {'root':'images', 'name':'Drawings'},
+    {'root':'music', 'name':'Songs'},
+    {'root':'music', 'name':'Albums'},
+    {'root':'music', 'name':'Playlists'},
+    {'root':'video', 'name':'Movies'},
+    {'root':'video', 'name':'Clips'},
+    {'root':'video', 'name':'Recordings'},
+]
 
-# Cache file
-CACHE_FILE = 'life_pim_cache.pickle'
-
-# Visual density settings - very compact
-UI = {
-    'font_family': 'TkDefaultFont',
-    'font_size': 9,  # was 9 , 11 looks ok as well
-    'padding': 2,
-    'toolbar_button_padx': 3,
-    'toolbar_button_pady': 2,
-}
-
-style_name = 'clam'  # 'clam' for light mode, 'dark' for dark mode
-
-
-# large icons
-tab_font_name = 'Segoe UI Emoji'
-tab_font_size = 14
-tab_font_bold = 'bold'
-
-# medium icons
-tab_font_name = 'Segoe UI Emoji'
-tab_font_size = 10
-tab_font_bold = ''
+api_routes = [
+    '/',
+    '/notes',
+    '/notes/<id>',
+    '/tasks',
+    '/tasks/<id>',
+    '/calendar',
+    '/calendar/<id>',
+    '/files',
+    '/files/<filename>',
+    '/options',
+]
 
 
-# ----------------------------------------------------------------------------
+current_index_list = [
+    r'\\FANGORN\user\duncan\LifePIM\Data',
+    r'\\FANGORN\user\duncan\C\user\docs',
+    r'\\FANGORN\user\duncan\C\user\dev',
+    r'\\FANGORN\user\duncan\C\user\AIKIF',
+    r'\\FANGORN\user\duncan\C\user\acute',
+    r'\\FANGORN\user\DATA\photos',
+    r'\\FANGORN\user\DATA\eBooks',
+    r'\\FANGORN\user\DATA\3D',
+    r'\\FANGORN\photo',
+    r'\\FANGORN\music',
+    r'D:\docs\Unreal Projects',
+    r'D:\dev\src',
+]
 
 
+port_num=9741           # port to browse to, eg. http://127.0.0.1:9741/
+WEB_VERSION = "DEV"     # to show debug lines in web server
+base_url = 'https://www.lifepim.com'    # testing, point to live site for API
+base_url = '127.0.0.1:5000'             # running local (default)
+
+
+# --------------------------------------------------------
+# Functions
+
+
+def get_conn_str():
+	conn_str = {}
+	with open(logon_file, 'r') as f:
+		conn_str['host'] = f.readline().strip(' ').strip('\n')
+		conn_str['user'] = f.readline().strip(' ').strip('\n')
+		conn_str['pass'] = f.readline().strip(' ').strip('\n')
+		conn_str['db'] = f.readline().strip(' ').strip('\n')
+
+	return conn_str

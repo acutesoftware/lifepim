@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+{% if is_authenticated == 'Y' %}
+
+{% from 'macros.html' import get_hex_color %}
+
+{% if view_as == '▤' %}
+<div id="lists">
+<TABLE width=95%>
+
+{% for id, title, pinned, important, is_archived, color, content, folder in lst %}
+
+{% if is_archived %}
+  <!-- archived note not shown -->
+  {% set hidden = 'Y' %}
+{% else %}
+
+  {% set note_col = get_hex_color(color) %}
+  <TR>
+    <TD>{% if pinned %}📌{% endif %}</td>
+    <TD>{% if important %}<div class="text-danger">❗</div>{% endif %}</TD>
+    <TD><a class="text-dark" href="{{ url_for('page_note', id_to_update=id )}}">{{ title }}</a></TD>
+
+    <!--<TD bgcolor="{{ note_col }}"><a class="text-dark" href="{{ url_for('edit_value', listname='notes', id_to_update=id )}}">EDIT</a></TD>-->
+  </TR>
+{% endif %}
+{% endfor %}  <!-- end loop through records in LIST view -->
+</TABLE>
+</div>
+
+
+{% elif view_as == '⛏' %}
+
+<div class="card-columns">
+
+{% for id, title, pinned, important, is_archived, color, content, folder in lst %}
+
+{% if is_archived %}
+  <!-- archived note not shown -->
+  {% set hidden = 'Y' %}
+{% else %}
+  {% set note_col = get_hex_color(color) %}
+
+  <a href="{{ url_for('page_note',  id_to_update=id )}}">
+  <div class="card text-dark" style="background-color:{{ note_col }}">
+  <div class="card-body">
+  <h5 class="card-title">
+          {% if pinned %}
+            📌
+          {% endif %}
+          {% if important %}
+              <div class="text-danger float-left">❗ </div>
+          {% endif %}
+
+          {{ title }}</h5></a>
+          <small>
+          {% if content %}
+            <p>
+            {% set paragraphs = content.split('\n') %}
+            {% set mode = 'P' %}
+            {% for paragraph in paragraphs[0:50] %}
+              <!--start of paragraph = {{ paragraph[0:5] }} <BR>
+              image = {{ paragraph[5:]|replace("[/img]", "") }}<BR>-->
+              {% if paragraph[0:3] == '###' %}
+                </pre></p><H5>{{ paragraph[3:] }}</H5><p>
+              {% elif paragraph[0:2] == '##' %}
+                </pre></p><H4>{{ paragraph[2:] }}</H4><p>
+              {% elif paragraph[1:9] == 'img src=' %}
+                </pre></p>
+                <img src=" {{ paragraph[9:] }} "  class="img-fluid" alt="Responsive image"><p>
+              {% elif paragraph[0:5] == '[img]' %}
+                </pre></p>
+                <!--showing image<BR>
+                {{ paragraph[5:]|replace("[/img]", "") }}-->
+                <img src="/img_view/{{paragraph[5:]|replace("[/img]", "")}}"  class="img-fluid" alt="Responsive image"><p>
+
+
+
+              {% elif paragraph[0:17] == 'https://www.youtu' %}  <!--# was 'iframe src=' now https://www.youtu -->
+                  </pre></p>
+                  <div class="embed-responsive embed-responsive-16by9">
+                    {% if 'embed' in paragraph %}
+                      #| replace("|", "<br/>")
+                      <iframe class="embed-responsive-item" src="{{ paragraph }}" allowfullscreen></iframe>
+                    {% else %}
+                      #"watch?v=", "embed/"
+                      <iframe class="embed-responsive-item" src="{{ paragraph | replace("watch?v=", "embed/") }}" allowfullscreen></iframe>
+                      <!--- also show the URL to utube untouched -->
+
+                    {% endif %}</div>{{ paragraph[0:1200]|urlize(80, target='_blank') }}<BR>
+
+              {% elif paragraph[0:3] == '~~~' %}
+                  {% if mode == 'P' %}
+                    </p><pre>{% set mode = 'PRE' %}
+                  {% else %}
+                    </pre><p>{% set mode = 'P' %}
+                  {% endif %}
+              {% elif paragraph[1:13] == 'iframe src="' %}
+                <div class="embed-responsive embed-responsive-16by9">
+                <iframe class="embed-responsive-item" src="{{ paragraph[13:] }}" allowfullscreen></iframe>
+              </div>
+
+              {% else %}{{ paragraph[0:1200]|urlize(80, target='_blank') }}{% if mode == 'P' %}<BR>{% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}   <!--- end if content -->
+        </small>
+      </div>
+  </div>
+  {% endif %}  <!-- end if archived -->
+
+  {% endfor %}  <!-- end loop through records in Birdseye view -->
+  </div>
+
+{% else %}  <!-- other view as -->
+<div class="card-columns">
+
+{% for id, title, pinned, important, is_archived, color, content, folder in lst %}
+{% if is_archived %}
+  <!-- archived note not shown -->
+  {% set hidden = 'Y' %}
+{% else %}
+  {% set note_col = get_hex_color(color) %}
+
+
+  <a href="{{ url_for('page_note',  id_to_update=id )}}">
+
+  <div class="card text-dark" style="background-color:{{ note_col }}">
+
+
+    <div class="card-body">
+        <h5 class="card-title">
+          {% if pinned %}📌{% endif %}
+          {% if important %}<div class="text-danger float-left">❗ </div>{% endif %}
+          {{ title }}</h5>
+        <small>
+          {% if content %}
+          <p>
+          {% set paragraphs = content[0:256].split('\n') %}
+          {% set mode = 'P' %}
+          {% for paragraph in paragraphs[0:8] %}
+            <!--start of paragraph = {{ paragraph[0:5] }} <BR>
+            image = {{ paragraph[5:]|replace("[/img]", "") }}<BR>-->
+            {% if paragraph[0:3] == '###' %}
+              </pre></p><H5>{{ paragraph[3:] }}</H5><p>
+            {% elif paragraph[0:2] == '##' %}
+              </pre></p><H4>{{ paragraph[2:] }}</H4><p>
+            {% elif paragraph[1:9] == 'img src=' %}
+              </pre></p>
+              <img src=" {{ paragraph[9:] }} "  class="img-fluid" alt="Responsive image"><p>
+            {% elif paragraph[0:5] == '[img]' %}
+              </pre></p>
+              <!--showing image<BR>
+              {{ paragraph[5:]|replace("[/img]", "") }}-->
+              <img src="/img_view/{{paragraph[5:]|replace("[/img]", "")}}"  class="img-fluid" alt="Responsive image"><p>
+
+
+
+            {% elif paragraph[0:17] == 'https://www.youtu' %}  <!--# was 'iframe src=' now https://www.youtu -->
+                </pre></p>
+                <div class="embed-responsive embed-responsive-16by9">
+                  {% if 'embed' in paragraph %}
+                    #| replace("|", "<br/>")
+                    <iframe class="embed-responsive-item" src="{{ paragraph }}" allowfullscreen></iframe>
+                  {% else %}
+                    #"watch?v=", "embed/"
+                    <iframe class="embed-responsive-item" src="{{ paragraph | replace("watch?v=", "embed/") }}" allowfullscreen></iframe>
+                    <!--- also show the URL to utube untouched -->
+
+                  {% endif %}</div>{{ paragraph[0:1200]|urlize(80, target='_blank') }}<BR>
+
+            {% elif paragraph[0:3] == '~~~' %}
+                {% if mode == 'P' %}
+                  </p><pre>{% set mode = 'PRE' %}
+                {% else %}
+                  </pre><p>{% set mode = 'P' %}
+                {% endif %}
+            {% elif paragraph[1:13] == 'iframe src="' %}
+              <div class="embed-responsive embed-responsive-16by9">
+              <iframe class="embed-responsive-item" src="{{ paragraph[13:] }}" allowfullscreen></iframe>
+            </div>
+
+            {% else %}{{ paragraph[0:1200]|urlize(80, target='_blank') }}{% if mode == 'P' %}<BR>{% endif %}
+            {% endif %}
+          {% endfor %}
+
+
+
+
+
+          {% else %}
+          {% endif %}
+        </small>
+      </div>
+
+  </div>
+  </a>
+  {% endif %} <!-- end is archived -->
+{% endfor %}  <!-- end loop through records in CARD view -->
+</div>
+
+{% endif %}  <!-- end VIEW AS -->
+
+<!--
+Total of {{ num_recs }} records
+{% if hidden %}
+  {% if hidden == 'Y' %}
+    some are archived so not displayed [but are still searchable]<BR>
+  {% endif %}
+{% endif %}
+-->
+
+{% else %}  <!-- we are NOT logged in -->
+
+<div class="jumbotron">
+  <H1>Keep track of the miscellaneous data you have</h1>
+Keep everything here - easily searchable, and protected from advertising and data resellers.<BR><BR>
+
+Easily jot down notes, or organise into folders and projects<BR><BR>
+
+<LI>website URL's and notes
+<LI>Recipes
+<LI>Ideas for christmas presents
+
+<BR>
+Easily find anything
+<BR>
+
+</div>
+
+
+
+{% endif %}
+
+
+
+
+{% endblock %}

@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+
+{% if is_authenticated == 'Y' %}
+
+<div class="row">
+  <div class="col-sm-2">
+
+<div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+  <a class="nav-link active" id="v-pills-settings-tab" data-toggle="pill" href="#v-pills-settings" role="tab" aria-controls="v-pills-settings" aria-selected="true">Settings</a>
+  <a class="nav-link" id="v-pills-home-tab" data-toggle="pill" href="#v-pills-home" role="tab" aria-controls="v-pills-home" aria-selected="false">Folders</a>
+  <a class="nav-link" id="v-pills-profile-tab" data-toggle="pill" href="#v-pills-profile" role="tab" aria-controls="v-pills-profile" aria-selected="false">Profile</a>
+  <a class="nav-link" id="v-pills-data-tab" data-toggle="pill" href="#v-pills-data" role="tab" aria-controls="v-pills-data" aria-selected="false">Data</a>
+</div>
+
+</div>
+
+<div class="col-sm-9">
+<!--    MAIN CONTENT OF OPTIONS SCREEN --------------------------------->
+
+<div class="tab-content" id="v-pills-tabContent">
+
+  <div class="tab-pane fade show active" id="v-pills-settings" role="tabpanel" aria-labelledby="v-pills-settings-tab">
+
+  <H3>Settings</H3>
+  Choose how you want to use LifePIM
+  <H4>Tabs</h4>
+  <form class="form-group" method="POST" action="{{ url_for('page_options_settings') }}">
+
+  {% if 'calendar' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_calendar" checked>Calendar<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_calendar">Calendar<BR>
+  {% endif %}
+  {% if 'tasks' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_tasks" checked>Tasks<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_tasks">Tasks<BR>
+  {% endif %}
+  {% if 'notes' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_notes" checked>Notes<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_notes">Notes<BR>
+  {% endif %}
+  {% if 'data' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_data" checked>Data<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_data">Data<BR>
+  {% endif %}
+  {% if 'files' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_files" checked>Files (Beta testers only)<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_files">Files (Beta testers only)<BR>
+  {% endif %}
+  {% if 'images' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_images" checked>Media<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_images">Media<BR>
+  {% endif %}
+  {% if 'apps' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_apps" checked>Apps (Beta testers only)<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_apps">Apps (Beta testers only)<BR>
+  {% endif %}
+  {% if 'badges' in lst: %}
+    <input type="checkbox" class="form-group" name="tab_badges" checked>Badges (Beta testers only)<BR>
+  {% else %}
+    <input type="checkbox" class="form-group" name="tab_badges">Badges (Beta testers only)<BR>
+  {% endif %}
+    <input class="form-group" type="submit" namr="btn_submit" value="Save Settings"><BR>
+  </form>
+  </div>
+
+
+  <div class="tab-pane fade" id="v-pills-home" role="tabpanel" aria-labelledby="v-pills-home-tab">
+
+    <H3>Folders</H3>
+    Use folders to quickly filter your data - a great way to focus on a certain project
+    <BR><BR>
+    You can manage your list of folders <a href="{{ url_for('page_folders' )}}">here</a>
+
+    <BR><BR>
+
+
+  </div>
+
+  <div class="tab-pane fade" id="v-pills-profile" role="tabpanel" aria-labelledby="v-pills-profile-tab">
+    <H3>Profile</H3>
+      time and date settings
+      <div class="container">
+        <div class="row">
+          <div class="col-sm2">UTC Time</div><div id="time_UTC" class="col">NNN</div>
+        </div>
+        <div class="row">
+          <div class="col-sm2">Local Time</div><div id="time_local" class="col">NNN</div>
+        </div>
+        <div class="row">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <div class="tab-pane fade" id="v-pills-data" role="tabpanel" aria-labelledby="v-pills-data-tab">
+
+    <H3>Export my Data</H3>
+
+ 
+    Export data in CSV format<BR>
+      TODO
+
+
+      <BR>
+      <BR>
+
+
+    <H3>Import Data</H3>
+    Import a CSV file to a LifePIM table here. Make sure that the columns are in the correct order!<BR>
+
+TODO
+
+    <BR>
+    <BR>
+
+
+  </div>
+
+
+</div>
+
+</div>
+</div>
+
+
+
+
+{% else %}
+
+<div class="jumbotron">
+
+<H1>Powerful Options</H1>
+
+<LI>One click access to export all your data
+<LI>Import data to any table
+<LI>Use folders to quickly group your information
+<LI>Fast, USEFUL search_text
+
+
+</div>
+
+
+<BR>
+
+<H3>Command Line interface</H3>
+You can run commands from the Search box - see more details
+<a href="{{ url_for('page_help', listname='about')}}">in the help page</a>
+<BR>
+
+
+
+<BR>
+
+	Login <a href="{{ url_for('login') }}">here</a> to here to start using LifePIM<BR><BR>
+
+	Not registered? <a href="{{ url_for('register') }}">sign up here</a><BR>
+
+
+
+{% endif %}
+
+
+<script>
+
+
+if(window.attachEvent) {
+    window.attachEvent('onload', startupOptions);
+} else {
+    if(window.onload) {
+        var curronload = window.onload;
+        var newonload = function(evt) {
+            curronload(evt);
+            startupOptions(evt);
+        };
+        window.onload = newonload;
+    } else {
+        window.onload = startupOptions;
+    }
+}
+
+function startupOptions() {
+  // this function called after the options page is loaded
+  showTimeZone()
+
+}
+
+function showTimeZone() {
+
+  var offset = new Date().getTimezoneOffset();
+  console.log(offset);
+  document.getElementById("time_offset").innerHTML = offset;
+  document.getElementById("update_offset").value = offset;
+
+  UTCTime("time_UTC")
+  localTime("time_local")
+  //document.getElementById("time_local").innerHTML = localTime();
+
+}
+
+function todayAsString() {
+  let dte = new Date();
+  let cur_day = lPad(String(dte.getDate()), 2);
+  let cur_month = lPad(String(dte.getMonth() + 1), 2);
+  let cur_year = dte.getFullYear();
+  return cur_year + "-" + cur_month + "-" + cur_day;
+  }
+
+  function timestampToString(UNIX_timestamp){
+    var a = new Date(UNIX_timestamp * 1);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var year = a.getFullYear();
+    //var month = months[a.getMonth()];
+    var month = lPad((a.getMonth() + 1).toString(), 2)
+    var date = lPad(a.getDate().toString(), 2);
+    var hour = lPad(a.getHours().toString(), 2);
+    var min = lPad(a.getMinutes().toString(), 2);
+    var sec = lPad(a.getSeconds().toString(), 2);
+    var time = year + '-' + month + '-' + date + ' ' + hour + ':' + min + ':' + sec ;
+    return time;
+  }
+
+
+function updateClock(){
+  var refresh=1000; // Refresh rate in milli seconds
+  mytime=setTimeout('showClock()',refresh)
+  event.preventDefault();
+}
+
+function UTCTime(l_id) {
+  var x = new Date() //.getTime();
+
+  document.getElementById(l_id).innerHTML = x.toUTCString();
+}
+
+function localTime(l_id) {
+  var x = new Date()
+  document.getElementById(l_id).innerHTML = x;
+
+}
+
+function showClock(elemId) {
+  var x = new Date()
+  document.getElementById(elemId).innerHTML = x;
+  event.preventDefault();
+  updateClock();
+}
+
+function lPad(txt, maxLength) {
+  while (txt.length < maxLength) {
+    txt = '0' + txt;
+    }
+  return txt;
+  }
+
+</script>
+
+
+
+
+
+{% endblock %}

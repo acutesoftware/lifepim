@@ -1,1 +1,1 @@
-python ./server.py
+python ./web_server.py
