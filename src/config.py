@@ -99,26 +99,117 @@ sub_menus = [
 ]
 
 filters = [
-      ['notes', 'type', ['Idea', 'Meeting Note', 'Project Info', 'Research']],
-        ['tasks', 'status', ['Not Started', 'In Progress', 'Completed', 'Deferred', 'Waiting on someone else']],
-        ['tasks', 'priority', ['Low', 'Medium', 'High', 'Urgent']],
-        ['calendar', 'type', ['Appointment', 'Event', 'Reminder']],
-        ['data', 'type', ['Database', 'Spreadsheet', 'Checklist']],
-        ['files', 'type', ['Document', 'PDF', 'Presentation']],
-        ['images', 'type', ['Photo', 'Screenshot', 'Drawing']],
-        ['music', 'type', ['Song', 'Album', 'Playlist']],
-        ['video', 'type', ['Movie', 'Clip', 'Recording']], 
+    ['notes', 'type', ['Idea', 'Meeting Note', 'Project Info', 'Research']],
+    ['tasks', 'status', ['Not Started', 'In Progress', 'Completed', 'Deferred', 'Waiting on someone else']],
+    ['tasks', 'priority', ['Low', 'Medium', 'High', 'Urgent']],
+    ['calendar', 'type', ['Appointment', 'Event', 'Reminder', 'Logs']],
+    ['data', 'type', ['Database', 'Spreadsheet', 'Checklist']],
+    ['files', 'type', ['Document', 'PDF', 'Presentation']],
+    ['files', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
+    ['images', 'type', ['Photo', 'Screenshot', 'Drawing']],
+    ['images', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
+    ['music', 'type', ['Song', 'Album', 'Playlist']],
+    ['music', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
+    ['video', 'type', ['Movie', 'Clip', 'Recording']], 
+    ['video', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
 ]   
-
-for tab in TABS:
-    sub_menus.append({'root':tab['id'], 'name':'Add'})
-	
 
 ui_actions = []    # these are the clickable links that appear per tab / submenu
 for tab in TABS:
-    ui_actions.append([tab['id'], 'Add', 'fn_' + tab['id'] + '_add'])
+    if tab['id'] in ['notes','tasks','contacts','etl','calendar','data','files','images','music','video']:
+        ui_actions.append([tab['id'], 'Add', 'fn_' + tab['id'] + '_add'])
+        sub_menus.append({'root':tab['id'], 'name':'Add'})
     #ui_actions.append([tab['id'], 'Import', 'fn_' + tab['id'] + '_import'])
     #ui_actions.append([tab['id'], 'Generate', 'fn_' + tab['id'] + '_gen'])
+
+
+"""
+TODO - make sure the following common tasks are available in the appropriate places
+
+Car - last serviced, MOT due, tax due, insurance due, fuel log
+Health - weight, BMI, blood pressure, medications, allergies, conditions, doctors, dentist, optician
+Home - insurance, mortgage, rent, council tax, utilities, repairs, improvements
+Games - collection, wish list, completed
+Work - projects, tasks, meetings, contacts
+Shopping - Food Shopping, Wish List, To Buy, Receipts
+Family - birthdays, events, contacts, medical info
+Food - recipes, meal plans, shopping lists
+Admin - passwords, licenses, warranties, manuals
+Pers - diary, journal, photos, videos, events, contacts
+Study - courses, notes, tasks, calendar, contacts
+Design - projects, ideas, inspiration, contacts
+Fun - books, movies, music, games, hobbies
+Web - bookmarks, passwords, ideas, projects, contacts
+Business - clients, projects, tasks, invoices, contacts
+Dev - projects, tasks, bugs, ideas, contacts
+RasbPI - projects, tasks, ideas, contacts
+Support - warranties, manuals, contacts, tasks
+AI - projects, tasks, ideas, contacts
+Project - name, description, start date, end date, status, priority, tags, notes, tasks, calendar events, files, images, links
+
+From the above list, we need to implement the following database tables:
+- projects
+- tasks
+- calendar_events
+- notes
+- files
+- images
+- contacts
+- tags
+- links
+- passwords
+- reminders
+- locations
+- budgets
+- expenses
+- incomes
+- music
+- videos
+- badges
+- checklists
+- databases
+- spreadsheets
+- recipes
+- shopping_lists
+- fuel_logs
+- medical_info
+- service_records
+- warranties
+- licenses  
+- manuals
+- bookmarks
+- journals
+- logs
+- meetings
+- appointments
+
+"""
+
+project_specific_tables = [
+    'car_service_records',
+    'car_fuel_logs',
+    'health_medical_info',
+    'home_utilities',
+    'home_repairs',
+    'games_collection',
+    'work_meetings',
+    'shopping_receipts',
+    'family_birthdays',
+    'food_recipes',
+    'admin_warranties',
+    'pers_journal',
+    'study_courses',
+    'design_inspiration',
+    'fun_hobbies',
+    'web_bookmarks',    
+    'business_invoices',
+    'dev_bugs',
+    'rasbpi_projects',
+    'support_warranties',
+    'ai_projects',
+]
+
+print('TODO - make sure every single CSV file and database table can be mapped to a submenu/project')
 
 
 
