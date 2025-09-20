@@ -45,26 +45,74 @@ toolbar_definition_OLD =  [  # [icon, name, function, comments]
     ['⚙',  'about',   'tb_about',    'About LifePIM']
     ]
 
+
+"""other icons on top to include - or possibly sub top menus
+food🍕
+break ☕  movie ticket 
+moon phases to show : 🌑🌒🌓🌔🌕🌖🌗🌘
+notes : ideas 💡, lists 📇   others : 📑📒📓📔📕📖📗📘📙📚
+
+notes : shitlist 💩
+money : 💵 💳
+
+comms : 📧📨✉️ 📨 📩 📤 📥 📦 📫 📪 📨 📬 📭  🗳️ 📞📟 📠 
+news: 📡 📢
+tasks: ✅ ✔️ ✖️ ❌ ❎ 
+package : 📦  💼  💽 💾  (??)
+3d objects / things : 📦 🏷️ 🎁 🎀 🏵️ 🔳 🏺 👀 🔌
+
+
+
+design / cad - 📐
+tools : 🔦 🔧  🔨 🔩
+
+links : 🔗  🖇️  📎  🧷  🗜️  ⚖️  🪝  🪜  🧰  🧲  🪃  🪁  🛠️  🛡️  🗡️  ⚔️  🔫  💣  🪓
+
+ai: 🕵
+fun : 🕺
+
+staff / groups : 👥 
+family : 👪
+
+
+health : ⚕️  🏥  💊  🩺  🦠  🧬  🦷  🦴  🧠  ❤️‍🩹 ❤️‍🔥 ❤️ 💔 💓 💗 💖 💘 💝
+
+"""
+
 TABS = [
-    { 'icon': '🏠', 'id': 'home', 'label': 'Overview', 'module': 'views.home', 'class': 'HomeView'},
-    { 'icon': '📝', 'id': 'notes', 'label': 'Notes', 'module': 'views.notes', 'class': 'NotesView'},
-    { 'icon': '☑', 'id': 'tasks', 'label': 'Tasks', 'module': 'views.tasks', 'class': 'TasksView'},
-    { 'icon': '🕐', 'id': 'calendar', 'label': 'Calendar', 'module': 'views.calendar', 'class': 'CalendarView'},
-    { 'icon': '▦', 'id': 'data', 'label': 'Data', 'module': 'views.data', 'class': 'DataView'},
-    { 'icon': '📂', 'id': 'files', 'label': 'Files', 'module': 'views.files', 'class': 'FileView'},
-    { 'icon': '🖼️', 'id': 'images', 'label': 'Images', 'module': 'views.images', 'class': 'ImagesView'},
-    { 'icon': '♬', 'id': 'music', 'label': 'Music', 'module': 'views.music', 'class': 'MusicView'},
-    { 'icon': '🎥', 'id': 'video', 'label': 'Video', 'module': 'views.video', 'class': 'VideoView'},
-    { 'icon': '🏆', 'id': 'badges', 'label': 'Badges', 'module': 'views.badges', 'class': 'BadgesView'},
-    { 'icon': '💲', 'id': 'money', 'label': 'Money', 'module': 'views.money', 'class': 'MoneyView'},
-    { 'icon': '👤', 'id': 'contacts', 'label': 'Contacts', 'module': 'views.contacts', 'class': 'ContactsView'},
-    { 'icon': '🌏', 'id': 'places', 'label': 'Places', 'module': 'views.places', 'class': 'PlacesView'},
-    { 'icon': '💻', 'id': 'system', 'label': 'System', 'module': 'views.system', 'class': 'SystemView'},
-    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps', 'module': 'views.apps', 'class': 'AppsView'},
-    { 'icon': '⚙', 'id': 'etl', 'label': 'ETL', 'module': 'views.etl', 'class': 'EtlView'},
-    { 'icon': '📜', 'id': 'journal', 'label': 'Journal / Logs', 'module': 'views.journal', 'class': 'JournalView'},
-    { 'icon': '⚿', 'id': 'admin', 'label': 'Admin', 'module': 'views.admin', 'class': 'AdminView'},
-    { 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'module': 'views.agent', 'class': 'AgentView'},
+    { 'icon': '🏠', 'id': 'home', 'label': 'Overview'},
+
+    { 'icon': '📝', 'id': 'notes', 'label': 'Notes'},
+    { 'icon': '☑', 'id': 'tasks', 'label': 'Tasks'},
+    { 'icon': '🕐', 'id': 'calendar', 'label': 'Calendar'},
+  
+    { 'icon': '📰', 'id': 'news', 'label': 'News, reddit, twitter, RSS feeds'},
+    { 'icon': '✉', 'id': 'comms', 'label': 'Mail, Chat, Social, Messages  📱📲'},
+    
+
+
+    { 'icon': '▦', 'id': 'data', 'label': 'Data'},
+    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps'},
+   
+    { 'icon': '📂', 'id': 'files', 'label': 'Files'},
+    { 'icon': '🖼️', 'id': 'images', 'label': 'Images'},
+    { 'icon': '♬', 'id': 'music', 'label': 'Music'},
+    { 'icon': '🎥', 'id': 'video', 'label': 'Video', },
+
+  { 'icon': '🏷', 'id': '3d', 'label': 'Objects / 3D / Things', },
+
+
+    { 'icon': '🏆', 'id': 'badges', 'label': 'Badges'},
+    { 'icon': '💲', 'id': 'money', 'label': 'Money'},
+    { 'icon': '👤', 'id': 'contacts', 'label': 'Contacts'},
+    { 'icon': '🌏', 'id': 'places', 'label': 'Places'},
+    
+    { 'icon': '💻', 'id': 'etl', 'label': 'ETL  🔣'},
+    { 'icon': '⌚', 'id': 'jobs', 'label': 'Scheduled Jobs'},
+    
+    { 'icon': '📜', 'id': 'logs', 'label': 'Journal / Logs'},
+    { 'icon': '⚙', 'id': 'admin', 'label': 'Admin'},
+    { 'icon': '🤖', 'id': 'agent', 'label': 'Agent'},
 
 ]
 
@@ -103,12 +151,14 @@ filters = [
     ['tasks', 'status', ['Not Started', 'In Progress', 'Completed', 'Deferred', 'Waiting on someone else']],
     ['tasks', 'priority', ['Low', 'Medium', 'High', 'Urgent']],
     ['calendar', 'type', ['Appointment', 'Event', 'Reminder', 'Logs']],
+    ['calendar', 'view', ['Life', 'Year', 'Quarter', 'Month', 'Fortnight', 'Week', 'Day']],
     ['data', 'type', ['Database', 'Spreadsheet', 'Checklist']],
     ['files', 'type', ['Document', 'PDF', 'Presentation']],
     ['files', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
     ['images', 'type', ['Photo', 'Screenshot', 'Drawing']],
     ['images', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
     ['music', 'type', ['Song', 'Album', 'Playlist']],
+    ['music', 'genre', ['Rock', 'Techno', 'Classidal', 'Jazz', 'Pop', 'Folk', 'Other']],
     ['music', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
     ['video', 'type', ['Movie', 'Clip', 'Recording']], 
     ['video', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
