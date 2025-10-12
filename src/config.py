@@ -26,89 +26,79 @@ proj_list = ['Dev','Design','Fun','Games','Family','Car',
              'RasbPI','AI','Support','Pers']
 
 
-toolbar_definition_OLD =  [  # [icon, name, function, comments]
-    ['🏠', 'home',     'tb_home',         '🏠📰 This is the overview page'],
-    ['🕐', 'calendar', 'tb_calendar', '⌚📅 🕐 Project overview showing current list of tasks being worked on'],
-    ['☑',  'tasks',    'tb_tasks',    '☑✔📎🔨✘☑ ⛏ ☹     💻 💹 Tasks'],
-    ['📝', 'notes',    'tb_notes',    '🗒✎📝 ✏ 🗊Team wiki page - ultra simple'], #
-    ['👤', 'contacts', 'tb_contacts',     '☎👱  👤  Contacts view'],
-    ['🌏️', 'places',   'tb_places',    '🌏🛰️⛟ ⌖ ⛰    💻 💹Locations - maps, people finder'],
-    ['▦',  'data',     'tb_data',    '▧🗒 🗊data tables'],
-    ['🏆', 'badges',   'tb_badges',     '★ ⛤ ✵ ✭ ⚜'],
-    ['💲', 'money',    'tb_money',      ''],
-    ['♬',  'music',    'tb_music',     '🗒 🗊music'],
-    ['🖼',  'images',  'tb_images',      '🗒 🗊images'],
-    ['🎮', 'apps',     'tb_apps',     '👍 👎 '],
-    ['📂',  'files',   'tb_files',     '🗒 🗊images and files'],
-    ['⚿',  'admin',   'tb_admin',      'passwords'],
-    ['⚙',  'options', 'tb_options',     'Options for LifePIM'],
-    ['⚙',  'about',   'tb_about',    'About LifePIM']
-    ]
+SIDE_TABS_GROUPS = [  # for possible sub folders
+    { 'icon': '*', 'id': 'ALL', 'sub_list': 'All Projects'},
+    { 'icon': '🔒', 'id': 'PERS', 'sub_list': 'Pers,Health,Home,Car,Family,Food'},
+    { 'icon': '🎉', 'id': 'FUN', 'sub_list': 'games, travel, Music, movies, Books, Hobbies'},
+    { 'icon': '💼', 'id': 'WORK', 'sub_list': 'Work,Business,Side Gigs,Commision'},
+    { 'icon': '🛠️', 'id': 'MAKE', 'sub_list': 'Dev,Design,Web,RasbPI,AI,PC Support'},
+    { 'icon': '👩🏻‍🎓', 'id': 'LEARN', 'sub_list': 'Study, Skills, Languages, Courses'},
+]
+
+SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
+    { 'icon': '*', 'id': 'any', 'label': 'Any Project Areas'},
+
+    { 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},
+    { 'icon': '💊', 'id': 'health', 'label': 'Health'}, 
+    { 'icon': '👪', 'id': 'family', 'label': 'Family'}, 
+    { 'icon': '🏈', 'id': 'sport', 'label': 'Sport'}, 
+    { 'icon': '🏚️', 'id': 'house', 'label': 'House'}, 
+    { 'icon': '🍕', 'id': 'food', 'label': 'Food'}, 
+    { 'icon': '🚗', 'id': 'car', 'label': 'Car'}, 
+    { 'icon': '🎉', 'id': 'fun', 'label': 'Fun'},  # note that top tabs separate movies,
+    { 'icon': '🕹️', 'id': 'games', 'label': 'Games'}, 
+
+    { 'icon': '🖥️', 'id': 'dev', 'label': 'Dev'}, 
+    { 'icon': '🖥️', 'id': 'dev/UE5', 'label': 'UE5'}, 
+    { 'icon': '🖥️', 'id': 'dev/Python', 'label': 'Python'}, 
+    { 'icon': '📐', 'id': 'design', 'label': 'Design'}, 
+    { 'icon': '📐', 'id': 'design/write', 'label': 'Writing'}, 
+    { 'icon': '📐', 'id': 'design/programs', 'label': 'Program Design'}, 
+    { 'icon': '📻', 'id': 'make', 'label': 'Make'}, 
+    { 'icon': '📻', 'id': 'make/rasbpi', 'label': 'RasbPI'}, 
+    { 'icon': '📻', 'id': 'make/pc', 'label': 'PC'}, 
+
+    { 'icon': '💼', 'id': 'work', 'label': 'Work'}, 
+    { 'icon': '💼', 'id': 'work/business', 'label': 'Business'}, 
+    { 'icon': '💼', 'id': 'work/side', 'label': 'Side Gigs'}, 
+
+    { 'icon': '👩🏻‍🎓', 'id': 'learn', 'label': 'Learn'}, 
+    { 'icon': '🕵', 'id': 'ai', 'label': 'AI'}, 
+    { 'icon': '🧰', 'id': 'support', 'label': 'Support'},
+    
+]
 
 
-"""other icons on top to include - or possibly sub top menus
-food🍕
-break ☕  movie ticket 
-moon phases to show : 🌑🌒🌓🌔🌕🌖🌗🌘
-notes : ideas 💡, lists 📇   others : 📑📒📓📔📕📖📗📘📙📚
 
-notes : shitlist 💩
-money : 💵 💳
-
-comms : 📧📨✉️ 📨 📩 📤 📥 📦 📫 📪 📨 📬 📭  🗳️ 📞📟 📠 
-news: 📡 📢
-tasks: ✅ ✔️ ✖️ ❌ ❎ 
-package : 📦  💼  💽 💾  (??)
-3d objects / things : 📦 🏷️ 🎁 🎀 🏵️ 🔳 🏺 👀 🔌
-
-
-
-design / cad - 📐
-tools : 🔦 🔧  🔨 🔩
-
-links : 🔗  🖇️  📎  🧷  🗜️  ⚖️  🪝  🪜  🧰  🧲  🪃  🪁  🛠️  🛡️  🗡️  ⚔️  🔫  💣  🪓
-
-ai: 🕵
-fun : 🕺
-
-staff / groups : 👥 
-family : 👪
-
-
-health : ⚕️  🏥  💊  🩺  🦠  🧬  🦷  🦴  🧠  ❤️‍🩹 ❤️‍🔥 ❤️ 💔 💓 💗 💖 💘 💝
-
-"""
-
-TABS = [
+TABS = [  #Tabs across top of LifePIM
     { 'icon': '🏠', 'id': 'home', 'label': 'Overview'},
 
     { 'icon': '📝', 'id': 'notes', 'label': 'Notes'},
-    { 'icon': '☑', 'id': 'tasks', 'label': 'Tasks'},
-    { 'icon': '🕐', 'id': 'calendar', 'label': 'Calendar'},
-  
-    { 'icon': '📰', 'id': 'news', 'label': 'News, reddit, twitter, RSS feeds'},
-    { 'icon': '✉', 'id': 'comms', 'label': 'Mail, Chat, Social, Messages  📱📲'},
+    { 'icon': '☑️', 'id': 'plan', 'label': 'Goals /Plans (WHY)'},
+    { 'icon': '🕐', 'id': 'calendar', 'label': 'Calendar (WHEN)'},
+    { 'icon': '📘', 'id': 'how', 'label': '(HOW):Blueprint/task template/process/job'},
+    { 'icon': '📝', 'id': 'tasks', 'label': 'Tasks (actual list of things to do)'},
     
-
-
-    { 'icon': '▦', 'id': 'data', 'label': 'Data'},
+    { 'icon': '📰', 'id': 'news', 'label': 'News, reddit, twitter, RSS feeds'},
+    { 'icon': '📩', 'id': 'comms', 'label': 'Mail, Chat, Social, Messages  📱📲'},
+    
+    { 'icon': '🗄️', 'id': 'data', 'label': 'Data'},
     { 'icon': '🎮', 'id': 'apps', 'label': 'Apps'},
    
     { 'icon': '📂', 'id': 'files', 'label': 'Files'},
     { 'icon': '🖼️', 'id': 'images', 'label': 'Images'},
-    { 'icon': '♬', 'id': 'music', 'label': 'Music'},
+    { 'icon': '🎵', 'id': 'music', 'label': 'Music'},
     { 'icon': '🎥', 'id': 'video', 'label': 'Video', },
 
-  { 'icon': '🏷', 'id': '3d', 'label': 'Objects / 3D / Things', },
-
+    { 'icon': '🧱', 'id': '3d', 'label': 'Objects / 3D / Things', },
 
     { 'icon': '🏆', 'id': 'badges', 'label': 'Badges'},
     { 'icon': '💲', 'id': 'money', 'label': 'Money'},
-    { 'icon': '👤', 'id': 'contacts', 'label': 'Contacts'},
-    { 'icon': '🌏', 'id': 'places', 'label': 'Places'},
+    { 'icon': '👤', 'id': 'contacts', 'label': 'Contacts (WHO)'},
+    { 'icon': '🌏', 'id': 'places', 'label': 'Places (WHERE - real life, URL or virt location)'},
     
     { 'icon': '💻', 'id': 'etl', 'label': 'ETL  🔣'},
-    { 'icon': '⌚', 'id': 'jobs', 'label': 'Scheduled Jobs'},
+    { 'icon': '⌚', 'id': 'jobs', 'label': 'Scheduled Jobs (NO - this should be a recurr event of type:ETL )'},
     
     { 'icon': '📜', 'id': 'logs', 'label': 'Journal / Logs'},
     { 'icon': '⚙', 'id': 'admin', 'label': 'Admin'},
@@ -172,68 +162,6 @@ for tab in TABS:
     #ui_actions.append([tab['id'], 'Import', 'fn_' + tab['id'] + '_import'])
     #ui_actions.append([tab['id'], 'Generate', 'fn_' + tab['id'] + '_gen'])
 
-
-"""
-TODO - make sure the following common tasks are available in the appropriate places
-
-Car - last serviced, MOT due, tax due, insurance due, fuel log
-Health - weight, BMI, blood pressure, medications, allergies, conditions, doctors, dentist, optician
-Home - insurance, mortgage, rent, council tax, utilities, repairs, improvements
-Games - collection, wish list, completed
-Work - projects, tasks, meetings, contacts
-Shopping - Food Shopping, Wish List, To Buy, Receipts
-Family - birthdays, events, contacts, medical info
-Food - recipes, meal plans, shopping lists
-Admin - passwords, licenses, warranties, manuals
-Pers - diary, journal, photos, videos, events, contacts
-Study - courses, notes, tasks, calendar, contacts
-Design - projects, ideas, inspiration, contacts
-Fun - books, movies, music, games, hobbies
-Web - bookmarks, passwords, ideas, projects, contacts
-Business - clients, projects, tasks, invoices, contacts
-Dev - projects, tasks, bugs, ideas, contacts
-RasbPI - projects, tasks, ideas, contacts
-Support - warranties, manuals, contacts, tasks
-AI - projects, tasks, ideas, contacts
-Project - name, description, start date, end date, status, priority, tags, notes, tasks, calendar events, files, images, links
-
-From the above list, we need to implement the following database tables:
-- projects
-- tasks
-- calendar_events
-- notes
-- files
-- images
-- contacts
-- tags
-- links
-- passwords
-- reminders
-- locations
-- budgets
-- expenses
-- incomes
-- music
-- videos
-- badges
-- checklists
-- databases
-- spreadsheets
-- recipes
-- shopping_lists
-- fuel_logs
-- medical_info
-- service_records
-- warranties
-- licenses  
-- manuals
-- bookmarks
-- journals
-- logs
-- meetings
-- appointments
-
-"""
 
 project_specific_tables = [
     'car_service_records',
