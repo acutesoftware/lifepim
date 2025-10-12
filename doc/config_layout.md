@@ -26,63 +26,65 @@ TODO - make sure every single CSV file and database table can be mapped to a sub
 TODO - make sure the following common tasks are available in the appropriate places
 The list below needs to be accessibly, and ideally prominent when user selects appropriate combo of Areas and Tabs.
 
-Car - last serviced, Rego due, tax due, insurance due, fuel log
-Health - weight, BMI, blood pressure, medications, allergies, conditions, doctors, dentist
-Home - insurance, mortgage, rent, council tax, utilities, repairs, improvements
-Games - collection, wish list, completed
-Work - projects, tasks, meetings, contacts
-Shopping - Food Shopping, Wish List, To Buy, Receipts
-Family - birthdays, events, contacts, medical info
-Food - recipes, meal plans, shopping lists
-Admin - passwords, licenses, warranties, manuals
-Pers - diary, journal, photos, videos, events, contacts
-Study - courses, notes, tasks, calendar, contacts
-Design - projects, ideas, inspiration, contacts
-Fun - books, movies, music, games, hobbies
-Web - bookmarks, passwords, ideas, projects, contacts
-Business - clients, projects, tasks, invoices, contacts
-Dev - projects, tasks, bugs, ideas, contacts
-RasbPI - projects, tasks, ideas, contacts
-Support - warranties, manuals, contacts, tasks
-AI - projects, tasks, ideas, contacts
-Project - name, description, start date, end date, status, priority, tags, notes, tasks, calendar events, files, images, links
+```
+    Car - last serviced, Rego due, tax due, insurance due, fuel log
+    Health - weight, BMI, blood pressure, medications, allergies, conditions, doctors, dentist
+    Home - insurance, mortgage, rent, council tax, utilities, repairs, improvements
+    Games - collection, wish list, completed
+    Work - projects, tasks, meetings, contacts
+    Shopping - Food Shopping, Wish List, To Buy, Receipts
+    Family - birthdays, events, contacts, medical info
+    Food - recipes, meal plans, shopping lists
+    Admin - passwords, licenses, warranties, manuals
+    Pers - diary, journal, photos, videos, events, contacts
+    Study - courses, notes, tasks, calendar, contacts
+    Design - projects, ideas, inspiration, contacts
+    Fun - books, movies, music, games, hobbies
+    Web - bookmarks, passwords, ideas, projects, contacts
+    Business - clients, projects, tasks, invoices, contacts
+    Dev - projects, tasks, bugs, ideas, contacts
+    RasbPI - projects, tasks, ideas, contacts
+    Support - warranties, manuals, contacts, tasks
+    AI - projects, tasks, ideas, contacts
+    Project - name, description, start date, end date, status, priority, tags, notes, tasks, calendar events, files, images, links
 
-From the above list, we need to implement the following database tables:
-- projects
-- tasks
-- calendar_events
-- notes
-- files
-- images
-- contacts
-- tags
-- links
-- passwords
-- reminders
-- locations
-- budgets
-- expenses
-- incomes
-- music
-- videos
-- badges
-- checklists
-- databases
-- spreadsheets
-- recipes
-- shopping_lists
-- fuel_logs
-- medical_info
-- service_records
-- warranties
-- licenses  
-- manuals
-- bookmarks
-- journals
-- logs
-- meetings
-- appointments
+    From the above list, we need to implement the following database tables:
+    - projects
+    - tasks
+    - calendar_events
+    - notes
+    - files
+    - images
+    - contacts
+    - tags
+    - links
+    - passwords
+    - reminders
+    - locations
+    - budgets
+    - expenses
+    - incomes
+    - music
+    - videos
+    - badges
+    - checklists
+    - databases
+    - spreadsheets
+    - recipes
+    - shopping_lists
+    - fuel_logs
+    - medical_info
+    - service_records
+    - warranties
+    - licenses  
+    - manuals
+    - bookmarks
+    - journals
+    - logs
+    - meetings
+    - appointments
 
+```
 
 
 
@@ -90,8 +92,8 @@ From the above list, we need to implement the following database tables:
 
 ### Scratchpad, ideas for icons
 
-
-toolbar_definition_OLD =  [  # [icon, name, function, comments]
+```
+    toolbar_definition_OLD =  [  # [icon, name, function, comments]
     ['🏠', 'home',     'tb_home',         '🏠📰 This is the overview page'],
     ['🕐', 'calendar', 'tb_calendar', '⌚📅 🕐 Project overview showing current list of tasks being worked on'],
     ['☑',  'tasks',    'tb_tasks',    '☑✔📎🔨✘☑ ⛏ ☹     💻 💹 Tasks'],
@@ -111,55 +113,56 @@ toolbar_definition_OLD =  [  # [icon, name, function, comments]
     ]
 
 
-"""other icons on top to include - or possibly sub top menus
-food🍕
-break ☕  movie ticket 
-moon phases to show : 🌑🌒🌓🌔🌕🌖🌗🌘
-notes : ideas 💡, lists 📇   others : 📑📒📓📔📕📖📗📘📙📚
+    """other icons on top to include - or possibly sub top menus
+    food🍕
+    break ☕  movie ticket 
+    moon phases to show : 🌑🌒🌓🌔🌕🌖🌗🌘
+    notes : ideas 💡, lists 📇   others : 📑📒📓📔📕📖📗📘📙📚
 
-notes : shitlist 💩
-money : 💵 💳
+    notes : shitlist 💩
+    money : 💵 💳
 
-comms : 📧📨✉️ 📨 📩 📤 📥 📦 📫 📪 📨 📬 📭  🗳️ 📞📟 📠 
-news: 📡 📢
-tasks: ✅ ✔️ ✖️ ❌ ❎  ☑️ blueprint = 📘
-package : 📦  💼  💽 💾  (??)
-3d objects / things : 📦 🏷️ 🎁 🎀 🏵️ 🔳 🏺 👀  🔌 🧱 🏷
-music : 🎵 🎶 🎼 🎤 🎧 🥁 🎷 🎸 🎹 📻 📱
-images : 🖼️ 🖌️ 🎨 📷 📸 
-video : 📹 🎥 📽️ 🎞️
+    comms : 📧📨✉️ 📨 📩 📤 📥 📦 📫 📪 📨 📬 📭  🗳️ 📞📟 📠 
+    news: 📡 📢
+    tasks: ✅ ✔️ ✖️ ❌ ❎  ☑️ blueprint = 📘
+    package : 📦  💼  💽 💾  (??)
+    3d objects / things : 📦 🏷️ 🎁 🎀 🏵️ 🔳 🏺 👀  🔌 🧱 🏷
+    music : 🎵 🎶 🎼 🎤 🎧 🥁 🎷 🎸 🎹 📻 📱
+    images : 🖼️ 🖌️ 🎨 📷 📸 
+    video : 📹 🎥 📽️ 🎞️
 
-design / cad - 📐
-tools : 🔦 🔧  🔨 🔩
+    design / cad - 📐
+    tools : 🔦 🔧  🔨 🔩
 
-links : 🔗  🖇️  📎  🧷  🗜️  ⚖️  🪝  🪜  🧰  🧲  🪃  🪁  🛠️  🛡️  🗡️  ⚔️  🔫  💣  🪓
+    links : 🔗  🖇️  📎  🧷  🗜️  ⚖️  🪝  🪜  🧰  🧲  🪃  🪁  🛠️  🛡️  🗡️  ⚔️  🔫  💣  🪓
 
-ai: 🕵
-fun : 🕺
+    ai: 🕵
+    fun : 🕺
 
-staff / groups : 👥 
-family : 👪
+    staff / groups : 👥 
+    family : 👪
 
 
-health : ⚕️  🏥  💊  🩺  🦠  🧬  🦷  🦴  🧠  ❤️‍🩹 ❤️‍🔥 ❤️ 💔 💓 💗 💖 💘 💝
+    health : ⚕️  🏥  💊  🩺  🦠  🧬  🦷  🦴  🧠  ❤️‍🩹 ❤️‍🔥 ❤️ 💔 💓 💗 💖 💘 💝
 
-PROJECT ICONS
-garden : 🌳 🌲 🌴 🌵 🌾 🌿 ☘️ 🍀 🎍 🎋 🍃 🍂 🍁 🌱
-house : 🏠🏡🏘️🏚️🏢🏣🏤🏥🏦🏨
-car : 🚗🚕🚙🚌🚎🏎️🚓🚑🚒🚐🚚🚛🚜🛺
-health : 🏥💊🩺🦷🦴🧠❤️‍🩹❤️‍🔥❤️💔💓💗💖💘💝
-games : 🎮 🕹️🎲 🎯 🧩 🎭 🎰 🃏 🎴 ♠️ ♥️ ♦️ ♣️ 🀄
-study : 📖 📚 📕 📗 📘 📙 📔 📒 📓 📑 🧾 📜 📰
-work : 💼 📁 📂 🗂️ 🗃️ 🗄️ 📅 📆 📇 📈 📉 📊 📋 📌 📍 ✂️ 🖊️ 🖋️ ✒️ 🖌️ 🖍️ 📝
-admin : 🗝️ 🔐 🔒 🔓 🛂 
-make: 🛠️ 🧰 🔧 🔨 ⚙️ 🪛 🪚 🪜
-etl :  🔣  (data extract, transform, load)
-dev: 💻 🖥️ 🖱️ ⌨️ 🖨️ 🖲️ 💾 💿 📀
-develop : 🧑‍💻 👨‍💻 👩‍💻 🧑‍🔧 👨‍🔧 👩‍🔧 🧑‍🏭 👨‍🏭 👩‍🏭
-code :  </>  {}  []  ()
-sports: ⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🎱 🪀 🪁 🏓 🏸 🥅 🏒 🏑 🥍 🏏 ⛳ 🏹 🎣 🤿 🛶 🚣‍♂️ 🏊‍♂️ 🤽‍♂️ 🚴‍♂️ 🚵‍♂️ 🏋️‍♂️ 🤸‍♂️ 🤼‍♂️ 🤺 🤾‍♂️
-fun : 🎉 🎊 🎈 🎂 🎁 🎀 🎆 🎇 ✨ 🎃 🎄 🎋 🎍 🏮 🎎 🎏 🎐 🧨
-cooking / food : 🥣🍳🍔🍏🍎🍐🍊🍋🍌🍉🍇🍓🫐🍈🍒🍑🥭🍍🥥🥝🍅🫒🥑🍆🥔🥕🌽🌶️🫑🥒🥬🥦🧄🧅🍄🥜🌰🍞🥐🥖🫓🥨🥯🥞🧇🧀🍖🍗🥩🥓🍔🍟🌭🍕🫔🥪🌮🌯🫕🥗🥘🫙🍝🍜🍲🍛🦪🍣🍱🥟🦀🦞🦐🦑🍤🥠🥡🧆🍦🍧🍨🍩🎂🍰🧁🥧🍪🍫🍬🍭☕🫖🍵🥤🧃🧉🍶🍺🍻🥂🍷🥃
+    PROJECT ICONS
+    garden : 🌳 🌲 🌴 🌵 🌾 🌿 ☘️ 🍀 🎍 🎋 🍃 🍂 🍁 🌱
+    house : 🏠🏡🏘️🏚️🏢🏣🏤🏥🏦🏨
+    car : 🚗🚕🚙🚌🚎🏎️🚓🚑🚒🚐🚚🚛🚜🛺
+    health : 🏥💊🩺🦷🦴🧠❤️‍🩹❤️‍🔥❤️💔💓💗💖💘💝
+    games : 🎮 🕹️🎲 🎯 🧩 🎭 🎰 🃏 🎴 ♠️ ♥️ ♦️ ♣️ 🀄
+    study : 📖 📚 📕 📗 📘 📙 📔 📒 📓 📑 🧾 📜 📰
+    work : 💼 📁 📂 🗂️ 🗃️ 🗄️ 📅 📆 📇 📈 📉 📊 📋 📌 📍 ✂️ 🖊️ 🖋️ ✒️ 🖌️ 🖍️ 📝
+    admin : 🗝️ 🔐 🔒 🔓 🛂 
+    make: 🛠️ 🧰 🔧 🔨 ⚙️ 🪛 🪚 🪜
+    etl :  🔣  (data extract, transform, load)
+    dev: 💻 🖥️ 🖱️ ⌨️ 🖨️ 🖲️ 💾 💿 📀
+    develop : 🧑‍💻 👨‍💻 👩‍💻 🧑‍🔧 👨‍🔧 👩‍🔧 🧑‍🏭 👨‍🏭 👩‍🏭
+    code :  </>  {}  []  ()
+    sports: ⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🎱 🪀 🪁 🏓 🏸 🥅 🏒 🏑 🥍 🏏 ⛳ 🏹 🎣 🤿 🛶 🚣‍♂️ 🏊‍♂️ 🤽‍♂️ 🚴‍♂️ 🚵‍♂️ 🏋️‍♂️ 🤸‍♂️ 🤼‍♂️ 🤺 🤾‍♂️
+    fun : 🎉 🎊 🎈 🎂 🎁 🎀 🎆 🎇 ✨ 🎃 🎄 🎋 🎍 🏮 🎎 🎏 🎐 🧨
+    cooking / food : 🥣🍳🍔🍏🍎🍐🍊🍋🍌🍉🍇🍓🫐🍈🍒🍑🥭🍍🥥🥝🍅🫒🥑🍆🥔🥕🌽🌶️🫑🥒🥬🥦🧄🧅🍄🥜🌰🍞🥐🥖🫓🥨🥯🥞🧇🧀🍖🍗🥩🥓🍔🍟🌭🍕🫔🥪🌮🌯🫕🥗🥘🫙🍝🍜🍲🍛🦪🍣🍱🥟🦀🦞🦐🦑🍤🥠🥡🧆🍦🍧🍨🍩🎂🍰🧁🥧🍪🍫🍬🍭☕🫖🍵🥤🧃🧉🍶🍺🍻🥂🍷🥃
 
-"""
+```
+
 
