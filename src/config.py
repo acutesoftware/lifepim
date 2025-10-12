@@ -36,7 +36,7 @@ SIDE_TABS_GROUPS = [  # for possible sub folders
 ]
 
 SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
-    { 'icon': '*', 'id': 'any', 'label': 'Any Project Areas'},
+    { 'icon': '*', 'id': 'any', 'label': 'All Projects'},
 
     { 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},
     { 'icon': '💊', 'id': 'health', 'label': 'Health'}, 
@@ -71,38 +71,48 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
 
 
 TABS = [  #Tabs across top of LifePIM
-    { 'icon': '🏠', 'id': 'home', 'label': 'Overview'},
+    { 'icon': '🏠', 'id': 'home', 'label': 'Overview', 'desc': 'Overview Dashboard'},
 
-    { 'icon': '📝', 'id': 'notes', 'label': 'Notes'},
-    { 'icon': '☑️', 'id': 'plan', 'label': 'Goals /Plans (WHY)'},
-    { 'icon': '🕐', 'id': 'calendar', 'label': 'Calendar (WHEN)'},
-    { 'icon': '📘', 'id': 'how', 'label': '(HOW):Blueprint/task template/process/job'},
-    { 'icon': '📝', 'id': 'tasks', 'label': 'Tasks (actual list of things to do)'},
+    #{ 'icon': '📝', 'id': 'notes', 'label': 'What', 'desc': 'Notes'},
+    #{ 'icon': '🕐', 'id': 'calendar', 'label': 'When', 'desc': 'Calendar, Appointments, Events, Reminders (WHEN)'},
+    #{ 'icon': '🌏', 'id': 'places', 'label': 'Where', 'desc': 'Places (WHERE - real life, URL or virt location)'},
+    #{ 'icon': '📘', 'id': 'how', 'label': 'How', 'desc': 'Blueprints, Task Templates, Processes, Jobs (HOW)'},
+    #{ 'icon': '☑️', 'id': 'plan', 'label': 'Why', 'desc': 'Goals and Plans (WHY)'},
     
-    { 'icon': '📰', 'id': 'news', 'label': 'News, reddit, twitter, RSS feeds'},
-    { 'icon': '📩', 'id': 'comms', 'label': 'Mail, Chat, Social, Messages  📱📲'},
+    { 'icon': '📝', 'id': 'notes', 'label': 'Notes', 'desc': 'Notes'},
+    { 'icon': '🕐', 'id': 'calendar', 'label': 'Cal', 'desc': 'Calendar, Appointments, Events, Reminders (WHEN)'},
+    # NOTE - subtask of overview / tasks { 'icon': '📘', 'id': 'how', 'label': 'How', 'desc': 'Blueprints, Task Templates, Processes, Jobs (HOW)'},
+    # NOTE - subtask of overview / tasks { 'icon': '☑️', 'id': 'plan', 'label': 'Why', 'desc': 'Goals and Plans (WHY)'},
+
+    { 'icon': '📝', 'id': 'tasks', 'label': 'Tasks', 'desc': 'Tasks (actual list of things to do)'},
     
-    { 'icon': '🗄️', 'id': 'data', 'label': 'Data'},
-    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps'},
+    # { 'icon': '📰', 'id': 'news', 'label': 'News', 'desc': 'News, reddit, twitter, RSS feeds'},
+    # { 'icon': '📩', 'id': 'comms', 'label': 'Comms', 'desc' : 'Mail, Chat, Social, Messages  📱📲'},
+    
+    { 'icon': '🗄️', 'id': 'data', 'label': 'Data', 'desc': 'Data' },
+    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps', 'desc': 'Apps'},
    
-    { 'icon': '📂', 'id': 'files', 'label': 'Files'},
-    { 'icon': '🖼️', 'id': 'images', 'label': 'Images'},
-    { 'icon': '🎵', 'id': 'music', 'label': 'Music'},
-    { 'icon': '🎥', 'id': 'video', 'label': 'Video', },
+    { 'icon': '📂', 'id': 'files', 'label': 'Files', 'desc': 'Files'},
 
-    { 'icon': '🧱', 'id': '3d', 'label': 'Objects / 3D / Things', },
+    
+    { 'icon': '💿', 'id': 'media', 'label': 'Media', 'desc': 'Images, Audio, Video'},
+    
+    #{ 'icon': '🖼️', 'id': 'images', 'label': 'Images', 'desc': 'Images'},
+    #{ 'icon': '🎵', 'id': 'music', 'label': 'Music', 'desc': 'Music'},
+    #{ 'icon': '🎥', 'id': 'video', 'label': 'Video', 'desc': 'Video' },
 
-    { 'icon': '🏆', 'id': 'badges', 'label': 'Badges'},
-    { 'icon': '💲', 'id': 'money', 'label': 'Money'},
-    { 'icon': '👤', 'id': 'contacts', 'label': 'Contacts (WHO)'},
-    { 'icon': '🌏', 'id': 'places', 'label': 'Places (WHERE - real life, URL or virt location)'},
+    { 'icon': '🧱', 'id': '3d', 'label': '3D',  'desc': 'Objects / 3D / Things'},
+
+    # { 'icon': '🏆', 'id': 'badges', 'label': 'Badges', 'desc': 'Badges, Achievements, Scores, Ranks, Awards'},
+    { 'icon': '👤', 'id': 'contacts', 'label': 'People', 'desc': 'Contacts (WHO)'},
+    { 'icon': '🌏', 'id': 'places', 'label': 'Places', 'desc': 'Places (WHERE - real life, URL or virt location)'},
+    { 'icon': '💲', 'id': 'money', 'label': 'Money', 'desc': 'Money'},
     
-    { 'icon': '💻', 'id': 'etl', 'label': 'ETL  🔣'},
-    { 'icon': '⌚', 'id': 'jobs', 'label': 'Scheduled Jobs (NO - this should be a recurr event of type:ETL )'},
-    
-    { 'icon': '📜', 'id': 'logs', 'label': 'Journal / Logs'},
-    { 'icon': '⚙', 'id': 'admin', 'label': 'Admin'},
-    { 'icon': '🤖', 'id': 'agent', 'label': 'Agent'},
+    { 'icon': '💻', 'id': 'etl', 'label': 'ETL', 'desc': 'ETL'},
+
+    # { 'icon': '📜', 'id': 'logs', 'label': 'Logs', 'desc': 'Journal / Logs'},
+    #{ 'icon': '⚙', 'id': 'admin', 'label': 'Admin', 'desc': 'Admin'},
+    #{ 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'desc': 'Agent'},
 
 ]
 

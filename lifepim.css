@@ -1,0 +1,68 @@
+
+/* LifePIM Layout - clean, compact, modern */
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background-color: #fafafa;
+}
+
+/* --- TOP TABS --- */
+.top-tabs {
+    display: flex;
+    background: #2f3542;
+    overflow-x: auto;
+    white-space: nowrap;
+    border-bottom: 1px solid #444;
+}
+.top-tabs a {
+    display: inline-flex;
+    align-items: center;
+    color: #eee;
+    text-decoration: none;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+.top-tabs a:hover {
+    background: #444;
+    color: #fff;
+}
+.top-tabs span.icon {
+    margin-right: 6px;
+}
+
+/* --- LHS SIDE TABS --- */
+.side-tabs {
+    position: fixed;
+    top: 36px;
+    bottom: 0;
+    left: 0;
+    width: 130px;
+    background: #f3f3f3;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+.side-tabs a {
+    display: flex;
+    align-items: center;
+    color: #333;
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin: 2px 4px;
+}
+.side-tabs a:hover {
+    background: #ddd;
+}
+.side-tabs span.icon {
+    margin-right: 6px;
+}
+
+/* --- CONTENT AREA --- */
+.content {
+    margin-left: 140px;
+    margin-top: 40px;
+    padding: 10px;
+    font-size: 14px;
+}

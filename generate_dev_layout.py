@@ -6,6 +6,7 @@ from pprint import pprint
 
 def main():
     show_layout()
+    render_layout('test.html')
     print(mod_cfg.ui_actions)
     print(mod_cfg.filters)
 
@@ -35,6 +36,132 @@ def show_layout():
             if sub_menu['root'] == tab['id']:
                 tbl = get_table_name(tab['id'], sub_menu['name'])
                 print(f"    - {sub_menu['name']}  (data = '{tbl}')")
+
+
+
+def render_layout(html_file="lifepim.html", css_file="lifepim.css"):
+    """Render compact static HTML layout for LifePIM top and side tabs."""
+
+    # --- CSS stored separately ---
+    css = """
+/* LifePIM Layout - clean, compact, modern */
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background-color: #fafafa;
+}
+
+/* --- TOP TABS --- */
+.top-tabs {
+    display: flex;
+    background: #2f3542;
+    overflow-x: auto;
+    white-space: nowrap;
+    border-bottom: 1px solid #444;
+}
+.top-tabs a {
+    display: inline-flex;
+    align-items: center;
+    color: #eee;
+    text-decoration: none;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+.top-tabs a:hover {
+    background: #444;
+    color: #fff;
+}
+.top-tabs span.icon {
+    margin-right: 6px;
+}
+
+/* --- LHS SIDE TABS --- */
+.side-tabs {
+    position: fixed;
+    top: 36px;
+    bottom: 0;
+    left: 0;
+    width: 130px;
+    background: #f3f3f3;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+.side-tabs a {
+    display: flex;
+    align-items: center;
+    color: #333;
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin: 2px 4px;
+}
+.side-tabs a:hover {
+    background: #ddd;
+}
+.side-tabs span.icon {
+    margin-right: 6px;
+}
+
+/* --- CONTENT AREA --- */
+.content {
+    margin-left: 140px;
+    margin-top: 40px;
+    padding: 10px;
+    font-size: 14px;
+}
+"""
+
+    # --- HTML content ---
+    html = [
+        "<!DOCTYPE html>",
+        "<html lang='en'>",
+        "<head>",
+        "  <meta charset='utf-8'/>",
+        "  <title>LifePIM UI</title>",
+        f"  <link rel='stylesheet' href='{css_file}'/>",
+        "</head>",
+        "<body>",
+        "",
+        "  <!-- Top Tabs -->",
+        "  <div class='top-tabs'>"
+    ]
+
+    # render top tabs
+    for t in mod_cfg.TABS:
+        desc = t.get("desc", "")
+        html.append(
+            f"    <a href='#{t['id']}' title='{desc}'><span class='icon'>{t['icon']}</span>{t['label']}</a>"
+        )
+
+    html.append("  </div>")
+
+    # side tabs
+    html.append("\n  <!-- Side Tabs -->")
+    html.append("  <div class='side-tabs'>")
+
+    for s in mod_cfg.SIDE_TABS:
+        desc = s.get("label", "")
+        html.append(
+            f"    <a href='#{s['id']}' title='{desc}'><span class='icon'>{s['icon']}</span>{s['label']}</a>"
+        )
+
+    html.append("  </div>")
+
+    # placeholder for main content
+    html.append("\n  <div class='content'>Select a tab to view content.</div>")
+    html.append("</body></html>")
+
+    # --- Write files ---
+    with open(html_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(html))
+    with open(css_file, "w", encoding="utf-8") as f:
+        f.write(css)
+
+    print(f"✅ Wrote: {html_file} and {css_file}")
+
+
 
 
 def generate_table_spec(nme, cols_as_string):
