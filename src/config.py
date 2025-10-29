@@ -37,34 +37,60 @@ SIDE_TABS_GROUPS = [  # for possible sub folders
 
 SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
     { 'icon': '*', 'id': 'any', 'label': 'All Projects'},
+    { 'icon': '', 'id': 'spacer', 'label': 'PERS________'}, 
 
-    { 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},
+    #{ 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},
     { 'icon': '💊', 'id': 'health', 'label': 'Health'}, 
     { 'icon': '👪', 'id': 'family', 'label': 'Family'}, 
-    { 'icon': '🏈', 'id': 'sport', 'label': 'Sport'}, 
     { 'icon': '🏚️', 'id': 'house', 'label': 'House'}, 
-    { 'icon': '🍕', 'id': 'food', 'label': 'Food'}, 
+    { 'icon': '🌴', 'id': 'garden', 'label': 'Garden'}, 
     { 'icon': '🚗', 'id': 'car', 'label': 'Car'}, 
-    { 'icon': '🎉', 'id': 'fun', 'label': 'Fun'},  # note that top tabs separate movies,
-    { 'icon': '🕹️', 'id': 'games', 'label': 'Games'}, 
 
-    { 'icon': '🖥️', 'id': 'dev', 'label': 'Dev'}, 
-    { 'icon': '🖥️', 'id': 'dev/UE5', 'label': 'UE5'}, 
-    { 'icon': '🖥️', 'id': 'dev/Python', 'label': 'Python'}, 
-    { 'icon': '📐', 'id': 'design', 'label': 'Design'}, 
-    { 'icon': '📐', 'id': 'design/write', 'label': 'Writing'}, 
-    { 'icon': '📐', 'id': 'design/programs', 'label': 'Program Design'}, 
-    { 'icon': '📻', 'id': 'make', 'label': 'Make'}, 
-    { 'icon': '📻', 'id': 'make/rasbpi', 'label': 'RasbPI'}, 
-    { 'icon': '📻', 'id': 'make/pc', 'label': 'PC'}, 
+    { 'icon': '', 'id': 'fun', 'label': 'FUN________'}, 
 
-    { 'icon': '💼', 'id': 'work', 'label': 'Work'}, 
+    { 'icon': '🎉', 'id': 'fun/events', 'label': 'Events'},  # note that top tabs separate movies,
+    { 'icon': '🕹️', 'id': 'fun/games', 'label': 'Games'}, 
+    { 'icon': '🍕', 'id': 'fun/food', 'label': 'Food'}, 
+
+    { 'icon': '🏈', 'id': 'fun/sport', 'label': 'Sport'}, 
+    { 'icon': '👣', 'id': 'fun/travel', 'label': 'Travel'}, 
+
+
+
+    { 'icon': '', 'id': 'make', 'label': 'MAKE________'}, 
+
+
+    #{ 'icon': '🖥️', 'id': 'dev/Python', 'label': 'Python'}, 
+    { 'icon': '📐', 'id': 'make/design', 'label': 'Design'},   # can be Art / Draw
+    { 'icon': '🖋️', 'id': 'make/write', 'label': 'Writing'}, 
+    #{ 'icon': '📐', 'id': 'design/programs', 'label': 'Program Design'}, 
+    { 'icon': '🛠️', 'id': 'make/build', 'label': 'Build'}, 
+    
+    #{ 'icon': '📻', 'id': 'make/pc', 'label': 'PC'}, 
+
+    { 'icon': '', 'id': 'spacer', 'label': 'WORK________'}, 
+
+
+    { 'icon': '💼', 'id': 'work/job', 'label': 'Job'}, 
     { 'icon': '💼', 'id': 'work/business', 'label': 'Business'}, 
-    { 'icon': '💼', 'id': 'work/side', 'label': 'Side Gigs'}, 
+    #{ 'icon': '💼', 'id': 'work/freelance', 'label': 'Freelance'}, 
 
-    { 'icon': '👩🏻‍🎓', 'id': 'learn', 'label': 'Learn'}, 
-    { 'icon': '🕵', 'id': 'ai', 'label': 'AI'}, 
-    { 'icon': '🧰', 'id': 'support', 'label': 'Support'},
+    { 'icon': '👩🏻‍🎓', 'id': 'work/study', 'label': 'Study'}, 
+    
+    #{ 'icon': '🧰', 'id': 'support', 'label': 'Support'},
+    
+    { 'icon': '', 'id': 'proj', 'label': 'PROJ________'}, 
+    { 'icon': '🗡️', 'id': 'proj/UE5', 'label': 'UE5'}, 
+    #{ 'icon': '🗡️', 'id': 'proj/UE5/sanct', 'label': 'Sanct'}, 
+    #{ 'icon': '🖋️', 'id': 'proj/worldbuild', 'label': 'Worldbuild'}, 
+    { 'icon': '🖋️', 'id': 'proj/worldbuild/alrona', 'label': 'Alrona'}, 
+
+    { 'icon': '🖥️', 'id': 'proj/dev', 'label': 'Dev'}, 
+    { 'icon': '🕵', 'id': 'proj/dev/ai', 'label': 'AI'}, 
+    { 'icon': '👩🏻‍🎓', 'id': 'proj/dev/lifepim', 'label': 'LifePIM'}, 
+    #{ 'icon': '📻', 'id': 'proj/elec', 'label': 'Electronics'},             
+    { 'icon': '📻', 'id': 'proj/elec/rasbpi', 'label': 'RasbPI'},             
+
     
 ]
 
@@ -72,78 +98,76 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
 
 TABS = [  #Tabs across top of LifePIM
     { 'icon': '🏠', 'id': 'home', 'label': 'Overview', 'desc': 'Overview Dashboard'},
-
-    #{ 'icon': '📝', 'id': 'notes', 'label': 'What', 'desc': 'Notes'},
-    #{ 'icon': '🕐', 'id': 'calendar', 'label': 'When', 'desc': 'Calendar, Appointments, Events, Reminders (WHEN)'},
-    #{ 'icon': '🌏', 'id': 'places', 'label': 'Where', 'desc': 'Places (WHERE - real life, URL or virt location)'},
-    #{ 'icon': '📘', 'id': 'how', 'label': 'How', 'desc': 'Blueprints, Task Templates, Processes, Jobs (HOW)'},
-    #{ 'icon': '☑️', 'id': 'plan', 'label': 'Why', 'desc': 'Goals and Plans (WHY)'},
-    
-    { 'icon': '📝', 'id': 'notes', 'label': 'Notes', 'desc': 'Notes'},
     { 'icon': '🕐', 'id': 'calendar', 'label': 'Cal', 'desc': 'Calendar, Appointments, Events, Reminders (WHEN)'},
-    # NOTE - subtask of overview / tasks { 'icon': '📘', 'id': 'how', 'label': 'How', 'desc': 'Blueprints, Task Templates, Processes, Jobs (HOW)'},
-    # NOTE - subtask of overview / tasks { 'icon': '☑️', 'id': 'plan', 'label': 'Why', 'desc': 'Goals and Plans (WHY)'},
-
+    { 'icon': '🏆', 'id': 'goals', 'label': 'Goals', 'desc': 'Goals and Achievements (WHY)'},
     { 'icon': '📝', 'id': 'tasks', 'label': 'Tasks', 'desc': 'Tasks (actual list of things to do)'},
-    
-    # { 'icon': '📰', 'id': 'news', 'label': 'News', 'desc': 'News, reddit, twitter, RSS feeds'},
-    # { 'icon': '📩', 'id': 'comms', 'label': 'Comms', 'desc' : 'Mail, Chat, Social, Messages  📱📲'},
-    
-    { 'icon': '🗄️', 'id': 'data', 'label': 'Data', 'desc': 'Data' },
-    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps', 'desc': 'Apps'},
-   
+    { 'icon': '📘', 'id': 'how', 'label': 'How', 'desc': 'Blueprints, Task Templates, Processes, Jobs (HOW)'},
+    { 'icon': '📔', 'id': 'notes', 'label': 'Notes', 'desc': 'Notes'},
+    { 'icon': '▦', 'id': 'data', 'label': 'Data', 'desc': 'Data' },
     { 'icon': '📂', 'id': 'files', 'label': 'Files', 'desc': 'Files'},
-
-    
-    { 'icon': '💿', 'id': 'media', 'label': 'Media', 'desc': 'Images, Audio, Video'},
-    
-    #{ 'icon': '🖼️', 'id': 'images', 'label': 'Images', 'desc': 'Images'},
-    #{ 'icon': '🎵', 'id': 'music', 'label': 'Music', 'desc': 'Music'},
-    #{ 'icon': '🎥', 'id': 'video', 'label': 'Video', 'desc': 'Video' },
-
+    { 'icon': '🖼️', 'id': 'media', 'label': 'Media', 'desc': 'Images / Videos / 2D things'},
+    { 'icon': '🎵', 'id': 'audio', 'label': 'Audio', 'desc': 'Music / Podcasts / Sound Effects'},
     { 'icon': '🧱', 'id': '3d', 'label': '3D',  'desc': 'Objects / 3D / Things'},
-
-    # { 'icon': '🏆', 'id': 'badges', 'label': 'Badges', 'desc': 'Badges, Achievements, Scores, Ranks, Awards'},
+    { 'icon': '💲', 'id': 'money', 'label': 'Money', 'desc': 'Money'},
     { 'icon': '👤', 'id': 'contacts', 'label': 'People', 'desc': 'Contacts (WHO)'},
     { 'icon': '🌏', 'id': 'places', 'label': 'Places', 'desc': 'Places (WHERE - real life, URL or virt location)'},
-    { 'icon': '💲', 'id': 'money', 'label': 'Money', 'desc': 'Money'},
     
-    { 'icon': '💻', 'id': 'etl', 'label': 'ETL', 'desc': 'ETL'},
-
+    #{ 'icon': '📰', 'id': 'news', 'label': 'News', 'desc': 'News, reddit, twitter, RSS feeds'},
+    #{ 'icon': '📩', 'id': 'comms', 'label': 'Comms', 'desc' : 'Mail, Chat, Social, Messages  📱📲'},
+    #{ 'icon': '💿', 'id': 'media', 'label': 'Media', 'desc': 'Images, Audio, Video'},
+    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps', 'desc': 'Apps'},
+    #{ 'icon': '💻', 'id': 'etl', 'label': 'ETL', 'desc': 'ETL'},
     # { 'icon': '📜', 'id': 'logs', 'label': 'Logs', 'desc': 'Journal / Logs'},
     #{ 'icon': '⚙', 'id': 'admin', 'label': 'Admin', 'desc': 'Admin'},
-    #{ 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'desc': 'Agent'},
-
+    { 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'desc': 'Agent'},
 ]
 
 
 sub_menus = [
-    {'root':'notes', 'name':'Ideas'},
-    {'root':'notes', 'name':'Meeting Notes'},
-    {'root':'notes', 'name':'Project Info'},
-    {'root':'notes', 'name':'Research'},
-    {'root':'tasks', 'name':'Today'},
-    {'root':'tasks', 'name':'This Week'},
-    {'root':'tasks', 'name':'This Month'},
-    {'root':'tasks', 'name':'Completed'},
-    {'root':'calendar', 'name':'Appointments'},
-    {'root':'calendar', 'name':'Events'},
-    {'root':'calendar', 'name':'Reminders'},
-    {'root':'data', 'name':'Databases'},
-    {'root':'data', 'name':'Spreadsheets'},
-    {'root':'data', 'name':'Checklists'},
-    {'root':'files', 'name':'Documents'},
-    {'root':'files', 'name':'PDFs'},
-    {'root':'files', 'name':'Presentations'},
-    {'root':'images', 'name':'Photos'},
-    {'root':'images', 'name':'Screenshots'},
-    {'root':'images', 'name':'Drawings'},
-    {'root':'music', 'name':'Songs'},
-    {'root':'music', 'name':'Albums'},
-    {'root':'music', 'name':'Playlists'},
-    {'root':'video', 'name':'Movies'},
-    {'root':'video', 'name':'Clips'},
-    {'root':'video', 'name':'Recordings'},
+    {'root':'notes', 'name':'Add Note', 'fn':'fn_notes_add'},
+    {'root':'notes', 'name':'List All', 'fn':'fn_notes_list'},
+
+    {'root':'notes', 'name':'Meeting Notes', 'fn':'fn_notes_meeting'},
+    {'root':'notes', 'name':'Project Info', 'fn':'fn_notes_proj'},
+    
+
+    {'root':'tasks', 'name':'Add Task', 'fn':'fn_tasks_add'},
+    {'root':'tasks', 'name':'List All', 'fn':'fn_tasks_list'},
+    {'root':'tasks', 'name':'Today', 'fn':'fn_tasks_today'},
+    {'root':'tasks', 'name':'This Week', 'fn':'fn_tasks_week'},
+    {'root':'tasks', 'name':'This Month', 'fn':'fn_tasks_month'},
+    {'root':'tasks', 'name':'Completed', 'fn':'fn_tasks_done'},
+
+
+    {'root':'calendar', 'name':'Add Event', 'fn':'fn_calendar_add'},
+    {'root':'calendar', 'name':'List All', 'fn':'fn_calendar_list'},
+    {'root':'calendar', 'name':'Today', 'fn':'fn_calendar_today'},
+    {'root':'calendar', 'name':'Week View', 'fn':'fn_calendar_week'},
+    {'root':'calendar', 'name':'Month View', 'fn':'fn_calendar_month'},
+    {'root':'calendar', 'name':'Year View', 'fn':'fn_calendar_year'},
+    
+
+    {'root':'data', 'name':'Add Table', 'fn':'fn_data_add'},
+    {'root':'data', 'name':'List All', 'fn':'fn_data_list'},
+    {'root':'data', 'name':'Databases', 'fn':'fn_data_tbl'},
+    {'root':'data', 'name':'Spreadsheets', 'fn':'fn_data_csv'},
+ 
+    {'root':'files', 'name':'Favorites', 'fn':'fn_files_fav'},
+    {'root':'files', 'name':'Folders', 'fn':'fn_files_folders'},
+    {'root':'files', 'name':'Files', 'fn':'fn_files_all'},
+    
+
+    {'root':'media', 'name':'Photos', 'fn':'fn_media_photos'},
+    {'root':'media', 'name':'Screenshots', 'fn':'fn_media_screenshots'},
+    {'root':'media', 'name':'Drawings', 'fn':'fn_media_drawings'},
+    {'root':'media', 'name':'Movies', 'fn':'fn_media_movies'},
+    {'root':'media', 'name':'Recordings', 'fn':'fn_media_recordings'},    
+    
+
+    {'root':'audio', 'name':'Songs', 'fn':'fn_audio_songs'},
+    {'root':'audio', 'name':'Albums', 'fn':'fn_audio_albums'},
+    {'root':'audio', 'name':'Playlists', 'fn':'fn_audio_playlists'},
+
 ]
 
 filters = [
@@ -163,14 +187,6 @@ filters = [
     ['video', 'type', ['Movie', 'Clip', 'Recording']], 
     ['video', 'year', ['1980-1989','1990-1999','2000-2009','2010-2019','2020-2029']],
 ]   
-
-ui_actions = []    # these are the clickable links that appear per tab / submenu
-for tab in TABS:
-    if tab['id'] in ['notes','tasks','contacts','etl','calendar','data','files','images','music','video']:
-        ui_actions.append([tab['id'], 'Add', 'fn_' + tab['id'] + '_add'])
-        sub_menus.append({'root':tab['id'], 'name':'Add'})
-    #ui_actions.append([tab['id'], 'Import', 'fn_' + tab['id'] + '_import'])
-    #ui_actions.append([tab['id'], 'Generate', 'fn_' + tab['id'] + '_gen'])
 
 
 project_specific_tables = [

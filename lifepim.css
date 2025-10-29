@@ -6,15 +6,39 @@ body {
     background-color: #fafafa;
 }
 
-/* --- TOP TABS --- */
-.top-tabs {
-    display: flex;
+/* --- FIX: NEW TOP NAV WRAPPER ---
+  This new container holds the background and border,
+  allowing the inner .top-tabs to scroll without
+  clipping the vertical dropdowns.
+*/
+.top-nav-container {
+    position: relative; /* Establishes stacking context */
+    z-index: 10;      /* Ensures top bar is above other content */
     background: #2f3542;
-    overflow-x: auto;
-    white-space: nowrap;
     border-bottom: 1px solid #444;
 }
-.top-tabs a {
+
+/* --- TOP TABS (MODIFIED) --- 
+  This is NOW ONLY a scrolling flex container.
+  Background and border are removed.
+*/
+.top-tabs {
+    display: flex;
+    overflow-x: auto;
+    /* overflow-y: visible; <-- REMOVED */
+    white-space: nowrap;
+    /* background: #2f3542; <-- MOVED to .top-nav-container */
+    /* border-bottom: 1px solid #444; <-- MOVED to .top-nav-container */
+}
+
+/* Wrapper for tabs that have dropdowns */
+.top-tab-item {
+    position: relative;
+    display: inline-block;
+}
+
+/* This class applies to ALL top-level links */
+.top-tab-link {
     display: inline-flex;
     align-items: center;
     color: #eee;
@@ -22,13 +46,55 @@ body {
     padding: 6px 10px;
     font-size: 13px;
 }
-.top-tabs a:hover {
+
+/* Hover for links */
+.top-tab-link:hover {
     background: #444;
     color: #fff;
 }
-.top-tabs span.icon {
+
+/* Keep tab highlighted when hovering dropdown */
+.top-tab-item:hover .top-tab-link {
+    background: #444;
+    color: #fff;
+}
+
+.top-tab-link span.icon {
     margin-right: 6px;
 }
+
+/* --- NEW DROPDOWN MENU --- */
+.dropdown-menu {
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: 100%; /* Position right below the tab */
+    left: 0;
+    background-color: #3a4150;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    border-radius: 0 0 4px 4px;
+}
+
+.dropdown-menu a {
+    color: #eee;
+    padding: 8px 12px;
+    text-decoration: none;
+    display: block;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.dropdown-menu a:hover {
+    background-color: #444;
+    color: #fff;
+}
+
+/* Show the dropdown on hover */
+.top-tab-item:hover .dropdown-menu {
+    display: block;
+}
+
 
 /* --- LHS SIDE TABS --- */
 .side-tabs {

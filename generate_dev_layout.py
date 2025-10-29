@@ -1,26 +1,88 @@
 # generate_dev_layout.py
 # written by Duncan Murray 15/9/2025
 
+"""
+samples from config.py below: 
+
+SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
+    { 'icon': '*', 'id': 'any', 'label': 'All Projects'},
+    { 'icon': '', 'id': 'spacer', 'label': 'PERS________'}, 
+    { 'icon': '💊', 'id': 'health', 'label': 'Health'}, 
+    { 'icon': '👪', 'id': 'family', 'label': 'Family'}, 
+    { 'icon': '🏚️', 'id': 'house', 'label': 'House'}, 
+    { 'icon': '🌴', 'id': 'garden', 'label': 'Garden'}, 
+    { 'icon': '🚗', 'id': 'car', 'label': 'Car'}, 
+    { 'icon': '', 'id': 'fun', 'label': 'FUN________'}, 
+    { 'icon': '🎉', 'id': 'fun/events', 'label': 'Events'},  # note that top tabs separate movies,
+    { 'icon': '🕹️', 'id': 'fun/games', 'label': 'Games'}, 
+    { 'icon': '🍕', 'id': 'fun/food', 'label': 'Food'}, 
+]
+
+TABS = [  #Tabs across top of LifePIM
+    { 'icon': '🏠', 'id': 'home', 'label': 'Overview', 'desc': 'Overview Dashboard'},
+    { 'icon': '🕐', 'id': 'calendar', 'label': 'Cal', 'desc': 'Calendar, Appointments, Events, Reminders (WHEN)'},
+    { 'icon': '🏆', 'id': 'goals', 'label': 'Goals', 'desc': 'Goals and Achievements (WHY)'},
+    { 'icon': '📝', 'id': 'tasks', 'label': 'Tasks', 'desc': 'Tasks (actual list of things to do)'},
+    { 'icon': '📘', 'id': 'how', 'label': 'How', 'desc': 'Blueprints, Task Templates, Processes, Jobs (HOW)'},
+    { 'icon': '📔', 'id': 'notes', 'label': 'Notes', 'desc': 'Notes'},
+    { 'icon': '▦', 'id': 'data', 'label': 'Data', 'desc': 'Data' },
+    { 'icon': '📂', 'id': 'files', 'label': 'Files', 'desc': 'Files'},
+    { 'icon': '🖼️', 'id': 'media', 'label': 'Media', 'desc': 'Images / Videos / 2D things'},
+    { 'icon': '🎵', 'id': 'audio', 'label': 'Audio', 'desc': 'Music / Podcasts / Sound Effects'},
+    { 'icon': '🧱', 'id': '3d', 'label': '3D',  'desc': 'Objects / 3D / Things'},
+    { 'icon': '💲', 'id': 'money', 'label': 'Money', 'desc': 'Money'},
+    { 'icon': '👤', 'id': 'contacts', 'label': 'People', 'desc': 'Contacts (WHO)'},
+    { 'icon': '🌏', 'id': 'places', 'label': 'Places', 'desc': 'Places (WHERE - real life, URL or virt location)'},
+    
+    #{ 'icon': '📰', 'id': 'news', 'label': 'News', 'desc': 'News, reddit, twitter, RSS feeds'},
+    #{ 'icon': '📩', 'id': 'comms', 'label': 'Comms', 'desc' : 'Mail, Chat, Social, Messages  📱📲'},
+    #{ 'icon': '💿', 'id': 'media', 'label': 'Media', 'desc': 'Images, Audio, Video'},
+    { 'icon': '🎮', 'id': 'apps', 'label': 'Apps', 'desc': 'Apps'},
+    #{ 'icon': '💻', 'id': 'etl', 'label': 'ETL', 'desc': 'ETL'},
+    # { 'icon': '📜', 'id': 'logs', 'label': 'Logs', 'desc': 'Journal / Logs'},
+    #{ 'icon': '⚙', 'id': 'admin', 'label': 'Admin', 'desc': 'Admin'},
+    { 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'desc': 'Agent'},
+]
+
+
+sub_menus = [
+    {'root':'notes', 'name':'Ideas'},
+    {'root':'notes', 'name':'Meeting Notes'},
+    {'root':'notes', 'name':'Project Info'},
+    {'root':'notes', 'name':'Research'},
+    {'root':'tasks', 'name':'Today'},
+    {'root':'tasks', 'name':'This Week'},
+    {'root':'tasks', 'name':'This Month'},
+    {'root':'tasks', 'name':'Completed'},
+    {'root':'calendar', 'name':'Appointments'},
+    {'root':'calendar', 'name':'Events'},
+    {'root':'calendar', 'name':'Logs'},
+    {'root':'data', 'name':'Databases'},
+    {'root':'data', 'name':'Spreadsheets'},
+    {'root':'data', 'name':'Checklists'},
+    ]
+
+"""
 from src import config as mod_cfg
 from pprint import pprint
 
 def main():
     show_layout()
     render_layout('test.html')
-    print(mod_cfg.ui_actions)
-    print(mod_cfg.filters)
+
+    #print(mod_cfg.filters)
 
     spec_cal = generate_table_spec("calendar", "date DATE, time TEXT 4, event_summary TEXT 200, event_type TEXT 200, details TEXT BLOB")
     spec_note = generate_table_spec("note", "date DATE, time TEXT 4, note_summary TEXT 2000, note_type TEXT 200, details TEXT BLOB")
         
-    
+    """
     pprint(spec_cal,sort_dicts=False)
     spec_cal_view_list = generate_view_spec(spec_cal, 'LIST', ['date', 'time', 'event_summary'])
     pprint(spec_cal_view_list,sort_dicts=False)
 
     spec_note_view_card = generate_view_spec(spec_note, 'CARD', ['details'])
     pprint(spec_note_view_card,sort_dicts=False)
-
+    """
 
 def get_table_name(top_menu, sub_menu):
     if sub_menu == '':
@@ -37,81 +99,8 @@ def show_layout():
                 tbl = get_table_name(tab['id'], sub_menu['name'])
                 print(f"    - {sub_menu['name']}  (data = '{tbl}')")
 
-
-
-def render_layout(html_file="lifepim.html", css_file="lifepim.css"):
+def render_layout(html_file="lifepim.html"):
     """Render compact static HTML layout for LifePIM top and side tabs."""
-
-    # --- CSS stored separately ---
-    css = """
-/* LifePIM Layout - clean, compact, modern */
-body {
-    margin: 0;
-    font-family: system-ui, sans-serif;
-    background-color: #fafafa;
-}
-
-/* --- TOP TABS --- */
-.top-tabs {
-    display: flex;
-    background: #2f3542;
-    overflow-x: auto;
-    white-space: nowrap;
-    border-bottom: 1px solid #444;
-}
-.top-tabs a {
-    display: inline-flex;
-    align-items: center;
-    color: #eee;
-    text-decoration: none;
-    padding: 6px 10px;
-    font-size: 13px;
-}
-.top-tabs a:hover {
-    background: #444;
-    color: #fff;
-}
-.top-tabs span.icon {
-    margin-right: 6px;
-}
-
-/* --- LHS SIDE TABS --- */
-.side-tabs {
-    position: fixed;
-    top: 36px;
-    bottom: 0;
-    left: 0;
-    width: 130px;
-    background: #f3f3f3;
-    border-right: 1px solid #ccc;
-    overflow-y: auto;
-    padding: 4px 0;
-}
-.side-tabs a {
-    display: flex;
-    align-items: center;
-    color: #333;
-    text-decoration: none;
-    font-size: 13px;
-    padding: 4px 6px;
-    border-radius: 4px;
-    margin: 2px 4px;
-}
-.side-tabs a:hover {
-    background: #ddd;
-}
-.side-tabs span.icon {
-    margin-right: 6px;
-}
-
-/* --- CONTENT AREA --- */
-.content {
-    margin-left: 140px;
-    margin-top: 40px;
-    padding: 10px;
-    font-size: 14px;
-}
-"""
 
     # --- HTML content ---
     html = [
@@ -120,29 +109,62 @@ body {
         "<head>",
         "  <meta charset='utf-8'/>",
         "  <title>LifePIM UI</title>",
-        f"  <link rel='stylesheet' href='{css_file}'/>",
+        "  <link rel='stylesheet' href=""lifepim.css"">",
         "</head>",
         "<body>",
         "",
-        "  <!-- Top Tabs -->",
-        "  <div class='top-tabs'>"
+        "  ",
+        "  <div class='top-nav-container'>",  # "    <div class='top-tabs'>"
     ]
 
     # render top tabs
     for t in mod_cfg.TABS:
+        tab_id = t['id']
         desc = t.get("desc", "")
-        html.append(
-            f"    <a href='#{t['id']}' title='{desc}'><span class='icon'>{t['icon']}</span>{t['label']}</a>"
-        )
+        
+        # Find sub-menus for this tab
+        sub_items = [s for s in mod_cfg.sub_menus if s['root'] == tab_id]
+        print('sub items for menu = ' + str(sub_items))
+       
+        if not sub_items:
+            # No dropdown, just the plain link
+            html.append(
+                f"      <a href='#{tab_id}' title='{desc}' class='top-tab-link'><span class='icon'>{t['icon']}</span>{t['label']}</a>"
+            )
+        else:
+            # This tab HAS a dropdown
 
-    html.append("  </div>")
+            html.append("      <div class='top-tab-item'>")
+            # Add the main link
+            html.append(
+                f"        <a href='#{tab_id}' title='{desc}' class='top-tab-link'><span class='icon'>{t['icon']}</span>{t['label']}</a>"
+            )
+            
+            # Add the dropdown menu
+            html.append("        <div class='dropdown-menu'>")
+            for sub in sub_items:
+                sub_name = sub['name']
+                print(' sub = ' + str(sub))
+                
+                # Create a simple ID from the name (e.g., "Meeting Notes" -> "meeting_notes")
+                sub_id = sub['fn']# sub_name.replace(' ', '_').lower()
+                # Route to [TAB]_[SUBTAB] as requested
+                href = f"#{tab_id}_{sub_id}"
 
-    # side tabs
-    html.append("\n  <!-- Side Tabs -->")
+                print('href = ' + href )
+                html.append(f"          <a href='{href}'>{sub_name}</a>")
+            
+            html.append("        </div>") # close dropdown-menu
+            html.append("      </div>") # close top-tab-item
+
+    html.append("    </div>") # close .top-tabs
+    html.append("  </div>")   # # side tabs
+    html.append("\n  ")
     html.append("  <div class='side-tabs'>")
 
     for s in mod_cfg.SIDE_TABS:
         desc = s.get("label", "")
+        
         html.append(
             f"    <a href='#{s['id']}' title='{desc}'><span class='icon'>{s['icon']}</span>{s['label']}</a>"
         )
@@ -153,16 +175,11 @@ body {
     html.append("\n  <div class='content'>Select a tab to view content.</div>")
     html.append("</body></html>")
 
-    # --- Write files ---
+    # --- Write file ---
     with open(html_file, "w", encoding="utf-8") as f:
         f.write("\n".join(html))
-    with open(css_file, "w", encoding="utf-8") as f:
-        f.write(css)
 
-    print(f"✅ Wrote: {html_file} and {css_file}")
-
-
-
+    print(f"✅ Wrote: {html_file}")
 
 def generate_table_spec(nme, cols_as_string):
     """
