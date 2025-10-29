@@ -37,7 +37,7 @@ SIDE_TABS_GROUPS = [  # for possible sub folders
 
 SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
     { 'icon': '*', 'id': 'any', 'label': 'All Projects'},
-    { 'icon': '', 'id': 'spacer', 'label': 'PERS________'}, 
+    { 'icon': '', 'id': 'spacer', 'label': 'PERS'}, 
 
     #{ 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},
     { 'icon': '💊', 'id': 'health', 'label': 'Health'}, 
@@ -46,7 +46,7 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
     { 'icon': '🌴', 'id': 'garden', 'label': 'Garden'}, 
     { 'icon': '🚗', 'id': 'car', 'label': 'Car'}, 
 
-    { 'icon': '', 'id': 'fun', 'label': 'FUN________'}, 
+    { 'icon': '', 'id': 'fun', 'label': 'FUN'}, 
 
     { 'icon': '🎉', 'id': 'fun/events', 'label': 'Events'},  # note that top tabs separate movies,
     { 'icon': '🕹️', 'id': 'fun/games', 'label': 'Games'}, 
@@ -57,7 +57,7 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
 
 
 
-    { 'icon': '', 'id': 'make', 'label': 'MAKE________'}, 
+    { 'icon': '', 'id': 'make', 'label': 'MAKE'}, 
 
 
     #{ 'icon': '🖥️', 'id': 'dev/Python', 'label': 'Python'}, 
@@ -68,7 +68,7 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
     
     #{ 'icon': '📻', 'id': 'make/pc', 'label': 'PC'}, 
 
-    { 'icon': '', 'id': 'spacer', 'label': 'WORK________'}, 
+    { 'icon': '', 'id': 'spacer', 'label': 'WORK'}, 
 
 
     { 'icon': '💼', 'id': 'work/job', 'label': 'Job'}, 
@@ -79,7 +79,7 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
     
     #{ 'icon': '🧰', 'id': 'support', 'label': 'Support'},
     
-    { 'icon': '', 'id': 'proj', 'label': 'PROJ________'}, 
+    { 'icon': '', 'id': 'proj', 'label': 'PROJECTS'}, 
     { 'icon': '🗡️', 'id': 'proj/UE5', 'label': 'UE5'}, 
     #{ 'icon': '🗡️', 'id': 'proj/UE5/sanct', 'label': 'Sanct'}, 
     #{ 'icon': '🖋️', 'id': 'proj/worldbuild', 'label': 'Worldbuild'}, 

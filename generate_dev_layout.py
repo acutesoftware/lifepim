@@ -148,8 +148,8 @@ def render_layout(html_file="lifepim.html"):
                 
                 # Create a simple ID from the name (e.g., "Meeting Notes" -> "meeting_notes")
                 sub_id = sub['fn']# sub_name.replace(' ', '_').lower()
-                # Route to [TAB]_[SUBTAB] as requested
-                href = f"#{tab_id}_{sub_id}"
+                # Route to [TAB]_[SUBTAB]  f"#{tab_id}_{sub_id}"
+                href = f"?tab={sub['fn']}?proj=any"
 
                 print('href = ' + href )
                 html.append(f"          <a href='{href}'>{sub_name}</a>")
@@ -164,10 +164,13 @@ def render_layout(html_file="lifepim.html"):
 
     for s in mod_cfg.SIDE_TABS:
         desc = s.get("label", "")
-        
-        html.append(
-            f"    <a href='#{s['id']}' title='{desc}'><span class='icon'>{s['icon']}</span>{s['label']}</a>"
-        )
+        href = f"?tab=home?proj={s['id']}"
+
+        # is this a side spacer?
+        if desc.endswith("___") or s['icon'] == '':
+            html.append(f"    <a href='{href}' title='{desc}'><B>{s['label']}</B></a>")
+        else:
+            html.append(f"    <a href='{href}' title='{desc}'><span class='icon'>{s['icon']}</span>{s['label']}</a>")
 
     html.append("  </div>")
 
