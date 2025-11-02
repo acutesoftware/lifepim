@@ -1,6 +1,6 @@
 body {
   font-family: Arial, sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   margin: 0;
   padding: 0;
   background: #fafafa;
@@ -101,7 +101,7 @@ body {
   padding: 2px 6px;
   text-decoration: none;
   color: #222;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .side:hover {

@@ -102,7 +102,7 @@ TABS = [  #Tabs across top of LifePIM
     { 'icon': '📝', 'id': 'tasks', 'label': 'Tasks', 'desc': 'Tasks (actual list of things to do)'},
     { 'icon': '📘', 'id': 'how', 'label': 'How', 'desc': 'Blueprints, Task Templates, Processes, Jobs (HOW)'},
     { 'icon': '📔', 'id': 'notes', 'label': 'Notes', 'desc': 'Notes'},
-    { 'icon': '▦', 'id': 'data', 'label': 'Data', 'desc': 'Data' },
+    { 'icon': '📅', 'id': 'data', 'label': 'Data', 'desc': 'Data' },
     { 'icon': '📂', 'id': 'files', 'label': 'Files', 'desc': 'Files'},
     { 'icon': '🖼️', 'id': 'media', 'label': 'Media', 'desc': 'Images / Videos / 2D things'},
     { 'icon': '🎵', 'id': 'audio', 'label': 'Audio', 'desc': 'Music / Podcasts / Sound Effects'},

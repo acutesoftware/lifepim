@@ -1,5 +1,9 @@
 {% extends "layout.html" %}
-{% block content %}
+{% block module_content %}
 <h1>Tasks</h1>
+  <a href="{{ url_for('notes.add_note_route') }}">➕ Add Task (TODO CHANGE URL)</a>
+
 {% include "widgets/wid_tbl_list.html" %}
 {% endblock %}
+
+
