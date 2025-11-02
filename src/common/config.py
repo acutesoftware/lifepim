@@ -95,7 +95,6 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
 ]
 
 
-
 TABS = [  #Tabs across top of LifePIM
     { 'icon': '🏠', 'id': 'home', 'label': 'Overview', 'desc': 'Overview Dashboard'},
     { 'icon': '🕐', 'id': 'calendar', 'label': 'Cal', 'desc': 'Calendar, Appointments, Events, Reminders (WHEN)'},

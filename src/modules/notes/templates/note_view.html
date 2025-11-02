@@ -1,0 +1,9 @@
+{% extends 'layout.html' %}
+{% block module_content %}
+  <div class="note-view">
+    <h4>{{ note.title }}</h4>
+    <div>{{ note.content }}</div>
+    <p><i>Updated {{ note.updated.strftime('%Y-%m-%d %H:%M') }}</i></p>
+    <p><a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}">✏️ Edit</a></p>
+  </div>
+{% endblock %}

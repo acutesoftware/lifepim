@@ -1,0 +1,12 @@
+{% extends 'layout.html' %}
+{% block module_content %}
+  <form method="POST">
+    <label>Title:</label><br>
+    <input type="text" name="title" value="{{ note.title if note else '' }}" required><br>
+    <label>Project:</label><br>
+    <input type="text" name="project" value="{{ note.project if note else 'General' }}"><br>
+    <label>Content:</label><br>
+    <textarea name="content" rows="6" cols="60">{{ note.content if note else '' }}</textarea><br><br>
+    <button type="submit">Save</button>
+  </form>
+{% endblock %}

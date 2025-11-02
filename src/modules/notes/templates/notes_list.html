@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <a href="{{ url_for('notes.add_note_route') }}">➕ Add Note</a>
+
+<table border="1" cellpadding="5">
+  <tr><th>Title</th><th>Project</th><th>Created</th><th>Actions</th></tr>
+  {% for n in notes %}
+  <tr>
+    <td>{{ n.title }}</td>
+    
+    <td>
+      <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">View</a> |
+      <a href="{{ url_for('notes.edit_note_route', note_id=n.id) }}">Edit</a> |
+      <a href="{{ url_for('notes.delete_note_route', note_id=n.id) }}" onclick="return confirm('Delete note?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>  
+{% endblock %}

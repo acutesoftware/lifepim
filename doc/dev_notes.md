@@ -1,5 +1,28 @@
 ## Developer Notes for LifePIM Desktop
 
+
+
+## Layout
+
+```
+    lifepim/
+    ├── app.py
+    ├── static/lifepim.css
+    ├── templates/layout.html
+    ├── common/
+    │   ├── utils.py
+    │   ├── data.py
+    └── modules/
+        └── notes/
+            ├── __init__.py
+            ├── routes.py
+            └── templates/
+                ├── notes_list.html
+                ├── note_view.html
+                └── note_edit.html
+```
+
+
 Notes for developers.
 
 ## Developing locally on your PC

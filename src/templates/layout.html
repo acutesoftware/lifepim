@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>LifePIM - {{ active_tab }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css') }}">
+</head>
+<body>
+  <div class="topbar">
+    <!-- Hamburger dropdown menu -->
+    <div class="menu-wrapper">
+      <button class="menu-btn" id="menuToggle">☰</button>
+      <div class="dropdown-menu" id="menuDropdown">
+        <a href="#" id="showSidebar">Show project list</a>
+        <a href="#" id="hideSidebar">Hide project list</a>
+        <a href="#">Edit projects</a>
+        <div class="menu-spacer"></div>
+        <a href="#">Settings</a>
+        <a href="#">Help</a>
+      </div>
+    </div>
+
+    <div class="top-nav-container">
+      {% for t in tabs %}
+        <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="/{{t.id}}" title="{{t.desc}}">
+          <span class="ic">{{t.icon}}</span><span class="lab">{{t.label}}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="container">
+    <aside class="side-tabs" id="sidebar">
+      {% for s in side_tabs %}
+        <a class="side" href="/{{active_tab}}?proj={{s.id}}">
+          <span class="ic">{{s.icon}}</span>
+          <span class="lab">{{s.label}}</span>
+        </a>
+      {% endfor %}
+    </aside>
+
+    <main class="main">
+      <h3>{{ content_title or active_tab }}</h3>
+      <div class="content">
+        {{ content_html|safe }}
+      </div>
+      {% block module_content %}{% endblock %}
+    </main>
+  </div>
+
+  <script>
+    const menuToggle = document.getElementById('menuToggle');
+    const menuDropdown = document.getElementById('menuDropdown');
+    const sidebar = document.getElementById('sidebar');
+    const showSidebar = document.getElementById('showSidebar');
+    const hideSidebar = document.getElementById('hideSidebar');
+
+    // Toggle dropdown visibility
+    menuToggle.addEventListener('click', () => {
+      menuDropdown.classList.toggle('show');
+    });
+
+    // Hide dropdown if clicking outside
+    window.addEventListener('click', (e) => {
+      if (!menuToggle.contains(e.target) && !menuDropdown.contains(e.target)) {
+        menuDropdown.classList.remove('show');
+      }
+    });
+
+    // Sidebar show/hide actions
+    showSidebar.addEventListener('click', (e) => {
+      e.preventDefault();
+      sidebar.classList.remove('hidden');
+      menuDropdown.classList.remove('show');
+    });
+
+    hideSidebar.addEventListener('click', (e) => {
+      e.preventDefault();
+      sidebar.classList.add('hidden');
+      menuDropdown.classList.remove('show');
+    });
+  </script>
+</body>
+</html>

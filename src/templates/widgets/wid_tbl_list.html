@@ -1,0 +1,10 @@
+<table border="1" cellpadding="4">
+<thead>
+  <tr>{% for col in column_names %}<th>{{ col }}</th>{% endfor %}</tr>
+</thead>
+<tbody>
+{% for row in col_values %}
+  <tr>{% for v in row %}<td>{{ v }}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody>
+</table>

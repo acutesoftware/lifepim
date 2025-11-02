@@ -1,0 +1,137 @@
+body {
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  margin: 0;
+  padding: 0;
+  background: #fafafa;
+  color: #222;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  background: #eee;
+  border-bottom: 1px solid #ccc;
+  padding: 2px 4px;
+}
+
+.menu-wrapper {
+  position: relative;
+}
+
+.menu-btn {
+  font-size: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 22px;
+  left: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  min-width: 160px;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.2);
+  z-index: 100;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-menu a {
+  display: block;
+  padding: 4px 8px;
+  text-decoration: none;
+  color: #333;
+  font-size: 11px;
+}
+
+.dropdown-menu a:hover {
+  background: #f2f2f2;
+}
+
+.menu-spacer {
+  border-top: 1px solid #ddd;
+  margin: 2px 0;
+}
+
+.top-nav-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.top-tab-item {
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #333;
+}
+
+.top-tab-item.active {
+  background: #ccc;
+  font-weight: bold;
+}
+
+.container {
+  display: flex;
+  min-height: calc(100vh - 30px);
+}
+
+.side-tabs {
+  width: 140px;
+  background: #f2f2f2;
+  border-right: 1px solid #ccc;
+  display: flex;
+  flex-direction: column;
+  padding: 2px;
+}
+
+.side-tabs.hidden {
+  display: none;
+}
+
+.side {
+  padding: 2px 6px;
+  text-decoration: none;
+  color: #222;
+  font-size: 11px;
+}
+
+.side:hover {
+  background: #ddd;
+}
+
+.main {
+  flex: 1;
+  padding: 4px 6px;
+  overflow-x: auto;
+}
+
+.content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.content th, .content td {
+  border: 1px solid #ccc;
+  padding: 2px 4px;
+  text-align: left;
+}
+
+@media (max-width: 600px) {
+  .side-tabs {
+    width: 120px;
+    position: absolute;
+    top: 28px;
+    left: 0;
+    height: calc(100vh - 30px);
+    z-index: 50;
+  }
+}
