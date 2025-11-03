@@ -1,0 +1,29 @@
+id,icon,label
+any,*,All Projects
+spacer,,PERS
+health,💊,Health
+family,👪,Family
+house,🏚️,House
+garden,🌴,Garden
+car,🚗,Car
+fun,,FUN
+fun/events,🎉,Events
+fun/games,🕹️,Games
+fun/food,🍕,Food
+fun/sport,🏈,Sport
+fun/travel,👣,Travel
+make,,MAKE
+make/design,📐,Design
+make/write,🖋️,Writing
+make/build,🛠️,Build
+spacer,,WORK
+work/job,💼,Job
+work/business,💼,Business
+work/study,👩🏻‍🎓,Study
+proj,,PROJECTS
+proj/UE5,🗡️,UE5
+proj/worldbuild/alrona,🖋️,Alrona
+proj/dev,🖥️,Dev
+proj/dev/ai,🕵,AI
+proj/dev/lifepim,👩🏻‍🎓,LifePIM
+proj/elec/rasbpi,📻,RasbPI

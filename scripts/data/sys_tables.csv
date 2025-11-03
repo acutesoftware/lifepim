@@ -1,0 +1,17 @@
+table_name,cols,col_types,imp_cols,search_col,url,page_function
+ui_tabs,"id,icon,label,desc","id,Text,Text,Text",,,,
+ui_sidetabs,"id,icon,label","id,Text,Text",,,,
+event,"id,dateevent_str,timeevent,details,event_type,proj","id,Date,Time,Note,Text,List","dateevent_str,details","details,dateevent_str",calendar,page_calendar
+note,"id,title,pinned,important,is_archived,color,content,proj","id,Text,Checkbox,Checkbox,Checkbox,Color,Note,List","proj,title,content","title,content",notes,page_notes
+task,"id,Title,Pinned,Important,Notes,proj,Done","id,Text,Checkbox,Checkbox,Note,List,Checkbox","proj,title,notes,Date","title,notes",tasks,page_tasks
+task_project,"id,category,title,proj","id,Number,Text,List","title","title",projects,page_projects
+goal,"id,goal_area,goal_name,proj,goal_note","id,Text,Text,List,Text","goal_area,goal_name,goal_note","goal_area,goal_name,goal_note",goals,page_goals
+place,"id,nme,proj","id,List,Text","nme","",places,page_places
+money,"id,nme,proj,amount","id,List,Text,Number","nme","",money,page_money
+ref_badges,"badge_area,badge_name,badge_desc","Text,Text,Text","badge_name","",badges,page_badges
+music,"id,nme,proj","id,Text,List","nme","",music,page_music
+images,"id,nme,proj","id,Text,List","nme","",images,page_images
+files,"id,nme,proj","id,Text,List","nme","",files,page_files
+apps,"id,proj,app_name,app_desc,app_launch_url,app_notes","id,List,Text,Text,Text,Note","app_name,app_desc,app_launch_url,app_notes,proj","app_name,app_desc,app_launch_url",apps,page_apps
+data_tables,"id,table_name,color,proj,table_desc","id,Text,Color,List,Text,Text,Text","table_name,table_desc","table_name,table_desc",data_tables,page_data
+data_values,"id,table_id,is_header,is_hdr_short_name,is_col_type_def,is_default_values,is_row_data,col1,col2,col3,col4,col5,col6,col7,col8,col9","id,Hidden,Hidden,Hidden,Hidden,Hidden,Hidden,Text,Text,Text,Text,Text,Text,Text,Text,Text","col1,col2,col3,col4,col5,col6,col7,col8,col9","col1,col2,col3,col4,col5,col6,col7,col8,col9",data_values,page_data_values

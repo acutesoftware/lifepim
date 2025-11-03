@@ -1,0 +1,7 @@
+widget, html_pre, html_post, notes
+Label, <label>, </label>,Simple text label
+TEXTBOX, <input type="text" value=",">,Single line text input box
+TEXTAREA, <textarea>, </textarea>,Multi-line text area input box
+DROPDOWNLIST, <select>, </select>,Drop down List to pick a string
+DATEPICKER, <input type="date" value=",">,Date picker input box
+DATETIMEPICKER,<input type="datetime-local" value=",">,Date and time picker input box

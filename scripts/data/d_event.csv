@@ -1,0 +1,4 @@
+id,dateevent_str,timeevent,details,event_type,proj
+125,2024-01-01,12:00,event note_longer_text_area,event example,Job
+242,2024-01-01,12:00,event note_longer_text_area,event example,Food
+131,2024-01-01,12:00,event note_longer_text_area,event example,AI

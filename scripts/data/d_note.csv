@@ -1,0 +1,4 @@
+id,title,pinned,important,is_archived,color,content,proj
+482,note example,0,1,1,#0000FF,note note_longer_text_area,Sport
+440,note example,0,0,0,#0000FF,note note_longer_text_area,Alrona
+426,note example,0,1,1,#FFFF00,note note_longer_text_area,WORK
