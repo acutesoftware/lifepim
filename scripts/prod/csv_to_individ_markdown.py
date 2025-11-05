@@ -7,7 +7,10 @@
 import os 
 import sys
 import time
-import config as mod_cfg
+
+sys.path.append(os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + ".." ) )
+
+from src.common import config as mod_cfg
 
 op_fldr = os.path.join(mod_cfg.export_data_folder_base)
 

@@ -15,7 +15,7 @@ data_folder = os.path.join(user_folder, 'DATA')
 index_folder = os.path.join(user_folder, 'index')
 calendar_folder = os.path.join(user_folder, 'calendar')
 folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
-
+export_data_folder_base = os.path.join(user_folder, 'export_data')
 
 # ----------------------------------------------------------------------------
 # Interface configuration

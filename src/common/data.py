@@ -1,3 +1,10 @@
+# data.py - common data access functions
+def query_table(name, condition):
+    pass
+
+
+
+# ---- old dummy data functions for testing ----
 def get_table_list(name):
     # Demo data
     if name == "notes":
