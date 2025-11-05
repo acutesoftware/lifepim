@@ -17,6 +17,10 @@ calendar_folder = os.path.join(user_folder, 'calendar')
 folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 export_data_folder_base = os.path.join(user_folder, 'export_data')
 
+
+db_name = os.path.join(user_folder, 'DATA', 'SQL', 'lifepim.db')
+db_name = os.path.join('..', '..', 'data', 'lifepim.db')
+
 # ----------------------------------------------------------------------------
 # Interface configuration
 
@@ -211,8 +215,6 @@ project_specific_tables = [
     'support_warranties',
     'ai_projects',
 ]
-
-print('TODO - make sure every single CSV file and database table can be mapped to a submenu/project')
 
 
 

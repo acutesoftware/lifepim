@@ -7,9 +7,9 @@
 import os , sys
 import random
 
-op_folder = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__),  'data')))
+op_folder = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..','..', 'data')))
 
-cfg_path = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..', 'src', 'common')))
+cfg_path = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..', ',,', 'src', 'common')))
                            
 print('cfg_path = ' + cfg_path)
 sys.path.append(cfg_path)

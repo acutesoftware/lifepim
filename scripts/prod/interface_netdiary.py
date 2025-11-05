@@ -15,13 +15,19 @@ import aikif.lib.cls_filelist as mod_fl
 path_root =  os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + ".." ) 
 sys.path.append(str(path_root))
 
-import config as mod_cfg
+from src.common import config as mod_cfg
 
 
 path_diary = r"U:\acute\netDiary\data"
 output_folder = mod_cfg.user_folder
 output_log = os.path.join(output_folder, 'load_diary.log')
-db_name = mod_cfg.db_name
+db_name = os.path.join(mod_cfg.data_folder, 'SQL', 'diary_hist.db')
+
+if os.path.exists(db_name):
+    print('using database ' + db_name)  
+else:
+    print('\nERROR\ndatabase ' + db_name + ' does not exist\n')
+    exit(0)
 
 db_table_raw_data = 'raw_EVENTS'
 
@@ -29,8 +35,8 @@ db_table_raw_data = 'raw_EVENTS'
 TODO - import different format logfiles from N:\lnz\tar\home\duncan\aikif\diary
 """
 def TEST():
-    load_diary_to_raw_tables()
-    ETL_raw_diary()
+    #load_diary_to_raw_tables()
+    #ETL_raw_diary()
     query_diary()
 
 
@@ -68,7 +74,7 @@ def query_diary():
 
 
     # Latest events
-    sql = 'select date, time, details from ' + db_table_raw_data + ' WHERE date like "202205%" ORDER BY 1, 2 limit 100'
+    #sql = 'select date, time, details from ' + db_table_raw_data + ' WHERE date like "202205%" ORDER BY 1, 2 limit 100'
 
     # Run the SQL
     db.exec(sql)

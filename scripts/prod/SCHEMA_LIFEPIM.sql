@@ -21,7 +21,7 @@ insert into sys_cat_widgets (widget, html_pre, html_post, notes) values
 CREATE TABLE IF NOT EXISTS "sys_meta_tables" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"tbl"	TEXT,
-	"desc_name"	TEXT,
+	"desc_name"	TEXT
 );
 
 INSERT INTO "sys_meta_tables" ("tbl", "desc_name") VALUES

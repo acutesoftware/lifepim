@@ -109,7 +109,7 @@ def render_layout(html_file="lifepim.html"):
         "<head>",
         "  <meta charset='utf-8'/>",
         "  <title>LifePIM UI</title>",
-        "  <link rel='stylesheet' href=""lifepim.css"">",
+        "  <link rel='stylesheet' href=""lifepim_test.css"">",
         "</head>",
         "<body>",
         "",

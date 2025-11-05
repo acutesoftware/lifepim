@@ -7,7 +7,7 @@
 import os 
 import sys
 import time
-import events
+import scripts.prod.events as events
 import index as index 
 import config as mod_cfg
 
