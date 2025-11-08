@@ -1,4 +1,10 @@
+#!/usr/bin/python3
+# coding: utf-8
 # data.py - common data access functions
+
+from datetime import datetime
+
+
 def query_table(name, condition):
     pass
 
@@ -15,7 +21,11 @@ def get_table_list(name):
         return [["Meeting", "Tomorrow"], ["Gym", "Today"]]
     return []
 
-from datetime import datetime
+
+
+
+
+################ DUMMY FUNCTIONS FOR NOTES (to be removed) ################
 
 NOTES = [
     {"id": 1, "title": "First Note", "project": "General", "content": "This is a sample note.", "updated": datetime.now()},
