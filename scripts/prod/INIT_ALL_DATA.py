@@ -41,9 +41,9 @@ print('Database file set to: ' + db_file)
 
 ################################ IMPORTS #######################################
 
-pth = os.path.join(root_folder,  'src', 'common')
-
-sys.path.append(pth)
+#root_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+src_folder = os.path.join(root_folder, 'src', 'common')
+sys.path.insert(0, src_folder)
 
 import if_sqlite as mod_sqlite
 

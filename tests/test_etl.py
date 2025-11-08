@@ -5,9 +5,10 @@ import os
 import sys
 import unittest
 
-root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + ".." + os.sep + 'src')
+root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + 'src')
 pth = os.path.join(root_folder,  'common')
 
+print (pth)
 sys.path.append(pth)
 
 import if_sqlite as mod_sqlite

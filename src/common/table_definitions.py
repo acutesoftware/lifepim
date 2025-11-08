@@ -1,4 +1,5 @@
 # table_definitions.py
+# written by Duncan Murray 2025-11-08
 
 sql_create_sys_log = """ CREATE TABLE IF NOT EXISTS sys_log (
                                         id integer PRIMARY KEY,

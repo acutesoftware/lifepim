@@ -22,8 +22,6 @@ if hostname == 'treebeard':
     fldr_list = [
                 #r'N:\DATA',
                 #r'N:\duncan',
-                #r'N:\UniSA_work',
-                #r'N:\izzy',
                 'P:'
                  #'W:',
                  #'M:',
