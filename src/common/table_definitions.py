@@ -41,7 +41,7 @@ def_lp_job_steps = [ # job_id, job_num, step_num, job_type, details, sql_to_run
 
     [ 'LOAD_REF', 0, 12, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\ref_project.csv', '', 'Projects Ref', '', ''],
     [ 'LOAD_REF', 0, 13, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\d_apps.csv', '', 'data - apps', '', ''],
-    [ 'LOAD_REF', 0, 14, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\d_notes.csv', '', 'data - notes', '', ''],
+    [ 'LOAD_REF', 0, 14, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\d_note.csv', '', 'data - notes', '', ''],
 
 
     [ 'LOAD_RAW_FILELIST', 1, 1, 'CSV', r'N:\duncan\LifePIM_Data\index\raw_treebeard_*.csv', '', 'Load multiple CSV files into own tables', '', ''],
