@@ -20,7 +20,12 @@ def list_tasks():
 @tasks_bp.route('/')
 def list_tasks_route():
     project = request.args.get("proj")
-    task_list = data.get_table_list("tasks") # (project)
+    task_list = data.get_tasks(data.conn, project)
+    column_names = ["Title", "Project", "Start", "Due"]
+    col_values = [
+        [task.get("title"), task.get("project"), task.get("start_date"), task.get("due_date")]
+        for task in task_list
+    ]
     return render_template(
         "tasks_list.html",
         active_tab="tasks",
@@ -28,12 +33,13 @@ def list_tasks_route():
         side_tabs=get_side_tabs(),
         content_title=f"Tasks ({project or 'All'})",
         content_html="this is a task list",
-        dta = task_list
+        column_names=column_names,
+        col_values=col_values,
     )
 
 
 def get_tasks(project=None):
     if project:
-        return data.query_table('tasks', f"project='{project}'")
+        return data.get_tasks(data.conn, project)
     else:
-        return data.get_table_list('tasks')
+        return data.get_tasks(data.conn)

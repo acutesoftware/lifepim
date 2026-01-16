@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for
-from common.data import get_notes, get_note_by_id, add_note, update_note, delete_note
+from common import data
 from common.utils import get_tabs, get_side_tabs
 
 notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
@@ -9,7 +9,7 @@ notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
 @notes_bp.route('/')
 def list_notes_route():
     project = request.args.get("proj")
-    notes = get_notes(project)
+    notes = data.get_notes(data.conn, project)
     return render_template(
         "notes_list.html",
         active_tab="notes",
@@ -22,7 +22,7 @@ def list_notes_route():
 
 @notes_bp.route('/view/<int:note_id>')
 def view_note_route(note_id):
-    note = get_note_by_id(note_id)
+    note = data.get_note_by_id(data.conn, note_id)
     return render_template(
         "note_view.html",
         active_tab="notes",
@@ -36,7 +36,12 @@ def view_note_route(note_id):
 @notes_bp.route('/add', methods=["GET", "POST"])
 def add_note_route():
     if request.method == "POST":
-        add_note(request.form["title"], request.form["content"])
+        data.add_note(
+            data.conn,
+            request.form["title"],
+            request.form.get("content", ""),
+            request.form.get("project", "General"),
+        )
         return redirect(url_for("notes.list_notes_route"))
     return render_template(
         "note_edit.html",
@@ -49,9 +54,15 @@ def add_note_route():
 
 @notes_bp.route('/edit/<int:note_id>', methods=["GET", "POST"])
 def edit_note_route(note_id):
-    note = get_note_by_id(note_id)
+    note = data.get_note_by_id(data.conn, note_id)
     if request.method == "POST":
-        update_note(note_id, request.form["title"], request.form["content"])
+        data.update_note(
+            data.conn,
+            note_id,
+            request.form["title"],
+            request.form.get("content", ""),
+            request.form.get("project", "General"),
+        )
         return redirect(url_for("notes.view_note_route", note_id=note_id))
     return render_template(
         "note_edit.html",
@@ -64,5 +75,5 @@ def edit_note_route(note_id):
 
 @notes_bp.route('/delete/<int:note_id>')
 def delete_note_route(note_id):
-    delete_note(note_id)
+    data.delete_note(data.conn, note_id)
     return redirect(url_for("notes.list_notes_route"))

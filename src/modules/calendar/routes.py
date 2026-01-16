@@ -3,13 +3,7 @@ from datetime import date, datetime
 
 from flask import Blueprint, render_template, request, redirect, url_for
 
-from common.data import (
-    get_calendar_events,
-    get_calendar_event_by_id,
-    add_calendar_event,
-    update_calendar_event,
-    delete_calendar_event,
-)
+from common import data
 from common.utils import get_tabs, get_side_tabs
 
 
@@ -53,7 +47,7 @@ def month_view_route():
     month = request.args.get("month", type=int) or today.month
     project = request.args.get("proj")
 
-    events = get_calendar_events(year=year, month=month, project=project)
+    events = data.get_calendar_events(data.conn, year=year, month=month, project=project)
     events_by_day = {}
     for event in events:
         try:
@@ -94,7 +88,7 @@ def add_event_route():
         detail = request.form.get("detail", "").strip()
         project = request.form.get("project", "General").strip() or "General"
 
-        event = add_calendar_event(title, date_str, time_str, detail, project)
+        event = data.add_calendar_event(data.conn, title, date_str, time_str, detail, project)
         year_month = _date_to_year_month(event.get("date", ""))
         if year_month:
             return redirect(
@@ -124,12 +118,13 @@ def add_event_route():
 
 @calendar_bp.route("/edit/<int:event_id>", methods=["GET", "POST"])
 def edit_event_route(event_id):
-    event = get_calendar_event_by_id(event_id)
+    event = data.get_calendar_event_by_id(data.conn, event_id)
     if not event:
         return redirect(url_for("calendar.month_view_route"))
 
     if request.method == "POST":
-        update_calendar_event(
+        data.update_calendar_event(
+            data.conn,
             event_id,
             request.form["title"].strip(),
             request.form.get("date", "").strip(),
@@ -164,8 +159,8 @@ def edit_event_route(event_id):
 
 @calendar_bp.route("/delete/<int:event_id>")
 def delete_event_route(event_id):
-    event = get_calendar_event_by_id(event_id)
-    delete_calendar_event(event_id)
+    event = data.get_calendar_event_by_id(data.conn, event_id)
+    data.delete_calendar_event(data.conn, event_id)
     if event:
         year_month = _date_to_year_month(event.get("date", ""))
         if year_month:
