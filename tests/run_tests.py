@@ -3,7 +3,6 @@
 # run_tests.py
 
 import os
-import glob
 import time
 import unittest as unittest
 

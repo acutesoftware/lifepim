@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <a href="{{ url_for('goals.add_goal_route', proj=project) }}">Add Goal</a>
+
+<table border="1" cellpadding="5">
+  <tr>
+    {% for col in col_list %}
+    <th>{{ col.replace('_', ' ') }}</th>
+    {% endfor %}
+    <th>Actions</th>
+  </tr>
+  {% for item in items %}
+  <tr>
+    {% for col in col_list %}
+    <td>{{ item[col] }}</td>
+    {% endfor %}
+    <td>
+      <a href="{{ url_for('goals.view_goal_route', item_id=item.id, proj=project) }}">View</a> |
+      <a href="{{ url_for('goals.edit_goal_route', item_id=item.id, proj=project) }}">Edit</a> |
+      <a href="{{ url_for('goals.delete_goal_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

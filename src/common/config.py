@@ -39,13 +39,24 @@ print('DB_FILE = ' + DB_FILE)
 #  column name contains 'amount', 'total', 'num_' = NUMBER
 #  
 table_def = [
-	{'name':'lp_notes', 'display_name':'Notes', 'col_list':['title','content', 'project']},
-	{'name':'lp_tasks', 'display_name':'Tasks', 'col_list':['title','content', 'project', 'start_date', 'due_date']},
-	{'name':'lp_events', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
+	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['title','content', 'project']},
+	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'project', 'start_date', 'due_date']},
+	{'name':'lp_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
+
+	{'name':'lp_goals', 'route':'goals', 'display_name':'Goals', 'col_list':['parent_goal_id', 'title','description', 'goal_date', 'remind_date', 'project']},
+	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'project']},
+	{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'project']},
+	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'file_type', 'project']},
 	
 ]
 
-
+"""
+use the route value in config.py > table_def to decide which table the top tab uses
+from the table name, also lookup the col_list to determine the select statement
+Implement the tasks view, add, edit and delete using these parameters to directly
+call the data.py > get_data, add_record, update_record, delete_record.
+There should not be separate get_tasks, add_tasks in the data.py
+"""
 
 # ----------------------------------------------------------------------------
 # Interface configuration

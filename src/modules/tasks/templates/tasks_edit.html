@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <form method="POST">
+    <label>Title:</label><br>
+    <input type="text" name="title" value="{{ task.title if task else '' }}" required><br>
+    <label>Project:</label><br>
+    <input type="text" name="project" value="{{ task.project if task else 'General' }}"><br>
+    <label>Start Date:</label><br>
+    <input type="date" name="start_date" value="{{ task.start_date if task else '' }}"><br>
+    <label>Due Date:</label><br>
+    <input type="date" name="due_date" value="{{ task.due_date if task else '' }}"><br>
+    <label>Details:</label><br>
+    <textarea name="content" rows="6" cols="60">{{ task.content if task else '' }}</textarea><br><br>
+    <button type="submit">Save</button>
+  </form>
+{% endblock %}

@@ -35,7 +35,7 @@
               <span class="calendar-title-text">{{ ev.title }}</span>
               <span class="calendar-actions">
                 <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
-                <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id) }}" onclick="return confirm('Delete event?');">Del</a>
+                <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=year, month=month, proj=project) }}" onclick="return confirm('Delete event?');">Del</a>
               </span>
             </div>
             {% endfor %}

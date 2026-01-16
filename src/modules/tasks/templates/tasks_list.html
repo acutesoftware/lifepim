@@ -1,9 +1,27 @@
 {% extends "layout.html" %}
 {% block module_content %}
 <h1>Tasks</h1>
-  <a href="{{ url_for('notes.add_note_route') }}">➕ Add Task (TODO CHANGE URL)</a>
+  <a href="{{ url_for('tasks.add_task_route') }}">➕ Add Task</a>
 
-{% include "widgets/wid_tbl_list.html" %}
+<table border="1" cellpadding="5">
+  <tr>
+    <th>Title</th>
+    <th>Project</th>
+    <th>Start</th>
+    <th>Due</th>
+    <th>Actions</th>
+  </tr>
+  {% for task in tasks %}
+  <tr>
+    <td>{{ task.title }}</td>
+    <td>{{ task.project }}</td>
+    <td>{{ task.start_date }}</td>
+    <td>{{ task.due_date }}</td>
+    <td>
+      <a href="{{ url_for('tasks.edit_task_route', task_id=task.id) }}">Edit</a> |
+      <a href="{{ url_for('tasks.delete_task_route', task_id=task.id) }}" onclick="return confirm('Delete task?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
 {% endblock %}
-
-

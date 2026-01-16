@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('how.list_how_route', proj=project) }}">Back to list</a>
+  </div>
+  <table border="1" cellpadding="5">
+    {% for col in col_list %}
+    <tr>
+      <th>{{ col.replace('_', ' ') }}</th>
+      <td>{{ item[col] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p>
+    <a href="{{ url_for('how.edit_how_route', item_id=item.id, proj=project) }}">Edit</a> |
+    <a href="{{ url_for('how.delete_how_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+  </p>
+{% endblock %}

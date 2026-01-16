@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <a href="{{ url_for('files.add_file_route', proj=project) }}">Add File</a>
+
+<table border="1" cellpadding="5">
+  <tr>
+    {% for col in col_list %}
+    <th>{{ col.replace('_', ' ') }}</th>
+    {% endfor %}
+    <th>Actions</th>
+  </tr>
+  {% for item in items %}
+  <tr>
+    {% for col in col_list %}
+    <td>{{ item[col] }}</td>
+    {% endfor %}
+    <td>
+      <a href="{{ url_for('files.view_file_route', item_id=item.id, proj=project) }}">View</a> |
+      <a href="{{ url_for('files.edit_file_route', item_id=item.id, proj=project) }}">Edit</a> |
+      <a href="{{ url_for('files.delete_file_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,19 +1,37 @@
+import sys
+
 from flask import Flask, render_template
 from jinja2 import ChoiceLoader, FileSystemLoader
 
 from common.utils import get_tabs, get_side_tabs
 import common.config as mod_cfg
 
+def _dbg(msg):
+    print(f"[app] {msg}", file=sys.stderr, flush=True)
+
+
+_dbg("Creating Flask app")
 app = Flask(__name__)
 
 # Register blueprints
+_dbg("Importing blueprints")
 from modules.calendar.routes import calendar_bp
+from modules.data.routes import data_bp
+from modules.files.routes import files_bp
+from modules.goals.routes import goals_bp
+from modules.how.routes import how_bp
 from modules.notes.routes import notes_bp
 from modules.tasks.tasks import tasks_bp
 
+_dbg("Registering blueprints")
 app.register_blueprint(calendar_bp, url_prefix="/calendar")
+app.register_blueprint(data_bp, url_prefix="/data")
+app.register_blueprint(files_bp, url_prefix="/files")
+app.register_blueprint(goals_bp, url_prefix="/goals")
+app.register_blueprint(how_bp, url_prefix="/how")
 app.register_blueprint(notes_bp, url_prefix="/notes")
 app.register_blueprint(tasks_bp, url_prefix="/tasks")
+_dbg("Blueprints registered")
 
 @app.route('/')
 def index():

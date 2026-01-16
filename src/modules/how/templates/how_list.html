@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <a href="{{ url_for('how.add_how_route', proj=project) }}">Add How</a>
+
+<table border="1" cellpadding="5">
+  <tr>
+    {% for col in col_list %}
+    <th>{{ col.replace('_', ' ') }}</th>
+    {% endfor %}
+    <th>Actions</th>
+  </tr>
+  {% for item in items %}
+  <tr>
+    {% for col in col_list %}
+    <td>{{ item[col] }}</td>
+    {% endfor %}
+    <td>
+      <a href="{{ url_for('how.view_how_route', item_id=item.id, proj=project) }}">View</a> |
+      <a href="{{ url_for('how.edit_how_route', item_id=item.id, proj=project) }}">Edit</a> |
+      <a href="{{ url_for('how.delete_how_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

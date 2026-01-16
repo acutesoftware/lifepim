@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('files.list_files_route', proj=project) }}">Back to list</a>
+  </div>
+  <table border="1" cellpadding="5">
+    {% for col in col_list %}
+    <tr>
+      <th>{{ col.replace('_', ' ') }}</th>
+      <td>{{ item[col] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p>
+    <a href="{{ url_for('files.edit_file_route', item_id=item.id, proj=project) }}">Edit</a> |
+    <a href="{{ url_for('files.delete_file_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+  </p>
+
+  <h4>Explorer</h4>
+  {% if explorer_error %}
+    <p>{{ explorer_error }}</p>
+  {% else %}
+  <table border="1" cellpadding="5">
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Size</th>
+    </tr>
+    {% for entry in explorer_entries %}
+    <tr>
+      <td>{{ entry.name }}</td>
+      <td>{{ "Folder" if entry.is_dir else "File" }}</td>
+      <td>{% if not entry.is_dir %}{{ entry.size }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+{% endblock %}

@@ -7,7 +7,8 @@
   {% for n in notes %}
   <tr>
     <td>{{ n.title }}</td>
-    
+    <td>{{ n.project }}</td>
+    <td>{{ n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
     <td>
       <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">View</a> |
       <a href="{{ url_for('notes.edit_note_route', note_id=n.id) }}">Edit</a> |
