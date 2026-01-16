@@ -7,6 +7,8 @@ the live site but you get to choose which data gets uploaded to your lifepim
 account.
 
 ## Status
+working on web interface
+
 Under development - nothing significant works yet!
 
 2025 - restarting. Old code moved to N:\duncan\C\user\dev\src\python\z_bk_python\LifePIM_public_2024
