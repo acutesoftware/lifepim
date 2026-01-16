@@ -125,6 +125,110 @@ body {
   text-align: left;
 }
 
+.calendar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.calendar-title {
+  font-weight: bold;
+}
+
+.calendar-nav,
+.calendar-add-main {
+  padding: 2px 6px;
+  border: 1px solid #bbb;
+  background: #f8f8f8;
+  border-radius: 3px;
+  text-decoration: none;
+  color: #333;
+}
+
+.calendar-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.calendar-grid th {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  padding: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.calendar-cell {
+  border: 1px solid #ddd;
+  vertical-align: top;
+  height: 90px;
+  padding: 2px;
+}
+
+.calendar-cell.empty {
+  background: #fafafa;
+}
+
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+}
+
+.calendar-day-num {
+  font-size: 12px;
+  font-weight: bold;
+  color: #444;
+}
+
+.calendar-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.calendar-event {
+  background: #f9f9ff;
+  border: 1px solid #d8d8ef;
+  border-radius: 3px;
+  padding: 2px 3px;
+  font-size: 11px;
+}
+
+.calendar-time {
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.calendar-actions {
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+.calendar-actions a {
+  color: #444;
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.calendar-add {
+  align-self: flex-start;
+  font-size: 10px;
+  text-decoration: none;
+  color: #555;
+}
+
+.calendar-form input,
+.calendar-form textarea {
+  width: 100%;
+  max-width: 480px;
+}
+
 @media (max-width: 600px) {
   .side-tabs {
     width: 120px;

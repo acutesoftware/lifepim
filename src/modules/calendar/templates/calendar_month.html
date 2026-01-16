@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<div class="calendar-controls">
+  <a class="calendar-nav" href="{{ url_for('calendar.month_view_route', year=prev_year, month=prev_month, proj=project) }}">Prev</a>
+  <div class="calendar-title">{{ month_name }} {{ year }}</div>
+  <a class="calendar-nav" href="{{ url_for('calendar.month_view_route', year=next_year, month=next_month, proj=project) }}">Next</a>
+  <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', proj=project) }}">Add Event</a>
+</div>
+
+<table class="calendar-grid">
+  <thead>
+    <tr>
+      <th>Mon</th>
+      <th>Tue</th>
+      <th>Wed</th>
+      <th>Thu</th>
+      <th>Fri</th>
+      <th>Sat</th>
+      <th>Sun</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for week in month_weeks %}
+    <tr>
+      {% for day in week %}
+      <td class="calendar-cell {% if day == 0 %}empty{% endif %}">
+        {% if day != 0 %}
+        {% set day_str = "%04d-%02d-%02d"|format(year, month, day) %}
+        <div class="calendar-day">
+          <div class="calendar-day-num">{{ day }}</div>
+          <div class="calendar-events">
+            {% for ev in events_by_day.get(day, []) %}
+            <div class="calendar-event">
+              {% if ev.time %}<span class="calendar-time">{{ ev.time }}</span>{% endif %}
+              <span class="calendar-title-text">{{ ev.title }}</span>
+              <span class="calendar-actions">
+                <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
+                <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id) }}" onclick="return confirm('Delete event?');">Del</a>
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+          <a class="calendar-add" href="{{ url_for('calendar.add_event_route', date=day_str, proj=project) }}">+ Add</a>
+        </div>
+        {% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

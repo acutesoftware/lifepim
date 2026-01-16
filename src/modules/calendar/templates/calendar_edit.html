@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<form method="POST" class="calendar-form">
+  <label>Title:</label><br>
+  <input type="text" name="title" value="{{ event.title if event else '' }}" required><br>
+  <label>Date:</label><br>
+  <input type="date" name="date" value="{{ event.date if event else default_date }}" required><br>
+  <label>Time:</label><br>
+  <input type="time" name="time" value="{{ event.time if event else '' }}"><br>
+  <label>Project:</label><br>
+  <input type="text" name="project" value="{{ event.project if event else default_project }}"><br>
+  <label>Details:</label><br>
+  <textarea name="detail" rows="6" cols="60">{{ event.detail if event else '' }}</textarea><br><br>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

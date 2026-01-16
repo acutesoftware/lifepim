@@ -20,3 +20,4 @@ coverage.xml
 .coveralls.yml
 
 venv2/
+.venv/

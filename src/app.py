@@ -7,9 +7,11 @@ import common.config as mod_cfg
 app = Flask(__name__)
 
 # Register blueprints
+from modules.calendar.routes import calendar_bp
 from modules.notes.routes import notes_bp
 from modules.tasks.tasks import tasks_bp
 
+app.register_blueprint(calendar_bp, url_prefix="/calendar")
 app.register_blueprint(notes_bp, url_prefix="/notes")
 app.register_blueprint(tasks_bp, url_prefix="/tasks")
 

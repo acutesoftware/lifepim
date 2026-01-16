@@ -49,6 +49,15 @@ git pull https://github.com/acutesoftware/lifepim.git
 pip install pycalendar
 ```
 
+
+### Setup Virtual Environment
+from the root folder
+
+```
+    python -m venv .venv                                  
+    .venv\Scripts\activate
+```
+
 ### Coding standards
 
 1. PEP8
