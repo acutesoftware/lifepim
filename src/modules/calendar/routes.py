@@ -46,6 +46,8 @@ def month_view_route():
     year = request.args.get("year", type=int) or today.year
     month = request.args.get("month", type=int) or today.month
     project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
 
     tbl = get_table_def("calendar")
     if not tbl:
@@ -54,7 +56,7 @@ def month_view_route():
         cols = ["id"] + tbl["col_list"]
         condition_parts = ["1=1"]
         params = []
-        if project and project not in ("any", "spacer"):
+        if project and project not in ("any", "spacer", "All", "all", "ALL"):
             condition_parts.append("project = ?")
             params.append(project)
         condition_parts.append("event_date LIKE ?")

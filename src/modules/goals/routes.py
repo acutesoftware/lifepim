@@ -30,6 +30,8 @@ def _load_item(item_id):
 @goals_bp.route("/")
 def list_goals_route():
     project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
     tbl = _get_tbl()
     items = []
     col_list = []
@@ -79,10 +81,15 @@ def view_goal_route(item_id):
 
 @goals_bp.route("/add", methods=["GET", "POST"])
 def add_goal_route():
-    project = request.args.get("proj")
+    project = request.args.get("proj") or "General"
     tbl = _get_tbl()
     if request.method == "POST" and tbl:
-        values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
+        values = []
+        for col in tbl["col_list"]:
+            if col == "project":
+                values.append(request.form.get(col, "").strip() or project)
+            else:
+                values.append(request.form.get(col, "").strip())
         db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
         return redirect(url_for("goals.list_goals_route", proj=project))
     fields = build_form_fields(tbl["col_list"]) if tbl else []

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from flask import Blueprint, render_template, request, redirect, url_for
 
@@ -29,32 +30,139 @@ def _load_item(item_id):
     return None
 
 
-def _list_directory(path_value):
-    if not path_value:
-        return [], "No path provided."
-    if not os.path.isdir(path_value):
-        return [], f"Path not found: {path_value}"
-    entries = []
+def _list_drives():
+    drives = []
+    for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        path = f"{letter}:\\"
+        if os.path.exists(path):
+            drives.append(path)
+    return drives
+
+
+def _build_tree(base_path, rel_path="", max_depth=3):
+    full_path = _safe_join(base_path, rel_path) if rel_path else base_path
+    if max_depth < 0 or not os.path.isdir(full_path):
+        return []
+    nodes = []
     try:
-        with os.scandir(path_value) as it:
+        with os.scandir(full_path) as it:
             for entry in it:
-                info = entry.stat()
-                entries.append(
-                    {
-                        "name": entry.name,
-                        "is_dir": entry.is_dir(),
-                        "size": info.st_size,
-                    }
-                )
+                if entry.is_dir():
+                    child_rel = os.path.join(rel_path, entry.name) if rel_path else entry.name
+                    nodes.append(
+                        {
+                            "name": entry.name,
+                            "rel_path": child_rel,
+                            "children": _build_tree(base_path, child_rel, max_depth - 1),
+                        }
+                    )
+    except Exception:
+        return []
+    nodes.sort(key=lambda row: row["name"].lower())
+    return nodes
+
+
+def _list_folders(base_path):
+    if not base_path:
+        return [], "No path provided."
+    if not os.path.isdir(base_path):
+        return [], f"Path not found: {base_path}"
+    try:
+        tree = _build_tree(base_path)
     except Exception as exc:
         return [], f"Unable to read directory: {exc}"
-    entries.sort(key=lambda row: (not row["is_dir"], row["name"].lower()))
+    return tree, ""
+
+
+def _list_files(folder_path):
+    if not folder_path:
+        return [], "No folder selected."
+    if not os.path.isdir(folder_path):
+        return [], f"Path not found: {folder_path}"
+    entries = []
+    try:
+        with os.scandir(folder_path) as it:
+            for entry in it:
+                if entry.is_file():
+                    info = entry.stat()
+                    entries.append(
+                        {
+                            "name": entry.name,
+                            "full_path": entry.path,
+                            "size": info.st_size,
+                            "modified": datetime.fromtimestamp(info.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                    )
+    except Exception as exc:
+        return [], f"Unable to read files: {exc}"
+    entries.sort(key=lambda row: row["name"].lower())
     return entries, ""
+
+
+def _safe_join(base_path, rel_path):
+    if not rel_path:
+        return base_path
+    cleaned = rel_path.replace("/", os.sep).replace("\\", os.sep)
+    return os.path.normpath(os.path.join(base_path, cleaned))
+
+
+def _normalize_drive(drive_value):
+    if not drive_value:
+        return ""
+    if len(drive_value) == 2 and drive_value[1] == ":":
+        return f"{drive_value}\\"
+    return drive_value
+
+
+def _rel_path(base_path, full_path):
+    try:
+        return os.path.relpath(full_path, base_path)
+    except ValueError:
+        return ""
+
+
+@files_bp.route("/tree")
+def tree_view_route():
+    base_path = _normalize_drive(request.args.get("drive") or "")
+    rel_dir = request.args.get("dir") or ""
+    if not base_path:
+        return {"nodes": [], "error": "No drive selected."}
+    folder_path = _safe_join(base_path, rel_dir)
+    if not os.path.isdir(folder_path):
+        return {"nodes": [], "error": f"Path not found: {folder_path}"}
+    nodes = []
+    try:
+        with os.scandir(folder_path) as it:
+            for entry in it:
+                if entry.is_dir():
+                    nodes.append(
+                        {
+                            "name": entry.name,
+                            "rel_path": _rel_path(base_path, entry.path),
+                        }
+                    )
+    except Exception as exc:
+        return {"nodes": [], "error": f"Unable to read directory: {exc}"}
+    nodes.sort(key=lambda row: row["name"].lower())
+    return {"nodes": nodes, "error": ""}
+
+
+@files_bp.route("/list")
+def file_list_route():
+    base_path = _normalize_drive(request.args.get("base") or "")
+    rel_dir = request.args.get("dir") or ""
+    if not base_path:
+        return {"files": [], "error": "No base path provided."}
+    folder_path = _safe_join(base_path, rel_dir)
+    files, error = _list_files(folder_path)
+    return {"files": files, "error": error}
 
 
 @files_bp.route("/")
 def list_files_route():
     project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
     tbl = _get_tbl()
     items = []
     col_list = []
@@ -86,10 +194,16 @@ def list_files_route():
 @files_bp.route("/view/<int:item_id>")
 def view_file_route(item_id):
     project = request.args.get("proj")
+    selected_dir = request.args.get("dir")
+    drive = _normalize_drive(request.args.get("drive"))
     item = _load_item(item_id)
     if not item:
         return redirect(url_for("files.list_files_route", proj=project))
-    entries, explorer_error = _list_directory(item.get("path"))
+    base_path = drive or item.get("path", "")
+    drives = _list_drives()
+    selected_path = _safe_join(base_path, selected_dir)
+    files, files_error = _list_files(selected_path)
+    explorer_error = files_error
     return render_template(
         "files_view.html",
         active_tab="files",
@@ -100,17 +214,26 @@ def view_file_route(item_id):
         item=item,
         col_list=_get_tbl()["col_list"],
         project=project,
-        explorer_entries=entries,
+        file_list=files,
         explorer_error=explorer_error,
+        selected_dir=selected_dir,
+        base_path=base_path,
+        drives=drives,
+        selected_drive=drive,
     )
 
 
 @files_bp.route("/add", methods=["GET", "POST"])
 def add_file_route():
-    project = request.args.get("proj")
+    project = request.args.get("proj") or "General"
     tbl = _get_tbl()
     if request.method == "POST" and tbl:
-        values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
+        values = []
+        for col in tbl["col_list"]:
+            if col == "project":
+                values.append(request.form.get(col, "").strip() or project)
+            else:
+                values.append(request.form.get(col, "").strip())
         db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
         return redirect(url_for("files.list_files_route", proj=project))
     fields = build_form_fields(tbl["col_list"]) if tbl else []

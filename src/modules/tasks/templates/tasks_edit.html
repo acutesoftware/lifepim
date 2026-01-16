@@ -4,7 +4,7 @@
     <label>Title:</label><br>
     <input type="text" name="title" value="{{ task.title if task else '' }}" required><br>
     <label>Project:</label><br>
-    <input type="text" name="project" value="{{ task.project if task else 'General' }}"><br>
+    <input type="text" name="project" value="{{ task.project if task else project }}"><br>
     <label>Start Date:</label><br>
     <input type="date" name="start_date" value="{{ task.start_date if task else '' }}"><br>
     <label>Due Date:</label><br>

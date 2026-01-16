@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block module_content %}
 <h1>Tasks</h1>
-  <a href="{{ url_for('tasks.add_task_route') }}">➕ Add Task</a>
+  <a href="{{ url_for('tasks.add_task_route', proj=project) }}">ホ Add Task</a>
 
 <table border="1" cellpadding="5">
   <tr>

@@ -21,8 +21,12 @@
     </div>
 
     <div class="top-nav-container">
+      {% set current_proj = request.args.get('proj') %}
+      {% if current_proj in ['any', 'All', 'all', 'ALL', 'spacer'] %}
+        {% set current_proj = None %}
+      {% endif %}
       {% for t in tabs %}
-        <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="/{{t.id}}" title="{{t.desc}}">
+        <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="/{{t.id}}{% if current_proj %}?proj={{ current_proj }}{% endif %}" title="{{t.desc}}">
           <span class="ic">{{t.icon}}</span><span class="lab">{{t.label}}</span>
         </a>
       {% endfor %}
@@ -32,7 +36,7 @@
   <div class="container">
     <aside class="side-tabs" id="sidebar">
       {% for s in side_tabs %}
-        <a class="side" href="/{{active_tab}}?proj={{s.id}}">
+        <a class="side" href="/{{active_tab}}{% if s.id not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{s.id}}{% endif %}">
           <span class="ic">{{s.icon}}</span>
           <span class="lab">{{s.label}}</span>
         </a>

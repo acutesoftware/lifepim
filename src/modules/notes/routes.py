@@ -12,6 +12,8 @@ notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
 @notes_bp.route('/')
 def list_notes_route():
     project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
     tbl = get_table_def("notes")
     if not tbl:
         notes = []
@@ -34,6 +36,7 @@ def list_notes_route():
         content_title=f"Notes ({project or 'All'})",
         content_html="",
         notes=notes,
+        project=project,
     )
 
 @notes_bp.route('/view/<int:note_id>')
@@ -66,14 +69,15 @@ def view_note_route(note_id):
 @notes_bp.route('/add', methods=["GET", "POST"])
 def add_note_route():
     tbl = get_table_def("notes")
+    project = request.args.get("proj") or "General"
     if request.method == "POST" and tbl:
         values = [
             request.form.get("title", "").strip(),
             request.form.get("content", "").strip(),
-            request.form.get("project", "General").strip() or "General",
+            request.form.get("project", "").strip() or project,
         ]
         data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
-        return redirect(url_for("notes.list_notes_route"))
+        return redirect(url_for("notes.list_notes_route", proj=project))
     return render_template(
         "note_edit.html",
         active_tab="notes",
@@ -81,6 +85,7 @@ def add_note_route():
         side_tabs=get_side_tabs(),
         content_title="Add Note",
         note=None,
+        project=project,
     )
 
 @notes_bp.route('/edit/<int:note_id>', methods=["GET", "POST"])

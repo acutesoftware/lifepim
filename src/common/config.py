@@ -68,7 +68,7 @@ proj_list = ['Dev','Design','Fun','Games','Family','Car',
 
 
 SIDE_TABS_GROUPS = [  # for possible sub folders
-    { 'icon': '*', 'id': 'ALL', 'sub_list': 'All Projects'},
+    { 'icon': '*', 'id': 'All', 'sub_list': 'All Projects'},
     { 'icon': '🔒', 'id': 'PERS', 'sub_list': 'Pers,Health,Home,Car,Family,Food'},
     { 'icon': '🎉', 'id': 'FUN', 'sub_list': 'games, travel, Music, movies, Books, Hobbies'},
     { 'icon': '💼', 'id': 'WORK', 'sub_list': 'Work,Business,Side Gigs,Commision'},
@@ -77,7 +77,7 @@ SIDE_TABS_GROUPS = [  # for possible sub folders
 ]
 
 SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
-    { 'icon': '*', 'id': 'any', 'label': 'All Projects'},
+    { 'icon': '*', 'id': 'All', 'label': 'All Projects'},
     { 'icon': '', 'id': 'spacer', 'label': 'PERS'}, 
 
     #{ 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},

@@ -4,7 +4,7 @@
     <label>Title:</label><br>
     <input type="text" name="title" value="{{ note.title if note else '' }}" required><br>
     <label>Project:</label><br>
-    <input type="text" name="project" value="{{ note.project if note else 'General' }}"><br>
+    <input type="text" name="project" value="{{ note.project if note else project }}"><br>
     <label>Content:</label><br>
     <textarea name="content" rows="6" cols="60">{{ note.content if note else '' }}</textarea><br><br>
     <button type="submit">Save</button>

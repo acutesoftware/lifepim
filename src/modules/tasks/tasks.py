@@ -21,6 +21,8 @@ def list_tasks():
 @tasks_bp.route('/')
 def list_tasks_route():
     project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
     tbl = get_table_def("tasks")
     if not tbl:
         task_list = []
@@ -41,22 +43,24 @@ def list_tasks_route():
         content_title=f"Tasks ({project or 'All'})",
         content_html="",
         tasks=task_list,
+        project=project,
     )
 
 
 @tasks_bp.route('/add', methods=["GET", "POST"])
 def add_task_route():
     tbl = get_table_def("tasks")
+    project = request.args.get("proj") or "General"
     if request.method == "POST" and tbl:
         values = [
             request.form.get("title", "").strip(),
             request.form.get("content", "").strip(),
-            request.form.get("project", "General").strip() or "General",
+            request.form.get("project", "").strip() or project,
             request.form.get("start_date", "").strip(),
             request.form.get("due_date", "").strip(),
         ]
         data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
-        return redirect(url_for("tasks.list_tasks_route"))
+        return redirect(url_for("tasks.list_tasks_route", proj=project))
     return render_template(
         "tasks_edit.html",
         active_tab="tasks",
@@ -64,6 +68,7 @@ def add_task_route():
         side_tabs=get_side_tabs(),
         content_title="Add Task",
         task=None,
+        project=project,
     )
 
 

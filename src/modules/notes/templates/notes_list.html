@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <a href="{{ url_for('notes.add_note_route') }}">➕ Add Note</a>
+  <a href="{{ url_for('notes.add_note_route', proj=project) }}">ホ Add Note</a>
 
 <table border="1" cellpadding="5">
   <tr><th>Title</th><th>Project</th><th>Created</th><th>Actions</th></tr>
@@ -16,5 +16,5 @@
     </td>
   </tr>
   {% endfor %}
-</table>  
+</table>
 {% endblock %}

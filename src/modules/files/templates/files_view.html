@@ -20,19 +20,234 @@
   {% if explorer_error %}
     <p>{{ explorer_error }}</p>
   {% else %}
-  <table border="1" cellpadding="5">
-    <tr>
-      <th>Name</th>
-      <th>Type</th>
-      <th>Size</th>
-    </tr>
-    {% for entry in explorer_entries %}
-    <tr>
-      <td>{{ entry.name }}</td>
-      <td>{{ "Folder" if entry.is_dir else "File" }}</td>
-      <td>{% if not entry.is_dir %}{{ entry.size }}{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <style>
+    .explorer-wrap { display: flex; gap: 16px; }
+    .folder-tree { list-style: none; padding-left: 12px; margin: 0; }
+    .folder-tree .node { margin: 2px 0; }
+    .folder-toggle { cursor: pointer; display: inline-block; width: 20px; }
+    .folder-link { text-decoration: none; }
+    .folder-selected { font-weight: bold; }
+    .file-list { list-style: none; padding: 0; margin: 0; }
+    .file-list li { padding: 4px 0; cursor: pointer; }
+    .drive-select { margin-bottom: 8px; }
+  </style>
+
+  <div class="explorer-wrap">
+    <div style="flex:1;">
+      <h5>Folders</h5>
+      <form class="drive-select" method="get">
+        <input type="hidden" name="proj" value="{{ project or '' }}">
+        <label for="drive">Drive:</label>
+        <select id="drive" name="drive" onchange="this.form.submit()">
+          {% for drive in drives %}
+          <option value="{{ drive }}" {% if drive == selected_drive %}selected{% endif %}>{{ drive }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <div id="folder-root" data-base="{{ base_path }}" data-proj="{{ project or '' }}" data-item="{{ item.id }}" data-selected="{{ selected_dir or '' }}">
+        <div class="node">
+          <span class="folder-toggle" data-dir="">[+]</span>
+          <a class="folder-link {% if not selected_dir %}folder-selected{% endif %}"
+             href="{{ url_for('files.view_file_route', item_id=item.id, proj=project, drive=selected_drive) }}">
+            {{ base_path }}
+          </a>
+          <ul class="folder-tree" data-container=""></ul>
+        </div>
+      </div>
+    </div>
+    <div style="flex:2;">
+      <h5>Files</h5>
+      <ul class="file-list" id="file-list">
+        {% for file in file_list %}
+        <li class="file-row"
+            data-name="{{ file.name }}"
+            data-size="{{ file.size }}"
+            data-path="{{ file.full_path }}"
+            data-modified="{{ file.modified }}">
+          {{ file.name }}{% if file.size %} ({{ file.size }}){% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+
+      <h5>File Details</h5>
+      <table border="1" cellpadding="5" width="100%" id="file-details">
+        <tr><th>Name</th><td id="detail-name">Select a file</td></tr>
+        <tr><th>Full Path</th><td id="detail-path"></td></tr>
+        <tr><th>Size</th><td id="detail-size"></td></tr>
+        <tr><th>Modified</th><td id="detail-modified"></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const folderRoot = document.getElementById('folder-root');
+    const basePath = folderRoot.dataset.base;
+    const proj = folderRoot.dataset.proj;
+    const itemId = folderRoot.dataset.item;
+    const selectedDir = folderRoot.dataset.selected;
+    const drive = document.getElementById('drive').value;
+
+    function buildNode(node) {
+      const li = document.createElement('li');
+      li.className = 'node';
+      const toggle = document.createElement('span');
+      toggle.className = 'folder-toggle';
+      toggle.textContent = '[+]';
+      toggle.dataset.dir = node.rel_path;
+      toggle.addEventListener('click', () => toggleNode(toggle));
+
+      const link = document.createElement('a');
+      link.className = 'folder-link';
+      link.href = `/files/view/${itemId}?dir=${encodeURIComponent(node.rel_path)}&drive=${encodeURIComponent(drive)}${proj ? `&proj=${encodeURIComponent(proj)}` : ''}`;
+      link.textContent = node.name;
+      if (node.rel_path === selectedDir) {
+        link.classList.add('folder-selected');
+      }
+      link.addEventListener('click', async (evt) => {
+        evt.preventDefault();
+        toggle.textContent = '[-]';
+        const childContainer = toggle.parentElement.querySelector('ul.folder-tree');
+        if (childContainer && childContainer.childElementCount === 0) {
+          await loadChildren(node.rel_path, childContainer);
+        }
+        if (childContainer) {
+          childContainer.style.display = 'block';
+        }
+        setSelectedFolder(node.rel_path);
+        await loadFiles(node.rel_path);
+        window.history.replaceState({}, '', link.href);
+      });
+
+      const children = document.createElement('ul');
+      children.className = 'folder-tree';
+      children.dataset.container = node.rel_path;
+
+      li.appendChild(toggle);
+      li.appendChild(link);
+      li.appendChild(children);
+      return li;
+    }
+
+    async function loadChildren(dir, container) {
+      const url = `/files/tree?drive=${encodeURIComponent(drive)}&dir=${encodeURIComponent(dir)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) {
+        container.textContent = data.error;
+        return;
+      }
+      container.innerHTML = '';
+      data.nodes.forEach((node) => {
+        container.appendChild(buildNode(node));
+      });
+    }
+
+    function toggleNode(toggle) {
+      const dir = toggle.dataset.dir || '';
+      const container = toggle.parentElement.querySelector('ul.folder-tree');
+      if (!container) {
+        return;
+      }
+      if (container.childElementCount > 0) {
+        const isOpen = toggle.textContent === '[-]';
+        toggle.textContent = isOpen ? '[+]' : '[-]';
+        container.style.display = isOpen ? 'none' : 'block';
+        return;
+      }
+      toggle.textContent = '[-]';
+      loadChildren(dir, container);
+    }
+
+    async function expandPath(relPath) {
+      if (!relPath) {
+        return;
+      }
+      const parts = relPath.split(/[/\\]+/).filter(Boolean);
+      let current = "";
+      let container = document.querySelector('ul.folder-tree[data-container=""]');
+      for (const part of parts) {
+        if (!container) {
+          break;
+        }
+        if (container.childElementCount === 0) {
+          await loadChildren(current, container);
+        }
+        current = current ? `${current}\\${part}` : part;
+        const toggle = container.querySelector(`.folder-toggle[data-dir="${current.replace(/"/g, '\\"')}"]`);
+        if (!toggle) {
+          break;
+        }
+        toggle.textContent = '[-]';
+        const childContainer = toggle.parentElement.querySelector('ul.folder-tree');
+        if (childContainer) {
+          childContainer.style.display = 'block';
+          container = childContainer;
+        }
+      }
+    }
+
+    const rootToggle = document.querySelector('.folder-toggle[data-dir=""]');
+    if (rootToggle) {
+      rootToggle.addEventListener('click', () => toggleNode(rootToggle));
+      toggleNode(rootToggle);
+    }
+    expandPath(selectedDir);
+
+    function setSelectedFolder(relPath) {
+      document.querySelectorAll('.folder-link.folder-selected').forEach((el) => {
+        el.classList.remove('folder-selected');
+      });
+      const selected = document.querySelector(`.folder-link[href*="dir=${encodeURIComponent(relPath)}"]`);
+      if (selected) {
+        selected.classList.add('folder-selected');
+      }
+    }
+
+    function renderFiles(files) {
+      const list = document.getElementById('file-list');
+      list.innerHTML = '';
+      files.forEach((file) => {
+        const li = document.createElement('li');
+        li.className = 'file-row';
+        li.dataset.name = file.name;
+        li.dataset.size = file.size;
+        li.dataset.path = file.full_path;
+        li.dataset.modified = file.modified;
+        li.textContent = file.size ? `${file.name} (${file.size})` : file.name;
+        list.appendChild(li);
+      });
+      bindFileRows();
+    }
+
+    async function loadFiles(relPath) {
+      const url = `/files/list?base=${encodeURIComponent(basePath)}&dir=${encodeURIComponent(relPath || '')}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) {
+        renderFiles([]);
+        nameEl.textContent = data.error;
+        return;
+      }
+      renderFiles(data.files);
+    }
+
+    const nameEl = document.getElementById('detail-name');
+    const pathEl = document.getElementById('detail-path');
+    const sizeEl = document.getElementById('detail-size');
+    const modEl = document.getElementById('detail-modified');
+
+    function bindFileRows() {
+      document.querySelectorAll('.file-row').forEach((row) => {
+        row.addEventListener('click', () => {
+          nameEl.textContent = row.dataset.name || '';
+          pathEl.textContent = row.dataset.path || '';
+          sizeEl.textContent = row.dataset.size || '';
+          modEl.textContent = row.dataset.modified || '';
+        });
+      });
+    }
+
+    bindFileRows();
+  </script>
   {% endif %}
 {% endblock %}
