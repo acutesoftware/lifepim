@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <a href="{{ url_for('data.add_data_route', proj=project) }}">Add Data</a>
+  <a href="{{ url_for('data.import_data_db_route', proj=project) }}">Import Databases</a>
 
 <table border="1" cellpadding="5">
   <tr>

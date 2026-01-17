@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Back to Media</a>
+  </div>
+  <table border="1" cellpadding="5">
+    {% for key, value in item.items() %}
+    <tr>
+      <th>{{ key.replace('_', ' ') }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div style="margin-top:8px;">
+    {% if not file_exists %}
+      <p>File not found: {{ item.path }}{{ item.file_name }}</p>
+    {% elif is_video %}
+      <video controls style="max-width:100%;">
+        <source src="{{ media_url }}">
+      </video>
+    {% else %}
+      <img src="{{ media_url }}" alt="{{ item.file_name }}" style="max-width:100%;">
+    {% endif %}
+  </div>
+{% endblock %}

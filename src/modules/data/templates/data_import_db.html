@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="calendar-controls">
+    <a class="calendar-add-main" href="{{ url_for('data.list_data_route', proj=project) }}">Back to Data</a>
+  </div>
+
+  <form method="POST">
+    <label>SQLite DB File Paths (one per line):</label><br>
+    <textarea name="db_paths" rows="8" cols="80" placeholder="C:\path\to\file.db"></textarea><br><br>
+    <button type="submit">Import Databases</button>
+    <hr>
+    <label>SQLite DB Folder:</label><br>
+    <input type="text" name="db_folder" placeholder="C:\path\to\folder"><br><br>
+    <button type="submit" formaction="{{ url_for('data.import_data_db_folder_route', proj=project) }}">Import Folder</button>
+    {% if error %}
+      <p>{{ error }}</p>
+    {% endif %}
+    {% if imported is not none %}
+      <p>Imported {{ imported }} databases.</p>
+    {% endif %}
+  </form>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('media.list_media_list_route', proj=project) }}">List</a> |
+    <a href="{{ url_for('media.list_media_grid_route', proj=project) }}">Grid</a> |
+    <a href="{{ url_for('media.import_media_route', proj=project) }}">Add Media</a>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-top:8px;">
+    {% for item in items %}
+    <div style="border:1px solid #ccc; border-radius:6px; padding:6px;">
+      <a href="{{ url_for('media.view_media_route', item_id=item.id, proj=project) }}">
+        {% if item.is_video %}
+          <video muted style="max-width:100%; max-height:120px;">
+            <source src="{{ item.media_url }}">
+          </video>
+        {% else %}
+          <img src="{{ item.media_url }}" alt="{{ item.file_name }}" style="max-width:100%; max-height:120px;">
+        {% endif %}
+      </a>
+      <div style="font-size:11px; color:#666;">{{ item.file_name }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="margin-top:8px;">
+    {% if page > 1 %}
+      <a href="{{ url_for('media.list_media_grid_route', proj=project, page=page-1) }}">Prev</a>
+    {% endif %}
+    {% if has_next %}
+      <a href="{{ url_for('media.list_media_grid_route', proj=project, page=page+1) }}">Next</a>
+    {% endif %}
+  </div>
+{% endblock %}

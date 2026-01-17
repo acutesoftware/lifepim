@@ -5,3 +5,8 @@ REM be moved to requirements.txt and proper setup - for now, run this
 
 pip install flask
 pip install pandas
+
+pip install markdown
+
+
+

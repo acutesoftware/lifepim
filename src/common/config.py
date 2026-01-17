@@ -42,12 +42,17 @@ table_def = [
 	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['title','content', 'project']},
 	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'project', 'start_date', 'due_date']},
 	{'name':'lp_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
+	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
+	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'artist', 'album', 'song', 'project']},
 
 	{'name':'lp_goals', 'route':'goals', 'display_name':'Goals', 'col_list':['parent_goal_id', 'title','description', 'goal_date', 'remind_date', 'project']},
 	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'project']},
 	{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'project']},
 	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'file_type', 'project']},
+
+	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
 	
+
 ]
 
 """

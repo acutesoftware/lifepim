@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Back to Media</a>
+  </div>
+
+  <form method="POST">
+    <label>Media Folder:</label><br>
+    <input type="text" name="media_folder" placeholder="C:\path\to\folder"><br><br>
+    <button type="submit">Import Media</button>
+    {% if error %}
+      <p>{{ error }}</p>
+    {% endif %}
+    {% if imported is not none %}
+      <p>Imported {{ imported }} files.</p>
+    {% endif %}
+  </form>
+{% endblock %}

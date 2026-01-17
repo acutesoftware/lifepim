@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('audio.list_audio_table_route', proj=project) }}">Back to Audio</a>
+  </div>
+
+  <form method="POST">
+    <label>Audio Folder:</label><br>
+    <input type="text" name="audio_folder" placeholder="C:\path\to\folder"><br><br>
+    <button type="submit">Import Audio</button>
+    {% if error %}
+      <p>{{ error }}</p>
+    {% endif %}
+    {% if imported is not none %}
+      <p>Imported {{ imported }} files.</p>
+    {% endif %}
+  </form>
+{% endblock %}

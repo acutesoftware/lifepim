@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('audio.list_audio_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('audio.list_audio_list_route', proj=project) }}">List</a> |
+    <a href="{{ url_for('audio.import_audio_route', proj=project) }}">Add Audio</a>
+  </div>
+
+<table border="1" cellpadding="5">
+  <tr>
+    {% for col in col_list %}
+    {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
+    <th>
+      <a href="{{ url_for('audio.list_audio_table_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    {% endfor %}
+  </tr>
+  {% for item in items %}
+  <tr>
+    {% for col in col_list %}
+    <td>
+      {% if col == 'file_name' %}
+      <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item[col] }}</a>
+      {% else %}
+      {{ item[col] }}
+      {% endif %}
+    </td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

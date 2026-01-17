@@ -15,4 +15,41 @@
     <a href="{{ url_for('data.edit_data_route', item_id=item.id, proj=project) }}">Edit</a> |
     <a href="{{ url_for('data.delete_data_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
   </p>
+
+  {% if is_sqlite %}
+  <div style="display:flex; gap:12px; margin-top:8px;">
+    <div style="flex:1;">
+      <h4>Tables</h4>
+      <ul style="list-style:none; padding:0; margin:0;">
+        {% for tbl in db_tables %}
+        <li>
+          <a href="{{ url_for('data.view_data_route', item_id=item.id, proj=project, table=tbl) }}"
+             {% if tbl == selected_table %}style="font-weight:bold;"{% endif %}>{{ tbl }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div style="flex:2;">
+      {% if selected_table %}
+      <h4>{{ selected_table }} (top 10 rows)</h4>
+      <table border="1" cellpadding="5">
+        <tr>
+          {% for col in db_preview_cols %}
+          <th>{{ col }}</th>
+          {% endfor %}
+        </tr>
+        {% for row in db_preview_rows %}
+        <tr>
+          {% for val in row %}
+          <td>{{ val }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <p>Select a table to preview.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 {% endblock %}

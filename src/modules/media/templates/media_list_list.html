@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('media.list_media_list_route', proj=project) }}">List</a> |
+    <a href="{{ url_for('media.list_media_grid_route', proj=project) }}">Grid</a> |
+    <a href="{{ url_for('media.import_media_route', proj=project) }}">Add Media</a>
+  </div>
+
+  <ul style="list-style:none; padding:0; margin:8px 0;">
+    {% for item in items %}
+    <li style="padding:4px 0;">
+      <a href="{{ url_for('media.view_media_route', item_id=item.id, proj=project) }}">{{ item.file_name }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+{% endblock %}

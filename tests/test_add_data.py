@@ -158,6 +158,40 @@ class TestAddData(unittest.TestCase):
         fetched = _fetch_ids(tbl, ids)
         self.assertEqual(len(fetched), len(ids))
 
+    def test_08_media(self):
+        tbl = utils.get_table_def("media")
+        self.assertIsNotNone(tbl)
+        rows = [
+            ["video.mp4", r"E:\\BK_fangorn\\photo\\__Downloads\\music_videos", "video", "444", "2014-01-02", "800", "800", ""],
+            ["photo_153.JPG", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "image", "444", "2014-01-02", "800", "800", ""],
+            ["photo_134.MOV", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "video", "444", "2014-01-02", "800", "800", ""],
+            ["photo_141.JPG", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "image", "444", "2014-01-02", "800", "800", ""],
+            ["clip_001.MOV", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "video", "", "", "", "", ""],
+            ["photo_001.JPG", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "image", "", "", "", "", ""],
+        ]
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
+
+
+    def test_08_media(self):
+        # 	col_list ['file_name','path', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
+
+        tbl = utils.get_table_def("media")
+        self.assertIsNotNone(tbl)
+        rows = [
+            ["video_BE DEUTSCH! [Achtung! Germans on the rise!] _ NEO MAGAZIN ROYALE mit Jan Böhmermann - ZDFneo-HMQkV5cTuoY.mp4", r"E:\\BK_fangorn\\photo\\__Downloads\\music_videos", "444", "2014-01-02", "800", "800", ""],
+            ["moving-to-glenelg 153.JPG", r"E:\BK_fangorn\photo\travel\Glenelg\beach", "444", "2014-01-02", "800", "800", ""],
+            ["moving-to-glenelg 134.MOV", r"E:\BK_fangorn\photo\travel\Glenelg\beach", "444", "2014-01-02", "800", "800", ""],
+            ["moving-to-glenelg 141.JPG", r"E:\BK_fangorn\photo\travel\Glenelg\beach", "444", "2014-01-02", "800", "800", ""],
+
+        ]
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
+
 
 if __name__ == '__main__':
     unittest.main()
