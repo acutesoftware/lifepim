@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from flask import Blueprint, render_template, request, redirect, url_for, make_response
@@ -26,6 +27,7 @@ def _fetch_notes(project):
     notes = [dict(row) for row in rows]
     for note in notes:
         note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
+        note["date_modified_dt"] = _parse_datetime(note.get("date_modified")) or note["updated"]
     return notes
 
 
@@ -37,7 +39,7 @@ def list_notes_route():
     view_pref = request.cookies.get("notes_view")
     if view_pref in ("list", "cards"):
         return redirect(url_for(f"notes.list_notes_{view_pref}_route", proj=project))
-    sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "updated"
+    sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
     notes = _sort_notes(_fetch_notes(project), sort_col, sort_dir)
     resp = make_response(
@@ -66,7 +68,7 @@ def list_notes_table_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
-    sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "updated"
+    sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
     notes = _sort_notes(_fetch_notes(project), sort_col, sort_dir)
     resp = make_response(
@@ -119,7 +121,7 @@ def list_notes_cards_route():
         project = None
     notes = _fetch_notes(project)
     card_values = [
-        [n.get("title"), n.get("content"), url_for("notes.view_note_route", note_id=n.get("id"))]
+        [n.get("file_name"), n.get("path"), url_for("notes.view_note_route", note_id=n.get("id"))]
         for n in notes
     ]
     resp = make_response(
@@ -157,23 +159,31 @@ def view_note_route(note_id):
             note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
     if not note:
         return redirect(url_for("notes.list_notes_route"))
+    note_path = _build_note_path(note)
+    file_exists = note_path and os.path.isfile(note_path)
+    note_text = ""
+    if file_exists:
+        note_text = _read_note_file(note_path)
     content_html = ""
     hex_rows = []
     if render_mode == "markdown":
-        content_html = markdown_utils.render_markdown(note.get("content", ""))
+        content_html = markdown_utils.render_markdown(note_text)
     elif render_mode == "hex":
-        hex_rows = hex_utils.hex_dump(note.get("content", ""))
+        hex_rows = hex_utils.hex_dump(note_text)
     return render_template(
         "note_view.html",
         active_tab="notes",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
         note=note,
-        content_title=note["title"],
+        content_title=note.get("file_name") or "Note",
         content_html="",
         render_mode=render_mode,
         content_html_rendered=content_html,
         hex_rows=hex_rows,
+        note_text=note_text,
+        file_exists=file_exists,
+        note_path=note_path,
     )
 
 @notes_bp.route('/add', methods=["GET", "POST"])
@@ -181,11 +191,18 @@ def add_note_route():
     tbl = get_table_def("notes")
     project = request.args.get("proj") or "General"
     if request.method == "POST" and tbl:
-        values = [
-            request.form.get("title", "").strip(),
-            request.form.get("content", "").strip(),
-            request.form.get("project", "").strip() or project,
-        ]
+        form_values = {col: request.form.get(col, "").strip() for col in tbl["col_list"]}
+        if not form_values.get("project"):
+            form_values["project"] = project
+        note_path = _build_note_path(form_values)
+        if note_path and os.path.isfile(note_path):
+            if not form_values.get("size"):
+                form_values["size"] = str(os.path.getsize(note_path))
+            if not form_values.get("date_modified"):
+                form_values["date_modified"] = datetime.fromtimestamp(
+                    os.path.getmtime(note_path)
+                ).strftime("%Y-%m-%d %H:%M:%S")
+        values = [form_values.get(col, "") for col in tbl["col_list"]]
         data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
         return redirect(url_for("notes.list_notes_route", proj=project))
     return render_template(
@@ -214,11 +231,18 @@ def edit_note_route(note_id):
             note = dict(rows[0])
             note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
     if request.method == "POST" and tbl:
-        values = [
-            request.form.get("title", "").strip(),
-            request.form.get("content", "").strip(),
-            request.form.get("project", "General").strip() or "General",
-        ]
+        form_values = {col: request.form.get(col, "").strip() for col in tbl["col_list"]}
+        if not form_values.get("project"):
+            form_values["project"] = "General"
+        note_path = _build_note_path(form_values)
+        if note_path and os.path.isfile(note_path):
+            if not form_values.get("size"):
+                form_values["size"] = str(os.path.getsize(note_path))
+            if not form_values.get("date_modified"):
+                form_values["date_modified"] = datetime.fromtimestamp(
+                    os.path.getmtime(note_path)
+                ).strftime("%Y-%m-%d %H:%M:%S")
+        values = [form_values.get(col, "") for col in tbl["col_list"]]
         data.update_record(data.conn, tbl["name"], note_id, tbl["col_list"], values)
         return redirect(url_for("notes.view_note_route", note_id=note_id))
     return render_template(
@@ -227,7 +251,7 @@ def edit_note_route(note_id):
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
         note=note,
-        content_title=f"Edit: {note['title']}" if note else "Edit Note",
+        content_title=f"Edit: {note.get('file_name')}" if note else "Edit Note",
     )
 
 @notes_bp.route('/delete/<int:note_id>')
@@ -297,24 +321,31 @@ def import_notes_folder_route():
     imported = None
     error = ""
     if request.method == "POST":
-        uploaded_files = request.files.getlist("folder_files")
-        if not uploaded_files:
-            error = "No files uploaded."
+        folder_path = request.form.get("notes_folder", "").strip()
+        if not folder_path:
+            error = "No folder provided."
+        elif not os.path.isdir(folder_path):
+            error = "Folder not found."
         elif not tbl:
             error = "Notes table not found."
         else:
             count = 0
-            for file_obj in uploaded_files:
-                filename = file_obj.filename or ""
-                if not filename.lower().endswith(".md"):
+            for name in os.listdir(folder_path):
+                if not name.lower().endswith(".md"):
                     continue
-                base_name = filename.replace("\\", "/").split("/")[-1]
-                title = base_name.rsplit(".", 1)[0]
-                try:
-                    content = file_obj.stream.read().decode("utf-8", errors="ignore")
-                except Exception:
-                    content = ""
-                values = [title, content, project]
+                full_path = os.path.join(folder_path, name)
+                if not os.path.isfile(full_path):
+                    continue
+                values_map = {
+                    "file_name": name,
+                    "path": folder_path,
+                    "size": str(os.path.getsize(full_path)),
+                    "date_modified": datetime.fromtimestamp(os.path.getmtime(full_path)).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    "project": project,
+                }
+                values = [values_map.get(col, "") for col in tbl["col_list"]]
                 record_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
                 if record_id:
                     count += 1
@@ -347,10 +378,40 @@ def _parse_datetime(value):
 
 def _sort_notes(notes, sort_col, sort_dir):
     key_map = {
-        "title": lambda n: (n.get("title") or "").lower(),
+        "file_name": lambda n: (n.get("file_name") or "").lower(),
+        "path": lambda n: (n.get("path") or "").lower(),
+        "size": lambda n: _parse_size(n.get("size")),
         "project": lambda n: (n.get("project") or "").lower(),
+        "date_modified": lambda n: n.get("date_modified_dt") or datetime.min,
         "updated": lambda n: n.get("updated") or datetime.min,
     }
     key_fn = key_map.get(sort_col, key_map["updated"])
     reverse = sort_dir == "desc"
     return sorted(notes, key=key_fn, reverse=reverse)
+
+
+def _build_note_path(note):
+    file_name = (note.get("file_name") or "").strip()
+    path = (note.get("path") or "").strip()
+    if path and file_name:
+        return os.path.join(path, file_name)
+    if file_name and os.path.isabs(file_name):
+        return file_name
+    return path or file_name
+
+
+def _read_note_file(note_path):
+    try:
+        with open(note_path, "r", encoding="utf-8", errors="replace") as handle:
+            return handle.read()
+    except OSError:
+        return ""
+
+
+def _parse_size(value):
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0

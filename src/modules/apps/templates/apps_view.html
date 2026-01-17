@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('apps.list_apps_table_route', proj=project) }}">Back to Apps</a>
+  </div>
+  <table border="1" cellpadding="5">
+    {% for key, value in item.items() %}
+    <tr>
+      <th>{{ key.replace('_', ' ') }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

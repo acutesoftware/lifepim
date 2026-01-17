@@ -11,6 +11,10 @@
     {% for item in items %}
     <li style="padding:4px 0;">
       <a href="{{ url_for('media.view_media_route', item_id=item.id, proj=project) }}">{{ item.file_name }}</a>
+      <span>
+        <a href="{{ url_for('media.edit_media_route', item_id=item.id, proj=project) }}">Edit</a> |
+        <a href="{{ url_for('media.delete_media_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+      </span>
     </li>
     {% endfor %}
   </ul>

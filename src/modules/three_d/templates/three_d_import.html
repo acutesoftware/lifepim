@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('three_d.list_3d_table_route', proj=project) }}">Back to 3D</a>
+  </div>
+
+  <form method="POST">
+    <label>.blend Folder:</label><br>
+    <input type="text" name="blend_folder" placeholder="C:\path\to\folder"><br><br>
+    <button type="submit">Import .blend Files</button>
+    {% if error %}
+      <p>{{ error }}</p>
+    {% endif %}
+    {% if imported is not none %}
+      <p>Imported {{ imported }} files.</p>
+    {% endif %}
+  </form>
+{% endblock %}

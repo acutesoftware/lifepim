@@ -1,7 +1,7 @@
 import mimetypes
 import os
 
-from flask import Blueprint, render_template, request, url_for, send_file, abort
+from flask import Blueprint, render_template, request, url_for, send_file, abort, redirect
 
 from common import data as db
 from common.utils import get_side_tabs, get_table_def, get_tabs
@@ -163,6 +163,41 @@ def view_audio_route(item_id):
         audio_url=audio_url,
         file_exists=os.path.exists(full_path),
     )
+
+
+@audio_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
+def edit_audio_route(item_id):
+    project = request.args.get("proj")
+    tbl = _get_tbl()
+    item = None
+    if tbl:
+        rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [item_id])
+        if rows:
+            item = dict(rows[0])
+    if request.method == "POST" and tbl:
+        values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
+        db.update_record(db.conn, tbl["name"], item_id, tbl["col_list"], values)
+        return redirect(url_for("audio.view_audio_route", item_id=item_id, proj=project))
+    return render_template(
+        "audio_edit.html",
+        active_tab="audio",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Edit Audio",
+        content_html="",
+        item=item,
+        project=project,
+        col_list=tbl["col_list"] if tbl else [],
+    )
+
+
+@audio_bp.route("/delete/<int:item_id>")
+def delete_audio_route(item_id):
+    project = request.args.get("proj")
+    tbl = _get_tbl()
+    if tbl:
+        db.delete_record(db.conn, tbl["name"], item_id)
+    return redirect(url_for("audio.list_audio_table_route", proj=project))
 
 
 @audio_bp.route("/file/<int:item_id>")

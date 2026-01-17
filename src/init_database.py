@@ -28,7 +28,7 @@ def reset_database(db_file):
 
 
 def create_table(db_conn, tbl):
-    # {'name':'lp_notes', 'display_name':'Notes', 'col_list':['title','content', 'project']},
+    # {'name':'lp_notes', 'display_name':'Notes', 'col_list':['file_name','path','size','date_modified','project']},
     # also include standard columns
     col_defs = []
     for col in tbl["col_list"]:

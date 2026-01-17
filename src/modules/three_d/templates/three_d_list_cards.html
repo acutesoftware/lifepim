@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('three_d.list_3d_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('three_d.list_3d_list_route', proj=project) }}">List</a> |
+    <a href="{{ url_for('three_d.list_3d_cards_route', proj=project) }}">Cards</a> |
+    <a href="{{ url_for('three_d.import_3d_route', proj=project) }}">Add .blend</a>
+  </div>
+
+  {% set col_values = card_values %}
+  {% set note_card_bg = '#f7f7f7' %}
+  {% include "widgets/wid_card_list.html" %}
+
+  <ul style="list-style:none; padding:0; margin:8px 0;">
+    {% for item in items %}
+    <li style="padding:2px 0;">
+      <a href="{{ url_for('three_d.edit_3d_route', item_id=item.id, proj=project) }}">Edit</a> |
+      <a href="{{ url_for('three_d.delete_3d_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    </li>
+    {% endfor %}
+  </ul>
+{% endblock %}

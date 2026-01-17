@@ -4,9 +4,9 @@
     <a class="calendar-add-main" href="{{ url_for('notes.list_notes_route', proj=project) }}">Back to Notes</a>
   </div>
 
-  <form method="POST" enctype="multipart/form-data">
-    <label>Markdown Folder:</label><br>
-    <input type="file" name="folder_files" webkitdirectory directory multiple><br><br>
+  <form method="POST">
+    <label>Notes Folder:</label><br>
+    <input type="text" name="notes_folder" placeholder="C:\\path\\to\\folder" style="width:80%;"><br><br>
     <button type="submit">Import Folder</button>
     {% if error %}
       <p>{{ error }}</p>

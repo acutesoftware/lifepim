@@ -5,34 +5,45 @@
     <a href="{{ url_for('notes.list_notes_list_route', proj=project) }}">List</a> |
     <a href="{{ url_for('notes.list_notes_cards_route', proj=project) }}">Card</a>
   </div>
-  <a href="{{ url_for('notes.add_note_route', proj=project) }}">ホ Add Note</a>
-  <a href="{{ url_for('notes.import_notes_route', proj=project) }}">Import Notes</a>
+  <a href="{{ url_for('notes.add_note_route', proj=project) }}">Add Note</a>
   <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
 
 <table border="1" cellpadding="5">
   <tr>
-    {% set dir_title = 'asc' if sort_col != 'title' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_file = 'asc' if sort_col != 'file_name' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_path = 'asc' if sort_col != 'path' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_size = 'asc' if sort_col != 'size' or sort_dir == 'desc' else 'desc' %}
     {% set dir_project = 'asc' if sort_col != 'project' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_updated = 'asc' if sort_col != 'updated' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_modified = 'asc' if sort_col != 'date_modified' or sort_dir == 'desc' else 'desc' %}
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='title', dir=dir_title) }}">Title</a>
-      {% if sort_col == 'title' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      <a href="{{ url_for(route_name, proj=project, sort='file_name', dir=dir_file) }}">File</a>
+      {% if sort_col == 'file_name' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, sort='path', dir=dir_path) }}">Path</a>
+      {% if sort_col == 'path' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, sort='size', dir=dir_size) }}">Size</a>
+      {% if sort_col == 'size' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
       <a href="{{ url_for(route_name, proj=project, sort='project', dir=dir_project) }}">Project</a>
       {% if sort_col == 'project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='updated', dir=dir_updated) }}">Created</a>
-      {% if sort_col == 'updated' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      <a href="{{ url_for(route_name, proj=project, sort='date_modified', dir=dir_modified) }}">Modified</a>
+      {% if sort_col == 'date_modified' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>Actions</th>
   </tr>
   {% for n in notes %}
   <tr>
-    <td>{{ n.title }}</td>
+    <td>{{ n.file_name }}</td>
+    <td>{{ n.path }}</td>
+    <td>{{ n.size }}</td>
     <td>{{ n.project }}</td>
-    <td>{{ n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
+    <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
     <td>
       <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">View</a> |
       <a href="{{ url_for('notes.edit_note_route', note_id=n.id) }}">Edit</a> |

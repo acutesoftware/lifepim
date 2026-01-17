@@ -2,7 +2,7 @@
 {% for row in col_values %}
   <a class="card"
      href="{{ row[2] if row|length > 2 else '#' }}"
-     style="display:block; text-decoration:none; color:inherit; background:{{ note_card_bg }}; border:1px solid #ccc; border-radius:6px; padding:8px;">
+     style="display:block; text-decoration:none; color:inherit; background:{{ note_card_bg|default('#f0f0f0') }}; border:1px solid #ccc; border-radius:6px; padding:8px;">
     <strong>{{ row[0] }}</strong><br>{{ row[1] }}
   </a>
 {% endfor %}

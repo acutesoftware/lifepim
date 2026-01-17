@@ -20,6 +20,10 @@
         {% endif %}
       </a>
       <div style="font-size:11px; color:#666;">{{ item.file_name }}</div>
+      <div style="font-size:10px;">
+        <a href="{{ url_for('media.edit_media_route', item_id=item.id, proj=project) }}">Edit</a> |
+        <a href="{{ url_for('media.delete_media_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+      </div>
     </div>
     {% endfor %}
   </div>

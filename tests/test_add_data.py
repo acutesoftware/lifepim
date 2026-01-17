@@ -48,12 +48,12 @@ class TestAddData(unittest.TestCase):
         tbl = utils.get_table_def("notes")
         self.assertIsNotNone(tbl)
         rows = [
-            [_rand_text("note"), "Tips and snippets", "Dev"],
-            [_rand_text("note"), "Daily notes", ""],
-            [_rand_text("note"), "", "Games"],
-            [_rand_text("note"), "", ""],
-            [_rand_text("note"), "Meeting prep", "Work"],
-            [_rand_text("note"), "Loose ideas", "Pers"],
+            [_rand_text("note") + ".md", r"C:\\Notes", "120", "2024-01-02 10:00:00", "Dev"],
+            [_rand_text("note") + ".md", r"C:\\Notes", "44", "2024-01-03 09:30:00", ""],
+            [_rand_text("note") + ".md", r"C:\\Notes", "", "", "Games"],
+            [_rand_text("note") + ".md", r"C:\\Notes", "", "", ""],
+            [_rand_text("note") + ".md", r"C:\\Notes", "256", "2024-02-10 08:15:00", "Work"],
+            [_rand_text("note") + ".md", r"C:\\Notes", "10", "2024-03-01 12:00:00", "Pers"],
         ]
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))

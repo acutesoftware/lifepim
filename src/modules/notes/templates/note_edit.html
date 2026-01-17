@@ -1,12 +1,16 @@
 {% extends 'layout.html' %}
 {% block module_content %}
   <form method="POST">
-    <label>Title:</label><br>
-    <input type="text" name="title" value="{{ note.title if note else '' }}" required><br>
+    <label>File Name:</label><br>
+    <input type="text" name="file_name" value="{{ note.file_name if note else '' }}"><br>
+    <label>Path:</label><br>
+    <input type="text" name="path" value="{{ note.path if note else '' }}"><br>
+    <label>Size:</label><br>
+    <input type="text" name="size" value="{{ note.size if note else '' }}"><br>
+    <label>Date Modified:</label><br>
+    <input type="text" name="date_modified" value="{{ note.date_modified if note else '' }}"><br>
     <label>Project:</label><br>
-    <input type="text" name="project" value="{{ note.project if note else project }}"><br>
-    <label>Content:</label><br>
-    <textarea name="content" rows="6" cols="60">{{ note.content if note else '' }}</textarea><br><br>
+    <input type="text" name="project" value="{{ note.project if note else project }}"><br><br>
     <button type="submit">Save</button>
   </form>
 {% endblock %}

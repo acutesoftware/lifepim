@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Back to Media</a>
+  </div>
+
+  <form method="POST">
+    {% for col in col_list %}
+    <label>{{ col.replace('_', ' ') }}:</label><br>
+    <input type="text" name="{{ col }}" value="{{ item[col] if item else '' }}"><br><br>
+    {% endfor %}
+    <button type="submit">Save</button>
+  </form>
+{% endblock %}

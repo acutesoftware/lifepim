@@ -39,11 +39,13 @@ print('DB_FILE = ' + DB_FILE)
 #  column name contains 'amount', 'total', 'num_' = NUMBER
 #  
 table_def = [
-	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['title','content', 'project']},
+	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'size', 'date_modified', 'project']},
 	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'project', 'start_date', 'due_date']},
 	{'name':'lp_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
 	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
 	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'artist', 'album', 'song', 'project']},
+	{'name':'lp_3d', 'route':'3d', 'display_name':'3D', 'col_list':['file_name','path', 'size', 'date_modified', 'project']},
+	{'name':'lp_apps', 'route':'apps', 'display_name':'Apps', 'col_list':['file_path','title','icon', 'project']},
 
 	{'name':'lp_goals', 'route':'goals', 'display_name':'Goals', 'col_list':['parent_goal_id', 'title','description', 'goal_date', 'remind_date', 'project']},
 	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'project']},

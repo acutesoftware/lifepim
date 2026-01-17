@@ -16,6 +16,7 @@
       {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     {% endfor %}
+    <th>Actions</th>
   </tr>
   {% for item in items %}
   <tr>
@@ -28,6 +29,10 @@
       {% endif %}
     </td>
     {% endfor %}
+    <td>
+      <a href="{{ url_for('media.edit_media_route', item_id=item.id, proj=project) }}">Edit</a> |
+      <a href="{{ url_for('media.delete_media_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    </td>
   </tr>
   {% endfor %}
 </table>

@@ -23,6 +23,8 @@ from modules.data.routes import data_bp
 from modules.files.routes import files_bp
 from modules.media.routes import media_bp
 from modules.audio.routes import audio_bp
+from modules.three_d.routes import three_d_bp
+from modules.apps.routes import apps_bp
 from modules.goals.routes import goals_bp
 from modules.how.routes import how_bp
 from modules.notes.routes import notes_bp
@@ -34,6 +36,8 @@ app.register_blueprint(data_bp, url_prefix="/data")
 app.register_blueprint(files_bp, url_prefix="/files")
 app.register_blueprint(media_bp, url_prefix="/media")
 app.register_blueprint(audio_bp, url_prefix="/audio")
+app.register_blueprint(three_d_bp, url_prefix="/3d")
+app.register_blueprint(apps_bp, url_prefix="/apps")
 app.register_blueprint(goals_bp, url_prefix="/goals")
 app.register_blueprint(how_bp, url_prefix="/how")
 app.register_blueprint(notes_bp, url_prefix="/notes")

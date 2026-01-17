@@ -18,7 +18,7 @@
     <h4>Recent Notes</h4>
     <ul style="list-style:none; padding:0; margin:0;">
       {% for n in notes %}
-      <li><a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.title }}</a></li>
+      <li><a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a></li>
       {% endfor %}
     </ul>
   </div>

@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('apps.list_apps_table_route', proj=project) }}">Back to Apps</a>
+  </div>
+
+  <form method="POST">
+    <label>Apps Folder:</label><br>
+    <input type="text" name="apps_folder" placeholder="C:\path\to\folder"><br><br>
+    <button type="submit">Import Apps</button>
+    {% if error %}
+      <p>{{ error }}</p>
+    {% endif %}
+    {% if imported is not none %}
+      <p>Imported {{ imported }} files.</p>
+    {% endif %}
+  </form>
+{% endblock %}

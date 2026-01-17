@@ -10,6 +10,10 @@
     {% for item in items %}
     <li style="padding:4px 0;">
       <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item.file_name }}</a>{% if item.artist %} - {{ item.artist }}{% endif %}
+      <span>
+        <a href="{{ url_for('audio.edit_audio_route', item_id=item.id, proj=project) }}">Edit</a> |
+        <a href="{{ url_for('audio.delete_audio_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+      </span>
     </li>
     {% endfor %}
   </ul>
