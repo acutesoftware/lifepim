@@ -26,7 +26,8 @@
         {% set current_proj = None %}
       {% endif %}
       {% for t in tabs %}
-        <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="/{{t.id}}{% if current_proj %}?proj={{ current_proj }}{% endif %}" title="{{t.desc}}">
+        {% set tab_href = '/' if t.id == 'home' else '/' ~ t.id %}
+        <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="{{ tab_href }}{% if current_proj %}?proj={{ current_proj }}{% endif %}" title="{{t.desc}}">
           <span class="ic">{{t.icon}}</span><span class="lab">{{t.label}}</span>
         </a>
       {% endfor %}

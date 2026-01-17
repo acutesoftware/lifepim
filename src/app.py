@@ -1,10 +1,13 @@
 import sys
 
+from datetime import date, datetime
+
 from flask import Flask, render_template
 from jinja2 import ChoiceLoader, FileSystemLoader
 
-from common.utils import get_tabs, get_side_tabs
+from common.utils import get_tabs, get_side_tabs, get_table_def
 import common.config as mod_cfg
+from common import data as db
 
 def _dbg(msg):
     print(f"[app] {msg}", file=sys.stderr, flush=True)
@@ -35,13 +38,84 @@ _dbg("Blueprints registered")
 
 @app.route('/')
 def index():
+    today = date.today()
+    notes = []
+    tasks = []
+    events_today = []
+
+    notes_tbl = get_table_def("notes")
+    if notes_tbl:
+        rows = db.get_data(
+            db.conn,
+            notes_tbl["name"],
+            ["id"] + notes_tbl["col_list"] + ["rec_extract_date as updated"],
+            "1=1",
+            [],
+        )
+        notes = [dict(row) for row in rows]
+        notes.sort(key=lambda n: n.get("updated") or "", reverse=True)
+        notes = notes[:10]
+
+    tasks_tbl = get_table_def("tasks")
+    if tasks_tbl:
+        rows = db.get_data(
+            db.conn,
+            tasks_tbl["name"],
+            ["id"] + tasks_tbl["col_list"] + ["rec_extract_date as updated"],
+            "1=1",
+            [],
+        )
+        tasks = [dict(row) for row in rows]
+        tasks.sort(key=lambda t: t.get("updated") or "", reverse=True)
+        tasks = tasks[:5]
+
+    cal_tbl = get_table_def("calendar")
+    month_weeks = []
+    days_with_events = set()
+    if cal_tbl:
+        month_weeks = __import__("calendar").monthcalendar(today.year, today.month)
+        rows = db.get_data(
+            db.conn,
+            cal_tbl["name"],
+            ["id"] + cal_tbl["col_list"],
+            "event_date LIKE ?",
+            [f"{today.year:04d}-{today.month:02d}%"],
+        )
+        events = [dict(row) for row in rows]
+        for ev in events:
+            try:
+                day_num = int((ev.get("event_date") or "").split("-")[2])
+            except (IndexError, ValueError, AttributeError):
+                continue
+            days_with_events.add(day_num)
+        events_today = [
+            ev for ev in events if (ev.get("event_date") or "").startswith(today.strftime("%Y-%m-%d"))
+        ]
+        events_today.sort(key=lambda e: e.get("event_date") or "")
+
     return render_template(
-        'layout.html',
-        active_tab='notes',
+        'overview.html',
+        active_tab='home',
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title='Home',
-        content_html='<p>Welcome to LifePIM!</p>'
+        content_title='Overview',
+        content_html='',
+        today=today,
+        month_weeks=month_weeks,
+        month=today.month,
+        year=today.year,
+        month_name=__import__("calendar").month_name[today.month],
+        days_with_events=days_with_events,
+        highlight_day_data=mod_cfg.CAL_HIGHLIGHT_DAY_DATA,
+        highlight_day_today=mod_cfg.CAL_HIGHLIGHT_DAY_TODAY,
+        col_bg_day=mod_cfg.CAL_COL_BG_DAY,
+        col_bg_weekend=mod_cfg.CAL_COL_BG_WEEKEND,
+        col_bg_today=mod_cfg.CAL_COL_BG_TODAY,
+        notes=notes,
+        tasks=tasks,
+        events_today=events_today,
+        overview_grid_w=mod_cfg.OVERVIEW_GRID_W,
+        overview_grid_h=mod_cfg.OVERVIEW_GRID_H,
     )
 
 if __name__ == "__main__":

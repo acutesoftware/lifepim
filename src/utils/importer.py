@@ -9,6 +9,7 @@ import tempfile
 from common import config as cfg
 from common import data
 
+tmp_dir = os.path.join(cfg.user_folder, 'tmp_import')
 
 TOKEN_VALUES = {
     "curr_project_selected": "",
@@ -37,7 +38,7 @@ def _resolve_value(mapping_value, row):
 def save_upload(file_storage):
     if file_storage is None or file_storage.filename == "":
         return ""
-    tmp_dir = os.path.join(os.path.dirname(__file__), "..", "tmp_imports")
+    #tmp_dir = os.path.join(os.path.dirname(__file__), "..", "tmp_imports")
     os.makedirs(tmp_dir, exist_ok=True)
     handle, path = tempfile.mkstemp(prefix="import_", suffix=".csv", dir=tmp_dir)
     os.close(handle)

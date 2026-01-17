@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<div class="overview-grid" style="width:{{ overview_grid_w }}; height:{{ overview_grid_h }};">
+  <div class="overview-card">
+    <h4>Today</h4>
+    {% include "widgets/wid_calendar_mini_month.html" %}
+    {% if events_today %}
+    <ul style="list-style:none; padding:0; margin:6px 0 0 0;">
+      {% for ev in events_today %}
+      <li>{{ ev.event_date }} {{ ev.title }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No events today.</p>
+    {% endif %}
+  </div>
+  <div class="overview-card">
+    <h4>Recent Notes</h4>
+    <ul style="list-style:none; padding:0; margin:0;">
+      {% for n in notes %}
+      <li><a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="overview-card">
+    <h4>Recent Tasks</h4>
+    <ul style="list-style:none; padding:0; margin:0;">
+      {% for t in tasks %}
+      <li>{{ t.title }}{% if t.due_date %} ({{ t.due_date }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="overview-card">
+    <h4>Summary</h4>
+    <p>Notes: {{ notes|length }}</p>
+    <p>Tasks: {{ tasks|length }}</p>
+    <p>Events today: {{ events_today|length }}</p>
+  </div>
+</div>
+{% endblock %}

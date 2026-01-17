@@ -305,6 +305,8 @@ CAL_TIME_END_WORK = 1700    # 1700
 CAL_TIME_LUNCH_START = 1200 # 1200
 CAL_TIME_LUNCH_END = 1230   # 1230
 NOTE_CARD_DEF_BG_COL = '#f0f0f0'
+OVERVIEW_GRID_W = '100%'
+OVERVIEW_GRID_H = '600px'
 
 
 # --------------------------------------------------------

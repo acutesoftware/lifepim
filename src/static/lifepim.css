@@ -261,6 +261,17 @@ body {
   max-width: 480px;
 }
 
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overview-card {
+  padding: 6px;
+}
+
 @media (max-width: 600px) {
   .side-tabs {
     width: 120px;
