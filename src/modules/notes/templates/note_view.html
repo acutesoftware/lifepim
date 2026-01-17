@@ -1,9 +1,41 @@
 {% extends 'layout.html' %}
 {% block module_content %}
   <div class="note-view">
+    <div>
+      {% set btn_style = "display:inline-block;padding:2px 8px;border:1px solid #999;border-radius:4px;text-decoration:none;margin-right:4px;" %}
+      <a href="{{ url_for('notes.view_note_route', note_id=note.id, format='text') }}"
+         style="{{ btn_style }}{% if render_mode == 'text' %}background:#ddd;font-weight:bold;{% endif %}">Text</a>
+      <a href="{{ url_for('notes.view_note_route', note_id=note.id, format='markdown') }}"
+         style="{{ btn_style }}{% if render_mode == 'markdown' %}background:#ddd;font-weight:bold;{% endif %}">Markdown</a>
+      <a href="{{ url_for('notes.view_note_route', note_id=note.id, format='hex') }}"
+         style="{{ btn_style }}{% if render_mode == 'hex' %}background:#ddd;font-weight:bold;{% endif %}">Hex</a>
+    </div>
     <h4>{{ note.title }}</h4>
-    <div>{{ note.content }}</div>
+    {% if render_mode == 'markdown' %}
+      <div>{{ content_html_rendered|safe }}</div>
+    {% elif render_mode == 'hex' %}
+      <table border="1" cellpadding="4">
+        <tr><th>Title</th><td>{{ note.title }}</td></tr>
+        <tr><th>Project</th><td>{{ note.project }}</td></tr>
+        <tr><th>Updated</th><td>{{ note.updated.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+        <tr><th>Chars</th><td>{{ note.content|length }}</td></tr>
+      </table>
+      <div style="display:flex; gap:12px; margin-top:8px;">
+        <div style="flex:1; border:1px solid #ccc; padding:6px;">
+          {% for row in hex_rows %}
+            {{ row.hex }}{% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        </div>
+        <div style="flex:1; border:1px solid #ccc; padding:6px;">
+          {% for row in hex_rows %}
+            {{ row.ascii }}{% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <pre style="white-space: pre-wrap; font-family: inherit;">{{ note.content }}</pre>
+    {% endif %}
     <p><i>Updated {{ note.updated.strftime('%Y-%m-%d %H:%M') }}</i></p>
-    <p><a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}">✏️ Edit</a></p>
+    <p><a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}">ƒo?‹,? Edit</a></p>
   </div>
 {% endblock %}

@@ -4,6 +4,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, make_r
 
 from common import data
 from utils import importer
+from utils import markdown_utils
+from utils import hex_utils
 from common.utils import get_tabs, get_side_tabs, get_table_def
 from common import config as cfg
 
@@ -139,6 +141,7 @@ def list_notes_cards_route():
 
 @notes_bp.route('/view/<int:note_id>')
 def view_note_route(note_id):
+    render_mode = request.args.get("format") or "markdown"
     tbl = get_table_def("notes")
     note = None
     if tbl:
@@ -154,6 +157,12 @@ def view_note_route(note_id):
             note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
     if not note:
         return redirect(url_for("notes.list_notes_route"))
+    content_html = ""
+    hex_rows = []
+    if render_mode == "markdown":
+        content_html = markdown_utils.render_markdown(note.get("content", ""))
+    elif render_mode == "hex":
+        hex_rows = hex_utils.hex_dump(note.get("content", ""))
     return render_template(
         "note_view.html",
         active_tab="notes",
@@ -162,6 +171,9 @@ def view_note_route(note_id):
         note=note,
         content_title=note["title"],
         content_html="",
+        render_mode=render_mode,
+        content_html_rendered=content_html,
+        hex_rows=hex_rows,
     )
 
 @notes_bp.route('/add', methods=["GET", "POST"])
@@ -271,6 +283,50 @@ def import_notes_route():
         csv_path=csv_path,
         csv_headers=headers,
         mappings=mappings,
+        imported=imported,
+        error=error,
+    )
+
+
+@notes_bp.route('/import-folder', methods=["GET", "POST"])
+def import_notes_folder_route():
+    project = request.args.get("proj") or ""
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = ""
+    tbl = get_table_def("notes")
+    imported = None
+    error = ""
+    if request.method == "POST":
+        uploaded_files = request.files.getlist("folder_files")
+        if not uploaded_files:
+            error = "No files uploaded."
+        elif not tbl:
+            error = "Notes table not found."
+        else:
+            count = 0
+            for file_obj in uploaded_files:
+                filename = file_obj.filename or ""
+                if not filename.lower().endswith(".md"):
+                    continue
+                base_name = filename.replace("\\", "/").split("/")[-1]
+                title = base_name.rsplit(".", 1)[0]
+                try:
+                    content = file_obj.stream.read().decode("utf-8", errors="ignore")
+                except Exception:
+                    content = ""
+                values = [title, content, project]
+                record_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
+                if record_id:
+                    count += 1
+            imported = count
+    return render_template(
+        "notes_import_folder.html",
+        active_tab="notes",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Import Notes Folder",
+        content_html="",
+        project=project,
         imported=imported,
         error=error,
     )
