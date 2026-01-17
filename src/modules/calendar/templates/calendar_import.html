@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="calendar-controls">
+    <div class="calendar-views">
+      <a href="{{ url_for('calendar.month_view_route', year=today.year, month=today.month, proj=project) }}">Monthly</a> |
+      <a href="{{ url_for('calendar.week_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
+      <a href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
+      <a href="{{ url_for('calendar.year_view_route', year=today.year, proj=project) }}">Yearly</a>
+    </div>
+    <a class="calendar-add-main" href="{{ url_for('calendar.month_view_route', proj=project) }}">Back to Calendar</a>
+  </div>
+
+  {% include "widgets/wid_import_data.html" %}
+{% endblock %}

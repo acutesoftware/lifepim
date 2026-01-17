@@ -1,10 +1,17 @@
 {% extends "layout.html" %}
 {% block module_content %}
 <div class="calendar-controls">
+  <div class="calendar-views">
+    <a href="{{ url_for('calendar.month_view_route', year=view_date.year, month=view_date.month, proj=project) }}">Monthly</a> |
+    <a href="{{ url_for('calendar.week_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
+    <a href="{{ url_for('calendar.year_view_route', year=view_date.year, proj=project) }}">Yearly</a>
+  </div>
   <a class="calendar-nav" href="{{ url_for('calendar.month_view_route', year=prev_year, month=prev_month, proj=project) }}">Prev</a>
   <div class="calendar-title">{{ month_name }} {{ year }}</div>
   <a class="calendar-nav" href="{{ url_for('calendar.month_view_route', year=next_year, month=next_month, proj=project) }}">Next</a>
   <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', proj=project) }}">Add Event</a>
+  <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
 
 <table class="calendar-grid">
@@ -23,11 +30,24 @@
     {% for week in month_weeks %}
     <tr>
       {% for day in week %}
-      <td class="calendar-cell {% if day == 0 %}empty{% endif %}">
+      {% set is_today = today.year == year and today.month == month and today.day == day %}
+      {% set is_weekend = loop.index >= 6 %}
+      {% set cell_bg = col_bg_day %}
+      {% if is_weekend %}
+        {% set cell_bg = col_bg_weekend %}
+      {% endif %}
+      {% if is_today %}
+        {% set cell_bg = col_bg_today %}
+      {% endif %}
+      <td class="calendar-cell {% if day == 0 %}empty{% endif %}" {% if day != 0 %}style="background: {{ cell_bg }};"{% endif %}>
         {% if day != 0 %}
         {% set day_str = "%04d-%02d-%02d"|format(year, month, day) %}
         <div class="calendar-day">
-          <div class="calendar-day-num">{{ day }}</div>
+          {% set has_events = day in days_with_events %}
+          <div class="calendar-day-num"
+               {% if highlight_day_today == 'Red' and is_today %}style="color:#b00020;font-weight:bold;"{% elif highlight_day_data == 'Bold' and has_events %}style="font-weight:bold;"{% endif %}>
+            {{ day }}
+          </div>
           <div class="calendar-events">
             {% for ev in events_by_day.get(day, []) %}
             <div class="calendar-event">

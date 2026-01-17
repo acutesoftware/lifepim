@@ -109,7 +109,7 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
     
     #{ 'icon': '📻', 'id': 'make/pc', 'label': 'PC'}, 
 
-    { 'icon': '', 'id': 'spacer', 'label': 'WORK'}, 
+    { 'icon': '', 'id': 'work', 'label': 'WORK'}, 
 
 
     { 'icon': '💼', 'id': 'work/job', 'label': 'Job'}, 
@@ -289,6 +289,22 @@ port_num=9741           # port to browse to, eg. http://127.0.0.1:9741/
 WEB_VERSION = "DEV"     # to show debug lines in web server
 base_url = 'https://www.lifepim.com'    # testing, point to live site for API
 base_url = '127.0.0.1:5000'             # running local (default)
+
+# ----------------------------------------------------------------------------
+# Calendar view configuration
+CAL_TIMESLOT_START_TIME = 800   # 0800
+CAL_TIMESLOT_END_TIME = 2330    # 2330
+CAL_TIMESLOT_MINUTES = 30
+CAL_HIGHLIGHT_DAY_DATA = 'Bold'
+CAL_HIGHLIGHT_DAY_TODAY = 'Red'
+CAL_COL_BG_DAY = 'white'
+CAL_COL_BG_WEEKEND = '#f0f0f0'
+CAL_COL_BG_TODAY = 'yellow'
+CAL_TIME_START_WORK = 900   # 0900
+CAL_TIME_END_WORK = 1700    # 1700
+CAL_TIME_LUNCH_START = 1200 # 1200
+CAL_TIME_LUNCH_END = 1230   # 1230
+NOTE_CARD_DEF_BG_COL = '#f0f0f0'
 
 
 # --------------------------------------------------------

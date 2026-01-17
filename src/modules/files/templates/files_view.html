@@ -189,9 +189,20 @@
     const rootToggle = document.querySelector('.folder-toggle[data-dir=""]');
     if (rootToggle) {
       rootToggle.addEventListener('click', () => toggleNode(rootToggle));
-      toggleNode(rootToggle);
     }
-    expandPath(selectedDir);
+    (async () => {
+      if (rootToggle) {
+        rootToggle.textContent = '[-]';
+        const rootContainer = document.querySelector('ul.folder-tree[data-container=""]');
+        if (rootContainer && rootContainer.childElementCount === 0) {
+          await loadChildren("", rootContainer);
+        }
+        if (rootContainer) {
+          rootContainer.style.display = 'block';
+        }
+      }
+      await expandPath(selectedDir);
+    })();
 
     function setSelectedFolder(relPath) {
       document.querySelectorAll('.folder-link.folder-selected').forEach((el) => {

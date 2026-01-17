@@ -1,7 +1,9 @@
-<div class="cards">
+<div class="cards" style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px;">
 {% for row in col_values %}
-  <div class="card">
+  <a class="card"
+     href="{{ row[2] if row|length > 2 else '#' }}"
+     style="display:block; text-decoration:none; color:inherit; background:{{ note_card_bg }}; border:1px solid #ccc; border-radius:6px; padding:8px;">
     <strong>{{ row[0] }}</strong><br>{{ row[1] }}
-  </div>
+  </a>
 {% endfor %}
 </div>

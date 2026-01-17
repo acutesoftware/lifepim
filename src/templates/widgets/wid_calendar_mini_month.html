@@ -1,0 +1,42 @@
+<h5 style="margin:0 0 4px 0; font-size:0.85em;">{{ month_name }} {{ year }}</h5>
+<table class="calendar-grid mini-calendar">
+  <thead>
+    <tr>
+      <th>Mon</th>
+      <th>Tue</th>
+      <th>Wed</th>
+      <th>Thu</th>
+      <th>Fri</th>
+      <th>Sat</th>
+      <th>Sun</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for week in month_weeks %}
+    <tr>
+      {% for day in week %}
+      {% set is_today = today.year == year and today.month == month and today.day == day %}
+      {% set is_weekend = loop.index >= 6 %}
+      {% set cell_bg = col_bg_day %}
+      {% if is_weekend %}
+        {% set cell_bg = col_bg_weekend %}
+      {% endif %}
+      {% if is_today %}
+        {% set cell_bg = col_bg_today %}
+      {% endif %}
+      <td class="calendar-cell {% if day == 0 %}empty{% endif %}" {% if day != 0 %}style="background: {{ cell_bg }};"{% endif %}>
+        {% if day != 0 %}
+        <a href="{{ url_for('calendar.day_view_route', date='%04d-%02d-%02d'|format(year, month, day), proj=project) }}">
+          {% set has_events = day in days_with_events %}
+          <span
+            {% if highlight_day_today == 'Red' and is_today %}style="color:#b00020;font-weight:bold;"{% elif highlight_day_data == 'Bold' and has_events %}style="font-weight:bold;"{% endif %}>
+            {{ day }}
+          </span>
+        </a>
+        {% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

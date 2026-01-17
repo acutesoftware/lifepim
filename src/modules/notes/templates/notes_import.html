@@ -1,0 +1,8 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="calendar-controls">
+    <a class="calendar-add-main" href="{{ url_for('notes.list_notes_route', proj=project) }}">Back to Notes</a>
+  </div>
+
+  {% include "widgets/wid_import_data.html" %}
+{% endblock %}

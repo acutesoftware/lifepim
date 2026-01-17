@@ -1,0 +1,98 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<div class="calendar-controls">
+  <div class="calendar-views">
+    <a href="{{ url_for('calendar.month_view_route', year=view_date.year, month=view_date.month, proj=project) }}">Monthly</a> |
+    <a href="{{ url_for('calendar.week_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
+    <a href="{{ url_for('calendar.year_view_route', year=view_date.year, proj=project) }}">Yearly</a>
+  </div>
+  <a class="calendar-nav" href="{{ url_for('calendar.week_view_route', date=prev_week.strftime('%Y-%m-%d'), proj=project) }}">Prev</a>
+  <div class="calendar-title">Week of {{ week_days[0].strftime('%Y-%m-%d') }}</div>
+  <a class="calendar-nav" href="{{ url_for('calendar.week_view_route', date=next_week.strftime('%Y-%m-%d'), proj=project) }}">Next</a>
+  <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Add Event</a>
+  <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
+</div>
+
+<table class="calendar-grid weekly-view">
+  <thead>
+    <tr>
+      <th style="width:90px;"></th>
+      {% for day in week_days %}
+      {% set has_events = events_by_day.get(day, []) | length > 0 %}
+      {% set is_today = today == day %}
+      {% set is_weekend = day.weekday() >= 5 %}
+      {% set cell_bg = col_bg_day %}
+      {% if is_weekend %}
+        {% set cell_bg = col_bg_weekend %}
+      {% endif %}
+      {% if is_today %}
+        {% set cell_bg = col_bg_today %}
+      {% endif %}
+      <th
+        style="background: {{ cell_bg }};{% if highlight_day_today == 'Red' and is_today %}color:#b00020;font-weight:bold;{% elif highlight_day_data == 'Bold' and has_events %}font-weight:bold;{% endif %}">
+        {{ day.strftime('%a %d') }}
+      </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>All-day</td>
+      {% for day in week_days %}
+      {% set is_weekend = day.weekday() >= 5 %}
+      {% set cell_bg = col_bg_day %}
+      {% if is_weekend %}
+        {% set cell_bg = col_bg_weekend %}
+      {% endif %}
+      {% if today == day %}
+        {% set cell_bg = col_bg_today %}
+      {% endif %}
+      <td class="calendar-cell" style="background: {{ cell_bg }};">
+        {% for ev in all_day_events.get(day, []) %}
+        <div class="calendar-event">
+          <span class="calendar-title-text">{{ ev.title }}</span>
+          <span class="calendar-actions">
+            <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
+            <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=day.year, month=day.month, proj=project) }}" onclick="return confirm('Delete event?');">Del</a>
+          </span>
+        </div>
+        {% endfor %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% for slot in timeslots %}
+    {% set is_work_time = slot.minutes >= work_start and slot.minutes < work_end %}
+    {% set is_lunch = slot.minutes >= lunch_start and slot.minutes < lunch_end %}
+    {% set slot_bg = col_bg_weekend %}
+    {% if is_work_time and not is_lunch %}
+      {% set slot_bg = col_bg_day %}
+    {% endif %}
+    <tr>
+      <td>{{ slot.label }}</td>
+      {% for day in week_days %}
+      {% set is_weekend = day.weekday() >= 5 %}
+      {% set cell_bg = col_bg_day %}
+      {% if is_weekend %}
+        {% set cell_bg = col_bg_weekend %}
+      {% endif %}
+      {% if today == day %}
+        {% set cell_bg = col_bg_today %}
+      {% endif %}
+      <td class="calendar-cell" style="background: {{ cell_bg if is_weekend or today == day else slot_bg }};">
+        {% for ev in timed_events.get(day, {}).get(slot.minutes, []) %}
+        <div class="calendar-event">
+          <span class="calendar-title-text">{{ ev.title }}</span>
+          <span class="calendar-actions">
+            <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
+            <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=day.year, month=day.month, proj=project) }}" onclick="return confirm('Delete event?');">Del</a>
+          </span>
+        </div>
+        {% endfor %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

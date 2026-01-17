@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('notes.list_notes_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('notes.list_notes_list_route', proj=project) }}">List</a> |
+    <a href="{{ url_for('notes.list_notes_cards_route', proj=project) }}">Card</a>
+  </div>
+  <a href="{{ url_for('notes.add_note_route', proj=project) }}">ホ Add Note</a>
+  <a href="{{ url_for('notes.import_notes_route', proj=project) }}">Import Notes</a>
+
+  {% set col_values = card_values %}
+  {% include "widgets/wid_card_list.html" %}
+{% endblock %}

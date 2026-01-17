@@ -1,10 +1,12 @@
 import calendar as cal
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data
 from common.utils import get_tabs, get_side_tabs, get_table_def
+import common.config as cfg
+from utils import importer
 
 
 calendar_bp = Blueprint(
@@ -32,12 +34,91 @@ def _month_nav(year, month):
     return prev_year, prev_month, next_year, next_month
 
 
+def _week_nav(anchor_date):
+    prev_week = anchor_date - timedelta(days=7)
+    next_week = anchor_date + timedelta(days=7)
+    return prev_week, next_week
+
+
 def _date_to_year_month(date_str):
     try:
         parsed = datetime.strptime(date_str, "%Y-%m-%d")
         return parsed.year, parsed.month
     except (ValueError, TypeError):
         return None
+
+
+def _parse_date_param(date_str):
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _get_calendar_table():
+    return get_table_def("calendar")
+
+
+def _fetch_events(project=None, start_date=None, end_date=None):
+    tbl = _get_calendar_table()
+    if not tbl:
+        return []
+    cols = ["id"] + tbl["col_list"]
+    condition_parts = ["1=1"]
+    params = []
+    if project and project not in ("any", "All", "all", "ALL", "spacer"):
+        condition_parts.append("project = ?")
+        params.append(project)
+    if start_date and end_date:
+        condition_parts.append("event_date >= ? AND event_date < ?")
+        params.append(start_date.strftime("%Y-%m-%d"))
+        params.append(end_date.strftime("%Y-%m-%d"))
+    condition = " AND ".join(condition_parts)
+    rows = data.get_data(data.conn, tbl["name"], cols, condition, params)
+    return [_event_from_row(row) for row in rows]
+
+
+def _parse_time_to_minutes(time_str):
+    if not time_str:
+        return None
+    try:
+        parts = time_str.split(":")
+        hours = int(parts[0])
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        return hours * 60 + minutes
+    except (ValueError, TypeError, IndexError):
+        return None
+
+
+def _build_timeslots():
+    start_val = int(cfg.CAL_TIMESLOT_START_TIME)
+    end_val = int(cfg.CAL_TIMESLOT_END_TIME)
+    slot_minutes = int(cfg.CAL_TIMESLOT_MINUTES)
+    start_hour = start_val // 100
+    start_min = start_val % 100
+    end_hour = end_val // 100
+    end_min = end_val % 100
+    start_total = start_hour * 60 + start_min
+    end_total = end_hour * 60 + end_min
+    slots = []
+    current = start_total
+    while current <= end_total:
+        hour = current // 60
+        minute = current % 60
+        slots.append({"label": f"{hour:02d}:{minute:02d}", "minutes": current})
+        current += slot_minutes
+    return slots
+
+
+def _time_val_to_minutes(value):
+    value_int = int(value)
+    hours = value_int // 100
+    minutes = value_int % 100
+    return hours * 60 + minutes
+
+
+def _read_csv_headers(csv_file_name):
+    return importer.read_csv_headers(csv_file_name)
 
 
 @calendar_bp.route("/")
@@ -49,21 +130,14 @@ def month_view_route():
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
 
-    tbl = get_table_def("calendar")
-    if not tbl:
-        events = []
-    else:
-        cols = ["id"] + tbl["col_list"]
-        condition_parts = ["1=1"]
-        params = []
-        if project and project not in ("any", "spacer", "All", "all", "ALL"):
-            condition_parts.append("project = ?")
-            params.append(project)
-        condition_parts.append("event_date LIKE ?")
-        params.append(f"{year:04d}-{month:02d}%")
-        condition = " AND ".join(condition_parts)
-        rows = data.get_data(data.conn, tbl["name"], cols, condition, params)
-        events = [_event_from_row(row) for row in rows]
+    first_day = date(year, month, 1)
+    next_month = month + 1
+    next_year = year
+    if next_month > 12:
+        next_month = 1
+        next_year += 1
+    end_day = date(next_year, next_month, 1)
+    events = _fetch_events(project=project, start_date=first_day, end_date=end_day)
     events_by_day = {}
     for event in events:
         try:
@@ -82,16 +156,195 @@ def month_view_route():
         side_tabs=get_side_tabs(),
         content_title=f"{cal.month_name[month]} {year}",
         content_html="",
+        view_date=first_day,
         month_weeks=month_weeks,
         month=month,
         year=year,
         month_name=cal.month_name[month],
         events_by_day=events_by_day,
+        days_with_events=set(events_by_day.keys()),
+        today=date.today(),
         prev_year=prev_year,
         prev_month=prev_month,
         next_year=next_year,
         next_month=next_month,
         project=project,
+        highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
+        highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
+        col_bg_day=cfg.CAL_COL_BG_DAY,
+        col_bg_weekend=cfg.CAL_COL_BG_WEEKEND,
+        col_bg_today=cfg.CAL_COL_BG_TODAY,
+    )
+
+
+@calendar_bp.route("/week")
+def week_view_route():
+    today = date.today()
+    date_param = request.args.get("date")
+    project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
+    anchor = _parse_date_param(date_param) or today
+    week_start = anchor - timedelta(days=anchor.weekday())
+    week_end = week_start + timedelta(days=7)
+    events = _fetch_events(project=project, start_date=week_start, end_date=week_end)
+    events_by_day = {}
+    for event in events:
+        try:
+            day = datetime.strptime(event.get("date", ""), "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+        events_by_day.setdefault(day, []).append(event)
+    week_days = [week_start + timedelta(days=offset) for offset in range(7)]
+    prev_week = week_start - timedelta(days=7)
+    next_week = week_start + timedelta(days=7)
+    timeslots = _build_timeslots()
+    work_start = _time_val_to_minutes(cfg.CAL_TIME_START_WORK)
+    work_end = _time_val_to_minutes(cfg.CAL_TIME_END_WORK)
+    lunch_start = _time_val_to_minutes(cfg.CAL_TIME_LUNCH_START)
+    lunch_end = _time_val_to_minutes(cfg.CAL_TIME_LUNCH_END)
+    timed_events = {day: {} for day in week_days}
+    all_day_events = {day: [] for day in week_days}
+    for day in week_days:
+        for event in events_by_day.get(day, []):
+            mins = _parse_time_to_minutes(event.get("time"))
+            if mins is None:
+                all_day_events[day].append(event)
+            else:
+                timed_events[day].setdefault(mins, []).append(event)
+    return render_template(
+        "calendar_week.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Week of {week_start.strftime('%Y-%m-%d')}",
+        content_html="",
+        view_date=anchor,
+        week_days=week_days,
+        events_by_day=events_by_day,
+        timeslots=timeslots,
+        timed_events=timed_events,
+        all_day_events=all_day_events,
+        prev_week=prev_week,
+        next_week=next_week,
+        project=project,
+        today=date.today(),
+        highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
+        highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
+        col_bg_day=cfg.CAL_COL_BG_DAY,
+        col_bg_weekend=cfg.CAL_COL_BG_WEEKEND,
+        col_bg_today=cfg.CAL_COL_BG_TODAY,
+        work_start=work_start,
+        work_end=work_end,
+        lunch_start=lunch_start,
+        lunch_end=lunch_end,
+    )
+
+
+@calendar_bp.route("/day")
+def day_view_route():
+    today = date.today()
+    date_param = request.args.get("date")
+    project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
+    anchor = _parse_date_param(date_param) or today
+    next_day = anchor + timedelta(days=1)
+    events = _fetch_events(project=project, start_date=anchor, end_date=next_day)
+    events = sorted(events, key=lambda e: (e.get("time", ""), e.get("title", "")))
+    month_weeks = cal.monthcalendar(anchor.year, anchor.month)
+    month_start = date(anchor.year, anchor.month, 1)
+    next_month = anchor.month + 1
+    next_year = anchor.year
+    if next_month > 12:
+        next_month = 1
+        next_year += 1
+    month_end = date(next_year, next_month, 1)
+    month_events = _fetch_events(project=project, start_date=month_start, end_date=month_end)
+    events_by_day = {}
+    for event in month_events:
+        try:
+            day = int(event["date"].split("-")[2])
+        except (IndexError, ValueError, AttributeError):
+            continue
+        events_by_day.setdefault(day, []).append(event)
+    prev_day = anchor - timedelta(days=1)
+    return render_template(
+        "calendar_day.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=anchor.strftime("%Y-%m-%d"),
+        content_html="",
+        view_date=anchor,
+        day_date=anchor,
+        prev_day=prev_day,
+        next_day=next_day,
+        month_weeks=month_weeks,
+        month=anchor.month,
+        year=anchor.year,
+        month_name=cal.month_name[anchor.month],
+        events=events,
+        days_with_events=set(events_by_day.keys()),
+        today=date.today(),
+        project=project,
+        highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
+        highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
+        col_bg_day=cfg.CAL_COL_BG_DAY,
+        col_bg_weekend=cfg.CAL_COL_BG_WEEKEND,
+        col_bg_today=cfg.CAL_COL_BG_TODAY,
+    )
+
+
+@calendar_bp.route("/year")
+def year_view_route():
+    today = date.today()
+    year = request.args.get("year", type=int) or today.year
+    project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
+    months = []
+    for month in range(1, 13):
+        month_weeks = cal.monthcalendar(year, month)
+        month_start = date(year, month, 1)
+        next_month = month + 1
+        next_year = year
+        if next_month > 12:
+            next_month = 1
+            next_year += 1
+        month_end = date(next_year, next_month, 1)
+        month_events = _fetch_events(project=project, start_date=month_start, end_date=month_end)
+        events_by_day = {}
+        for event in month_events:
+            try:
+                day = int(event["date"].split("-")[2])
+            except (IndexError, ValueError, AttributeError):
+                continue
+            events_by_day.setdefault(day, []).append(event)
+        months.append(
+            {
+                "month": month,
+                "month_name": cal.month_name[month],
+                "month_weeks": month_weeks,
+                "days_with_events": set(events_by_day.keys()),
+            }
+        )
+    return render_template(
+        "calendar_year.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=str(year),
+        content_html="",
+        year=year,
+        months=months,
+        today=today,
+        project=project,
+        highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
+        highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
+        col_bg_day=cfg.CAL_COL_BG_DAY,
+        col_bg_weekend=cfg.CAL_COL_BG_WEEKEND,
+        col_bg_today=cfg.CAL_COL_BG_TODAY,
     )
 
 
@@ -207,6 +460,57 @@ def delete_event_route(event_id):
             )
         return redirect(url_for("calendar.month_view_route", proj=project or event.get("project")))
     return redirect(url_for("calendar.month_view_route", proj=project))
+
+
+@calendar_bp.route("/import", methods=["GET", "POST"])
+def import_events_route():
+    project = request.args.get("proj") or ""
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = ""
+    tbl = get_table_def("calendar")
+    csv_path = ""
+    headers = []
+    mappings = {}
+    imported = None
+    error = ""
+    if request.method == "POST":
+        csv_path = request.form.get("csv_path", "").strip()
+        upload = request.files.get("csv_file")
+        if upload and upload.filename:
+            csv_path = importer.save_upload(upload)
+        action = request.form.get("action", "load")
+        headers = _read_csv_headers(csv_path)
+        if action == "import" and tbl:
+            mappings = {col: request.form.get(f"map_{col}", "") for col in tbl["col_list"]}
+            map_list = []
+            for col in tbl["col_list"]:
+                choice = mappings.get(col, "")
+                if choice == "{curr_project_selected}":
+                    choice = project
+                map_list.append(choice)
+            try:
+                importer.set_token("curr_project_selected", project)
+                imported = importer.import_to_table(tbl["name"], csv_path, map_list)
+            except Exception as exc:
+                error = str(exc)
+        else:
+            mappings = {col: "" for col in (tbl["col_list"] if tbl else [])}
+    return render_template(
+        "calendar_import.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Import Events",
+        content_html="",
+        project=project,
+        table_def=tbl,
+        csv_path=csv_path,
+        csv_headers=headers,
+        mappings=mappings,
+        imported=imported,
+        error=error,
+        today=date.today(),
+    )
 
 
 def _event_from_row(row):

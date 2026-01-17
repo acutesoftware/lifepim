@@ -1,7 +1,8 @@
 
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, make_response
 
 from common import data
+from utils import importer
 from common.utils import get_tabs, get_side_tabs, get_table_def
 
 
@@ -23,11 +24,15 @@ def list_tasks_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    sort_col = request.args.get("sort") or request.cookies.get("tasks_sort_col") or "title"
+    sort_dir = request.args.get("dir") or request.cookies.get("tasks_sort_dir") or "asc"
     tbl = get_table_def("tasks")
     if not tbl:
         task_list = []
+        col_list = []
     else:
         cols = ["id"] + tbl["col_list"]
+        col_list = tbl["col_list"]
         condition = "1=1"
         params = []
         if project:
@@ -35,7 +40,9 @@ def list_tasks_route():
             params = [project]
         rows = data.get_data(data.conn, tbl["name"], cols, condition, params)
         task_list = [dict(row) for row in rows]
-    return render_template(
+    task_list = _sort_tasks(task_list, sort_col, sort_dir)
+    resp = make_response(
+        render_template(
         "tasks_list.html",
         active_tab="tasks",
         tabs=get_tabs(),
@@ -44,7 +51,14 @@ def list_tasks_route():
         content_html="",
         tasks=task_list,
         project=project,
+        col_list=col_list,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
     )
+    )
+    resp.set_cookie("tasks_sort_col", sort_col)
+    resp.set_cookie("tasks_sort_dir", sort_dir)
+    return resp
 
 
 @tasks_bp.route('/add', methods=["GET", "POST"])
@@ -106,3 +120,60 @@ def delete_task_route(task_id):
     if tbl:
         data.delete_record(data.conn, tbl["name"], task_id)
     return redirect(url_for("tasks.list_tasks_route"))
+
+
+def _sort_tasks(tasks, sort_col, sort_dir):
+    if not sort_col:
+        return tasks
+    reverse = sort_dir == "desc"
+    return sorted(tasks, key=lambda t: (t.get(sort_col) or ""), reverse=reverse)
+
+
+@tasks_bp.route('/import', methods=["GET", "POST"])
+def import_tasks_route():
+    project = request.args.get("proj") or ""
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = ""
+    tbl = get_table_def("tasks")
+    csv_path = ""
+    headers = []
+    mappings = {}
+    imported = None
+    error = ""
+    if request.method == "POST":
+        csv_path = request.form.get("csv_path", "").strip()
+        upload = request.files.get("csv_file")
+        if upload and upload.filename:
+            csv_path = importer.save_upload(upload)
+        action = request.form.get("action", "load")
+        headers = importer.read_csv_headers(csv_path)
+        if action == "import" and tbl:
+            mappings = {col: request.form.get(f"map_{col}", "") for col in tbl["col_list"]}
+            map_list = []
+            for col in tbl["col_list"]:
+                choice = mappings.get(col, "")
+                if choice == "{curr_project_selected}":
+                    choice = project
+                map_list.append(choice)
+            try:
+                importer.set_token("curr_project_selected", project)
+                imported = importer.import_to_table(tbl["name"], csv_path, map_list)
+            except Exception as exc:
+                error = str(exc)
+        else:
+            mappings = {col: "" for col in (tbl["col_list"] if tbl else [])}
+    return render_template(
+        "tasks_import.html",
+        active_tab="tasks",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Import Tasks",
+        content_html="",
+        project=project,
+        table_def=tbl,
+        csv_path=csv_path,
+        csv_headers=headers,
+        mappings=mappings,
+        imported=imported,
+        error=error,
+    )

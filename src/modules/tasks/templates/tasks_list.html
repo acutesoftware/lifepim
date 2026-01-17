@@ -2,21 +2,24 @@
 {% block module_content %}
 <h1>Tasks</h1>
   <a href="{{ url_for('tasks.add_task_route', proj=project) }}">ホ Add Task</a>
+  <a href="{{ url_for('tasks.import_tasks_route', proj=project) }}">Import Tasks</a>
 
 <table border="1" cellpadding="5">
   <tr>
-    <th>Title</th>
-    <th>Project</th>
-    <th>Start</th>
-    <th>Due</th>
+    {% for col in col_list %}
+    {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
+    <th>
+      <a href="{{ url_for('tasks.list_tasks_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    {% endfor %}
     <th>Actions</th>
   </tr>
   {% for task in tasks %}
   <tr>
-    <td>{{ task.title }}</td>
-    <td>{{ task.project }}</td>
-    <td>{{ task.start_date }}</td>
-    <td>{{ task.due_date }}</td>
+    {% for col in col_list %}
+    <td>{{ task[col] }}</td>
+    {% endfor %}
     <td>
       <a href="{{ url_for('tasks.edit_task_route', task_id=task.id) }}">Edit</a> |
       <a href="{{ url_for('tasks.delete_task_route', task_id=task.id) }}" onclick="return confirm('Delete task?');">Del</a>

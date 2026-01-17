@@ -1,0 +1,41 @@
+<form method="POST" enctype="multipart/form-data">
+  <label>CSV File:</label><br>
+  <input type="file" name="csv_file" accept=".csv"><br>
+  <input type="hidden" name="csv_path" value="{{ csv_path or '' }}">
+  {% if csv_path %}
+    <p>Loaded file: {{ csv_path }}</p>
+  {% endif %}
+  <br>
+  <button type="submit" name="action" value="load">Load Columns</button>
+  <button type="submit" name="action" value="import">Import Now</button>
+  {% if error %}
+    <p>{{ error }}</p>
+  {% endif %}
+  {% if imported is not none %}
+    <p>Imported {{ imported }} rows.</p>
+  {% endif %}
+
+  {% if table_def %}
+  <h4>Column Mapping</h4>
+  <table border="1" cellpadding="5">
+    <tr><th>Table Column</th><th>CSV Column / Value</th></tr>
+    {% for col in table_def.col_list %}
+    <tr>
+      <td>{{ col }}</td>
+      <td>
+        <select name="map_{{ col }}">
+          <option value=""></option>
+          <option value="NULL" {% if mappings.get(col) == 'NULL' %}selected{% endif %}>NULL</option>
+          {% if col == 'project' %}
+          <option value="{curr_project_selected}" {% if mappings.get(col) == '{curr_project_selected}' %}selected{% endif %}>Use selected project</option>
+          {% endif %}
+          {% for header in csv_headers %}
+          <option value="{{ header }}" {% if mappings.get(col) == header %}selected{% endif %}>{{ header }}</option>
+          {% endfor %}
+        </select>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</form>

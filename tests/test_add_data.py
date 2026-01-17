@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 # coding: utf-8
-# test_area_data.py
+# test_add_data.py
 from datetime import date, timedelta
 import os
+import random
+import string
 import sys
 import unittest
 
@@ -13,47 +15,148 @@ if root_folder not in sys.path:
 from common import data, utils
 
 
+def _rand_text(prefix):
+    return f"{prefix}_{''.join(random.choice(string.ascii_lowercase) for _ in range(6))}"
+
+
+def _insert_rows(tbl, rows):
+    inserted_ids = []
+    for row in rows:
+        values = []
+        for idx, col in enumerate(tbl["col_list"]):
+            if idx < len(row):
+                values.append(row[idx])
+            else:
+                values.append("")
+        record_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
+        inserted_ids.append(record_id)
+    return inserted_ids
+
+
+def _fetch_ids(tbl, ids):
+    if not ids:
+        return []
+    placeholders = ",".join(["?"] * len(ids))
+    condition = f"id IN ({placeholders})"
+    rows = data.get_data(data.conn, tbl["name"], ["id"] + tbl["col_list"], condition, ids)
+    return [dict(row) for row in rows]
+
+
 class TestAddData(unittest.TestCase):
 
-    def test_01_add_data(self):
-        notes_tbl = utils.get_table_def("notes")
-        tasks_tbl = utils.get_table_def("tasks")
-        events_tbl = utils.get_table_def("calendar")
-
-        self.assertIsNotNone(notes_tbl)
-        self.assertIsNotNone(tasks_tbl)
-        self.assertIsNotNone(events_tbl)
-
-        # add 3 notes with dummy data
-        note_rows = [
-            ["howto - python", "Tips and snippets", "Dev"],
-            ["journal", "Daily notes", "Pers"],
-            ["ideas for game", "Gameplay loops and mechanics", "Games"],
+    def test_01_notes(self):
+        tbl = utils.get_table_def("notes")
+        self.assertIsNotNone(tbl)
+        rows = [
+            [_rand_text("note"), "Tips and snippets", "Dev"],
+            [_rand_text("note"), "Daily notes", ""],
+            [_rand_text("note"), "", "Games"],
+            [_rand_text("note"), "", ""],
+            [_rand_text("note"), "Meeting prep", "Work"],
+            [_rand_text("note"), "Loose ideas", "Pers"],
         ]
-        for row in note_rows:
-            note_id = data.add_record(data.conn, notes_tbl["name"], notes_tbl["col_list"], row)
-            self.assertIsNotNone(note_id)
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
 
-        # add 3 tasks - different due dates
+    def test_02_tasks(self):
+        tbl = utils.get_table_def("tasks")
+        self.assertIsNotNone(tbl)
         today = date.today()
-        task_rows = [
-            ["fix plumbing", "Call plumber and schedule", "Home", today.isoformat(), (today + timedelta(days=2)).isoformat()],
-            ["check files", "Review archive structure", "Work", today.isoformat(), (today + timedelta(days=7)).isoformat()],
-            ["plan trip", "Draft itinerary", "Fun", today.isoformat(), (today + timedelta(days=30)).isoformat()],
+        rows = [
+            [_rand_text("task"), "Call plumber", "Home", today.isoformat(), (today + timedelta(days=2)).isoformat()],
+            [_rand_text("task"), "", "Work", "", ""],
+            [_rand_text("task"), "Review archive", "Work", today.isoformat(), ""],
+            [_rand_text("task"), "Plan trip", "Fun", "", (today + timedelta(days=30)).isoformat()],
+            [_rand_text("task"), "", "", "", ""],
+            [_rand_text("task"), "Follow up", "Pers", today.isoformat(), today.isoformat()],
         ]
-        for row in task_rows:
-            task_id = data.add_record(data.conn, tasks_tbl["name"], tasks_tbl["col_list"], row)
-            self.assertIsNotNone(task_id)
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
 
-        # add 3 calendar events
-        event_rows = [
-            ["9am meeting", "Team sync", today.isoformat() + " 09:00", "", "Work"],
-            ["go to town", "Errands", (today + timedelta(days=1)).isoformat() + " 10:00", "", "Pers"],
-            ["run backup", "Monthly backup", (today + timedelta(days=30)).isoformat() + " 18:00", "", "Dev"],
+    def test_03_events(self):
+        tbl = utils.get_table_def("calendar")
+        self.assertIsNotNone(tbl)
+        today = date.today()
+        rows = [
+            [_rand_text("event"), "Team sync", today.isoformat() + " 09:00", "", "Work"],
+            [_rand_text("event"), "Errands", (today + timedelta(days=1)).isoformat() + " 10:00", "", "Pers"],
+            [_rand_text("event"), "Backup", (today + timedelta(days=30)).isoformat() + " 18:00", "", "Dev"],
+            [_rand_text("event"), "", today.isoformat(), "", ""],
+            [_rand_text("event"), "Lunch", today.isoformat() + " 12:00", "", "Work"],
+            [_rand_text("event"), "", "", "", ""],
         ]
-        for row in event_rows:
-            event_id = data.add_record(data.conn, events_tbl["name"], events_tbl["col_list"], row)
-            self.assertIsNotNone(event_id)
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
+
+    def test_04_goals(self):
+        tbl = utils.get_table_def("goals")
+        self.assertIsNotNone(tbl)
+        rows = [
+            ["", _rand_text("goal"), "Primary goal", date.today().isoformat(), "", "Work"],
+            ["", _rand_text("goal"), "", "", "", ""],
+            ["", _rand_text("goal"), "Secondary", "", "", "Pers"],
+            ["", _rand_text("goal"), "", "", "", "Dev"],
+            ["", _rand_text("goal"), "Long term", date.today().isoformat(), "", "Work"],
+            ["", _rand_text("goal"), "", "", "", ""],
+        ]
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
+
+    def test_05_how(self):
+        tbl = utils.get_table_def("how")
+        self.assertIsNotNone(tbl)
+        rows = [
+            ["", _rand_text("how"), "Process notes", "Work"],
+            ["", _rand_text("how"), "", ""],
+            ["", _rand_text("how"), "Checklist", "Dev"],
+            ["", _rand_text("how"), "", "Pers"],
+            ["", _rand_text("how"), "Template", "Work"],
+            ["", _rand_text("how"), "", ""],
+        ]
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
+
+    def test_06_data(self):
+        tbl = utils.get_table_def("data")
+        self.assertIsNotNone(tbl)
+        rows = [
+            [_rand_text("data"), "Source list", "tbl_notes", "title,content,project", "Work"],
+            [_rand_text("data"), "", "", "", ""],
+            [_rand_text("data"), "Tracking", "tbl_tasks", "title,project", "Dev"],
+            [_rand_text("data"), "", "", "", "Pers"],
+            [_rand_text("data"), "Registry", "tbl_files", "", "Work"],
+            [_rand_text("data"), "", "", "", ""],
+        ]
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
+
+    def test_07_files(self):
+        tbl = utils.get_table_def("files")
+        self.assertIsNotNone(tbl)
+        rows = [
+            [_rand_text("filelist"), r"C:\\", "Folder", "Work"],
+            [_rand_text("filelist"), r"C:\Windows", "", ""],
+            [_rand_text("filelist"), r"C:\Users", "Folder", "Pers"],
+            [_rand_text("filelist"), r"C:\Temp", "", "Dev"],
+            [_rand_text("filelist"), "", "", ""],
+            [_rand_text("filelist"), r"C:\\", "Folder", ""],
+        ]
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
 
 
 if __name__ == '__main__':

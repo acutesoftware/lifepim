@@ -1,9 +1,32 @@
 {% extends "layout.html" %}
 {% block module_content %}
+  <div>
+    <a href="{{ url_for('notes.list_notes_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('notes.list_notes_list_route', proj=project) }}">List</a> |
+    <a href="{{ url_for('notes.list_notes_cards_route', proj=project) }}">Card</a>
+  </div>
   <a href="{{ url_for('notes.add_note_route', proj=project) }}">ホ Add Note</a>
+  <a href="{{ url_for('notes.import_notes_route', proj=project) }}">Import Notes</a>
 
 <table border="1" cellpadding="5">
-  <tr><th>Title</th><th>Project</th><th>Created</th><th>Actions</th></tr>
+  <tr>
+    {% set dir_title = 'asc' if sort_col != 'title' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_project = 'asc' if sort_col != 'project' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_updated = 'asc' if sort_col != 'updated' or sort_dir == 'desc' else 'desc' %}
+    <th>
+      <a href="{{ url_for(route_name, proj=project, sort='title', dir=dir_title) }}">Title</a>
+      {% if sort_col == 'title' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, sort='project', dir=dir_project) }}">Project</a>
+      {% if sort_col == 'project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, sort='updated', dir=dir_updated) }}">Created</a>
+      {% if sort_col == 'updated' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>Actions</th>
+  </tr>
   {% for n in notes %}
   <tr>
     <td>{{ n.title }}</td>
