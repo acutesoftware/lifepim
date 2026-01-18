@@ -3,7 +3,8 @@ import os
 from flask import Blueprint, render_template, request, url_for, redirect
 
 from common import data as db
-from common.utils import get_side_tabs, get_table_def, get_tabs
+from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
+from common import config as cfg
 
 
 apps_bp = Blueprint(
@@ -19,17 +20,29 @@ def _get_tbl():
     return get_table_def("apps")
 
 
-def _fetch_items(project=None):
+def _fetch_items(project=None, sort_col=None, sort_dir=None, limit=None, offset=None):
     tbl = _get_tbl()
     if not tbl:
         return []
     cols = ["id"] + tbl["col_list"]
-    condition = "1=1"
-    params = []
-    if project:
-        condition = "project = ?"
-        params = [project]
-    rows = db.get_data(db.conn, tbl["name"], cols, condition, params)
+    order_map = {
+        "file_path": "t.file_path",
+        "title": "t.title",
+        "icon": "t.icon",
+        "project": "t.project",
+    }
+    sort_key = order_map.get(sort_col or "title", "t.title")
+    sort_dir = sort_dir or "asc"
+    order_by = f"{sort_key} {sort_dir}"
+    rows = db.get_mapped_rows(
+        db.conn,
+        tbl["name"],
+        cols,
+        tab=project,
+        limit=limit,
+        offset=offset,
+        order_by=order_by,
+    )
     return [dict(row) for row in rows]
 
 
@@ -50,8 +63,21 @@ def list_apps_table_route():
         project = None
     sort_col = request.args.get("sort") or "title"
     sort_dir = request.args.get("dir") or "asc"
-    items = _fetch_items(project)
-    items = _sort_items(items, sort_col, sort_dir)
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    offset = (page - 1) * per_page
+    items = _fetch_items(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "apps.list_apps_table_route",
+        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        page,
+        total_pages,
+    )
     tbl = _get_tbl()
     col_list = tbl["col_list"] if tbl else []
     return render_template(
@@ -66,6 +92,11 @@ def list_apps_table_route():
         project=project,
         sort_col=sort_col,
         sort_dir=sort_dir,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
 
 
@@ -74,7 +105,21 @@ def list_apps_list_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
-    items = _fetch_items(project)
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    offset = (page - 1) * per_page
+    items = _fetch_items(project, limit=per_page, offset=offset)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "apps.list_apps_list_route",
+        {"proj": project},
+        page,
+        total_pages,
+    )
     return render_template(
         "apps_list_list.html",
         active_tab="apps",
@@ -84,6 +129,11 @@ def list_apps_list_route():
         content_html="",
         items=items,
         project=project,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
 
 
@@ -92,7 +142,21 @@ def list_apps_cards_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
-    items = _fetch_items(project)
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    offset = (page - 1) * per_page
+    items = _fetch_items(project, limit=per_page, offset=offset)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "apps.list_apps_cards_route",
+        {"proj": project},
+        page,
+        total_pages,
+    )
     card_values = [[i.get("title"), i.get("file_path"), url_for("apps.view_app_route", item_id=i.get("id"))] for i in items]
     return render_template(
         "apps_list_cards.html",
@@ -104,6 +168,11 @@ def list_apps_cards_route():
         items=items,
         card_values=card_values,
         project=project,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
 
 
@@ -181,22 +250,23 @@ def import_apps_route():
             error = "Folder not found."
         else:
             count = 0
-            for name in os.listdir(folder_path):
-                if not name.lower().endswith(".exe"):
-                    continue
-                full_path = os.path.join(folder_path, name)
-                if not os.path.isfile(full_path):
-                    continue
-                title = os.path.splitext(name)[0]
-                values = [
-                    full_path,
-                    title,
-                    "",
-                    project,
-                ]
-                record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
-                if record_id:
-                    count += 1
+            for root, _, files in os.walk(folder_path):
+                for name in files:
+                    if not name.lower().endswith(".exe"):
+                        continue
+                    full_path = os.path.join(root, name)
+                    if not os.path.isfile(full_path):
+                        continue
+                    title = os.path.splitext(name)[0]
+                    values = [
+                        full_path,
+                        title,
+                        "",
+                        project,
+                    ]
+                    record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
+                    if record_id:
+                        count += 1
             imported = count
     return render_template(
         "apps_import.html",

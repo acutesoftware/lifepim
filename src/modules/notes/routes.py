@@ -1,29 +1,63 @@
 import os
 from datetime import datetime
 
-from flask import Blueprint, render_template, request, redirect, url_for, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort
 
 from common import data
 from utils import importer
 from utils import markdown_utils
 from utils import hex_utils
-from common.utils import get_tabs, get_side_tabs, get_table_def
+from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total, build_pagination
 from common import config as cfg
 
 notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
                      template_folder='templates', static_folder='static')
 
-def _fetch_notes(project):
+def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None):
     tbl = get_table_def("notes")
     if not tbl:
         return []
-    cols = ["id"] + tbl["col_list"] + ["rec_extract_date as updated"]
-    condition = "1=1"
+    cols = ["id"] + tbl["col_list"]
+    order_map = {
+        "file_name": "t.file_name",
+        "path": "t.path",
+        "folder_id": "t.folder_id",
+        "size": "t.size",
+        "project": "t.project",
+        "date_modified": "t.date_modified",
+        "updated": "t.rec_extract_date",
+        "derived_project": "derived_project",
+    }
+    sort_key = order_map.get(sort_col or "updated", "t.rec_extract_date")
+    sort_dir = sort_dir or "desc"
+    order_by = f"{sort_key} {sort_dir}"
+    select_cols = [f"t.{col}" for col in cols]
+    select_cols.append("t.rec_extract_date as updated")
+    select_cols.append("MAX(mpf.tab) as derived_project")
     params = []
-    if project:
-        condition = "project = ?"
-        params = [project]
-    rows = data.get_data(data.conn, tbl["name"], cols, condition, params)
+    if project and project.lower() == "unmapped":
+        condition = "mpf.folder_id IS NULL"
+    elif project:
+        condition = "lower(mpf.tab) = lower(?)"
+        params.append(project)
+    else:
+        condition = "1=1"
+    sql = (
+        f"SELECT {', '.join(select_cols)} "
+        f"FROM {tbl['name']} t "
+        "LEFT JOIN map_project_folder mpf "
+        "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+        f"WHERE {condition} "
+        "GROUP BY t.id "
+        f"ORDER BY {order_by}"
+    )
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+        if offset:
+            sql += " OFFSET ?"
+            params.append(int(offset))
+    rows = data._get_conn().execute(sql, params).fetchall()
     notes = [dict(row) for row in rows]
     for note in notes:
         note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
@@ -36,12 +70,47 @@ def list_notes_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    tbl = get_table_def("notes")
+    if not tbl:
+        return render_template(
+            "notes_list.html",
+            active_tab="notes",
+            tabs=get_tabs(),
+            side_tabs=get_side_tabs(),
+            content_title="Notes",
+            content_html="",
+            notes=[],
+            project=project,
+            sort_col="date_modified",
+            sort_dir="desc",
+            route_name="notes.list_notes_table_route",
+            page=1,
+            total_pages=1,
+            pages=[],
+            first_url=url_for("notes.list_notes_table_route"),
+            last_url=url_for("notes.list_notes_table_route"),
+        )
     view_pref = request.cookies.get("notes_view")
     if view_pref in ("list", "cards"):
         return redirect(url_for(f"notes.list_notes_{view_pref}_route", proj=project))
     sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
-    notes = _sort_notes(_fetch_notes(project), sort_col, sort_dir)
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    offset = (page - 1) * per_page
+    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    route_name = "notes.list_notes_table_route"
+    pagination = build_pagination(
+        url_for,
+        route_name,
+        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        page,
+        total_pages,
+    )
     resp = make_response(
         render_template(
         "notes_list.html",
@@ -54,7 +123,12 @@ def list_notes_route():
         project=project,
         sort_col=sort_col,
         sort_dir=sort_dir,
-        route_name="notes.list_notes_table_route",
+        route_name=route_name,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
     )
     resp.set_cookie("notes_view", "table")
@@ -68,9 +142,44 @@ def list_notes_table_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    tbl = get_table_def("notes")
+    if not tbl:
+        return render_template(
+            "notes_list.html",
+            active_tab="notes",
+            tabs=get_tabs(),
+            side_tabs=get_side_tabs(),
+            content_title="Notes",
+            content_html="",
+            notes=[],
+            project=project,
+            sort_col="date_modified",
+            sort_dir="desc",
+            route_name="notes.list_notes_table_route",
+            page=1,
+            total_pages=1,
+            pages=[],
+            first_url=url_for("notes.list_notes_table_route"),
+            last_url=url_for("notes.list_notes_table_route"),
+        )
     sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
-    notes = _sort_notes(_fetch_notes(project), sort_col, sort_dir)
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    offset = (page - 1) * per_page
+    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    route_name = "notes.list_notes_table_route"
+    pagination = build_pagination(
+        url_for,
+        route_name,
+        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        page,
+        total_pages,
+    )
     resp = make_response(
         render_template(
         "notes_list.html",
@@ -83,7 +192,12 @@ def list_notes_table_route():
         project=project,
         sort_col=sort_col,
         sort_dir=sort_dir,
-        route_name="notes.list_notes_table_route",
+        route_name=route_name,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
     )
     resp.set_cookie("notes_view", "table")
@@ -97,7 +211,38 @@ def list_notes_list_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
-    notes = _fetch_notes(project)
+    tbl = get_table_def("notes")
+    if not tbl:
+        return render_template(
+            "notes_list_list.html",
+            active_tab="notes",
+            tabs=get_tabs(),
+            side_tabs=get_side_tabs(),
+            content_title="Notes",
+            content_html="",
+            notes=[],
+            project=project,
+            page=1,
+            total_pages=1,
+            pages=[],
+            first_url=url_for("notes.list_notes_list_route"),
+            last_url=url_for("notes.list_notes_list_route"),
+        )
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    offset = (page - 1) * per_page
+    notes = _fetch_notes(project, limit=per_page, offset=offset)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "notes.list_notes_list_route",
+        {"proj": project},
+        page,
+        total_pages,
+    )
     resp = make_response(
         render_template(
         "notes_list_list.html",
@@ -108,6 +253,11 @@ def list_notes_list_route():
         content_html="",
         notes=notes,
         project=project,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
     )
     resp.set_cookie("notes_view", "list")
@@ -119,7 +269,40 @@ def list_notes_cards_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
-    notes = _fetch_notes(project)
+    tbl = get_table_def("notes")
+    if not tbl:
+        return render_template(
+            "notes_list_cards.html",
+            active_tab="notes",
+            tabs=get_tabs(),
+            side_tabs=get_side_tabs(),
+            content_title="Notes",
+            content_html="",
+            notes=[],
+            card_values=[],
+            project=project,
+            note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
+            page=1,
+            total_pages=1,
+            pages=[],
+            first_url=url_for("notes.list_notes_cards_route"),
+            last_url=url_for("notes.list_notes_cards_route"),
+        )
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    offset = (page - 1) * per_page
+    notes = _fetch_notes(project, limit=per_page, offset=offset)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "notes.list_notes_cards_route",
+        {"proj": project},
+        page,
+        total_pages,
+    )
     card_values = [
         [n.get("file_name"), n.get("path"), url_for("notes.view_note_route", note_id=n.get("id"))]
         for n in notes
@@ -136,6 +319,11 @@ def list_notes_cards_route():
         card_values=card_values,
         project=project,
         note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
     )
     resp.set_cookie("notes_view", "cards")
@@ -147,13 +335,18 @@ def view_note_route(note_id):
     tbl = get_table_def("notes")
     note = None
     if tbl:
-        rows = data.get_data(
-            data.conn,
-            tbl["name"],
-            ["id"] + tbl["col_list"] + ["rec_extract_date as updated"],
-            "id = ?",
-            [note_id],
+        select_cols = [f"t.{col}" for col in (["id"] + tbl["col_list"])]
+        select_cols.append("t.rec_extract_date as updated")
+        select_cols.append("MAX(mpf.tab) as derived_project")
+        sql = (
+            f"SELECT {', '.join(select_cols)} "
+            f"FROM {tbl['name']} t "
+            "LEFT JOIN map_project_folder mpf "
+            "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+            "WHERE t.id = ? "
+            "GROUP BY t.id"
         )
+        rows = data._get_conn().execute(sql, [note_id]).fetchall()
         if rows:
             note = dict(rows[0])
             note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
@@ -167,7 +360,10 @@ def view_note_route(note_id):
     content_html = ""
     hex_rows = []
     if render_mode == "markdown":
-        content_html = markdown_utils.render_markdown(note_text)
+        def _asset_url(asset_name):
+            return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
+
+        content_html = markdown_utils.render_markdown(note_text, asset_resolver=_asset_url)
     elif render_mode == "hex":
         hex_rows = hex_utils.hex_dump(note_text)
     return render_template(
@@ -185,6 +381,34 @@ def view_note_route(note_id):
         file_exists=file_exists,
         note_path=note_path,
     )
+
+
+@notes_bp.route('/asset/<int:note_id>/<path:asset_path>')
+def note_asset_route(note_id, asset_path):
+    tbl = get_table_def("notes")
+    if not tbl:
+        abort(404)
+    rows = data.get_data(
+        data.conn,
+        tbl["name"],
+        ["id"] + tbl["col_list"],
+        "id = ?",
+        [note_id],
+    )
+    if not rows:
+        abort(404)
+    note = dict(rows[0])
+    note_path = _build_note_path(note)
+    base_dir = os.path.dirname(note_path) if note_path else ""
+    if not base_dir or os.path.isabs(asset_path):
+        abort(404)
+    full_path = os.path.abspath(os.path.join(base_dir, asset_path))
+    base_dir = os.path.abspath(base_dir)
+    if not full_path.startswith(base_dir + os.sep):
+        abort(404)
+    if not os.path.isfile(full_path):
+        abort(404)
+    return send_file(full_path)
 
 @notes_bp.route('/add', methods=["GET", "POST"])
 def add_note_route():
@@ -330,25 +554,26 @@ def import_notes_folder_route():
             error = "Notes table not found."
         else:
             count = 0
-            for name in os.listdir(folder_path):
-                if not name.lower().endswith(".md"):
-                    continue
-                full_path = os.path.join(folder_path, name)
-                if not os.path.isfile(full_path):
-                    continue
-                values_map = {
-                    "file_name": name,
-                    "path": folder_path,
-                    "size": str(os.path.getsize(full_path)),
-                    "date_modified": datetime.fromtimestamp(os.path.getmtime(full_path)).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
-                    "project": project,
-                }
-                values = [values_map.get(col, "") for col in tbl["col_list"]]
-                record_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
-                if record_id:
-                    count += 1
+            for root, _, files in os.walk(folder_path):
+                for name in files:
+                    if not name.lower().endswith(".md"):
+                        continue
+                    full_path = os.path.join(root, name)
+                    if not os.path.isfile(full_path):
+                        continue
+                    values_map = {
+                        "file_name": name,
+                        "path": root,
+                        "size": str(os.path.getsize(full_path)),
+                        "date_modified": datetime.fromtimestamp(os.path.getmtime(full_path)).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "project": project,
+                    }
+                    values = [values_map.get(col, "") for col in tbl["col_list"]]
+                    record_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
+                    if record_id:
+                        count += 1
             imported = count
     return render_template(
         "notes_import_folder.html",

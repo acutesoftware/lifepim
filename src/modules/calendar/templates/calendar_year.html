@@ -5,11 +5,13 @@
     <a href="{{ url_for('calendar.month_view_route', year=year, month=1, proj=project) }}">Monthly</a> |
     <a href="{{ url_for('calendar.week_view_route', date=year ~ '-01-01', proj=project) }}">Weekly</a> |
     <a href="{{ url_for('calendar.day_view_route', date=year ~ '-01-01', proj=project) }}">Daily</a> |
-    <a href="{{ url_for('calendar.year_view_route', year=year, proj=project) }}">Yearly</a>
+    <a href="{{ url_for('calendar.year_view_route', year=year, proj=project) }}">Yearly</a> |
+    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">List</a>
   </div>
   <a class="calendar-nav" href="{{ url_for('calendar.year_view_route', year=year-1, proj=project) }}">Prev</a>
   <div class="calendar-title">{{ year }}</div>
   <a class="calendar-nav" href="{{ url_for('calendar.year_view_route', year=year+1, proj=project) }}">Next</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Today</a>
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
 

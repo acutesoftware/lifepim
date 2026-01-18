@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data
-from common.utils import get_tabs, get_side_tabs, get_table_def
+from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination
 import common.config as cfg
 from utils import importer
 
@@ -67,7 +67,7 @@ def _fetch_events(project=None, start_date=None, end_date=None):
     condition_parts = ["1=1"]
     params = []
     if project and project not in ("any", "All", "all", "ALL", "spacer"):
-        condition_parts.append("project = ?")
+        condition_parts.append("lower(project) = lower(?)")
         params.append(project)
     if start_date and end_date:
         condition_parts.append("event_date >= ? AND event_date < ?")
@@ -345,6 +345,80 @@ def year_view_route():
         col_bg_day=cfg.CAL_COL_BG_DAY,
         col_bg_weekend=cfg.CAL_COL_BG_WEEKEND,
         col_bg_today=cfg.CAL_COL_BG_TODAY,
+    )
+
+
+@calendar_bp.route("/list")
+def list_view_route():
+    project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
+    sort_col = request.args.get("sort") or "date"
+    sort_dir = request.args.get("dir") or "asc"
+    events = _fetch_events(project=project)
+    if sort_col == "time":
+        key_fn = lambda e: (e.get("time") or "", e.get("date") or "", e.get("title") or "")
+    elif sort_col == "title":
+        key_fn = lambda e: (e.get("title") or "", e.get("date") or "", e.get("time") or "")
+    elif sort_col == "project":
+        key_fn = lambda e: (e.get("project") or "", e.get("date") or "", e.get("time") or "")
+    else:
+        sort_col = "date"
+        key_fn = lambda e: (e.get("date") or "", e.get("time") or "", e.get("title") or "")
+    events.sort(key=key_fn, reverse=(sort_dir == "desc"))
+    page = request.args.get("page", type=int) or 1
+    page_data = paginate_items(events, page, cfg.RECS_PER_PAGE)
+    events = page_data["items"]
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "calendar.list_view_route",
+        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        page,
+        total_pages,
+    )
+    return render_template(
+        "calendar_list.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Events ({project or 'All'})",
+        content_html="",
+        events=events,
+        project=project,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
+        now=date.today(),
+    )
+
+
+@calendar_bp.route("/view/<int:event_id>")
+def view_event_route(event_id):
+    tbl = get_table_def("calendar")
+    event = None
+    if tbl:
+        rows = data.get_data(data.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [event_id])
+        if rows:
+            event = _event_from_row(rows[0])
+    if not event:
+        return redirect(url_for("calendar.month_view_route"))
+    view_date = _parse_date_param(event.get("date")) or date.today()
+    return render_template(
+        "calendar_view.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=event.get("title") or "Event",
+        content_html="",
+        event=event,
+        project=event.get("project"),
+        view_date=view_date,
     )
 
 

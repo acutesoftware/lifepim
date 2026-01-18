@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<div class="calendar-controls">
+  <div class="calendar-views">
+    <a href="{{ url_for('calendar.month_view_route', year=now.year, month=now.month, proj=project) }}">Monthly</a> |
+    <a href="{{ url_for('calendar.week_view_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
+    <a href="{{ url_for('calendar.year_view_route', year=now.year, proj=project) }}">Yearly</a> |
+    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">List</a>
+  </div>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Today</a>
+  <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Add Event</a>
+  <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
+</div>
+
+<table border="1" cellpadding="5">
+  <tr>
+    {% set dir_date = 'asc' if sort_col != 'date' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_time = 'asc' if sort_col != 'time' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_title = 'asc' if sort_col != 'title' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_project = 'asc' if sort_col != 'project' or sort_dir == 'desc' else 'desc' %}
+    <th>
+      <a href="{{ url_for('calendar.list_view_route', proj=project, sort='date', dir=dir_date) }}">Date</a>
+      {% if sort_col == 'date' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for('calendar.list_view_route', proj=project, sort='time', dir=dir_time) }}">Time</a>
+      {% if sort_col == 'time' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for('calendar.list_view_route', proj=project, sort='title', dir=dir_title) }}">Title</a>
+      {% if sort_col == 'title' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for('calendar.list_view_route', proj=project, sort='project', dir=dir_project) }}">Project</a>
+      {% if sort_col == 'project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>Actions</th>
+  </tr>
+  {% for ev in events %}
+  <tr>
+    <td>{{ ev.date }}</td>
+    <td>{{ ev.time }}</td>
+    <td>{{ ev.title }}</td>
+    <td>{{ ev.project }}</td>
+    <td>
+      <a href="{{ url_for('calendar.view_event_route', event_id=ev.id, proj=project) }}">View</a> |
+      <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id, proj=project) }}">Edit</a> |
+      <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id, proj=project) }}" onclick="return confirm('Delete event?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% include "widgets/wid_pagination.html" %}
+{% endblock %}

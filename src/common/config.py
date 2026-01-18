@@ -17,6 +17,12 @@ index_folder = os.path.join(user_folder, 'index')
 calendar_folder = os.path.join(user_folder, 'calendar')
 folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 export_data_folder_base = os.path.join(user_folder, 'export_data')
+etl_folders_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv"
+etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv"
+PATH_ALIASES = [
+    (r"E:\BK_fangorn\user\duncan", r"N:\duncan"),
+    (r"E:\BK_fangorn\user", r"N:\\"),
+]
 
 
 #db_name = os.path.join(user_folder, 'DATA', 'SQL', 'lifepim.db')
@@ -39,20 +45,20 @@ print('DB_FILE = ' + DB_FILE)
 #  column name contains 'amount', 'total', 'num_' = NUMBER
 #  
 table_def = [
-	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'size', 'date_modified', 'project']},
+	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'folder_id', 'size', 'date_modified', 'project']},
 	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'project', 'start_date', 'due_date']},
 	{'name':'lp_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
-	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
-	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'artist', 'album', 'song', 'project']},
-	{'name':'lp_3d', 'route':'3d', 'display_name':'3D', 'col_list':['file_name','path', 'size', 'date_modified', 'project']},
-	{'name':'lp_apps', 'route':'apps', 'display_name':'Apps', 'col_list':['file_path','title','icon', 'project']},
+	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
+	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'artist', 'album', 'song', 'project']},
+	{'name':'lp_3d', 'route':'3d', 'display_name':'3D', 'col_list':['file_name','path', 'folder_id', 'size', 'date_modified', 'project']},
+	{'name':'lp_apps', 'route':'apps', 'display_name':'Apps', 'col_list':['file_path', 'folder_id', 'title','icon', 'project']},
 
 	{'name':'lp_goals', 'route':'goals', 'display_name':'Goals', 'col_list':['parent_goal_id', 'title','description', 'goal_date', 'remind_date', 'project']},
 	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'project']},
 	{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'project']},
-	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'file_type', 'project']},
+	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'folder_id', 'file_type', 'project']},
 
-	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
+	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
 	
 
 ]
@@ -67,6 +73,9 @@ There should not be separate get_tasks, add_tasks in the data.py
 
 # ----------------------------------------------------------------------------
 # Interface configuration
+
+# Pagination
+RECS_PER_PAGE = 200
 
 # Project list default
 proj_list = ['Dev','Design','Fun','Games','Family','Car',
@@ -165,7 +174,7 @@ TABS = [  #Tabs across top of LifePIM
     { 'icon': '🎮', 'id': 'apps', 'label': 'Apps', 'desc': 'Apps'},
     #{ 'icon': '💻', 'id': 'etl', 'label': 'ETL', 'desc': 'ETL'},
     # { 'icon': '📜', 'id': 'logs', 'label': 'Logs', 'desc': 'Journal / Logs'},
-    #{ 'icon': '⚙', 'id': 'admin', 'label': 'Admin', 'desc': 'Admin'},
+    { 'icon': '⚙', 'id': 'admin', 'label': 'Admin', 'desc': 'Admin'},
     { 'icon': '🤖', 'id': 'agent', 'label': 'Agent', 'desc': 'Agent'},
 ]
 

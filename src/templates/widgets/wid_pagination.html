@@ -1,0 +1,13 @@
+{% if total_pages and total_pages > 1 %}
+  <div style="margin:8px 0;">
+    <a href="{{ first_url }}">&lt;first&gt;</a>
+    {% for p in pages %}
+      {% if p.current %}
+        <span>[{{ p.num }}]</span>
+      {% else %}
+        <a href="{{ p.url }}">[{{ p.num }}]</a>
+      {% endif %}
+    {% endfor %}
+    <a href="{{ last_url }}">&lt;last&gt;</a>
+  </div>
+{% endif %}

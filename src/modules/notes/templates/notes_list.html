@@ -12,8 +12,10 @@
   <tr>
     {% set dir_file = 'asc' if sort_col != 'file_name' or sort_dir == 'desc' else 'desc' %}
     {% set dir_path = 'asc' if sort_col != 'path' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_folder_id = 'asc' if sort_col != 'folder_id' or sort_dir == 'desc' else 'desc' %}
     {% set dir_size = 'asc' if sort_col != 'size' or sort_dir == 'desc' else 'desc' %}
     {% set dir_project = 'asc' if sort_col != 'project' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_derived = 'asc' if sort_col != 'derived_project' or sort_dir == 'desc' else 'desc' %}
     {% set dir_modified = 'asc' if sort_col != 'date_modified' or sort_dir == 'desc' else 'desc' %}
     <th>
       <a href="{{ url_for(route_name, proj=project, sort='file_name', dir=dir_file) }}">File</a>
@@ -24,12 +26,20 @@
       {% if sort_col == 'path' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
+      <a href="{{ url_for(route_name, proj=project, sort='folder_id', dir=dir_folder_id) }}">Folder ID</a>
+      {% if sort_col == 'folder_id' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
       <a href="{{ url_for(route_name, proj=project, sort='size', dir=dir_size) }}">Size</a>
       {% if sort_col == 'size' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
       <a href="{{ url_for(route_name, proj=project, sort='project', dir=dir_project) }}">Project</a>
       {% if sort_col == 'project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, sort='derived_project', dir=dir_derived) }}">Derived</a>
+      {% if sort_col == 'derived_project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
       <a href="{{ url_for(route_name, proj=project, sort='date_modified', dir=dir_modified) }}">Modified</a>
@@ -41,8 +51,10 @@
   <tr>
     <td>{{ n.file_name }}</td>
     <td>{{ n.path }}</td>
+    <td>{{ n.folder_id }}</td>
     <td>{{ n.size }}</td>
     <td>{{ n.project }}</td>
+    <td>{{ n.derived_project }}</td>
     <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
     <td>
       <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">View</a> |
@@ -52,4 +64,5 @@
   </tr>
   {% endfor %}
 </table>
+  {% include "widgets/wid_pagination.html" %}
 {% endblock %}

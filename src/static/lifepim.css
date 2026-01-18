@@ -67,6 +67,23 @@ body {
   gap: 3px;
 }
 
+.search-form {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.search-form input[type="text"] {
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.search-form button {
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
 .top-tab-item {
   padding: 2px 6px;
   border-radius: 4px;

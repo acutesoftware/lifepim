@@ -5,11 +5,13 @@
     <a href="{{ url_for('calendar.month_view_route', year=view_date.year, month=view_date.month, proj=project) }}">Monthly</a> |
     <a href="{{ url_for('calendar.week_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
     <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
-    <a href="{{ url_for('calendar.year_view_route', year=view_date.year, proj=project) }}">Yearly</a>
+    <a href="{{ url_for('calendar.year_view_route', year=view_date.year, proj=project) }}">Yearly</a> |
+    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">List</a>
   </div>
   <a class="calendar-nav" href="{{ url_for('calendar.week_view_route', date=prev_week.strftime('%Y-%m-%d'), proj=project) }}">Prev</a>
   <div class="calendar-title">Week of {{ week_days[0].strftime('%Y-%m-%d') }}</div>
   <a class="calendar-nav" href="{{ url_for('calendar.week_view_route', date=next_week.strftime('%Y-%m-%d'), proj=project) }}">Next</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Today</a>
   <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Add Event</a>
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
@@ -53,6 +55,7 @@
         <div class="calendar-event">
           <span class="calendar-title-text">{{ ev.title }}</span>
           <span class="calendar-actions">
+            <a href="{{ url_for('calendar.view_event_route', event_id=ev.id) }}">View</a>
             <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
             <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=day.year, month=day.month, proj=project) }}" onclick="return confirm('Delete event?');">Del</a>
           </span>
@@ -84,6 +87,7 @@
         <div class="calendar-event">
           <span class="calendar-title-text">{{ ev.title }}</span>
           <span class="calendar-actions">
+            <a href="{{ url_for('calendar.view_event_route', event_id=ev.id) }}">View</a>
             <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
             <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=day.year, month=day.month, proj=project) }}" onclick="return confirm('Delete event?');">Del</a>
           </span>

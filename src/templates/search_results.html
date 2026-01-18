@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <strong>Query:</strong> {{ query or '' }}
+    {% if project %}<span> | <strong>Project:</strong> {{ project }}</span>{% endif %}
+    {% if route %}<span> | <strong>Tab:</strong> {{ route }}</span>{% endif %}
+  </div>
+
+  {% if not query %}
+    <p>Enter a search term to see results.</p>
+  {% else %}
+    {% if results_primary %}
+      <h4>Matches in current context</h4>
+      <table border="1" cellpadding="5">
+        <tr>
+          <th>Table</th>
+          <th>ID</th>
+          <th>Match</th>
+        </tr>
+        {% for item in results_primary %}
+        <tr>
+          <td>{{ item.table }}</td>
+          <td><a href="{{ item.url }}">{{ item.id }}</a></td>
+          <td>{{ item.match_field }}: {{ item.match_snippet }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+
+    {% if results_secondary %}
+      <h4>Other matches</h4>
+      <table border="1" cellpadding="5">
+        <tr>
+          <th>Table</th>
+          <th>ID</th>
+          <th>Match</th>
+        </tr>
+        {% for item in results_secondary %}
+        <tr>
+          <td>{{ item.table }}</td>
+          <td><a href="{{ item.url }}">{{ item.id }}</a></td>
+          <td>{{ item.match_field }}: {{ item.match_snippet }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+
+    {% if query and not results_primary and not results_secondary %}
+      <p>No matches found.</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

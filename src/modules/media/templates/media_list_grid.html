@@ -28,12 +28,5 @@
     {% endfor %}
   </div>
 
-  <div style="margin-top:8px;">
-    {% if page > 1 %}
-      <a href="{{ url_for('media.list_media_grid_route', proj=project, page=page-1) }}">Prev</a>
-    {% endif %}
-    {% if has_next %}
-      <a href="{{ url_for('media.list_media_grid_route', proj=project, page=page+1) }}">Next</a>
-    {% endif %}
-  </div>
+  {% include "widgets/wid_pagination.html" %}
 {% endblock %}

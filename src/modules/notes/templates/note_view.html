@@ -15,9 +15,11 @@
     <table border="1" cellpadding="4">
       <tr><th>File</th><td>{{ note.file_name }}</td></tr>
       <tr><th>Path</th><td>{{ note.path }}</td></tr>
+      <tr><th>Folder ID</th><td>{{ note.folder_id }}</td></tr>
       <tr><th>Size</th><td>{{ note.size }}</td></tr>
       <tr><th>Date Modified</th><td>{{ note.date_modified }}</td></tr>
       <tr><th>Project</th><td>{{ note.project }}</td></tr>
+      <tr><th>Derived Project</th><td>{{ note.derived_project }}</td></tr>
       <tr><th>Updated</th><td>{{ note.updated.strftime('%Y-%m-%d %H:%M') }}</td></tr>
     </table>
 

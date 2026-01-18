@@ -4,7 +4,8 @@ import sqlite3
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
-from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs
+from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs, paginate_items, build_pagination
+from common import config as cfg
 
 
 data_bp = Blueprint(
@@ -74,11 +75,23 @@ def list_data_route():
         condition = "1=1"
         params = []
         if project and "project" in col_list:
-            condition = "project = ?"
+            condition = "lower(project) = lower(?)"
             params = [project]
         rows = db.get_data(db.conn, tbl["name"], cols, condition, params)
         items = [dict(row) for row in rows]
         content_title = f"{tbl['display_name']} ({project or 'All'})"
+    page = request.args.get("page", type=int) or 1
+    page_data = paginate_items(items, page, cfg.RECS_PER_PAGE)
+    items = page_data["items"]
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "data.list_data_route",
+        {"proj": project},
+        page,
+        total_pages,
+    )
     return render_template(
         "data_list.html",
         active_tab="data",
@@ -89,6 +102,11 @@ def list_data_route():
         items=items,
         col_list=col_list,
         project=project,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
 
 
@@ -242,23 +260,24 @@ def import_data_db_folder_route():
         error = "Data table not found."
     else:
         count = 0
-        for name in os.listdir(folder_path):
-            if not name.lower().endswith(".db"):
-                continue
-            full_path = os.path.join(folder_path, name)
-            if not os.path.isfile(full_path):
-                continue
-            short_name = os.path.splitext(os.path.basename(full_path))[0]
-            values = [
-                short_name,
-                "SQLite database",
-                full_path,
-                "",
-                project,
-            ]
-            record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
-            if record_id:
-                count += 1
+        for root, _, files in os.walk(folder_path):
+            for name in files:
+                if not name.lower().endswith(".db"):
+                    continue
+                full_path = os.path.join(root, name)
+                if not os.path.isfile(full_path):
+                    continue
+                short_name = os.path.splitext(os.path.basename(full_path))[0]
+                values = [
+                    short_name,
+                    "SQLite database",
+                    full_path,
+                    "",
+                    project,
+                ]
+                record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
+                if record_id:
+                    count += 1
         imported = count
     return render_template(
         "data_import_db.html",

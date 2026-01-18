@@ -4,7 +4,8 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
-from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs
+from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
+from common import config as cfg
 
 
 files_bp = Blueprint(
@@ -167,17 +168,42 @@ def list_files_route():
     items = []
     col_list = []
     content_title = "Files"
+    page = request.args.get("page", type=int) or 1
+    total_pages = 1
+    pagination = build_pagination(
+        url_for,
+        "files.list_files_route",
+        {"proj": project},
+        1,
+        1,
+    )
     if tbl:
         col_list = tbl["col_list"]
         cols = ["id"] + col_list
-        condition = "1=1"
-        params = []
-        if project and "project" in col_list:
-            condition = "project = ?"
-            params = [project]
-        rows = db.get_data(db.conn, tbl["name"], cols, condition, params)
+        per_page = cfg.RECS_PER_PAGE
+        total = db.count_mapped_rows(db.conn, tbl["name"], tab=project)
+        offset = (page - 1) * per_page
+        rows = db.get_mapped_rows(
+            db.conn,
+            tbl["name"],
+            cols,
+            tab=project,
+            limit=per_page,
+            offset=offset,
+            order_by="t.id DESC",
+        )
         items = [dict(row) for row in rows]
         content_title = f"{tbl['display_name']} ({project or 'All'})"
+        page_data = paginate_total(total, page, per_page)
+        page = page_data["page"]
+        total_pages = page_data["total_pages"]
+        pagination = build_pagination(
+            url_for,
+            "files.list_files_route",
+            {"proj": project},
+            page,
+            total_pages,
+        )
     return render_template(
         "files_list.html",
         active_tab="files",
@@ -188,6 +214,11 @@ def list_files_route():
         items=items,
         col_list=col_list,
         project=project,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
 
 

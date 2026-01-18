@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
-from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs
+from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs, paginate_items, build_pagination
+from common import config as cfg
 
 
 goals_bp = Blueprint(
@@ -42,11 +43,23 @@ def list_goals_route():
         condition = "1=1"
         params = []
         if project and "project" in col_list:
-            condition = "project = ?"
+            condition = "lower(project) = lower(?)"
             params = [project]
         rows = db.get_data(db.conn, tbl["name"], cols, condition, params)
         items = [dict(row) for row in rows]
         content_title = f"{tbl['display_name']} ({project or 'All'})"
+    page = request.args.get("page", type=int) or 1
+    page_data = paginate_items(items, page, cfg.RECS_PER_PAGE)
+    items = page_data["items"]
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "goals.list_goals_route",
+        {"proj": project},
+        page,
+        total_pages,
+    )
     return render_template(
         "goals_list.html",
         active_tab="goals",
@@ -57,6 +70,11 @@ def list_goals_route():
         items=items,
         col_list=col_list,
         project=project,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
 
 

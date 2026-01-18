@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div style="margin-bottom:8px;">
+    <form method="post" style="display:inline;">
+      <input type="hidden" name="action" value="rebuild">
+      <button type="submit">Rebuild folder cache</button>
+    </form>
+    {% if message %}<span style="margin-left:8px;">{{ message }}</span>{% endif %}
+  </div>
+  <div style="margin-bottom:8px;">
+    <strong>DB:</strong> {{ db_file }}
+    {% if counts %}
+      <span style="margin-left:8px;">map_folder_project={{ counts.map_folder_project }}</span>
+      <span style="margin-left:8px;">map_project_folder={{ counts.map_project_folder }}</span>
+      <span style="margin-left:8px;">dim_folder={{ counts.dim_folder }}</span>
+    {% endif %}
+  </div>
+
+  <h4>Mapping rules (map_folder_project)</h4>
+  <table border="1" cellpadding="5">
+    <tr>
+      <th>map_id</th>
+      <th>path_prefix</th>
+      <th>tab</th>
+      <th>grp</th>
+      <th>project</th>
+      <th>tags</th>
+      <th>confidence</th>
+      <th>priority</th>
+      <th>primary</th>
+      <th>enabled</th>
+    </tr>
+    {% for row in rules %}
+    <tr>
+      <td>{{ row.map_id }}</td>
+      <td>{{ row.path_prefix }}</td>
+      <td>{{ row.tab }}</td>
+      <td>{{ row.grp }}</td>
+      <td>{{ row.project }}</td>
+      <td>{{ row.tags }}</td>
+      <td>{{ row.confidence }}</td>
+      <td>{{ row.priority }}</td>
+      <td>{{ row.is_primary }}</td>
+      <td>{{ row.is_enabled }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h4>Folders (dim_folder)</h4>
+  <div style="margin-bottom:6px;">
+    {% if unmapped_only %}
+      <a href="{{ url_for('admin.admin_mapping_route') }}">Show all folders</a>
+    {% else %}
+      <a href="{{ url_for('admin.admin_mapping_route', unmapped=1) }}">Show unmapped only</a>
+    {% endif %}
+  </div>
+  <table border="1" cellpadding="5">
+    <tr>
+      <th>folder_id</th>
+      <th>folder_path</th>
+      <th>is_active</th>
+      <th>last_seen_at</th>
+    </tr>
+    {% for row in folders %}
+    <tr>
+      <td>{{ row.folder_id }}</td>
+      <td>{{ row.folder_path }}</td>
+      <td>{{ row.is_active }}</td>
+      <td>{{ row.last_seen_at }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

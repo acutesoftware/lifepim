@@ -1,5 +1,7 @@
 from datetime import datetime
+import math
 import common.config as mod_cfg
+from common import data as db
 
 def format_date(dt):
     if isinstance(dt, str):
@@ -11,8 +13,81 @@ def get_tabs():
     return mod_cfg.TABS
 
 
+def _fetch_mapping_tabs():
+    try:
+        rows = db.get_data(
+            db.conn,
+            "map_folder_project",
+            ["tab"],
+            "is_enabled = 1 AND is_primary = 1",
+            [],
+        )
+    except Exception:
+        return []
+    tabs = []
+    for row in rows:
+        tab = (row["tab"] or "").strip()
+        if tab and tab not in tabs:
+            tabs.append(tab)
+    return tabs
+
+
+def _norm_tab_value(value):
+    return "".join(ch for ch in (value or "").lower() if ch.isalnum())
+
+
 def get_side_tabs():
-    return mod_cfg.SIDE_TABS
+    mapping_tabs = _fetch_mapping_tabs()
+    tabs = list(mod_cfg.SIDE_TABS)
+    if not any(t.get("id") == "Unmapped" for t in tabs):
+        tabs.insert(1, {"icon": "", "id": "Unmapped", "label": "Unmapped"})
+    if not mapping_tabs:
+        return tabs
+    mapping_by_lower = {t.lower(): t for t in mapping_tabs}
+    mapping_by_norm = { _norm_tab_value(t): t for t in mapping_tabs if _norm_tab_value(t) }
+    ordered = [
+        {"icon": "*", "id": "All", "label": "All Projects"},
+        {"icon": "", "id": "Unmapped", "label": "Unmapped"},
+    ]
+    seen = {"All", "Unmapped"}
+    for t in tabs:
+        tab_id = t.get("id")
+        label = t.get("label") or ""
+        if tab_id == "spacer":
+            mapping_value = mapping_by_lower.get(label.lower())
+            if not mapping_value:
+                mapping_value = mapping_by_norm.get(_norm_tab_value(label))
+            if mapping_value:
+                if mapping_value in seen:
+                    continue
+                entry = dict(t)
+                entry["id"] = mapping_value
+                ordered.append(entry)
+                seen.add(mapping_value)
+            else:
+                ordered.append(dict(t))
+            continue
+        if tab_id in ("All",):
+            continue
+        mapping_value = mapping_by_lower.get(tab_id.lower()) or mapping_by_lower.get(label.lower())
+        if not mapping_value:
+            mapping_value = mapping_by_norm.get(_norm_tab_value(label))
+        if not mapping_value and tab_id:
+            mapping_value = tab_id
+        if not mapping_value:
+            continue
+        if mapping_value in seen:
+            continue
+        entry = dict(t)
+        entry["id"] = mapping_value
+        ordered.append(entry)
+        seen.add(mapping_value)
+    for mapping_value in mapping_tabs:
+        if mapping_value in seen:
+            continue
+        ordered.append({"icon": "", "id": mapping_value, "label": mapping_value})
+        seen.add(mapping_value)
+    return ordered
 
 def get_table_def(route_id):
     for tbl in mod_cfg.table_def:
@@ -40,4 +115,57 @@ def build_form_fields(col_list):
             }
         )
     return fields
+
+
+def paginate_items(items, page, per_page):
+    per_page = max(1, int(per_page or 1))
+    total = len(items)
+    total_pages = max(1, int(math.ceil(total / per_page))) if total else 1
+    page = int(page or 1)
+    if page < 1:
+        page = 1
+    if page > total_pages:
+        page = total_pages
+    start = (page - 1) * per_page
+    end = start + per_page
+    return {
+        "items": items[start:end],
+        "page": page,
+        "total_pages": total_pages,
+        "page_numbers": list(range(1, total_pages + 1)),
+        "total": total,
+    }
+
+
+def paginate_total(total, page, per_page):
+    per_page = max(1, int(per_page or 1))
+    total_pages = max(1, int(math.ceil(total / per_page))) if total else 1
+    page = int(page or 1)
+    if page < 1:
+        page = 1
+    if page > total_pages:
+        page = total_pages
+    return {
+        "page": page,
+        "total_pages": total_pages,
+        "page_numbers": list(range(1, total_pages + 1)),
+        "total": total,
+    }
+
+
+def build_pagination(url_for_fn, route_name, base_args, page, total_pages):
+    pages = []
+    for num in range(1, total_pages + 1):
+        args = dict(base_args)
+        args["page"] = num
+        pages.append({"num": num, "url": url_for_fn(route_name, **args), "current": num == page})
+    first_args = dict(base_args)
+    first_args["page"] = 1
+    last_args = dict(base_args)
+    last_args["page"] = total_pages
+    return {
+        "pages": pages,
+        "first_url": url_for_fn(route_name, **first_args),
+        "last_url": url_for_fn(route_name, **last_args),
+    }
 

@@ -19,6 +19,16 @@ def _rand_text(prefix):
     return f"{prefix}_{''.join(random.choice(string.ascii_lowercase) for _ in range(6))}"
 
 
+def _rand_date(start, end):
+    delta = end - start
+    return start + timedelta(days=random.randint(0, max(delta.days, 0)))
+
+
+def _rand_dt(start, end):
+    dt = _rand_date(start, end)
+    return f"{dt.isoformat()} {random.randint(0, 23):02d}:{random.choice([0, 15, 30, 45]):02d}"
+
+
 def _insert_rows(tbl, rows):
     inserted_ids = []
     for row in rows:
@@ -47,14 +57,16 @@ class TestAddData(unittest.TestCase):
     def test_01_notes(self):
         tbl = utils.get_table_def("notes")
         self.assertIsNotNone(tbl)
-        rows = [
-            [_rand_text("note") + ".md", r"C:\\Notes", "120", "2024-01-02 10:00:00", "Dev"],
-            [_rand_text("note") + ".md", r"C:\\Notes", "44", "2024-01-03 09:30:00", ""],
-            [_rand_text("note") + ".md", r"C:\\Notes", "", "", "Games"],
-            [_rand_text("note") + ".md", r"C:\\Notes", "", "", ""],
-            [_rand_text("note") + ".md", r"C:\\Notes", "256", "2024-02-10 08:15:00", "Work"],
-            [_rand_text("note") + ".md", r"C:\\Notes", "10", "2024-03-01 12:00:00", "Pers"],
-        ]
+        projects = ["Dev", "Work", "Pers", "Games", ""]
+        rows = []
+        for _ in range(10):
+            rows.append([
+                _rand_text("note") + ".md",
+                r"C:\\Notes",
+                str(random.randint(1, 500)) if random.random() > 0.2 else "",
+                _rand_dt(date.today() - timedelta(days=90), date.today()) if random.random() > 0.2 else "",
+                random.choice(projects),
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)
@@ -64,14 +76,18 @@ class TestAddData(unittest.TestCase):
         tbl = utils.get_table_def("tasks")
         self.assertIsNotNone(tbl)
         today = date.today()
-        rows = [
-            [_rand_text("task"), "Call plumber", "Home", today.isoformat(), (today + timedelta(days=2)).isoformat()],
-            [_rand_text("task"), "", "Work", "", ""],
-            [_rand_text("task"), "Review archive", "Work", today.isoformat(), ""],
-            [_rand_text("task"), "Plan trip", "Fun", "", (today + timedelta(days=30)).isoformat()],
-            [_rand_text("task"), "", "", "", ""],
-            [_rand_text("task"), "Follow up", "Pers", today.isoformat(), today.isoformat()],
-        ]
+        projects = ["Home", "Work", "Fun", "Pers", ""]
+        rows = []
+        for _ in range(10):
+            start_date = _rand_date(today - timedelta(days=7), today) if random.random() > 0.2 else None
+            due_date = _rand_date(today, today + timedelta(days=30)) if random.random() > 0.3 else None
+            rows.append([
+                _rand_text("task"),
+                _rand_text("desc") if random.random() > 0.2 else "",
+                random.choice(projects),
+                start_date.isoformat() if start_date else "",
+                due_date.isoformat() if due_date else "",
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)
@@ -81,14 +97,16 @@ class TestAddData(unittest.TestCase):
         tbl = utils.get_table_def("calendar")
         self.assertIsNotNone(tbl)
         today = date.today()
-        rows = [
-            [_rand_text("event"), "Team sync", today.isoformat() + " 09:00", "", "Work"],
-            [_rand_text("event"), "Errands", (today + timedelta(days=1)).isoformat() + " 10:00", "", "Pers"],
-            [_rand_text("event"), "Backup", (today + timedelta(days=30)).isoformat() + " 18:00", "", "Dev"],
-            [_rand_text("event"), "", today.isoformat(), "", ""],
-            [_rand_text("event"), "Lunch", today.isoformat() + " 12:00", "", "Work"],
-            [_rand_text("event"), "", "", "", ""],
-        ]
+        projects = ["Work", "Pers", "Dev", ""]
+        rows = []
+        for _ in range(10):
+            rows.append([
+                _rand_text("event"),
+                _rand_text("title") if random.random() > 0.2 else "",
+                _rand_dt(today, today + timedelta(days=30)) if random.random() > 0.1 else "",
+                "",
+                random.choice(projects),
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)
@@ -97,14 +115,17 @@ class TestAddData(unittest.TestCase):
     def test_04_goals(self):
         tbl = utils.get_table_def("goals")
         self.assertIsNotNone(tbl)
-        rows = [
-            ["", _rand_text("goal"), "Primary goal", date.today().isoformat(), "", "Work"],
-            ["", _rand_text("goal"), "", "", "", ""],
-            ["", _rand_text("goal"), "Secondary", "", "", "Pers"],
-            ["", _rand_text("goal"), "", "", "", "Dev"],
-            ["", _rand_text("goal"), "Long term", date.today().isoformat(), "", "Work"],
-            ["", _rand_text("goal"), "", "", "", ""],
-        ]
+        projects = ["Work", "Pers", "Dev", ""]
+        rows = []
+        for _ in range(10):
+            rows.append([
+                "",
+                _rand_text("goal"),
+                _rand_text("desc") if random.random() > 0.3 else "",
+                _rand_date(date.today() - timedelta(days=30), date.today()).isoformat() if random.random() > 0.3 else "",
+                "",
+                random.choice(projects),
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)
@@ -113,14 +134,15 @@ class TestAddData(unittest.TestCase):
     def test_05_how(self):
         tbl = utils.get_table_def("how")
         self.assertIsNotNone(tbl)
-        rows = [
-            ["", _rand_text("how"), "Process notes", "Work"],
-            ["", _rand_text("how"), "", ""],
-            ["", _rand_text("how"), "Checklist", "Dev"],
-            ["", _rand_text("how"), "", "Pers"],
-            ["", _rand_text("how"), "Template", "Work"],
-            ["", _rand_text("how"), "", ""],
-        ]
+        projects = ["Work", "Dev", "Pers", ""]
+        rows = []
+        for _ in range(10):
+            rows.append([
+                "",
+                _rand_text("how"),
+                _rand_text("body") if random.random() > 0.3 else "",
+                random.choice(projects),
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)
@@ -129,14 +151,18 @@ class TestAddData(unittest.TestCase):
     def test_06_data(self):
         tbl = utils.get_table_def("data")
         self.assertIsNotNone(tbl)
-        rows = [
-            [_rand_text("data"), "Source list", "tbl_notes", "title,content,project", "Work"],
-            [_rand_text("data"), "", "", "", ""],
-            [_rand_text("data"), "Tracking", "tbl_tasks", "title,project", "Dev"],
-            [_rand_text("data"), "", "", "", "Pers"],
-            [_rand_text("data"), "Registry", "tbl_files", "", "Work"],
-            [_rand_text("data"), "", "", "", ""],
-        ]
+        tables = ["tbl_notes", "tbl_tasks", "tbl_files", "tbl_calendar", ""]
+        projects = ["Work", "Dev", "Pers", ""]
+        fields = ["title,content,project", "title,project", "file_name,path", ""]
+        rows = []
+        for _ in range(10):
+            rows.append([
+                _rand_text("data"),
+                _rand_text("desc") if random.random() > 0.2 else "",
+                random.choice(tables),
+                random.choice(fields),
+                random.choice(projects),
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)
@@ -145,14 +171,16 @@ class TestAddData(unittest.TestCase):
     def test_07_files(self):
         tbl = utils.get_table_def("files")
         self.assertIsNotNone(tbl)
-        rows = [
-            [_rand_text("filelist"), r"C:\\", "Folder", "Work"],
-            [_rand_text("filelist"), r"C:\Windows", "", ""],
-            [_rand_text("filelist"), r"C:\Users", "Folder", "Pers"],
-            [_rand_text("filelist"), r"C:\Temp", "", "Dev"],
-            [_rand_text("filelist"), "", "", ""],
-            [_rand_text("filelist"), r"C:\\", "Folder", ""],
-        ]
+        roots = [r"C:\\", r"C:\\Windows", r"C:\\Users", r"C:\\Temp", ""]
+        projects = ["Work", "Pers", "Dev", ""]
+        rows = []
+        for _ in range(10):
+            rows.append([
+                _rand_text("filelist"),
+                random.choice(roots),
+                random.choice(["Folder", ""]) if random.random() > 0.2 else "",
+                random.choice(projects),
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)
@@ -161,32 +189,31 @@ class TestAddData(unittest.TestCase):
     def test_08_media(self):
         tbl = utils.get_table_def("media")
         self.assertIsNotNone(tbl)
-        rows = [
-            ["video.mp4", r"E:\\BK_fangorn\\photo\\__Downloads\\music_videos", "video", "444", "2014-01-02", "800", "800", ""],
-            ["photo_153.JPG", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "image", "444", "2014-01-02", "800", "800", ""],
-            ["photo_134.MOV", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "video", "444", "2014-01-02", "800", "800", ""],
-            ["photo_141.JPG", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "image", "444", "2014-01-02", "800", "800", ""],
-            ["clip_001.MOV", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "video", "", "", "", "", ""],
-            ["photo_001.JPG", r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach", "image", "", "", "", "", ""],
+        paths = [
+            r"E:\\BK_fangorn\\photo\\__Downloads\\music_videos",
+            r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach",
+            r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\city",
         ]
-        ids = _insert_rows(tbl, rows)
-        self.assertTrue(all(ids))
-        fetched = _fetch_ids(tbl, ids)
-        self.assertEqual(len(fetched), len(ids))
-
-
-    def test_08_media(self):
-        # 	col_list ['file_name','path', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
-
-        tbl = utils.get_table_def("media")
-        self.assertIsNotNone(tbl)
-        rows = [
-            ["video_BE DEUTSCH! [Achtung! Germans on the rise!] _ NEO MAGAZIN ROYALE mit Jan Böhmermann - ZDFneo-HMQkV5cTuoY.mp4", r"E:\\BK_fangorn\\photo\\__Downloads\\music_videos", "444", "2014-01-02", "800", "800", ""],
-            ["moving-to-glenelg 153.JPG", r"E:\BK_fangorn\photo\travel\Glenelg\beach", "444", "2014-01-02", "800", "800", ""],
-            ["moving-to-glenelg 134.MOV", r"E:\BK_fangorn\photo\travel\Glenelg\beach", "444", "2014-01-02", "800", "800", ""],
-            ["moving-to-glenelg 141.JPG", r"E:\BK_fangorn\photo\travel\Glenelg\beach", "444", "2014-01-02", "800", "800", ""],
-
-        ]
+        projects = ["Work", "Pers", "Dev", ""]
+        file_types = {
+            "video": [".mp4", ".mov"],
+            "image": [".jpg", ".png"],
+            "audio": [".mp3", ".wav"],
+        }
+        rows = []
+        for _ in range(10):
+            file_type = random.choice(list(file_types.keys()))
+            ext = random.choice(file_types[file_type])
+            rows.append([
+                _rand_text("media") + ext,
+                random.choice(paths),
+                file_type,
+                str(random.randint(10, 5000)) if random.random() > 0.2 else "",
+                _rand_date(date.today() - timedelta(days=365), date.today()).isoformat() if random.random() > 0.2 else "",
+                str(random.randint(320, 4000)) if file_type != "audio" and random.random() > 0.2 else "",
+                str(random.randint(320, 4000)) if file_type != "audio" and random.random() > 0.2 else "",
+                random.choice(projects),
+            ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
         fetched = _fetch_ids(tbl, ids)

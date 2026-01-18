@@ -7,6 +7,8 @@ import os
 import sqlite3
 import sys
 
+import etl_folder_mapping as folder_etl
+
 from . import config as cfg
 from . import if_sqlite as mod_sql
 
@@ -72,6 +74,174 @@ def get_data(conn, tbl_name, col_list, condition="1=1", params=None):
     return cur.fetchall()
 
 
+def add_column_if_missing(conn, tbl_name, col_name, col_type):
+    conn = _get_conn() if conn is None else conn
+    table_row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (tbl_name,),
+    ).fetchone()
+    if not table_row:
+        return
+    rows = conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()
+    existing = {row[1].lower() for row in rows}
+    if col_name.lower() in existing:
+        return
+    conn.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type}")
+
+
+def ensure_folder_schema(conn=None):
+    conn = _get_conn() if conn is None else conn
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.executescript(folder_etl.DDL_CREATE_NO_FK)
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+    except Exception:
+        pass
+    folder_tables = [
+        "lp_notes",
+        "lp_media",
+        "lp_audio",
+        "lp_3d",
+        "lp_files",
+        "lp_apps",
+    ]
+    for tbl_name in folder_tables:
+        add_column_if_missing(conn, tbl_name, "folder_id", "INTEGER")
+        conn.execute(f"CREATE INDEX IF NOT EXISTS ix_{tbl_name}_folder_id ON {tbl_name}(folder_id)")
+    conn.commit()
+
+
+def upsert_dim_folder(conn, folder_path):
+    conn = _get_conn() if conn is None else conn
+    fp = folder_etl.norm_path(folder_path)
+    if not fp:
+        return None
+    conn.execute("INSERT OR IGNORE INTO dim_folder(folder_path) VALUES (?)", (fp,))
+    conn.execute(
+        "UPDATE dim_folder SET last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'), is_active=1 WHERE folder_path=?",
+        (fp,),
+    )
+    row = conn.execute("SELECT folder_id FROM dim_folder WHERE folder_path = ?", (fp,)).fetchone()
+    return row["folder_id"] if row else None
+
+
+def _normalize_folder_path(path_value):
+    return folder_etl.norm_path(path_value)
+
+
+def _derive_folder_path(route_name, values_map):
+    if route_name == "apps":
+        file_path = values_map.get("file_path") or ""
+        return os.path.dirname(file_path) if file_path else ""
+    if route_name == "notes":
+        path_value = (values_map.get("path") or "").strip()
+        file_name = (values_map.get("file_name") or "").strip()
+        full_path = ""
+        if file_name and os.path.isabs(file_name):
+            full_path = file_name
+        elif path_value and file_name:
+            full_path = os.path.join(path_value, file_name)
+        else:
+            full_path = path_value or file_name
+        if os.path.splitext(full_path)[1]:
+            return os.path.dirname(full_path)
+        return path_value or os.path.dirname(full_path)
+    if route_name in ("media", "audio", "3d"):
+        path_value = (values_map.get("path") or "").strip()
+        file_name = (values_map.get("file_name") or "").strip()
+        if path_value:
+            return path_value
+        if file_name and os.path.isabs(file_name):
+            return os.path.dirname(file_name)
+        return os.path.dirname(os.path.join(path_value, file_name)) if file_name else ""
+    if route_name == "files":
+        return (values_map.get("path") or "").strip()
+    return ""
+
+
+def update_folder_id_for_record(conn, tbl_name, route_name, record_id, values_map):
+    conn = _get_conn() if conn is None else conn
+    folder_path = _derive_folder_path(route_name, values_map)
+    folder_path = _normalize_folder_path(folder_path)
+    if not folder_path:
+        return
+    folder_id = upsert_dim_folder(conn, folder_path)
+    if not folder_id:
+        return
+    conn.execute(f"UPDATE {tbl_name} SET folder_id = ? WHERE id = ?", (folder_id, record_id))
+    conn.commit()
+
+
+def _qualify_cols(col_list, table_alias="t"):
+    cols = []
+    for col in col_list:
+        col_str = col.strip()
+        lower = col_str.lower()
+        if col_str == "*":
+            cols.append(col_str)
+        elif " as " in lower or "(" in col_str or "." in col_str:
+            cols.append(col_str)
+        else:
+            cols.append(f"{table_alias}.{col_str}")
+    return ", ".join(cols) if cols else "*"
+
+
+def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None, order_by=None):
+    conn = _get_conn() if conn is None else conn
+    cols = _qualify_cols(col_list, "t")
+    params = []
+    order_clause = order_by or "t.id DESC"
+    if tab and tab.lower() == "unmapped":
+        sql = (
+            f"SELECT {cols} FROM {tbl_name} t "
+            "LEFT JOIN map_project_folder mpf "
+            "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+            "WHERE mpf.folder_id IS NULL "
+            f"ORDER BY {order_clause}"
+        )
+    elif tab:
+        sql = (
+            f"SELECT {cols} FROM {tbl_name} t "
+            "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
+            "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?) "
+            f"ORDER BY {order_clause}"
+        )
+        params.append(tab)
+    else:
+        sql = f"SELECT {cols} FROM {tbl_name} t ORDER BY {order_clause}"
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+        if offset:
+            sql += " OFFSET ?"
+            params.append(int(offset))
+    _dbg(f"SELECT {tbl_name} tab={tab} limit={limit} offset={offset}")
+    return conn.execute(sql, params).fetchall()
+
+
+def count_mapped_rows(conn, tbl_name, tab=None):
+    conn = _get_conn() if conn is None else conn
+    params = []
+    if tab and tab.lower() == "unmapped":
+        sql = (
+            f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
+            "LEFT JOIN map_project_folder mpf "
+            "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+            "WHERE mpf.folder_id IS NULL"
+        )
+    elif tab:
+        sql = (
+            f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
+            "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
+            "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?)"
+        )
+        params.append(tab)
+    else:
+        sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
+    row = conn.execute(sql, params).fetchone()
+    return row["cnt"] if row else 0
+
+
 def add_record(conn, tbl_name, col_list, value_list):
     """
     Insert a row into a table.
@@ -90,10 +260,12 @@ def add_record(conn, tbl_name, col_list, value_list):
     sql = f"INSERT INTO {tbl_name} ({', '.join(cols)}) VALUES ({placeholders})"
     try:
         conn = _get_conn() if conn is None else conn
-        _dbg(f"INSERT {tbl_name} cols={cols}")
+        #_dbg(f"INSERT {tbl_name} cols={cols}")
         cur = conn.execute(sql, vals)
         conn.commit()
-        return cur.lastrowid
+        record_id = cur.lastrowid
+        _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id)
+        return record_id
     except Exception as exc:
         _log_error(conn, f"add_record failed: {exc}")
         return None
@@ -122,6 +294,7 @@ def update_record(conn, tbl_name, record_id, col_list, value_list):
         _dbg(f"UPDATE {tbl_name} id={record_id} cols={col_list}")
         conn.execute(sql, vals)
         conn.commit()
+        _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id)
         return True
     except Exception as exc:
         _log_error(conn, f"update_record failed: {exc}")
@@ -150,3 +323,18 @@ def delete_record(conn, tbl_name, record_id):
 
 
 conn = None
+
+
+def _route_for_table(tbl_name):
+    for tbl in cfg.table_def:
+        if tbl.get("name") == tbl_name:
+            return tbl.get("route")
+    return None
+
+
+def _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id):
+    route_name = _route_for_table(tbl_name)
+    if route_name not in {"notes", "media", "audio", "3d", "files", "apps"}:
+        return
+    values_map = dict(zip(col_list, value_list))
+    update_folder_id_for_record(conn, tbl_name, route_name, record_id, values_map)

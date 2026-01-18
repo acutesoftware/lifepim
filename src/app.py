@@ -2,12 +2,13 @@ import sys
 
 from datetime import date, datetime
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request, url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 
 from common.utils import get_tabs, get_side_tabs, get_table_def
 import common.config as mod_cfg
 from common import data as db
+from common import search as search_mod
 
 def _dbg(msg):
     print(f"[app] {msg}", file=sys.stderr, flush=True)
@@ -29,6 +30,7 @@ from modules.goals.routes import goals_bp
 from modules.how.routes import how_bp
 from modules.notes.routes import notes_bp
 from modules.tasks.tasks import tasks_bp
+from modules.admin.routes import admin_bp
 
 _dbg("Registering blueprints")
 app.register_blueprint(calendar_bp, url_prefix="/calendar")
@@ -42,6 +44,7 @@ app.register_blueprint(goals_bp, url_prefix="/goals")
 app.register_blueprint(how_bp, url_prefix="/how")
 app.register_blueprint(notes_bp, url_prefix="/notes")
 app.register_blueprint(tasks_bp, url_prefix="/tasks")
+app.register_blueprint(admin_bp, url_prefix="/admin")
 _dbg("Blueprints registered")
 
 @app.route('/')
@@ -124,6 +127,36 @@ def index():
         events_today=events_today,
         overview_grid_w=mod_cfg.OVERVIEW_GRID_W,
         overview_grid_h=mod_cfg.OVERVIEW_GRID_H,
+    )
+
+
+@app.route("/search")
+def search_route():
+    query = (request.args.get("q") or "").strip()
+    project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
+    route = request.args.get("route") or "home"
+    tab_ids = {t.get("id") for t in get_tabs()}
+    active_tab = route if route in tab_ids else "home"
+    results = search_mod.search_all(query, project=project, route=route)
+    for item in results["primary"] + results["secondary"]:
+        params = {item["id_param"]: item["id"]}
+        if project:
+            params["proj"] = project
+        item["url"] = url_for(item["view_route"], **params)
+    return render_template(
+        "search_results.html",
+        active_tab=active_tab,
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Search",
+        content_html="",
+        query=query,
+        project=project,
+        route=route,
+        results_primary=results["primary"],
+        results_secondary=results["secondary"],
     )
 
 if __name__ == "__main__":

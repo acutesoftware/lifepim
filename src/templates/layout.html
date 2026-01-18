@@ -32,6 +32,12 @@
         </a>
       {% endfor %}
     </div>
+    <form class="search-form" action="{{ url_for('search_route') }}" method="get">
+      <input type="text" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search">
+      <input type="hidden" name="proj" value="{{ current_proj or '' }}">
+      <input type="hidden" name="route" value="{{ active_tab }}">
+      <button type="submit">Search</button>
+    </form>
   </div>
 
   <div class="container">

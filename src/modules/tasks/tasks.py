@@ -3,7 +3,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, make_r
 
 from common import data
 from utils import importer
-from common.utils import get_tabs, get_side_tabs, get_table_def
+from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination
+from common import config as cfg
 
 
 tasks_bp = Blueprint('tasks', __name__, url_prefix="/tasks",
@@ -36,11 +37,23 @@ def list_tasks_route():
         condition = "1=1"
         params = []
         if project:
-            condition = "project = ?"
+            condition = "lower(project) = lower(?)"
             params = [project]
         rows = data.get_data(data.conn, tbl["name"], cols, condition, params)
         task_list = [dict(row) for row in rows]
     task_list = _sort_tasks(task_list, sort_col, sort_dir)
+    page = request.args.get("page", type=int) or 1
+    page_data = paginate_items(task_list, page, cfg.RECS_PER_PAGE)
+    task_list = page_data["items"]
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        "tasks.list_tasks_route",
+        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        page,
+        total_pages,
+    )
     resp = make_response(
         render_template(
         "tasks_list.html",
@@ -54,6 +67,11 @@ def list_tasks_route():
         col_list=col_list,
         sort_col=sort_col,
         sort_dir=sort_dir,
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
     )
     )
     resp.set_cookie("tasks_sort_col", sort_col)
