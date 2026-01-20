@@ -169,6 +169,7 @@ def import_audio_route():
                     values = [
                         name,
                         root,
+                        "",
                         file_type,
                         "",
                         "",

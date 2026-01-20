@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <form method="POST">
+    {% for field in fields %}
+    <label>{{ field.label }}:</label><br>
+    {% if field.is_textarea %}
+    <textarea name="{{ field.name }}" rows="6" cols="60">{{ item[field.name] if item else '' }}</textarea><br><br>
+    {% else %}
+    <input type="{{ field.input_type }}" name="{{ field.name }}" value="{{ item[field.name] if item else '' }}"{% if field.step %} step="{{ field.step }}"{% endif %}><br><br>
+    {% endif %}
+    {% endfor %}
+    <button type="submit">Save</button>
+  </form>
+{% endblock %}

@@ -186,6 +186,35 @@ def _qualify_cols(col_list, table_alias="t"):
     return ", ".join(cols) if cols else "*"
 
 
+def _has_project_col(col_list):
+    for col in col_list or []:
+        col_name = col.strip()
+        col_lower = col_name.lower()
+        if " as " in col_lower:
+            col_name = col_name[: col_lower.index(" as ")].strip()
+            col_lower = col_name.lower()
+        if "." in col_name:
+            col_name = col_name.split(".")[-1].strip()
+            col_lower = col_name.lower()
+        if col_lower == "project":
+            return True
+    return False
+
+
+def _table_has_project(conn, tbl_name):
+    try:
+        rows = conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()
+    except Exception:
+        return False
+    col_names = []
+    for row in rows:
+        try:
+            col_names.append(row[1])
+        except Exception:
+            continue
+    return _has_project_col(col_names)
+
+
 def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None, order_by=None):
     conn = _get_conn() if conn is None else conn
     cols = _qualify_cols(col_list, "t")
@@ -200,13 +229,23 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
             f"ORDER BY {order_clause}"
         )
     elif tab:
-        sql = (
-            f"SELECT {cols} FROM {tbl_name} t "
-            "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
-            "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?) "
-            f"ORDER BY {order_clause}"
-        )
-        params.append(tab)
+        if _has_project_col(col_list):
+            sql = (
+                f"SELECT {cols} FROM {tbl_name} t "
+                "LEFT JOIN map_project_folder mpf "
+                "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+                "WHERE lower(mpf.tab) = lower(?) OR lower(t.project) = lower(?) "
+                f"ORDER BY {order_clause}"
+            )
+            params.extend([tab, tab])
+        else:
+            sql = (
+                f"SELECT {cols} FROM {tbl_name} t "
+                "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
+                "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?) "
+                f"ORDER BY {order_clause}"
+            )
+            params.append(tab)
     else:
         sql = f"SELECT {cols} FROM {tbl_name} t ORDER BY {order_clause}"
     if limit is not None:
@@ -230,12 +269,21 @@ def count_mapped_rows(conn, tbl_name, tab=None):
             "WHERE mpf.folder_id IS NULL"
         )
     elif tab:
-        sql = (
-            f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
-            "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
-            "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?)"
-        )
-        params.append(tab)
+        if _table_has_project(conn, tbl_name):
+            sql = (
+                f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
+                "LEFT JOIN map_project_folder mpf "
+                "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+                "WHERE lower(mpf.tab) = lower(?) OR lower(t.project) = lower(?)"
+            )
+            params.extend([tab, tab])
+        else:
+            sql = (
+                f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
+                "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
+                "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?)"
+            )
+            params.append(tab)
     else:
         sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
     row = conn.execute(sql, params).fetchone()

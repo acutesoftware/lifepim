@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('places.list_places_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('places.list_places_map_route', proj=project) }}">Map</a> |
+    <a href="{{ url_for('places.add_place_route', proj=project) }}">Add Place</a>
+  </div>
+
+<table border="1" cellpadding="5">
+  <tr>
+    {% for col in col_list %}
+    {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
+    <th>
+      <a href="{{ url_for('places.list_places_table_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    {% endfor %}
+    <th>Actions</th>
+  </tr>
+  {% for item in items %}
+  <tr onclick="window.location='{{ url_for('places.view_place_route', place_id=item.id, proj=project) }}';" style="cursor:pointer;">
+    {% for col in col_list %}
+    <td>
+      {% if col == 'name' %}
+      <a href="{{ url_for('places.view_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation();">{{ item[col] }}</a>
+      {% else %}
+      {{ item[col] }}
+      {% endif %}
+    </td>
+    {% endfor %}
+    <td>
+      <a href="{{ url_for('places.edit_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation();">Edit</a> |
+      <a href="{{ url_for('places.delete_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation(); return confirm('Delete item?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% include "widgets/wid_pagination.html" %}
+{% endblock %}

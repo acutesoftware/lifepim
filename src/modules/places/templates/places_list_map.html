@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <div>
+    <a href="{{ url_for('places.list_places_table_route', proj=project) }}">Table</a> |
+    <a href="{{ url_for('places.list_places_map_route', proj=project) }}">Map</a> |
+    <a href="{{ url_for('places.add_place_route', proj=project) }}">Add Place</a>
+  </div>
+
+  {% if markers %}
+    <div id="places-map" class="places-map"></div>
+  {% else %}
+    <p class="places-map-empty">No places with GPS coordinates.</p>
+  {% endif %}
+
+  <ul>
+    {% for item in items %}
+    <li>
+      <a href="{{ url_for('places.view_place_route', place_id=item.id, proj=project) }}">{{ item.name or 'Place' }}</a>
+      {% if item.address_street or item.suburb or item.state %}
+        - {{ item.address_street }} {{ item.suburb }} {{ item.state }}
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  const markers = {{ markers | tojson }};
+  const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[ch]));
+  if (markers.length) {
+    const map = L.map("places-map");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+    const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lon]));
+    map.fitBounds(bounds, {padding: [20, 20]});
+    markers.forEach((m) => {
+      const marker = L.marker([m.lat, m.lon]).addTo(map);
+      const label = escapeHtml(m.name || "View place");
+      marker.bindPopup('<a href="' + m.url + '">' + label + "</a>");
+      marker.on("click", () => { window.location = m.url; });
+    });
+  }
+  </script>
+{% endblock %}

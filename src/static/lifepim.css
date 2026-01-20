@@ -299,3 +299,16 @@ body {
     z-index: 50;
   }
 }
+
+.places-map {
+  height: 480px;
+  width: 100%;
+  border: 1px solid #ccc;
+  margin: 6px 0;
+}
+
+.places-map-empty {
+  margin: 6px 0;
+  color: #666;
+  font-style: italic;
+}

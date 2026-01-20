@@ -229,6 +229,7 @@ def import_media_route():
                     values = [
                         name,
                         root,
+                        "",
                         file_type,
                         "",
                         "",

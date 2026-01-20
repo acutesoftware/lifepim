@@ -219,6 +219,20 @@ class TestAddData(unittest.TestCase):
         fetched = _fetch_ids(tbl, ids)
         self.assertEqual(len(fetched), len(ids))
 
+    def test_09_places(self):
+        tbl = utils.get_table_def("places")
+        self.assertIsNotNone(tbl)
+        rows = [
+            ["Tower of London", "Historic castle in London", "", "London", "", "", "United Kingdom", "51.5081", "-0.0759"],
+            ["Eiffel Tower", "Iconic Paris landmark", "", "Paris", "", "", "France", "48.8584", "2.2945"],
+            ["Statue of Liberty", "Famous statue in New York Harbor", "", "New York", "", "NY", "USA", "40.6892", "-74.0445"],
+            ["Great Pyramid of Giza", "Ancient pyramid in Egypt", "", "Giza", "", "", "Egypt", "29.9792", "31.1342"],
+            ["Sydney Opera House", "Performing arts center in Sydney", "", "Sydney", "", "NSW", "Australia", "-33.8568", "151.2153"],
+        ]
+        ids = _insert_rows(tbl, rows)
+        self.assertTrue(all(ids))
+        fetched = _fetch_ids(tbl, ids)
+        self.assertEqual(len(fetched), len(ids))
 
 if __name__ == '__main__':
     unittest.main()
