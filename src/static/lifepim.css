@@ -312,3 +312,145 @@ body {
   color: #666;
   font-style: italic;
 }
+
+.money-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.money-title {
+  font-weight: bold;
+}
+
+.money-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.money-btn {
+  padding: 2px 6px;
+  border: 1px solid #bbb;
+  background: #f6f6f6;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.money-btn.danger {
+  border-color: #c88;
+  background: #ffecec;
+}
+
+.money-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.money-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.money-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.money-summary {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.money-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.money-table th,
+.money-table td {
+  border: 1px solid #ccc;
+  padding: 4px 6px;
+}
+
+.money-row.selected {
+  background: #eef2ff;
+}
+
+.money-empty {
+  text-align: center;
+  color: #666;
+  padding: 10px;
+}
+
+.money-panel {
+  position: fixed;
+  top: 60px;
+  right: -420px;
+  width: 360px;
+  max-width: calc(100vw - 20px);
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 10px;
+  z-index: 120;
+  transition: right 0.2s ease;
+}
+
+.money-panel.open {
+  right: 10px;
+}
+
+.money-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 110;
+}
+
+.money-panel-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.money-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.money-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.money-form input,
+.money-form select,
+.money-form textarea {
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.money-panel-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}

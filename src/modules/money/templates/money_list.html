@@ -1,0 +1,296 @@
+{% extends "layout.html" %}
+
+{% block module_content %}
+<div class="money-toolbar">
+  <div class="money-title">Money</div>
+  <div class="money-actions">
+    <button class="money-btn" type="button" id="moneyAdd">+ Add Plan</button>
+    <button class="money-btn" type="button" id="moneyBought" disabled>Mark Bought</button>
+    <button class="money-btn danger" type="button" id="moneyDelete" disabled>Delete</button>
+  </div>
+</div>
+
+<form class="money-filters" method="get" action="{{ url_for('money.list_money_route') }}">
+  <label>
+    Domain
+    <select name="domain">
+      <option value="all" {% if domain_filter == 'all' %}selected{% endif %}>All</option>
+      {% for domain in domains %}
+        <option value="{{ domain }}" {% if domain_filter == domain %}selected{% endif %}>{{ domain }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Status
+    <select name="status">
+      {% for value, label in status_options %}
+        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Date
+    <select name="date">
+      {% for value, label in date_options %}
+        <option value="{{ value }}" {% if date_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Sort
+    <select name="sort">
+      {% for value, label in sort_options %}
+        <option value="{{ value }}" {% if sort_key == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="money-btn" type="submit">Apply</button>
+</form>
+
+<div class="money-summary">
+  <div>Next 30 days: ${{ '%.2f'|format(summary.next_30 or 0) }}</div>
+  <div>Next 90 days: ${{ '%.2f'|format(summary.next_90 or 0) }}</div>
+  <div>Unscheduled items: {{ summary.unscheduled or 0 }}</div>
+</div>
+
+<table class="money-table">
+  <thead>
+    <tr>
+      <th>Target Date</th>
+      <th>Item</th>
+      <th>Domain</th>
+      <th>Est. Cost</th>
+      <th>Priority</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for plan in plans %}
+      <tr class="money-row"
+          data-plan-id="{{ plan.plan_id }}"
+          data-item="{{ plan.item|e }}"
+          data-domain="{{ plan.domain|e }}"
+          data-cost="{{ plan.estimated_cost }}"
+          data-target-date="{{ plan.target_date or '' }}"
+          data-priority="{{ plan.priority }}"
+          data-status="{{ plan.status|e }}"
+          data-notes="{{ plan.notes|default('', true)|e }}">
+        <td>{{ plan.target_date or '-' }}</td>
+        <td>{{ plan.item }}</td>
+        <td>{{ plan.domain }}</td>
+        <td>${{ '%.2f'|format(plan.estimated_cost or 0) }}</td>
+        <td>{{ plan.priority }}</td>
+        <td>{{ plan.status }}</td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="6" class="money-empty">No plans yet.</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="money-panel" id="moneyPanel" aria-hidden="true">
+  <form id="moneyForm" class="money-form">
+    <input type="hidden" name="plan_id" id="moneyPlanId">
+    <label>
+      Item
+      <input type="text" name="item" id="moneyItem" required>
+    </label>
+    <label>
+      Domain
+      <input type="text" name="domain" id="moneyDomain" placeholder="General">
+    </label>
+    <label>
+      Estimated cost
+      <input type="number" name="estimated_cost" id="moneyCost" min="0" step="0.01" required>
+    </label>
+    <label>
+      Target date
+      <input type="date" name="target_date" id="moneyTargetDate">
+    </label>
+    <label>
+      Priority
+      <input type="number" name="priority" id="moneyPriority" min="1" max="5" value="3" required>
+    </label>
+    <label>
+      Status
+      <select name="status" id="moneyStatus">
+        <option value="idea">Idea</option>
+        <option value="planned">Planned</option>
+        <option value="bought">Bought</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </label>
+    <label>
+      Notes
+      <textarea name="notes" id="moneyNotes" rows="5"></textarea>
+    </label>
+    <div class="money-panel-actions">
+      <button class="money-btn" type="submit">Save</button>
+      <button class="money-btn" type="button" id="moneyCancel">Cancel</button>
+    </div>
+  </form>
+</div>
+<div class="money-panel-backdrop" id="moneyBackdrop" aria-hidden="true"></div>
+
+<script>
+  const addBtn = document.getElementById('moneyAdd');
+  const boughtBtn = document.getElementById('moneyBought');
+  const deleteBtn = document.getElementById('moneyDelete');
+  const panel = document.getElementById('moneyPanel');
+  const backdrop = document.getElementById('moneyBackdrop');
+  const form = document.getElementById('moneyForm');
+  const cancelBtn = document.getElementById('moneyCancel');
+  let selectedId = null;
+
+  function openPanel(data) {
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+    backdrop.classList.add('open');
+    backdrop.setAttribute('aria-hidden', 'false');
+    document.getElementById('moneyPlanId').value = data.plan_id || '';
+    document.getElementById('moneyItem').value = data.item || '';
+    document.getElementById('moneyDomain').value = data.domain || 'General';
+    document.getElementById('moneyCost').value = data.estimated_cost || '';
+    document.getElementById('moneyTargetDate').value = data.target_date || '';
+    document.getElementById('moneyPriority').value = data.priority || 3;
+    document.getElementById('moneyStatus').value = data.status || 'planned';
+    document.getElementById('moneyNotes').value = data.notes || '';
+  }
+
+  function closePanel() {
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+    backdrop.classList.remove('open');
+    backdrop.setAttribute('aria-hidden', 'true');
+  }
+
+  function setSelected(row) {
+    document.querySelectorAll('.money-row').forEach((r) => r.classList.remove('selected'));
+    if (row) {
+      row.classList.add('selected');
+      selectedId = row.dataset.planId;
+      boughtBtn.disabled = false;
+      deleteBtn.disabled = false;
+    } else {
+      selectedId = null;
+      boughtBtn.disabled = true;
+      deleteBtn.disabled = true;
+    }
+  }
+
+  document.querySelectorAll('.money-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      setSelected(row);
+      openPanel({
+        plan_id: row.dataset.planId,
+        item: row.dataset.item,
+        domain: row.dataset.domain,
+        estimated_cost: row.dataset.cost,
+        target_date: row.dataset.targetDate,
+        priority: row.dataset.priority,
+        status: row.dataset.status,
+        notes: row.dataset.notes,
+      });
+    });
+  });
+
+  addBtn.addEventListener('click', () => {
+    setSelected(null);
+    openPanel({
+      plan_id: '',
+      item: '',
+      domain: 'General',
+      estimated_cost: '',
+      target_date: '',
+      priority: 3,
+      status: 'planned',
+      notes: '',
+    });
+  });
+
+  cancelBtn.addEventListener('click', closePanel);
+  backdrop.addEventListener('click', closePanel);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = {
+      item: document.getElementById('moneyItem').value,
+      domain: document.getElementById('moneyDomain').value,
+      estimated_cost: document.getElementById('moneyCost').value,
+      target_date: document.getElementById('moneyTargetDate').value,
+      priority: document.getElementById('moneyPriority').value,
+      status: document.getElementById('moneyStatus').value,
+      notes: document.getElementById('moneyNotes').value,
+    };
+    const planId = document.getElementById('moneyPlanId').value;
+    const method = planId ? 'PUT' : 'POST';
+    const url = planId ? `/money/api/plans/${planId}` : '/money/api/plans';
+    try {
+      const resp = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        alert(data.error || 'Unable to save plan');
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      alert('Unable to save plan');
+    }
+  });
+
+  boughtBtn.addEventListener('click', async () => {
+    if (!selectedId) {
+      return;
+    }
+    try {
+      const resp = await fetch(`/money/api/plans/${selectedId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item: document.getElementById('moneyItem').value,
+          domain: document.getElementById('moneyDomain').value,
+          estimated_cost: document.getElementById('moneyCost').value,
+          target_date: document.getElementById('moneyTargetDate').value,
+          priority: document.getElementById('moneyPriority').value,
+          status: 'bought',
+          notes: document.getElementById('moneyNotes').value,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        alert(data.error || 'Unable to mark as bought');
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      alert('Unable to mark as bought');
+    }
+  });
+
+  deleteBtn.addEventListener('click', async () => {
+    if (!selectedId) {
+      return;
+    }
+    if (!confirm('Delete this plan?')) {
+      return;
+    }
+    try {
+      const resp = await fetch(`/money/api/plans/${selectedId}`, { method: 'DELETE' });
+      if (!resp.ok) {
+        const data = await resp.json();
+        alert(data.error || 'Unable to delete plan');
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      alert('Unable to delete plan');
+    }
+  });
+</script>
+{% endblock %}

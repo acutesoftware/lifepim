@@ -234,5 +234,54 @@ class TestAddData(unittest.TestCase):
         fetched = _fetch_ids(tbl, ids)
         self.assertEqual(len(fetched), len(ids))
 
+    def test_10_money_plans(self):
+        conn = data._get_conn()
+        table_row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_money_plans'"
+        ).fetchone()
+        if not table_row:
+            self.skipTest("lp_money_plans not available")
+        statuses = ["idea", "planned", "bought", "cancelled"]
+        domains = ["Car", "fun\\events", "Gardening", "cooking", "General"]
+        base_items = [
+            "External HD",
+            "tyres for car",
+            "Movie tickets",
+            "seedlings",
+            "Steak Knives",
+        ]
+        inserted_ids = []
+        for status in statuses:
+            for domain in domains:
+                for _ in range(2):
+                    item = f"{random.choice(base_items)} {_rand_text(status)}"
+                    cost = round(random.uniform(15, 1200), 2)
+                    priority = random.randint(1, 5)
+                    target_date = _rand_date(date.today(), date.today() + timedelta(days=365)).isoformat()
+                    if random.random() > 0.7:
+                        target_date = ""
+                    cur = conn.execute(
+                        "INSERT INTO lp_money_plans (item, domain, estimated_cost, target_date, priority, status, notes) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            item,
+                            domain,
+                            cost,
+                            target_date,
+                            priority,
+                            status,
+                            "",
+                        ),
+                    )
+                    inserted_ids.append(cur.lastrowid)
+        conn.commit()
+        self.assertTrue(all(inserted_ids))
+        placeholders = ",".join(["?"] * len(inserted_ids))
+        rows = conn.execute(
+            f"SELECT plan_id FROM lp_money_plans WHERE plan_id IN ({placeholders})",
+            inserted_ids,
+        ).fetchall()
+        self.assertEqual(len(rows), len(inserted_ids))
+
 if __name__ == '__main__':
     unittest.main()

@@ -27,7 +27,7 @@ def reset_database(db_file):
     for tbl in cfg.table_def:
         create_table(db_conn, tbl)
     db_conn.executescript(folder_etl.DDL_RESET)
-    #_run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "CREATE_LIFEPIM_TABLES.SQL"))
+    _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))
     db_conn.commit()
     db_conn.close()
 
