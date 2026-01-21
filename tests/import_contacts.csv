@@ -1,0 +1,31 @@
+display_name,email,phone,address,url,org,note
+Alice Carter,alice.carter@example.com,+1-555-0101,12 Main St Springfield,https://example.com/alice,Northwind,Met at conference
+Ben Dawson,ben.dawson@example.com,+1-555-0102,45 Pine Rd Rivertown,https://example.com/ben,Contoso,Prefers email
+Chloe Evans,chloe.evans@example.com,+1-555-0103,88 Lake View Hilltown,https://example.com/chloe,Globex,Works remote
+Daniel Frost,daniel.frost@example.com,+1-555-0104,5 Market St Lakeside,https://example.com/daniel,Initech,Project lead
+Emma Green,emma.green@example.com,+1-555-0105,200 Harbor Ave Seaside,https://example.com/emma,Umbrella,New hire
+Felix Howard,felix.howard@example.com,+1-555-0106,17 Oak Blvd Fairview,https://example.com/felix,Stark,Design review
+Grace Irwin,grace.irwin@example.com,+1-555-0107,9 Sunset Dr Brookfield,https://example.com/grace,Wayne,Follow up Q1
+Hector Jones,hector.jones@example.com,+1-555-0108,33 Forest Ln Maplewood,https://example.com/hector,Wonka,VIP client
+Ivy Keller,ivy.keller@example.com,+1-555-0109,78 Cedar Ct Pinecrest,https://example.com/ivy,Tyrell,Send docs
+Jack Lewis,jack.lewis@example.com,+1-555-0110,4 Birch Way Oakridge,https://example.com/jack,Acme,Phone preferred
+Kara Miles,kara.miles@example.com,+1-555-0111,16 River Rd Greendale,https://example.com/kara,LexCorp,Quarterly sync
+Liam Norton,liam.norton@example.com,+1-555-0112,62 Hill St Brookhaven,https://example.com/liam,Oscorp,Contractor
+Maya Olsen,maya.olsen@example.com,+1-555-0113,27 Valley Rd Highland,https://example.com/maya,PiedPiper,Trial account
+Noah Patel,noah.patel@example.com,+1-555-0114,310 Meadow Ln Crestview,https://example.com/noah,Vehement,Team lead
+Olivia Quinn,olivia.quinn@example.com,+1-555-0115,85 Ridge Pkwy Westview,https://example.com/olivia,Hooli,Preferred vendor
+Paul Rivera,paul.rivera@example.com,+1-555-0116,22 Park Blvd Eastgate,https://example.com/paul,MassiveDynamic,Annual review
+Quinn Shaw,quinn.shaw@example.com,+1-555-0117,94 Walnut St Fairview,https://example.com/quinn,Initrode,Onboarding
+Riley Tate,riley.tate@example.com,+1-555-0118,3 Elm St Stonebridge,https://example.com/riley,Globex,Schedule call
+Sofia Urban,sofia.urban@example.com,+1-555-0119,140 Maple Ave Lakeview,https://example.com/sofia,Monarch,Weekend contact
+Tyler Voss,tyler.voss@example.com,+1-555-0120,6 Poplar Rd Fairmont,https://example.com/tyler,Stark,Send NDA
+Uma Watts,uma.watts@example.com,+1-555-0121,55 Chestnut Ln Riverside,https://example.com/uma,Initrode,Billing contact
+Victor Young,victor.young@example.com,+1-555-0122,19 Summit Ave Highland,https://example.com/victor,Wayne,Escalation path
+Wendy Zane,wendy.zane@example.com,+1-555-0123,300 Spruce Ct Oakridge,https://example.com/wendy,Acme,Key stakeholder
+Xavier Allen,xavier.allen@example.com,+1-555-0124,74 Birch Rd Lakeside,https://example.com/xavier,Contoso,Technical lead
+Yara Blake,yara.blake@example.com,+1-555-0125,11 Ridge Rd Pinecrest,https://example.com/yara,Initech,Marketing
+Zane Cole,zane.cole@example.com,+1-555-0126,90 Grove St Seaside,https://example.com/zane,Northwind,Procurement
+Aria Drake,aria.drake@example.com,+1-555-0127,28 Harbor Rd Bayview,https://example.com/aria,Umbrella,Press contact
+Brian Epps,brian.epps@example.com,+1-555-0128,70 Willow Ave Hilltown,https://example.com/brian,Tyrell,Partner
+Clara Finch,clara.finch@example.com,+1-555-0129,15 Lake Rd Brookfield,https://example.com/clara,Oscorp,Finance
+Derek Grant,derek.grant@example.com,+1-555-0130,8 Valley Ave Greendale,https://example.com/derek,MassiveDynamic,Ops

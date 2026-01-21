@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('contacts.list_contacts_table_route') }}">Back to contacts</a>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data">
+    <label>CSV File</label><br>
+    <input type="file" name="csv_file" accept=".csv"><br>
+    <input type="hidden" name="csv_path" value="{{ csv_path or '' }}">
+    {% if csv_path %}
+      <p>Loaded file: {{ csv_path }}</p>
+    {% endif %}
+    <br>
+    <label>Source System</label><br>
+    <input type="text" name="source_system" value="{{ source_system or 'csv' }}"><br><br>
+    <label>Source Ref</label><br>
+    <input type="text" name="source_ref" value="{{ source_ref or '' }}"><br><br>
+    <label>Confidence</label><br>
+    <input type="text" name="confidence" value="{{ confidence or '' }}" placeholder="0..1"><br><br>
+
+    <button type="submit" name="action" value="load">Load Columns</button>
+    <button type="submit" name="action" value="import">Import Now</button>
+    {% if error %}
+      <p>{{ error }}</p>
+    {% endif %}
+    {% if imported is not none %}
+      <p>Imported {{ imported.inserted }} new contacts, updated {{ imported.updated }} contacts, added {{ imported.facts }} facts.</p>
+    {% endif %}
+
+    {% if csv_headers %}
+    <h4>Column Mapping</h4>
+    <table border="1" cellpadding="5">
+      <tr><th>CSV Column</th><th>Maps To</th></tr>
+      {% for header in csv_headers %}
+      {% set idx = loop.index0 %}
+      <tr>
+        <td>{{ header }}</td>
+        <td>
+          <input type="hidden" name="csv_header_{{ idx }}" value="{{ header }}">
+          <select name="map_{{ idx }}">
+            <option value=""></option>
+            <option value="display_name" {% if mappings.get(header) == 'display_name' %}selected{% endif %}>Display Name</option>
+            <option value="ignore" {% if mappings.get(header) == 'ignore' %}selected{% endif %}>Ignore</option>
+            {% for fact_type in fact_types %}
+            <option value="{{ fact_type }}" {% if mappings.get(header) == fact_type %}selected{% endif %}>{{ fact_type }}</option>
+            {% endfor %}
+          </select>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </form>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('contacts.list_contacts_table_route') }}">Table</a> |
+    <a href="{{ url_for('contacts.list_contacts_list_route') }}">List</a> |
+    <a href="{{ url_for('contacts.list_contacts_cards_route') }}">Cards</a> |
+    <a href="{{ url_for('contacts.add_contact_route') }}">Add Contact</a> |
+    <a href="{{ url_for('contacts.import_contacts_route') }}">Import Contacts</a>
+  </div>
+
+  {% set col_values = card_values %}
+  {% set note_card_bg = '#f7f7f7' %}
+  {% include "widgets/wid_card_list.html" %}
+  {% include "widgets/wid_pagination.html" %}
+{% endblock %}

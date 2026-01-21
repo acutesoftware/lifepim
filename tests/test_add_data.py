@@ -13,6 +13,7 @@ if root_folder not in sys.path:
     sys.path.append(root_folder)
 
 from common import data, utils
+from modules.contacts import dao as contacts_dao
 
 
 def _rand_text(prefix):
@@ -282,6 +283,46 @@ class TestAddData(unittest.TestCase):
             inserted_ids,
         ).fetchall()
         self.assertEqual(len(rows), len(inserted_ids))
+
+    def test_11_contacts(self):
+        conn = data._get_conn()
+        table_row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_contacts'"
+        ).fetchone()
+        if not table_row:
+            self.skipTest("lp_contacts not available")
+        contact_rows = [
+            ("Ada Lovelace", [("email", "ada@example.com"), ("phone", "+1-555-0001")]),
+            ("Grace Hopper", [("email", "grace@example.com"), ("org", "Navy"), ("note", "COBOL pioneer")]),
+            ("Linus Torvalds", [("url", "https://example.com/linus")]),
+            ("Alan Turing", []),
+            ("Katherine Johnson", [("phone", "+1-555-0002"), ("address", "123 Orbit Rd"), ("email", "kat@example.com")]),
+            ("Margaret Hamilton", [("email", "margaret@example.com")]),
+            ("Tim Berners-Lee", [("url", "https://example.com/tim"), ("org", "W3C"), ("note", "WWW")]),
+            ("Radia Perlman", [("email", "radia@example.com"), ("phone", "+1-555-0003"), ("address", "1 Bridge Way"), ("org", "DEC")]),
+            ("Donald Knuth", [("address", "Stanford, CA")]),
+        ]
+        contact_ids = []
+        fact_count = 0
+        for name, facts in contact_rows:
+            contact_id = contacts_dao.create_contact(name)
+            self.assertIsNotNone(contact_id)
+            contact_ids.append(contact_id)
+            for fact_type, fact_value in facts:
+                fact_id = contacts_dao.add_fact(contact_id, fact_type, fact_value, "manual")
+                self.assertIsNotNone(fact_id)
+                fact_count += 1
+        placeholders = ",".join(["?"] * len(contact_ids))
+        rows = conn.execute(
+            f"SELECT contact_id FROM lp_contacts WHERE contact_id IN ({placeholders})",
+            contact_ids,
+        ).fetchall()
+        self.assertEqual(len(rows), len(contact_ids))
+        row = conn.execute(
+            f"SELECT COUNT(1) AS cnt FROM lp_contact_facts WHERE contact_id IN ({placeholders})",
+            contact_ids,
+        ).fetchone()
+        self.assertEqual(row["cnt"], fact_count)
 
 if __name__ == '__main__':
     unittest.main()

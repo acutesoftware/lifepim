@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('contacts.list_contacts_table_route') }}">Back to list</a> |
+    <a href="{{ url_for('contacts.edit_contact_route', contact_id=contact.contact_id) }}">Edit</a> |
+    <a href="{{ url_for('contacts.delete_contact_route', contact_id=contact.contact_id) }}" onclick="return confirm('Delete contact?');">Del</a>
+  </div>
+
+  <table border="1" cellpadding="5">
+    <tr><th>Display Name</th><td>{{ contact.display_name }}</td></tr>
+    <tr><th>Normalized</th><td>{{ contact.normalized_name }}</td></tr>
+    <tr><th>Created</th><td>{{ contact.created_utc }}</td></tr>
+    <tr><th>Updated</th><td>{{ contact.updated_utc }}</td></tr>
+  </table>
+
+  <h4>Facts</h4>
+  <table border="1" cellpadding="5">
+    <tr>
+      <th>Type</th>
+      <th>Value</th>
+      <th>Source</th>
+      <th>Ref</th>
+      <th>Confidence</th>
+      <th>Created</th>
+      <th>Actions</th>
+    </tr>
+    {% for fact in facts %}
+    <tr>
+      <td>{{ fact.fact_type }}</td>
+      <td>{{ fact.fact_value }}</td>
+      <td>{{ fact.source_system }}</td>
+      <td>{{ fact.source_ref }}</td>
+      <td>{{ fact.confidence }}</td>
+      <td>{{ fact.created_utc }}</td>
+      <td>
+        <a href="{{ url_for('contacts.delete_fact_route', fact_id=fact.fact_id, contact_id=contact.contact_id) }}" onclick="return confirm('Delete fact?');">Del</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h4>Add Fact</h4>
+  <form method="POST" action="{{ url_for('contacts.add_fact_route', contact_id=contact.contact_id) }}">
+    <label>Type</label><br>
+    <select name="fact_type">
+      {% for fact_type in fact_types %}
+      <option value="{{ fact_type }}">{{ fact_type }}</option>
+      {% endfor %}
+    </select><br><br>
+    <label>Value</label><br>
+    <input type="text" name="fact_value" style="width:60%;" required><br><br>
+    <label>Source System</label><br>
+    <input type="text" name="source_system" value="manual"><br><br>
+    <label>Source Ref</label><br>
+    <input type="text" name="source_ref"><br><br>
+    <label>Confidence</label><br>
+    <input type="text" name="confidence" placeholder="0..1"><br><br>
+    <button type="submit">Add Fact</button>
+  </form>
+{% endblock %}

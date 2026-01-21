@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('contacts.list_contacts_table_route') }}">Table</a> |
+    <a href="{{ url_for('contacts.list_contacts_list_route') }}">List</a> |
+    <a href="{{ url_for('contacts.list_contacts_cards_route') }}">Cards</a> |
+    <a href="{{ url_for('contacts.add_contact_route') }}">Add Contact</a> |
+    <a href="{{ url_for('contacts.import_contacts_route') }}">Import Contacts</a>
+  </div>
+
+  <ul style="list-style:none; padding:0; margin:8px 0;">
+    {% for item in items %}
+    <li style="padding:4px 0;">
+      <a href="{{ url_for('contacts.view_contact_route', contact_id=item.contact_id) }}">{{ item.display_name }}</a>
+      {% if item.summary %}
+      <span> - {{ item.summary }}</span>
+      {% endif %}
+      <span>
+        <a href="{{ url_for('contacts.edit_contact_route', contact_id=item.contact_id) }}">Edit</a> |
+        <a href="{{ url_for('contacts.delete_contact_route', contact_id=item.contact_id) }}" onclick="return confirm('Delete contact?');">Del</a>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% include "widgets/wid_pagination.html" %}
+{% endblock %}

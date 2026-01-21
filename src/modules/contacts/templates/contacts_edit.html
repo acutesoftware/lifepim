@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('contacts.list_contacts_table_route') }}">Back to list</a>
+  </div>
+  <form method="POST">
+    <label>Display Name</label><br>
+    <input type="text" name="display_name" value="{{ contact.display_name if contact else '' }}" style="width:60%;" required><br><br>
+    <button type="submit">Save</button>
+  </form>
+{% endblock %}

@@ -31,6 +31,7 @@ from modules.how.routes import how_bp
 from modules.notes.routes import notes_bp
 from modules.places.routes import places_bp
 from modules.money.routes import money_bp
+from modules.contacts.routes import contacts_bp
 from modules.tasks.tasks import tasks_bp
 from modules.admin.routes import admin_bp
 
@@ -47,6 +48,7 @@ app.register_blueprint(how_bp, url_prefix="/how")
 app.register_blueprint(notes_bp, url_prefix="/notes")
 app.register_blueprint(places_bp, url_prefix="/places")
 app.register_blueprint(money_bp, url_prefix="/money")
+app.register_blueprint(contacts_bp, url_prefix="/contacts")
 app.register_blueprint(tasks_bp, url_prefix="/tasks")
 app.register_blueprint(admin_bp, url_prefix="/admin")
 _dbg("Blueprints registered")

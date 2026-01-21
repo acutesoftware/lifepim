@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div>
+    <a href="{{ url_for('contacts.list_contacts_table_route') }}">Table</a> |
+    <a href="{{ url_for('contacts.list_contacts_list_route') }}">List</a> |
+    <a href="{{ url_for('contacts.list_contacts_cards_route') }}">Cards</a> |
+    <a href="{{ url_for('contacts.add_contact_route') }}">Add Contact</a> |
+    <a href="{{ url_for('contacts.import_contacts_route') }}">Import Contacts</a>
+  </div>
+
+<table border="1" cellpadding="5">
+  <tr>
+    {% for col in col_list %}
+    {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
+    <th>
+      <a href="{{ url_for('contacts.list_contacts_table_route', sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    {% endfor %}
+    <th>Actions</th>
+  </tr>
+  {% for item in items %}
+  <tr>
+    {% for col in col_list %}
+    <td>
+      {% if col == 'display_name' %}
+      <a href="{{ url_for('contacts.view_contact_route', contact_id=item.contact_id) }}">{{ item[col] }}</a>
+      {% else %}
+      {{ item[col] }}
+      {% endif %}
+    </td>
+    {% endfor %}
+    <td>
+      <a href="{{ url_for('contacts.edit_contact_route', contact_id=item.contact_id) }}">Edit</a> |
+      <a href="{{ url_for('contacts.delete_contact_route', contact_id=item.contact_id) }}" onclick="return confirm('Delete contact?');">Del</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% include "widgets/wid_pagination.html" %}
+{% endblock %}
