@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div style="margin-bottom:8px;">
+    <form method="get" style="display:inline;">
+      <label>Show last
+        <input type="number" name="limit" value="{{ limit }}" min="10" max="1000" style="width:80px;">
+      </label>
+      <button type="submit">Apply</button>
+    </form>
+    {% if message %}<span style="margin-left:8px;">{{ message }}</span>{% endif %}
+  </div>
+
+  <table border="1" cellpadding="5">
+    <tr>
+      {% set dir_id = 'asc' if sort_col != 'id' or sort_dir == 'desc' else 'desc' %}
+      {% set dir_date = 'asc' if sort_col != 'log_date' or sort_dir == 'desc' else 'desc' %}
+      {% set dir_user = 'asc' if sort_col != 'user_name' or sort_dir == 'desc' else 'desc' %}
+      {% set dir_action = 'asc' if sort_col != 'action' or sort_dir == 'desc' else 'desc' %}
+      {% set dir_entity = 'asc' if sort_col != 'entity_type' or sort_dir == 'desc' else 'desc' %}
+      {% set dir_entity_id = 'asc' if sort_col != 'entity_id' or sort_dir == 'desc' else 'desc' %}
+      {% set dir_context = 'asc' if sort_col != 'context_type' or sort_dir == 'desc' else 'desc' %}
+      <th>
+        <a href="{{ url_for('admin.user_history_route', sort='id', dir=dir_id, limit=limit) }}">Id</a>
+        {% if sort_col == 'id' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      </th>
+      <th>
+        <a href="{{ url_for('admin.user_history_route', sort='log_date', dir=dir_date, limit=limit) }}">Date</a>
+        {% if sort_col == 'log_date' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      </th>
+      <th>
+        <a href="{{ url_for('admin.user_history_route', sort='user_name', dir=dir_user, limit=limit) }}">User</a>
+        {% if sort_col == 'user_name' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      </th>
+      <th>
+        <a href="{{ url_for('admin.user_history_route', sort='action', dir=dir_action, limit=limit) }}">Action</a>
+        {% if sort_col == 'action' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      </th>
+      <th>
+        <a href="{{ url_for('admin.user_history_route', sort='entity_type', dir=dir_entity, limit=limit) }}">Entity</a>
+        {% if sort_col == 'entity_type' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      </th>
+      <th>
+        <a href="{{ url_for('admin.user_history_route', sort='entity_id', dir=dir_entity_id, limit=limit) }}">Entity Id</a>
+        {% if sort_col == 'entity_id' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      </th>
+      <th>
+        <a href="{{ url_for('admin.user_history_route', sort='context_type', dir=dir_context, limit=limit) }}">Context</a>
+        {% if sort_col == 'context_type' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+      </th>
+      <th>Details</th>
+      <th>Undo</th>
+    </tr>
+    {% for row in entries %}
+    <tr>
+      <td>{{ row.id }}</td>
+      <td>{{ row.log_date }}</td>
+      <td>{{ row.user_name }}</td>
+      <td>{{ row.action }}</td>
+      <td>{{ row.entity_type }}</td>
+      <td>{{ row.entity_id }}</td>
+      <td>{{ row.context_type }}{% if row.context_id %}:{{ row.context_id }}{% endif %}</td>
+      <td>
+        {% if row.before_json %}
+          <div><strong>before</strong>: {{ row.before_json[:120] }}{% if row.before_json|length > 120 %}...{% endif %}</div>
+        {% endif %}
+        {% if row.after_json %}
+          <div><strong>after</strong>: {{ row.after_json[:120] }}{% if row.after_json|length > 120 %}...{% endif %}</div>
+        {% endif %}
+        {% if row.details %}
+          <div><strong>details</strong>: {{ row.details[:120] }}{% if row.details|length > 120 %}...{% endif %}</div>
+        {% endif %}
+      </td>
+      <td>
+        {% if row.undoable %}
+        <form method="post">
+          <input type="hidden" name="action" value="undo">
+          <input type="hidden" name="log_id" value="{{ row.id }}">
+          <button type="submit">Undo</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endblock %}

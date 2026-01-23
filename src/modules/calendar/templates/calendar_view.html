@@ -19,4 +19,10 @@
     <tr><th>Detail</th><td>{{ event.detail }}</td></tr>
     <tr><th>Project</th><td>{{ event.project }}</td></tr>
   </table>
+  {% set link_record_type = "event" %}
+  {% set link_record_id = event.id %}
+  {% set link_record_title = event.title %}
+  {% set link_context_type = "event_detail" %}
+  {% set link_mode = "outgoing" %}
+  {% include "widgets/links_drawer.html" %}
 {% endblock %}

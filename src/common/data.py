@@ -313,6 +313,7 @@ def add_record(conn, tbl_name, col_list, value_list):
         conn.commit()
         record_id = cur.lastrowid
         _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id)
+        _log_user_change(conn, "add", tbl_name, record_id, before=None, after=_fetch_row_by_id(conn, tbl_name, record_id))
         return record_id
     except Exception as exc:
         _log_error(conn, f"add_record failed: {exc}")
@@ -339,10 +340,13 @@ def update_record(conn, tbl_name, record_id, col_list, value_list):
     vals.append(record_id)
     try:
         conn = _get_conn() if conn is None else conn
+        before = _fetch_row_by_id(conn, tbl_name, record_id)
         _dbg(f"UPDATE {tbl_name} id={record_id} cols={col_list}")
         conn.execute(sql, vals)
         conn.commit()
         _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id)
+        after = _fetch_row_by_id(conn, tbl_name, record_id)
+        _log_user_change(conn, "update", tbl_name, record_id, before=before, after=after)
         return True
     except Exception as exc:
         _log_error(conn, f"update_record failed: {exc}")
@@ -361,9 +365,12 @@ def delete_record(conn, tbl_name, record_id):
     sql = f"DELETE FROM {tbl_name} WHERE id = ?"
     try:
         conn = _get_conn() if conn is None else conn
+        before = _fetch_row_by_id(conn, tbl_name, record_id)
         _dbg(f"DELETE {tbl_name} id={record_id}")
         conn.execute(sql, [record_id])
         conn.commit()
+        if before is not None:
+            _log_user_change(conn, "delete", tbl_name, record_id, before=before, after=None)
         return True
     except Exception as exc:
         _log_error(conn, f"delete_record failed: {exc}")
@@ -378,6 +385,35 @@ def _route_for_table(tbl_name):
         if tbl.get("name") == tbl_name:
             return tbl.get("route")
     return None
+
+
+def _fetch_row_by_id(conn, tbl_name, record_id):
+    try:
+        row = conn.execute(f"SELECT * FROM {tbl_name} WHERE id = ?", [record_id]).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    try:
+        return dict(row)
+    except Exception:
+        return row
+
+
+def _log_user_change(conn, action, tbl_name, record_id, before=None, after=None):
+    try:
+        from common import utils as utils_mod
+
+        utils_mod.lg_usr(
+            action=action,
+            entity_type=tbl_name,
+            entity_id=record_id,
+            before=before,
+            after=after,
+            conn=conn,
+        )
+    except Exception:
+        pass
 
 
 def _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id):

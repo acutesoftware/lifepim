@@ -13,8 +13,14 @@
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
 
-<table border="1" cellpadding="5">
+{% set link_list_type = "event" %}
+{% set link_list_context_id = "calendar_list" %}
+{% set link_table_id = "events-table" %}
+{% include "widgets/links_bulk_toolbar.html" %}
+
+<table border="1" cellpadding="5" id="events-table">
   <tr>
+    <th><input type="checkbox" class="link-select-all"></th>
     {% set dir_date = 'asc' if sort_col != 'date' or sort_dir == 'desc' else 'desc' %}
     {% set dir_time = 'asc' if sort_col != 'time' or sort_dir == 'desc' else 'desc' %}
     {% set dir_title = 'asc' if sort_col != 'title' or sort_dir == 'desc' else 'desc' %}
@@ -38,7 +44,8 @@
     <th>Actions</th>
   </tr>
   {% for ev in events %}
-  <tr>
+  <tr class="link-draggable" data-record-type="event" data-record-id="{{ ev.id }}" data-record-title="{{ ev.title }}">
+    <td><input type="checkbox" class="link-select" data-record-type="event" data-record-id="{{ ev.id }}" data-record-title="{{ ev.title }}"></td>
     <td>{{ ev.date }}</td>
     <td>{{ ev.time }}</td>
     <td>{{ ev.title }}</td>

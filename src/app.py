@@ -34,6 +34,7 @@ from modules.money.routes import money_bp
 from modules.contacts.routes import contacts_bp
 from modules.tasks.tasks import tasks_bp
 from modules.admin.routes import admin_bp
+from modules.links.routes import links_bp
 
 _dbg("Registering blueprints")
 app.register_blueprint(calendar_bp, url_prefix="/calendar")
@@ -51,6 +52,7 @@ app.register_blueprint(money_bp, url_prefix="/money")
 app.register_blueprint(contacts_bp, url_prefix="/contacts")
 app.register_blueprint(tasks_bp, url_prefix="/tasks")
 app.register_blueprint(admin_bp, url_prefix="/admin")
+app.register_blueprint(links_bp, url_prefix="/links")
 _dbg("Blueprints registered")
 
 @app.route('/')

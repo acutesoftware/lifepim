@@ -47,4 +47,10 @@
     {% endif %}
     <p><a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}">Edit</a></p>
   </div>
+  {% set link_record_type = "note" %}
+  {% set link_record_id = note.id %}
+  {% set link_record_title = note.file_name %}
+  {% set link_context_type = "note_detail" %}
+  {% set link_mode = "outgoing" %}
+  {% include "widgets/links_drawer.html" %}
 {% endblock %}

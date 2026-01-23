@@ -261,4 +261,10 @@
     bindFileRows();
   </script>
   {% endif %}
+  {% set link_record_type = "file" %}
+  {% set link_record_id = item.id %}
+  {% set link_record_title = item.filelist_name or item.path %}
+  {% set link_context_type = "file_detail" %}
+  {% set link_mode = "outgoing" %}
+  {% include "widgets/links_drawer.html" %}
 {% endblock %}

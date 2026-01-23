@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import math
 import common.config as mod_cfg
 from common import data as db
@@ -168,4 +169,80 @@ def build_pagination(url_for_fn, route_name, base_args, page, total_pages):
         "first_url": url_for_fn(route_name, **first_args),
         "last_url": url_for_fn(route_name, **last_args),
     }
+
+
+_USER_LOG_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS sys_user_log (
+    id INTEGER PRIMARY KEY,
+    log_date TEXT NOT NULL,
+    user_name TEXT,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT,
+    before_json TEXT,
+    after_json TEXT,
+    context_type TEXT,
+    context_id TEXT,
+    details TEXT
+);
+"""
+
+
+def _ensure_user_log_schema(conn):
+    conn.execute(_USER_LOG_SCHEMA_SQL)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS ix_sys_user_log_entity "
+        "ON sys_user_log(entity_type, entity_id)"
+    )
+
+
+def ensure_user_log_schema(conn=None):
+    conn = db._get_conn() if conn is None else conn
+    _ensure_user_log_schema(conn)
+
+
+def _json_blob(value):
+    if value is None:
+        return None
+    try:
+        return json.dumps(value, ensure_ascii=True, default=str)
+    except Exception:
+        return json.dumps(str(value), ensure_ascii=True)
+
+
+def lg_usr(
+    action,
+    entity_type,
+    entity_id=None,
+    before=None,
+    after=None,
+    context_type=None,
+    context_id=None,
+    extra=None,
+    conn=None,
+    user_name=None,
+):
+    conn = db._get_conn() if conn is None else conn
+    _ensure_user_log_schema(conn)
+    payload = _json_blob(extra)
+    conn.execute(
+        (
+            "INSERT INTO sys_user_log "
+            "(log_date, user_name, action, entity_type, entity_id, before_json, after_json, "
+            "context_type, context_id, details) "
+            "VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        (
+            user_name or db._current_user(),
+            (action or "").strip(),
+            (entity_type or "").strip(),
+            None if entity_id is None else str(entity_id),
+            _json_blob(before),
+            _json_blob(after),
+            context_type,
+            context_id,
+            payload,
+        ),
+    )
+    conn.commit()
 

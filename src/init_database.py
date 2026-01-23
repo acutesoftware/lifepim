@@ -28,6 +28,7 @@ def reset_database(db_file):
         create_table(db_conn, tbl)
     db_conn.executescript(folder_etl.DDL_RESET)
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_contacts.sql"))
+    _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_links.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))
     db_conn.commit()
     db_conn.close()

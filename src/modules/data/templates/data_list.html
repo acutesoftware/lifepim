@@ -6,7 +6,11 @@
 <table border="1" cellpadding="5">
   <tr>
     {% for col in col_list %}
-    <th>{{ col.replace('_', ' ') }}</th>
+    {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
+    <th>
+      <a href="{{ url_for('data.list_data_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
     {% endfor %}
     <th>Actions</th>
   </tr>

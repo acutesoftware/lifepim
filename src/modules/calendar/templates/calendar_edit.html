@@ -10,7 +10,16 @@
   <label>Project:</label><br>
   <input type="text" name="project" value="{{ event.project if event else default_project }}"><br>
   <label>Details:</label><br>
-  <textarea name="detail" rows="6" cols="60">{{ event.detail if event else '' }}</textarea><br><br>
+  <textarea name="detail" rows="6" cols="60" class="mention-enabled"
+            {% if event %}data-record-type="event" data-record-id="{{ event.id }}"{% endif %}>{{ event.detail if event else '' }}</textarea><br><br>
   <button type="submit">Save</button>
 </form>
+{% if event %}
+  {% set link_record_type = "event" %}
+  {% set link_record_id = event.id %}
+  {% set link_record_title = event.title %}
+  {% set link_context_type = "event_detail" %}
+  {% set link_mode = "outgoing" %}
+  {% include "widgets/links_drawer.html" %}
+{% endif %}
 {% endblock %}

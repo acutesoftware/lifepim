@@ -17,6 +17,7 @@
         <div class="menu-spacer"></div>
         <a href="#">Settings</a>
         <a href="#">Help</a>
+        <a href="{{ url_for('admin.user_history_route') }}">User history</a>
       </div>
     </div>
 
@@ -59,6 +60,8 @@
     </main>
   </div>
 
+  {% include "widgets/links_overlay.html" %}
+
   <script>
     const menuToggle = document.getElementById('menuToggle');
     const menuDropdown = document.getElementById('menuDropdown');
@@ -91,5 +94,6 @@
       menuDropdown.classList.remove('show');
     });
   </script>
+  <script src="{{ url_for('static', filename='links.js') }}"></script>
 </body>
 </html>

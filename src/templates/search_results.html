@@ -18,7 +18,8 @@
           <th>Match</th>
         </tr>
         {% for item in results_primary %}
-        <tr>
+        <tr class="link-draggable"
+            {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
           <td>{{ item.table }}</td>
           <td><a href="{{ item.url }}">{{ item.id }}</a></td>
           <td>{{ item.match_field }}: {{ item.match_snippet }}</td>
@@ -36,7 +37,8 @@
           <th>Match</th>
         </tr>
         {% for item in results_secondary %}
-        <tr>
+        <tr class="link-draggable"
+            {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
           <td>{{ item.table }}</td>
           <td><a href="{{ item.url }}">{{ item.id }}</a></td>
           <td>{{ item.match_field }}: {{ item.match_snippet }}</td>

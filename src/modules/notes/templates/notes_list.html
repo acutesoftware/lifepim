@@ -8,8 +8,14 @@
   <a href="{{ url_for('notes.add_note_route', proj=project) }}">Add Note</a>
   <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
 
-<table border="1" cellpadding="5">
+{% set link_list_type = "note" %}
+{% set link_list_context_id = "notes_list" %}
+{% set link_table_id = "notes-table" %}
+{% include "widgets/links_bulk_toolbar.html" %}
+
+<table border="1" cellpadding="5" id="notes-table">
   <tr>
+    <th><input type="checkbox" class="link-select-all"></th>
     {% set dir_file = 'asc' if sort_col != 'file_name' or sort_dir == 'desc' else 'desc' %}
     {% set dir_path = 'asc' if sort_col != 'path' or sort_dir == 'desc' else 'desc' %}
     {% set dir_folder_id = 'asc' if sort_col != 'folder_id' or sort_dir == 'desc' else 'desc' %}
@@ -48,7 +54,8 @@
     <th>Actions</th>
   </tr>
   {% for n in notes %}
-  <tr>
+  <tr class="link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
+    <td><input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}"></td>
     <td>{{ n.file_name }}</td>
     <td>{{ n.path }}</td>
     <td>{{ n.folder_id }}</td>

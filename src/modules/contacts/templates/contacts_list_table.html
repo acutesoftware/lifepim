@@ -8,8 +8,14 @@
     <a href="{{ url_for('contacts.import_contacts_route') }}">Import Contacts</a>
   </div>
 
-<table border="1" cellpadding="5">
+{% set link_list_type = "person" %}
+{% set link_list_context_id = "contacts_list" %}
+{% set link_table_id = "contacts-table" %}
+{% include "widgets/links_bulk_toolbar.html" %}
+
+<table border="1" cellpadding="5" id="contacts-table">
   <tr>
+    <th><input type="checkbox" class="link-select-all"></th>
     {% for col in col_list %}
     {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
     <th>
@@ -20,7 +26,8 @@
     <th>Actions</th>
   </tr>
   {% for item in items %}
-  <tr>
+  <tr class="link-draggable" data-record-type="person" data-record-id="{{ item.contact_id }}" data-record-title="{{ item.display_name }}">
+    <td><input type="checkbox" class="link-select" data-record-type="person" data-record-id="{{ item.contact_id }}" data-record-title="{{ item.display_name }}"></td>
     {% for col in col_list %}
     <td>
       {% if col == 'display_name' %}

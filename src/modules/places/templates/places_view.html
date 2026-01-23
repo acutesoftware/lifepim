@@ -16,4 +16,10 @@
     <a href="{{ url_for('places.edit_place_route', place_id=item.id, proj=project) }}">Edit</a> |
     <a href="{{ url_for('places.delete_place_route', place_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
   </p>
+  {% set link_record_type = "place" %}
+  {% set link_record_id = item.id %}
+  {% set link_record_title = item.name %}
+  {% set link_context_type = "place_detail" %}
+  {% set link_mode = "outgoing" %}
+  {% include "widgets/links_drawer.html" %}
 {% endblock %}

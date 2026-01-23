@@ -10,7 +10,16 @@
     <label>Due Date:</label><br>
     <input type="date" name="due_date" value="{{ task.due_date if task else '' }}"><br>
     <label>Details:</label><br>
-    <textarea name="content" rows="6" cols="60">{{ task.content if task else '' }}</textarea><br><br>
+    <textarea name="content" rows="6" cols="60" class="mention-enabled"
+              {% if task %}data-record-type="task" data-record-id="{{ task.id }}"{% endif %}>{{ task.content if task else '' }}</textarea><br><br>
     <button type="submit">Save</button>
   </form>
+  {% if task %}
+    {% set link_record_type = "task" %}
+    {% set link_record_id = task.id %}
+    {% set link_record_title = task.title %}
+    {% set link_context_type = "task_detail" %}
+    {% set link_mode = "outgoing" %}
+    {% include "widgets/links_drawer.html" %}
+  {% endif %}
 {% endblock %}

@@ -168,17 +168,28 @@ def list_files_route():
     items = []
     col_list = []
     content_title = "Files"
+    sort_col = request.args.get("sort") or "id"
+    dir_param = request.args.get("dir")
+    if not dir_param:
+        sort_dir = "desc"
+    else:
+        sort_dir = "desc" if dir_param.lower() == "desc" else "asc"
     page = request.args.get("page", type=int) or 1
     total_pages = 1
     pagination = build_pagination(
         url_for,
         "files.list_files_route",
-        {"proj": project},
+        {"proj": project, "sort": sort_col, "dir": sort_dir},
         1,
         1,
     )
     if tbl:
         col_list = tbl["col_list"]
+        allowed_sort = {"id"} | set(col_list)
+        if sort_col not in allowed_sort:
+            sort_col = "id"
+        order_key = "t.id" if sort_col == "id" else f"t.{sort_col}"
+        order_by = f"{order_key} {sort_dir}"
         cols = ["id"] + col_list
         per_page = cfg.RECS_PER_PAGE
         total = db.count_mapped_rows(db.conn, tbl["name"], tab=project)
@@ -190,7 +201,7 @@ def list_files_route():
             tab=project,
             limit=per_page,
             offset=offset,
-            order_by="t.id DESC",
+            order_by=order_by,
         )
         items = [dict(row) for row in rows]
         content_title = f"{tbl['display_name']} ({project or 'All'})"
@@ -200,7 +211,7 @@ def list_files_route():
         pagination = build_pagination(
             url_for,
             "files.list_files_route",
-            {"proj": project},
+            {"proj": project, "sort": sort_col, "dir": sort_dir},
             page,
             total_pages,
         )
@@ -214,6 +225,8 @@ def list_files_route():
         items=items,
         col_list=col_list,
         project=project,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],

@@ -69,8 +69,15 @@ def list_data_route():
     items = []
     col_list = []
     content_title = "Data"
+    sort_col = ""
+    sort_dir = "asc"
     if tbl:
         col_list = tbl["col_list"]
+        default_sort = "name" if "name" in col_list else (col_list[0] if col_list else "")
+        sort_col = request.args.get("sort") or default_sort
+        sort_dir = "desc" if (request.args.get("dir") or "").lower() == "desc" else "asc"
+        if sort_col not in col_list:
+            sort_col = default_sort
         cols = ["id"] + col_list
         condition = "1=1"
         params = []
@@ -79,6 +86,16 @@ def list_data_route():
             params = [project]
         rows = db.get_data(db.conn, tbl["name"], cols, condition, params)
         items = [dict(row) for row in rows]
+        if sort_col:
+            reverse = sort_dir == "desc"
+            def _sort_key(item):
+                value = item.get(sort_col)
+                if value is None:
+                    return (1, "")
+                if isinstance(value, (int, float)):
+                    return (0, value)
+                return (0, str(value).lower())
+            items = sorted(items, key=_sort_key, reverse=reverse)
         content_title = f"{tbl['display_name']} ({project or 'All'})"
     page = request.args.get("page", type=int) or 1
     page_data = paginate_items(items, page, cfg.RECS_PER_PAGE)
@@ -88,7 +105,7 @@ def list_data_route():
     pagination = build_pagination(
         url_for,
         "data.list_data_route",
-        {"proj": project},
+        {"proj": project, "sort": sort_col, "dir": sort_dir},
         page,
         total_pages,
     )
@@ -102,6 +119,8 @@ def list_data_route():
         items=items,
         col_list=col_list,
         project=project,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],

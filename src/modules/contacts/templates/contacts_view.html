@@ -57,4 +57,10 @@
     <input type="text" name="confidence" placeholder="0..1"><br><br>
     <button type="submit">Add Fact</button>
   </form>
+  {% set link_record_type = "person" %}
+  {% set link_record_id = contact.contact_id %}
+  {% set link_record_title = contact.display_name %}
+  {% set link_context_type = "person_detail" %}
+  {% set link_mode = "outgoing" %}
+  {% include "widgets/links_drawer.html" %}
 {% endblock %}

@@ -1,0 +1,42 @@
+<div class="links-drawer open"
+     tabindex="0"
+     data-record-type="{{ link_record_type }}"
+     data-record-id="{{ link_record_id }}"
+     data-record-title="{{ link_record_title }}"
+     data-context-type="{{ link_context_type }}"
+     data-mode="{{ link_mode or 'outgoing' }}">
+  <div class="links-drawer-resize" aria-hidden="true"></div>
+  <div class="links-drawer-header">
+    <span class="links-title">Links</span>
+    <div class="links-actions">
+      <button type="button" class="links-btn link-add">Add link</button>
+      <button type="button" class="links-btn link-toggle">Toggle</button>
+    </div>
+  </div>
+  <div class="links-tabs">
+    <button type="button" class="links-tab" data-mode="outgoing">Outgoing</button>
+    <button type="button" class="links-tab" data-mode="incoming">Incoming</button>
+  </div>
+  <div class="links-sections">
+    {% for link_type, label in [
+      ('related', 'Related'),
+      ('mentions', 'Mentions'),
+      ('attachment', 'Attachments'),
+      ('about', 'About'),
+      ('assigned_to', 'Assigned to'),
+      ('depends_on', 'Depends on'),
+      ('emails', 'Emails'),
+      ('calls', 'Calls'),
+      ('located_at', 'Located at'),
+    ] %}
+    <div class="links-section" data-link-type="{{ link_type }}">
+      <div class="links-section-header" data-drop-zone="{{ link_type }}">
+        <span>{{ label }}</span>
+        <span class="links-count">0</span>
+      </div>
+      <div class="links-drop-hint">Drop items here or click Add link</div>
+      <ul class="links-list"></ul>
+    </div>
+    {% endfor %}
+  </div>
+</div>

@@ -454,3 +454,383 @@ body {
   gap: 6px;
   justify-content: flex-end;
 }
+
+.links-drawer {
+  position: fixed;
+  top: 40px;
+  --links-drawer-width: 340px;
+  right: calc(-1 * (var(--links-drawer-width) + 20px));
+  width: var(--links-drawer-width);
+  max-width: calc(100vw - 20px);
+  height: calc(100vh - 60px);
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  z-index: 120;
+  overflow: auto;
+  transition: right 0.2s ease;
+}
+
+.links-drawer.open {
+  right: 10px;
+}
+
+.links-drawer:focus {
+  outline: 2px solid #99c;
+}
+
+.links-drawer-resize {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+body.links-resizing {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.links-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.links-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.links-btn {
+  padding: 2px 6px;
+  border: 1px solid #bbb;
+  background: #f6f6f6;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.links-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.links-tab {
+  flex: 1;
+  padding: 3px 4px;
+  border: 1px solid #ccc;
+  background: #f2f2f2;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.links-tab.active {
+  background: #ddd;
+  font-weight: bold;
+}
+
+.links-section {
+  border-top: 1px solid #eee;
+  padding: 6px 0;
+}
+
+.links-section-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  font-size: 11px;
+  padding: 3px 2px;
+  border-radius: 3px;
+}
+
+.links-section-header.drop-target {
+  background: #e9f1ff;
+  border: 1px dashed #99b;
+}
+
+.links-count {
+  font-weight: normal;
+  color: #666;
+}
+
+.links-drop-hint {
+  font-size: 10px;
+  color: #777;
+  margin: 2px 0 4px;
+}
+
+.links-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.link-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto auto;
+  gap: 4px;
+  align-items: center;
+  padding: 3px 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+.link-row.selected {
+  border-color: #88a;
+  background: #eef1ff;
+}
+
+.link-row.dragging {
+  opacity: 0.6;
+}
+
+.link-drag {
+  cursor: grab;
+  font-size: 10px;
+  color: #666;
+}
+
+.link-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.link-title {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.link-icon {
+  font-size: 11px;
+  font-weight: bold;
+  background: #eee;
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+
+.link-type-select {
+  font-size: 10px;
+}
+
+.link-label {
+  font-size: 10px;
+  padding: 1px 3px;
+  width: 90px;
+}
+
+.link-actions {
+  display: flex;
+  gap: 3px;
+}
+
+.link-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 130;
+}
+
+.link-modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.link-modal {
+  position: fixed;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 520px;
+  max-width: calc(100vw - 20px);
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  z-index: 140;
+  display: none;
+}
+
+.link-modal,
+.link-modal * {
+  box-sizing: border-box;
+}
+
+.link-modal.open {
+  display: block;
+}
+
+.link-modal-header,
+.link-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.link-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.link-picker-input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.link-picker-results {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  padding: 4px;
+  background: #fafafa;
+}
+
+.link-picker-group {
+  font-size: 11px;
+  font-weight: bold;
+  margin: 6px 0 4px;
+}
+
+.link-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  align-items: center;
+}
+
+.link-picker-row.selected {
+  background: #e8ecff;
+}
+
+.link-picker-title {
+  font-weight: bold;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-picker-subtitle {
+  font-size: 10px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-picker-type {
+  font-size: 10px;
+}
+
+.link-toast-container {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 150;
+}
+
+.link-toast {
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+  border-radius: 4px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.link-toast-type {
+  font-size: 11px;
+}
+
+.link-toast.fade {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mention-popup {
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  z-index: 160;
+  display: none;
+  min-width: 240px;
+}
+
+.mention-popup.open {
+  display: block;
+}
+
+.mention-row {
+  padding: 3px 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mention-row.selected {
+  background: #e8ecff;
+}
+
+.link-bulk-toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.link-bulk-count {
+  font-size: 11px;
+  color: #444;
+}
+
+.links-drawer-handle {
+  position: fixed;
+  top: 120px;
+  right: 0;
+  padding: 6px 8px;
+  border: 1px solid #bbb;
+  border-right: none;
+  background: #f6f6f6;
+  font-size: 11px;
+  border-radius: 4px 0 0 4px;
+  cursor: pointer;
+  z-index: 125;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.links-drawer-handle.hidden {
+  display: none;
+}

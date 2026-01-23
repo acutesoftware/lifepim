@@ -1,6 +1,24 @@
 from common import data
 from common.utils import get_table_def
 
+ROUTE_RECORD_TYPE = {
+    "notes": "note",
+    "tasks": "task",
+    "calendar": "event",
+    "files": "file",
+    "contacts": "person",
+    "places": "place",
+}
+
+ROUTE_TITLE_FIELD = {
+    "notes": "file_name",
+    "tasks": "title",
+    "calendar": "title",
+    "files": "filelist_name",
+    "contacts": "display_name",
+    "places": "name",
+}
+
 
 def _build_snippet(value, query_lower, max_len=80):
     text = value or ""
@@ -53,6 +71,8 @@ def _search_table(route_name, query_lower, columns, view_route, id_param):
                 "match_snippet": _build_snippet(match_value, query_lower),
                 "view_route": view_route,
                 "id_param": id_param,
+                "record_type": ROUTE_RECORD_TYPE.get(route_name, ""),
+                "title": item.get(ROUTE_TITLE_FIELD.get(route_name, "")) or "",
             }
         )
     return results

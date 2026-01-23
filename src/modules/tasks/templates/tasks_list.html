@@ -4,8 +4,14 @@
   <a href="{{ url_for('tasks.add_task_route', proj=project) }}">ホ Add Task</a>
   <a href="{{ url_for('tasks.import_tasks_route', proj=project) }}">Import Tasks</a>
 
-<table border="1" cellpadding="5">
+{% set link_list_type = "task" %}
+{% set link_list_context_id = "tasks_list" %}
+{% set link_table_id = "tasks-table" %}
+{% include "widgets/links_bulk_toolbar.html" %}
+
+<table border="1" cellpadding="5" id="tasks-table">
   <tr>
+    <th><input type="checkbox" class="link-select-all"></th>
     {% for col in col_list %}
     {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
     <th>
@@ -16,7 +22,8 @@
     <th>Actions</th>
   </tr>
   {% for task in tasks %}
-  <tr>
+  <tr class="link-draggable" data-record-type="task" data-record-id="{{ task.id }}" data-record-title="{{ task.title }}">
+    <td><input type="checkbox" class="link-select" data-record-type="task" data-record-id="{{ task.id }}" data-record-title="{{ task.title }}"></td>
     {% for col in col_list %}
     <td>{{ task[col] }}</td>
     {% endfor %}
