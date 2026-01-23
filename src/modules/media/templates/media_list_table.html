@@ -4,7 +4,8 @@
     <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Table</a> |
     <a href="{{ url_for('media.list_media_list_route', proj=project) }}">List</a> |
     <a href="{{ url_for('media.list_media_grid_route', proj=project) }}">Grid</a> |
-    <a href="{{ url_for('media.import_media_route', proj=project) }}">Add Media</a>
+    <a href="{{ url_for('media.import_media_route', proj=project) }}">Add Media</a> |
+    <a href="{{ url_for('media.media_player_route', proj=project) }}" onclick="window.open(this.href, 'media_player', 'width=520,height=620,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
   </div>
 
 <table border="1" cellpadding="5">
@@ -30,6 +31,7 @@
     </td>
     {% endfor %}
     <td>
+      <a href="{{ url_for('media.media_player_route', proj=project, id=item.id) }}" onclick="window.open(this.href, 'media_player', 'width=520,height=620,menubar=no,toolbar=no,location=no,status=no'); return false;">Play</a> |
       <a href="{{ url_for('media.edit_media_route', item_id=item.id, proj=project) }}">Edit</a> |
       <a href="{{ url_for('media.delete_media_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
     </td>

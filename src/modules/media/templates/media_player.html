@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>LifePIM Media Player</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+</head>
+<body class="media-player-body">
+  <div class="media-player-shell" id="media-player">
+    <header class="media-player-header">
+      <div class="media-player-logo">
+        <span class="media-player-mark">LP</span>
+        <span class="media-player-title">Media Player</span>
+      </div>
+      <div class="media-player-status" id="media-status">Ready</div>
+    </header>
+
+    <section class="media-player-display">
+      <div class="media-player-info">
+        <div class="media-player-name" id="media-title">No media loaded</div>
+        <div class="media-player-path" id="media-path"></div>
+      </div>
+      <div class="media-player-stage">
+        <img id="media-image" alt="">
+        <video id="media-video" preload="metadata"></video>
+      </div>
+    </section>
+
+    <section class="media-player-controls">
+      <button type="button" class="media-btn" id="media-prev" title="Previous"><<</button>
+      <button type="button" class="media-btn media-play" id="media-play-toggle" title="Play">></button>
+      <button type="button" class="media-btn" id="media-next" title="Next">>></button>
+    </section>
+  </div>
+
+  <script>
+    const items = {{ items|tojson }};
+    const startId = {{ start_id if start_id is not none else "null" }};
+    const titleEl = document.getElementById("media-title");
+    const pathEl = document.getElementById("media-path");
+    const statusEl = document.getElementById("media-status");
+    const imgEl = document.getElementById("media-image");
+    const videoEl = document.getElementById("media-video");
+    const playBtn = document.getElementById("media-play-toggle");
+    const prevBtn = document.getElementById("media-prev");
+    const nextBtn = document.getElementById("media-next");
+    let currentIndex = 0;
+    let currentIsVideo = false;
+
+    function setPlayButton(isPlaying) {
+      playBtn.textContent = isPlaying ? "||" : ">";
+      playBtn.title = isPlaying ? "Pause" : "Play";
+    }
+
+    function updateStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function setItem(index) {
+      if (!items.length) {
+        updateStatus("No media found");
+        return;
+      }
+      currentIndex = (index + items.length) % items.length;
+      const item = items[currentIndex];
+      titleEl.textContent = item.title || "Untitled";
+      pathEl.textContent = item.path || "";
+      currentIsVideo = !!item.is_video;
+      imgEl.style.display = currentIsVideo ? "none" : "block";
+      videoEl.style.display = currentIsVideo ? "block" : "none";
+      if (currentIsVideo) {
+        imgEl.removeAttribute("src");
+        videoEl.src = item.url;
+        videoEl.load();
+        setPlayButton(false);
+        playBtn.disabled = false;
+        updateStatus("Video ready");
+      } else {
+        videoEl.pause();
+        videoEl.removeAttribute("src");
+        videoEl.load();
+        imgEl.src = item.url;
+        setPlayButton(false);
+        playBtn.disabled = true;
+        updateStatus("Image ready");
+      }
+    }
+
+    playBtn.addEventListener("click", () => {
+      if (!currentIsVideo) {
+        return;
+      }
+      if (videoEl.paused) {
+        videoEl.play();
+      } else {
+        videoEl.pause();
+      }
+    });
+
+    prevBtn.addEventListener("click", () => setItem(currentIndex - 1));
+    nextBtn.addEventListener("click", () => setItem(currentIndex + 1));
+
+    videoEl.addEventListener("play", () => setPlayButton(true));
+    videoEl.addEventListener("pause", () => setPlayButton(false));
+    videoEl.addEventListener("ended", () => setPlayButton(false));
+
+    if (items.length) {
+      const startIndex = startId
+        ? items.findIndex((item) => Number(item.id) === Number(startId))
+        : 0;
+      setItem(startIndex >= 0 ? startIndex : 0);
+    } else {
+      updateStatus("No media found");
+    }
+  </script>
+</body>
+</html>

@@ -72,6 +72,10 @@ def _build_media_path(item):
     return full_path
 
 
+def _is_video_ext(ext):
+    return ext in [".mp4", ".mov", ".avi", ".mkv", ".webm", ".mpg", ".mpeg", ".wmv"]
+
+
 @media_bp.route("/")
 def list_media_route():
     return list_media_table_route()
@@ -285,6 +289,40 @@ def view_media_route(item_id):
         is_video=is_video,
         file_exists=os.path.exists(full_path),
         view_mode=view_mode,
+    )
+
+
+@media_bp.route("/player")
+def media_player_route():
+    project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
+    sort_col = request.args.get("sort") or "file_name"
+    sort_dir = request.args.get("dir") or "asc"
+    limit = request.args.get("limit", type=int) or 200
+    start_id = request.args.get("id", type=int)
+    items = _fetch_media(project, sort_col, sort_dir, limit=limit, offset=0)
+    playlist = []
+    for item in items:
+        full_path = _build_media_path(item)
+        ext = os.path.splitext(full_path)[1].lower()
+        playlist.append(
+            {
+                "id": item.get("id"),
+                "title": item.get("file_name") or "",
+                "path": item.get("path") or "",
+                "url": url_for("media.media_file_route", item_id=item.get("id")),
+                "is_video": _is_video_ext(ext),
+            }
+        )
+    return render_template(
+        "media_player.html",
+        items=playlist,
+        project=project,
+        start_id=start_id,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        limit=limit,
     )
 
 
