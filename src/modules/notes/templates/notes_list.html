@@ -56,7 +56,7 @@
   {% for n in notes %}
   <tr class="link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
     <td><input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}"></td>
-    <td>{{ n.file_name }}</td>
+    <td><a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a></td>
     <td>{{ n.path }}</td>
     <td>{{ n.folder_id }}</td>
     <td>{{ n.size }}</td>
@@ -64,7 +64,6 @@
     <td>{{ n.derived_project }}</td>
     <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
     <td>
-      <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">View</a> |
       <a href="{{ url_for('notes.edit_note_route', note_id=n.id) }}">Edit</a> |
       <a href="{{ url_for('notes.delete_note_route', note_id=n.id) }}" onclick="return confirm('Delete note?');">Del</a>
     </td>

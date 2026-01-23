@@ -9,6 +9,10 @@
     </form>
     {% if message %}<span style="margin-left:8px;">{{ message }}</span>{% endif %}
   </div>
+  <div style="margin-bottom:6px;">
+    Sorted by: {{ sort_col.replace('_', ' ') }} ({{ sort_dir }}) |
+    <a href="{{ url_for('admin.user_history_route', limit=limit) }}">Reset sort</a>
+  </div>
 
   <table border="1" cellpadding="5">
     <tr>

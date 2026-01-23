@@ -3,6 +3,20 @@
   <div>
     <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Back to Media</a>
   </div>
+  <div class="media-view-toggle">
+    View:
+    {% if view_mode == 'full' %}
+      <strong>Full</strong>
+    {% else %}
+      <a href="{{ url_for('media.view_media_route', item_id=item.id, proj=project, view='full') }}">Full</a>
+    {% endif %}
+    |
+    {% if view_mode == 'normal' %}
+      <strong>Normal</strong>
+    {% else %}
+      <a href="{{ url_for('media.view_media_route', item_id=item.id, proj=project, view='normal') }}">Normal</a>
+    {% endif %}
+  </div>
   <table border="1" cellpadding="5">
     {% for key, value in item.items() %}
     <tr>
@@ -11,15 +25,15 @@
     </tr>
     {% endfor %}
   </table>
-  <div style="margin-top:8px;">
+  <div class="media-viewer {{ view_mode }}">
     {% if not file_exists %}
       <p>File not found: {{ item.path }}{{ item.file_name }}</p>
     {% elif is_video %}
-      <video controls style="max-width:100%;">
+      <video controls>
         <source src="{{ media_url }}">
       </video>
     {% else %}
-      <img src="{{ media_url }}" alt="{{ item.file_name }}" style="max-width:100%;">
+      <img src="{{ media_url }}" alt="{{ item.file_name }}">
     {% endif %}
   </div>
 {% endblock %}

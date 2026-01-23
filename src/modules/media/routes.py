@@ -257,6 +257,9 @@ def import_media_route():
 @media_bp.route("/view/<int:item_id>")
 def view_media_route(item_id):
     project = request.args.get("proj")
+    view_mode = (request.args.get("view") or "full").strip().lower()
+    if view_mode not in {"full", "normal"}:
+        view_mode = "full"
     tbl = _get_tbl()
     item = None
     if tbl:
@@ -281,6 +284,7 @@ def view_media_route(item_id):
         media_url=media_url,
         is_video=is_video,
         file_exists=os.path.exists(full_path),
+        view_mode=view_mode,
     )
 
 

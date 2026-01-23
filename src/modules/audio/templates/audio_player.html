@@ -1,0 +1,283 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>LifePIM Player</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+</head>
+<body class="audio-player-body">
+  <div class="audio-player-shell" id="audio-player">
+    <header class="player-header">
+      <div class="player-logo">
+        <span class="player-mark">LP</span>
+        <span class="player-title">LifePIM Player</span>
+      </div>
+      <div class="player-status">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Ready</span>
+      </div>
+    </header>
+
+    <section class="player-display">
+      <div class="display-led">
+        <div class="display-track" id="track-title">No track loaded</div>
+        <div class="display-meta" id="track-meta">Select a track</div>
+      </div>
+      <div class="display-time">
+        <span id="time-elapsed">0:00</span>
+        <input type="range" id="progress" min="0" max="100" value="0">
+        <span id="time-duration">0:00</span>
+      </div>
+      <div class="display-eq">
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+      </div>
+    </section>
+
+    <section class="player-controls">
+      <button type="button" class="player-btn icon-btn" id="btn-prev" title="Previous"><<</button>
+      <button type="button" class="player-btn icon-btn primary" id="btn-play-toggle" title="Play">></button>
+      <button type="button" class="player-btn icon-btn" id="btn-next" title="Next">>></button>
+      <div class="player-volume">
+        <label for="volume">Vol</label>
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7">
+      </div>
+    </section>
+
+    <section class="player-playlist">
+      <div class="playlist-header">
+        <span>Playlist</span>
+        <span class="playlist-count">{{ tracks|length }} tracks</span>
+      </div>
+      <div class="playlist-list" id="playlist"></div>
+    </section>
+
+    <audio id="player-audio" preload="metadata"></audio>
+  </div>
+
+  <script>
+    const tracks = {{ tracks|tojson }};
+    const startId = {{ start_id if start_id is not none else "null" }};
+    const showFreqBar = {{ "true" if show_freq_bar else "false" }};
+    const audio = document.getElementById("player-audio");
+    const player = document.getElementById("audio-player");
+    const statusText = document.getElementById("status-text");
+    const statusDot = document.getElementById("status-dot");
+    const titleEl = document.getElementById("track-title");
+    const metaEl = document.getElementById("track-meta");
+    const timeElapsed = document.getElementById("time-elapsed");
+    const timeDuration = document.getElementById("time-duration");
+    const progress = document.getElementById("progress");
+    const volume = document.getElementById("volume");
+    const playToggle = document.getElementById("btn-play-toggle");
+    const playlistEl = document.getElementById("playlist");
+    let currentIndex = 0;
+    let seekActive = false;
+    let audioCtx = null;
+    let analyser = null;
+    let freqData = null;
+    let eqRaf = null;
+    const eqBars = Array.from(document.querySelectorAll(".eq-bar"));
+
+    function formatTime(seconds) {
+      if (!Number.isFinite(seconds)) {
+        return "0:00";
+      }
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
+    }
+
+    function updateStatus(text, playing) {
+      statusText.textContent = text;
+      if (playing) {
+        player.classList.add("playing");
+        statusDot.classList.add("live");
+        setPlayToggle(true);
+        startEq();
+      } else {
+        player.classList.remove("playing");
+        statusDot.classList.remove("live");
+        setPlayToggle(false);
+        stopEq();
+      }
+    }
+
+    function setPlayToggle(isPlaying) {
+      playToggle.textContent = isPlaying ? "||" : ">";
+      playToggle.title = isPlaying ? "Pause" : "Play";
+    }
+
+    function setTrack(index, autoPlay) {
+      if (!tracks.length) {
+        return;
+      }
+      currentIndex = (index + tracks.length) % tracks.length;
+      const track = tracks[currentIndex];
+      audio.src = track.url;
+      titleEl.textContent = track.title || "Unknown track";
+      const metaBits = [track.artist, track.album].filter(Boolean);
+      metaEl.textContent = metaBits.length ? metaBits.join(" / ") : (track.path || "");
+      highlightPlaylist();
+      updateStatus("Loaded", false);
+      if (autoPlay) {
+        audio.play();
+      }
+    }
+
+    function highlightPlaylist() {
+      const nodes = playlistEl.querySelectorAll(".playlist-item");
+      nodes.forEach((node) => {
+        node.classList.toggle("active", Number(node.dataset.index) === currentIndex);
+      });
+    }
+
+    function renderPlaylist() {
+      playlistEl.innerHTML = "";
+      if (!tracks.length) {
+        playlistEl.textContent = "No audio tracks found.";
+        return;
+      }
+      tracks.forEach((track, idx) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "playlist-item";
+        row.dataset.index = idx;
+        const meta = [track.artist, track.album].filter(Boolean).join(" / ");
+        const line = meta ? `${track.title || "Unknown track"} — ${meta}` : (track.title || "Unknown track");
+        row.innerHTML = `<span class="playlist-line">${line}</span>`;
+        row.addEventListener("click", () => {
+          setTrack(idx, true);
+        });
+        playlistEl.appendChild(row);
+      });
+      highlightPlaylist();
+    }
+
+    playToggle.addEventListener("click", () => {
+      if (audio.paused) {
+        audio.play();
+      } else {
+        audio.pause();
+      }
+    });
+    document.getElementById("btn-prev").addEventListener("click", () => {
+      setTrack(currentIndex - 1, true);
+    });
+    document.getElementById("btn-next").addEventListener("click", () => {
+      setTrack(currentIndex + 1, true);
+    });
+
+    audio.addEventListener("play", () => updateStatus("Playing", true));
+    audio.addEventListener("pause", () => updateStatus("Paused", false));
+    audio.addEventListener("ended", () => setTrack(currentIndex + 1, true));
+    audio.addEventListener("loadedmetadata", () => {
+      timeDuration.textContent = formatTime(audio.duration);
+    });
+    audio.addEventListener("timeupdate", () => {
+      if (seekActive) {
+        return;
+      }
+      const percent = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+      progress.value = Math.round(percent);
+      timeElapsed.textContent = formatTime(audio.currentTime);
+    });
+
+    progress.addEventListener("input", () => {
+      seekActive = true;
+    });
+    progress.addEventListener("change", () => {
+      if (!audio.duration) {
+        seekActive = false;
+        return;
+      }
+      const target = (Number(progress.value) / 100) * audio.duration;
+      audio.currentTime = target;
+      seekActive = false;
+    });
+
+    volume.addEventListener("input", () => {
+      audio.volume = Number(volume.value);
+    });
+    audio.volume = Number(volume.value);
+
+    renderPlaylist();
+    if (tracks.length) {
+      const startIndex = startId
+        ? tracks.findIndex((track) => Number(track.id) === Number(startId))
+        : 0;
+      setTrack(startIndex >= 0 ? startIndex : 0, false);
+    }
+
+    if (!showFreqBar) {
+      const eq = document.querySelector(".display-eq");
+      if (eq) {
+        eq.style.display = "none";
+      }
+    }
+
+    function initAnalyser() {
+      if (!showFreqBar || analyser) {
+        return;
+      }
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaElementSource(audio);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        freqData = new Uint8Array(analyser.frequencyBinCount);
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        player.classList.add("live-eq");
+      } catch (_) {
+        analyser = null;
+      }
+    }
+
+    function startEq() {
+      if (!showFreqBar || !eqBars.length) {
+        return;
+      }
+      initAnalyser();
+      if (!analyser) {
+        return;
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      if (eqRaf) {
+        cancelAnimationFrame(eqRaf);
+      }
+      const step = Math.max(1, Math.floor(freqData.length / eqBars.length));
+      const render = () => {
+        analyser.getByteFrequencyData(freqData);
+        eqBars.forEach((bar, idx) => {
+          const value = freqData[idx * step] || 0;
+          const height = Math.max(15, Math.round((value / 255) * 100));
+          bar.style.height = `${height}%`;
+        });
+        eqRaf = requestAnimationFrame(render);
+      };
+      render();
+    }
+
+    function stopEq() {
+      if (eqRaf) {
+        cancelAnimationFrame(eqRaf);
+        eqRaf = null;
+      }
+      eqBars.forEach((bar) => {
+        bar.style.height = "";
+      });
+    }
+  </script>
+</body>
+</html>

@@ -143,6 +143,41 @@ def list_audio_list_route():
     )
 
 
+@audio_bp.route("/player")
+def audio_player_route():
+    project = request.args.get("proj")
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        project = None
+    sort_col = request.args.get("sort") or "file_name"
+    sort_dir = request.args.get("dir") or "asc"
+    limit = request.args.get("limit", type=int) or 200
+    start_id = request.args.get("id", type=int)
+    items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
+    tracks = []
+    for item in items:
+        audio_url = url_for("audio.audio_file_route", item_id=item.get("id"))
+        tracks.append(
+            {
+                "id": item.get("id"),
+                "title": item.get("song") or item.get("file_name") or "",
+                "artist": item.get("artist") or "",
+                "album": item.get("album") or "",
+                "path": item.get("path") or "",
+                "url": audio_url,
+            }
+        )
+    return render_template(
+        "audio_player.html",
+        tracks=tracks,
+        project=project,
+        start_id=start_id,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        limit=limit,
+        show_freq_bar=(getattr(cfg, "AUDIO_SHOW_FREQ_BAR", "Y") or "Y").upper() == "Y",
+    )
+
+
 @audio_bp.route("/import", methods=["GET", "POST"])
 def import_audio_route():
     project = request.args.get("proj") or ""

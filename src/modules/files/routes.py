@@ -115,6 +115,15 @@ def _normalize_drive(drive_value):
     return drive_value
 
 
+def _drive_root(path_value):
+    if not path_value:
+        return ""
+    drive, _ = os.path.splitdrive(path_value)
+    if not drive:
+        return ""
+    return _normalize_drive(drive)
+
+
 def _rel_path(base_path, full_path):
     try:
         return os.path.relpath(full_path, base_path)
@@ -238,12 +247,18 @@ def list_files_route():
 @files_bp.route("/view/<int:item_id>")
 def view_file_route(item_id):
     project = request.args.get("proj")
-    selected_dir = request.args.get("dir")
+    selected_dir = request.args.get("dir") or ""
     drive = _normalize_drive(request.args.get("drive"))
     item = _load_item(item_id)
     if not item:
         return redirect(url_for("files.list_files_route", proj=project))
-    base_path = drive or item.get("path", "")
+    item_path = item.get("path", "") or ""
+    if not drive:
+        drive = _drive_root(item_path)
+        if drive and not selected_dir and item_path:
+            rel_path = _rel_path(drive, item_path)
+            selected_dir = "" if rel_path in (".", "") else rel_path
+    base_path = drive or item_path
     drives = _list_drives()
     selected_path = _safe_join(base_path, selected_dir)
     files, files_error = _list_files(selected_path)

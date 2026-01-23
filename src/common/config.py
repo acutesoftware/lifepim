@@ -78,6 +78,9 @@ There should not be separate get_tasks, add_tasks in the data.py
 # Pagination
 RECS_PER_PAGE = 200
 
+# Audio player settings
+AUDIO_SHOW_FREQ_BAR = "Y"
+
 # Project list default
 proj_list = ['Dev','Design','Fun','Games','Family','Car',
              'Business','Web','Home','Study','Health','Work',

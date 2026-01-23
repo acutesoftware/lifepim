@@ -158,6 +158,13 @@
       loadChildren(dir, container);
     }
 
+    function cssEscape(value) {
+      if (window.CSS && CSS.escape) {
+        return CSS.escape(value);
+      }
+      return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    }
+
     async function expandPath(relPath) {
       if (!relPath) {
         return;
@@ -173,7 +180,7 @@
           await loadChildren(current, container);
         }
         current = current ? `${current}\\${part}` : part;
-        const toggle = container.querySelector(`.folder-toggle[data-dir="${current.replace(/"/g, '\\"')}"]`);
+        const toggle = container.querySelector(`.folder-toggle[data-dir="${cssEscape(current)}"]`);
         if (!toggle) {
           break;
         }

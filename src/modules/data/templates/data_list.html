@@ -3,6 +3,13 @@
   <a href="{{ url_for('data.add_data_route', proj=project) }}">Add Data</a>
   <a href="{{ url_for('data.import_data_db_route', proj=project) }}">Import Databases</a>
 
+{% if col_list %}
+  <div style="margin:6px 0;">
+    Sorted by: {{ sort_col.replace('_', ' ') }} ({{ sort_dir }}) |
+    <a href="{{ url_for('data.list_data_route', proj=project) }}">Reset sort</a>
+  </div>
+{% endif %}
+
 <table border="1" cellpadding="5">
   <tr>
     {% for col in col_list %}

@@ -7,6 +7,13 @@
 {% set link_table_id = "files-table" %}
 {% include "widgets/links_bulk_toolbar.html" %}
 
+{% if col_list %}
+  <div style="margin:6px 0;">
+    Sorted by: {{ sort_col.replace('_', ' ') }} ({{ sort_dir }}) |
+    <a href="{{ url_for('files.list_files_route', proj=project) }}">Reset sort</a>
+  </div>
+{% endif %}
+
 <table border="1" cellpadding="5" id="files-table">
   <tr>
     <th><input type="checkbox" class="link-select-all"></th>

@@ -3,7 +3,8 @@
   <div>
     <a href="{{ url_for('audio.list_audio_table_route', proj=project) }}">Table</a> |
     <a href="{{ url_for('audio.list_audio_list_route', proj=project) }}">List</a> |
-    <a href="{{ url_for('audio.import_audio_route', proj=project) }}">Add Audio</a>
+    <a href="{{ url_for('audio.import_audio_route', proj=project) }}">Add Audio</a> |
+    <a href="{{ url_for('audio.audio_player_route', proj=project) }}" onclick="window.open(this.href, 'audio_player', 'width=420,height=640,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
   </div>
 
   <ul style="list-style:none; padding:0; margin:8px 0;">
