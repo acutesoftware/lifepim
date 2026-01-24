@@ -145,9 +145,16 @@ def search_route():
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
     route = request.args.get("route") or "home"
+    scope = (request.args.get("scope") or "titles").strip().lower()
+    include_note_content = scope == "all"
     tab_ids = {t.get("id") for t in get_tabs()}
     active_tab = route if route in tab_ids else "home"
-    results = search_mod.search_all(query, project=project, route=route)
+    results = search_mod.search_all(
+        query,
+        project=project,
+        route=route,
+        include_note_content=include_note_content,
+    )
     for item in results["primary"] + results["secondary"]:
         params = {item["id_param"]: item["id"]}
         if project:

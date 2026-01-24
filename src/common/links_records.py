@@ -1,14 +1,15 @@
 from common import data
 from common import links as link_model
+from common.search import parse_search_terms
 from common.utils import get_table_def
 from modules.contacts import dao as contacts_dao
 
 
 def search_records(query, types=None, limit=20):
-    query = (query or "").strip()
-    if not query:
+    terms = parse_search_terms(query)
+    if not terms:
         return []
-    query_lower = query.lower()
+    terms = [term.lower() for term in terms]
     types = [link_model._norm_type_id(t) for t in (types or []) if t]
     if not types:
         types = ["note", "task", "event", "file", "person", "place"]
@@ -24,17 +25,17 @@ def search_records(query, types=None, limit=20):
         remaining = max(0, remaining - len(rows))
 
     if "note" in types:
-        _extend(_search_notes(query_lower, remaining))
+        _extend(_search_notes(terms, remaining))
     if "task" in types:
-        _extend(_search_tasks(query_lower, remaining))
+        _extend(_search_tasks(terms, remaining))
     if "event" in types:
-        _extend(_search_events(query_lower, remaining))
+        _extend(_search_events(terms, remaining))
     if "file" in types:
-        _extend(_search_files(query_lower, remaining))
+        _extend(_search_files(terms, remaining))
     if "person" in types or "contact" in types:
-        _extend(_search_contacts(query_lower, remaining))
+        _extend(_search_contacts(terms, remaining))
     if "place" in types:
-        _extend(_search_places(query_lower, remaining))
+        _extend(_search_places(terms, remaining))
     return results
 
 
@@ -99,24 +100,24 @@ def _table_for_type(type_id):
     return None
 
 
-def _search_notes(query_lower, limit):
+def _search_notes(terms, limit):
     tbl = get_table_def("notes")
     if not tbl:
         return []
     cols = ["id", "file_name", "path"]
-    rows = _search_table(tbl["name"], cols, ["file_name", "path"], query_lower, limit)
+    rows = _search_table(tbl["name"], cols, ["file_name", "path"], terms, limit)
     return [
         _summary_from_values("note", row["id"], row.get("file_name"), row.get("path"))
         for row in rows
     ]
 
 
-def _search_tasks(query_lower, limit):
+def _search_tasks(terms, limit):
     tbl = get_table_def("tasks")
     if not tbl:
         return []
     cols = ["id", "title", "content", "due_date", "project"]
-    rows = _search_table(tbl["name"], cols, ["title", "content"], query_lower, limit)
+    rows = _search_table(tbl["name"], cols, ["title", "content"], terms, limit)
     return [
         _summary_from_values(
             "task",
@@ -128,12 +129,12 @@ def _search_tasks(query_lower, limit):
     ]
 
 
-def _search_events(query_lower, limit):
+def _search_events(terms, limit):
     tbl = get_table_def("calendar")
     if not tbl:
         return []
     cols = ["id", "title", "content", "event_date", "project"]
-    rows = _search_table(tbl["name"], cols, ["title", "content"], query_lower, limit)
+    rows = _search_table(tbl["name"], cols, ["title", "content"], terms, limit)
     return [
         _summary_from_values(
             "event",
@@ -145,12 +146,12 @@ def _search_events(query_lower, limit):
     ]
 
 
-def _search_files(query_lower, limit):
+def _search_files(terms, limit):
     tbl = get_table_def("files")
     if not tbl:
         return []
     cols = ["id", "filelist_name", "path", "project"]
-    rows = _search_table(tbl["name"], cols, ["filelist_name", "path"], query_lower, limit)
+    rows = _search_table(tbl["name"], cols, ["filelist_name", "path"], terms, limit)
     return [
         _summary_from_values(
             "file",
@@ -162,12 +163,12 @@ def _search_files(query_lower, limit):
     ]
 
 
-def _search_places(query_lower, limit):
+def _search_places(terms, limit):
     tbl = get_table_def("places")
     if not tbl:
         return []
     cols = ["id", "name", "desc", "suburb", "state", "country"]
-    rows = _search_table(tbl["name"], cols, ["name", "desc", "suburb", "state", "country"], query_lower, limit)
+    rows = _search_table(tbl["name"], cols, ["name", "desc", "suburb", "state", "country"], terms, limit)
     return [
         _summary_from_values(
             "place",
@@ -179,17 +180,24 @@ def _search_places(query_lower, limit):
     ]
 
 
-def _search_contacts(query_lower, limit):
+def _search_contacts(terms, limit):
     conn = data._get_conn()
+    term_conditions = []
+    params = []
+    for term in terms:
+        like_value = f"%{term}%"
+        term_conditions.append("(lower(display_name) LIKE ? OR lower(normalized_name) LIKE ?)")
+        params.extend([like_value, like_value])
+    where_clause = " AND ".join(term_conditions) if term_conditions else "1=1"
     sql = (
         "SELECT contact_id, display_name, normalized_name "
         "FROM lp_contacts "
-        "WHERE lower(display_name) LIKE ? OR lower(normalized_name) LIKE ? "
+        f"WHERE {where_clause} "
         "ORDER BY display_name "
         "LIMIT ?"
     )
-    like_value = f"%{query_lower}%"
-    rows = conn.execute(sql, [like_value, like_value, int(limit or 20)]).fetchall()
+    params.append(int(limit or 20))
+    rows = conn.execute(sql, params).fetchall()
     return [
         _summary_from_values(
             "person",
@@ -216,12 +224,18 @@ def _summary_fields(type_id, row):
     return "", ""
 
 
-def _search_table(tbl_name, cols, search_cols, query_lower, limit):
-    if not search_cols:
+def _search_table(tbl_name, cols, search_cols, terms, limit):
+    if not search_cols or not terms:
         return []
-    like_value = f"%{query_lower}%"
-    condition = " OR ".join([f"lower({col}) LIKE ?" for col in search_cols])
-    sql = f"SELECT {', '.join(cols)} FROM {tbl_name} WHERE {condition} LIMIT ?"
-    params = [like_value] * len(search_cols) + [int(limit or 20)]
+    term_conditions = []
+    params = []
+    for term in terms:
+        like_value = f"%{term}%"
+        condition = " OR ".join([f"lower({col}) LIKE ?" for col in search_cols])
+        term_conditions.append(f"({condition})")
+        params.extend([like_value] * len(search_cols))
+    where_clause = " AND ".join(term_conditions)
+    sql = f"SELECT {', '.join(cols)} FROM {tbl_name} WHERE {where_clause} LIMIT ?"
+    params.append(int(limit or 20))
     rows = data._get_conn().execute(sql, params).fetchall()
     return [dict(row) for row in rows]

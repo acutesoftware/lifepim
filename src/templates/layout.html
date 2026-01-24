@@ -33,18 +33,25 @@
         </a>
       {% endfor %}
     </div>
+    {% set search_scope = request.args.get('scope', 'titles') %}
     <form class="search-form" action="{{ url_for('search_route') }}" method="get">
       <input type="text" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search">
       <input type="hidden" name="proj" value="{{ current_proj or '' }}">
       <input type="hidden" name="route" value="{{ active_tab }}">
       <button type="submit">Search</button>
+      <select name="scope" title="Search scope">
+        <option value="titles" {% if search_scope != 'all' %}selected{% endif %}>Titles</option>
+        <option value="all" {% if search_scope == 'all' %}selected{% endif %}>All</option>
+      </select>
     </form>
   </div>
 
   <div class="container">
     <aside class="side-tabs" id="sidebar">
       {% for s in side_tabs %}
-        <a class="side" href="/{{active_tab}}{% if s.id not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{s.id}}{% endif %}">
+        {% set is_all = s.id in ['any', 'All', 'all', 'ALL'] %}
+        {% set is_active = (current_proj and s.id|lower == current_proj|lower) or (not current_proj and is_all) %}
+        <a class="side {% if is_active %}active{% endif %}" href="/{{active_tab}}{% if s.id not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{s.id}}{% endif %}">
           <span class="ic">{{s.icon}}</span>
           <span class="lab">{{s.label}}</span>
         </a>

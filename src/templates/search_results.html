@@ -11,18 +11,32 @@
   {% else %}
     {% if results_primary %}
       <h4>Matches in current context</h4>
-      <table border="1" cellpadding="5">
+      <table class="search-results" border="1" cellpadding="5">
+        <colgroup>
+          <col class="search-col-table">
+          <col class="search-col-match">
+        </colgroup>
         <tr>
           <th>Table</th>
-          <th>ID</th>
           <th>Match</th>
         </tr>
         {% for item in results_primary %}
         <tr class="link-draggable"
             {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
-          <td>{{ item.table }}</td>
-          <td><a href="{{ item.url }}">{{ item.id }}</a></td>
-          <td>{{ item.match_field }}: {{ item.match_snippet }}</td>
+          <td class="table-col">{{ item.table }}</td>
+          {% if item.match_field == 'content' %}
+            <td class="search-match match-col" title="{{ item.match_value }}">
+              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
+              <span class="search-match-sep"> - </span>
+              <span class="search-match-text">{{ item.match_value }}</span>
+            </td>
+          {% else %}
+            <td class="search-match match-col" title="{{ item.match_snippet }}">
+              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
+              <span class="search-match-sep"> - </span>
+              <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
+            </td>
+          {% endif %}
         </tr>
         {% endfor %}
       </table>
@@ -30,18 +44,32 @@
 
     {% if results_secondary %}
       <h4>Other matches</h4>
-      <table border="1" cellpadding="5">
+      <table class="search-results" border="1" cellpadding="5">
+        <colgroup>
+          <col class="search-col-table">
+          <col class="search-col-match">
+        </colgroup>
         <tr>
           <th>Table</th>
-          <th>ID</th>
           <th>Match</th>
         </tr>
         {% for item in results_secondary %}
         <tr class="link-draggable"
             {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
-          <td>{{ item.table }}</td>
-          <td><a href="{{ item.url }}">{{ item.id }}</a></td>
-          <td>{{ item.match_field }}: {{ item.match_snippet }}</td>
+          <td class="table-col">{{ item.table }}</td>
+          {% if item.match_field == 'content' %}
+            <td class="search-match match-col" title="{{ item.match_value }}">
+              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
+              <span class="search-match-sep"> - </span>
+              <span class="search-match-text">{{ item.match_value }}</span>
+            </td>
+          {% else %}
+            <td class="search-match match-col" title="{{ item.match_snippet }}">
+              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
+              <span class="search-match-sep"> - </span>
+              <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
+            </td>
+          {% endif %}
         </tr>
         {% endfor %}
       </table>
