@@ -5,7 +5,7 @@
     <a href="{{ url_for('notes.list_notes_list_route', proj=project) }}">List</a> |
     <a href="{{ url_for('notes.list_notes_cards_route', proj=project) }}">Card</a>
   </div>
-  <a href="{{ url_for('notes.add_note_route', proj=project) }}">Add Note</a>
+  <a href="#" class="new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a>
   <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
 
 {% set link_list_type = "note" %}
@@ -13,7 +13,7 @@
 {% set link_table_id = "notes-table" %}
 {% include "widgets/links_bulk_toolbar.html" %}
 
-<table border="1" cellpadding="5" id="notes-table">
+<table border="1" cellpadding="5" id="notes-table" data-notes-context="true">
   <tr>
     <th><input type="checkbox" class="link-select-all"></th>
     {% set dir_file = 'asc' if sort_col != 'file_name' or sort_dir == 'desc' else 'desc' %}

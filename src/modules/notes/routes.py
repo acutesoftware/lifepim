@@ -1,7 +1,8 @@
 import os
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 
-from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort
+from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
 
 from common import data
 from utils import importer
@@ -9,9 +10,289 @@ from utils import markdown_utils
 from utils import hex_utils
 from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total, build_pagination
 from common import config as cfg
+import etl_folder_mapping as folder_etl
 
 notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
                      template_folder='templates', static_folder='static')
+
+INVALID_TITLE_CHARS = re.compile(r'[<>:"/\\|?*]')
+WHITESPACE_RE = re.compile(r"\s+")
+NOTE_TITLE_MAX_LEN = 80
+
+
+def _sanitize_title(title):
+    cleaned = INVALID_TITLE_CHARS.sub("", (title or "").strip())
+    cleaned = WHITESPACE_RE.sub(" ", cleaned).strip()
+    if len(cleaned) > NOTE_TITLE_MAX_LEN:
+        cleaned = cleaned[:NOTE_TITLE_MAX_LEN].rstrip()
+    return cleaned or "Untitled"
+
+
+def _table_exists(conn, table_name):
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone()
+    return bool(row)
+
+
+def _table_columns(conn, table_name):
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    except Exception:
+        return set()
+    return {row[1] for row in rows}
+
+
+def _query_write_root_candidates(conn, tab_label):
+    if not tab_label:
+        return []
+    if _table_exists(conn, "map_project_folder"):
+        columns = _table_columns(conn, "map_project_folder")
+        path_col = "path_prefix" if "path_prefix" in columns else None
+        if path_col:
+            enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
+            tags_col = "tags" if "tags" in columns else None
+            conf_col = "confidence" if "confidence" in columns else None
+            notes_col = "notes" if "notes" in columns else None
+            tags_expr = tags_col or "''"
+            conf_expr = conf_col or "1.0"
+            notes_expr = notes_col or "''"
+            where = ["tab = ?"]
+            params = [tab_label]
+            if enabled_col:
+                where.append(f"{enabled_col} = 1")
+            if tags_col:
+                where.append("lower(tags) LIKE '%canonical%'")
+                where.append("lower(tags) LIKE '%write_root%'")
+            sql = (
+                f"SELECT {path_col} as path_prefix, tab, "
+                f"{tags_expr} as tags, "
+                f"{conf_expr} as confidence, "
+                f"{notes_expr} as notes "
+                "FROM map_project_folder "
+                f"WHERE {' AND '.join(where)} "
+                "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
+            )
+            rows = conn.execute(sql, params).fetchall()
+            return [dict(row) for row in rows]
+    if _table_exists(conn, "map_folder_project"):
+        columns = _table_columns(conn, "map_folder_project")
+        if "path_prefix" not in columns or "tab" not in columns:
+            return []
+        enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
+        tags_col = "tags" if "tags" in columns else None
+        conf_col = "confidence" if "confidence" in columns else None
+        notes_col = "notes" if "notes" in columns else None
+        tags_expr = tags_col or "''"
+        conf_expr = conf_col or "1.0"
+        notes_expr = notes_col or "''"
+        where = ["tab = ?"]
+        params = [tab_label]
+        if enabled_col:
+            where.append(f"{enabled_col} = 1")
+        if tags_col:
+            where.append("lower(tags) LIKE '%canonical%'")
+            where.append("lower(tags) LIKE '%write_root%'")
+        sql = (
+            "SELECT path_prefix, tab, "
+            f"{tags_expr} as tags, "
+            f"{conf_expr} as confidence, "
+            f"{notes_expr} as notes "
+            "FROM map_folder_project "
+            f"WHERE {' AND '.join(where)} "
+            "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
+        )
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+    if _table_exists(conn, "map_project_folder"):
+        columns = _table_columns(conn, "map_project_folder")
+        path_col = "matched_prefix" if "matched_prefix" in columns else None
+        if not path_col:
+            return []
+        enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
+        tags_col = "tags" if "tags" in columns else None
+        conf_col = "confidence" if "confidence" in columns else None
+        notes_col = "notes" if "notes" in columns else None
+        tags_expr = tags_col or "''"
+        conf_expr = conf_col or "1.0"
+        notes_expr = notes_col or "''"
+        where = ["tab = ?"]
+        params = [tab_label]
+        if enabled_col:
+            where.append(f"{enabled_col} = 1")
+        if tags_col:
+            where.append("lower(tags) LIKE '%canonical%'")
+            where.append("lower(tags) LIKE '%write_root%'")
+        sql = (
+            f"SELECT {path_col} as path_prefix, tab, "
+            f"{tags_expr} as tags, "
+            f"{conf_expr} as confidence, "
+            f"{notes_expr} as notes "
+            "FROM map_project_folder "
+            f"WHERE {' AND '.join(where)} "
+            "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
+        )
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+    return []
+
+
+def _lookup_tab_group(conn, tab_label):
+    label = (tab_label or "").strip()
+    if not label:
+        return ""
+    if _table_exists(conn, "map_folder_project"):
+        columns = _table_columns(conn, "map_folder_project")
+        if "grp" in columns and "tab" in columns:
+            enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
+            where = ["lower(tab) = lower(?)"]
+            params = [label]
+            if enabled_col:
+                where.append(f"{enabled_col} = 1")
+            sql = (
+                "SELECT grp FROM map_folder_project "
+                f"WHERE {' AND '.join(where)} "
+                "ORDER BY confidence DESC, LENGTH(path_prefix) DESC"
+            )
+            row = conn.execute(sql, params).fetchone()
+            return (row["grp"] or "").strip() if row else ""
+    if _table_exists(conn, "map_project_folder"):
+        columns = _table_columns(conn, "map_project_folder")
+        if "grp" in columns and "tab" in columns:
+            enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
+            where = ["lower(tab) = lower(?)"]
+            params = [label]
+            if enabled_col:
+                where.append(f"{enabled_col} = 1")
+            sql = (
+                "SELECT grp FROM map_project_folder "
+                f"WHERE {' AND '.join(where)} "
+                "ORDER BY confidence DESC"
+            )
+            row = conn.execute(sql, params).fetchone()
+            return (row["grp"] or "").strip() if row else ""
+    return ""
+
+
+def _dedupe_candidates(rows):
+    results = []
+    seen = set()
+    for row in rows or []:
+        path_prefix = (row.get("path_prefix") or "").strip()
+        norm_path = folder_etl.norm_path(path_prefix)
+        if not norm_path:
+            continue
+        key = norm_path.lower()
+        if key in seen:
+            continue
+        row["path_prefix"] = norm_path
+        row["notes"] = (row.get("notes") or "").strip()
+        row["tags"] = (row.get("tags") or "").strip()
+        try:
+            row["confidence"] = float(row.get("confidence") or 0)
+        except Exception:
+            row["confidence"] = 0
+        results.append(row)
+        seen.add(key)
+    return results
+
+
+def _parent_section(label):
+    if not label or ">" not in label:
+        return ""
+    return label.split(">", 1)[0].strip()
+
+
+def _select_write_root_candidates(sidebar_label):
+    label = (sidebar_label or "").strip()
+    conn = data._get_conn()
+    if label:
+        rows = _dedupe_candidates(_query_write_root_candidates(conn, label))
+        if rows:
+            return rows, label
+        if ">" in label:
+            normalized = " ".join(label.replace(">", " ").split())
+            if normalized and normalized != label:
+                rows = _dedupe_candidates(_query_write_root_candidates(conn, normalized))
+                if rows:
+                    return rows, normalized
+    parent = _parent_section(label)
+    if parent:
+        rows = _dedupe_candidates(_query_write_root_candidates(conn, parent))
+        if rows:
+            return rows, parent
+    if label:
+        grp = _lookup_tab_group(conn, label)
+        if grp:
+            rows = _dedupe_candidates(_query_write_root_candidates(conn, grp))
+            if rows:
+                return rows, grp
+    rows = _dedupe_candidates(_query_write_root_candidates(conn, "All Projects"))
+    if rows:
+        return rows, "All Projects"
+    return [], label or parent or "All Projects"
+
+
+def _note_template(title, created_utc, sidebar_label):
+    title_value = (title or "").replace('"', '\\"')
+    lines = [
+        "---",
+        f'title: "{title_value}"',
+        f'created_utc: "{created_utc}"',
+    ]
+    if sidebar_label:
+        sidebar_value = (sidebar_label or "").replace('"', '\\"')
+        lines.append(f'sidebar_tab: "{sidebar_value}"')
+    lines.append("tags: []")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# {title}")
+    lines.append("")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _write_note_file(folder_path, base_name, content):
+    for idx in range(1, 1000):
+        if idx == 1:
+            file_name = f"{base_name}.md"
+        else:
+            file_name = f"{base_name} ({idx}).md"
+        full_path = os.path.join(folder_path, file_name)
+        try:
+            with open(full_path, "x", encoding="utf-8") as handle:
+                handle.write(content)
+            return file_name, full_path
+        except FileExistsError:
+            continue
+    stamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
+    file_name = f"{stamp} {base_name}.md"
+    full_path = os.path.join(folder_path, file_name)
+    with open(full_path, "x", encoding="utf-8") as handle:
+        handle.write(content)
+    return file_name, full_path
+
+
+def _create_note_file(folder_path, title, sidebar_label):
+    folder_norm = folder_etl.norm_path(folder_path)
+    folder_path = folder_norm or folder_path
+    if not folder_path:
+        raise ValueError("Missing folder path")
+    os.makedirs(folder_path, exist_ok=True)
+    title_clean = _sanitize_title(title)
+    date_prefix = datetime.now().strftime("%Y-%m-%d")
+    base_name = f"{date_prefix} {title_clean}".strip().rstrip(". ")
+    created_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    content = _note_template(title_clean, created_utc, sidebar_label)
+    file_name, full_path = _write_note_file(folder_path, base_name, content)
+    return {
+        "file_name": file_name,
+        "full_path": full_path,
+        "folder_path": folder_path,
+        "created_utc": created_utc,
+        "title": title_clean,
+    }
 
 def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None):
     tbl = get_table_def("notes")
@@ -409,6 +690,82 @@ def note_asset_route(note_id, asset_path):
     if not os.path.isfile(full_path):
         abort(404)
     return send_file(full_path)
+
+
+@notes_bp.route('/api/new-note-options')
+def new_note_options_route():
+    sidebar_label = (request.args.get("sidebar_label") or request.args.get("proj") or "").strip()
+    options, resolved_label = _select_write_root_candidates(sidebar_label)
+    return jsonify({
+        "sidebar_label": resolved_label,
+        "options": options,
+    })
+
+
+@notes_bp.route('/api/create-note', methods=["POST"])
+def create_note_route():
+    payload = request.get_json(silent=True) or {}
+    sidebar_label = (payload.get("sidebar_label") or "").strip()
+    title = (payload.get("title") or "").strip()
+    path_prefix = (payload.get("path_prefix") or "").strip()
+    if not title:
+        return jsonify({"error": "Title is required."}), 400
+    if not path_prefix:
+        options, resolved_label = _select_write_root_candidates(sidebar_label)
+        if not options:
+            return jsonify({"error": "No canonical write root found."}), 400
+        path_prefix = options[0].get("path_prefix") or ""
+        if not sidebar_label:
+            sidebar_label = resolved_label
+    if not path_prefix:
+        return jsonify({"error": "Folder path is required."}), 400
+    try:
+        created = _create_note_file(path_prefix, title, sidebar_label)
+    except OSError as exc:
+        return jsonify({"error": f"Unable to create note file: {exc}"}), 500
+    except Exception as exc:
+        return jsonify({"error": f"Unable to create note file: {exc}"}), 500
+
+    tbl = get_table_def("notes")
+    if not tbl:
+        try:
+            os.remove(created["full_path"])
+        except Exception:
+            pass
+        return jsonify({"error": "Notes table not found."}), 500
+
+    try:
+        size = str(os.path.getsize(created["full_path"]))
+        date_modified = datetime.fromtimestamp(
+            os.path.getmtime(created["full_path"])
+        ).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        size = ""
+        date_modified = ""
+
+    values_map = {
+        "file_name": created["file_name"],
+        "path": created["folder_path"],
+        "folder_id": "",
+        "size": size,
+        "date_modified": date_modified,
+        "project": sidebar_label,
+    }
+    values = [values_map.get(col, "") for col in tbl["col_list"]]
+    note_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
+    if not note_id:
+        try:
+            os.remove(created["full_path"])
+        except Exception:
+            pass
+        return jsonify({"error": "Unable to insert note record."}), 500
+    return jsonify({
+        "note_id": note_id,
+        "file_name": created["file_name"],
+        "path": created["folder_path"],
+        "full_path": created["full_path"],
+        "open_url": url_for("notes.view_note_route", note_id=note_id),
+    })
 
 @notes_bp.route('/add', methods=["GET", "POST"])
 def add_note_route():

@@ -221,7 +221,7 @@ def load_map_folder_project_csv(conn: sqlite3.Connection, rules_csv: str, clear_
 
             conn.execute(
                 """
-                INSERT INTO map_folder_project
+                INSERT OR REPLACE INTO map_folder_project
                 (path_prefix, tab, grp, project, tags, confidence, priority, is_primary, notes, is_enabled)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,

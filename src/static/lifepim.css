@@ -1416,3 +1416,135 @@ body.links-resizing {
 .links-drawer-handle.hidden {
   display: none;
 }
+
+.note-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 170;
+}
+
+.note-modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.note-modal {
+  position: fixed;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 420px;
+  max-width: calc(100vw - 20px);
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  z-index: 180;
+  display: none;
+}
+
+.note-modal,
+.note-modal * {
+  box-sizing: border-box;
+}
+
+.note-modal.open {
+  display: block;
+}
+
+.note-modal-header,
+.note-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.note-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-modal-title {
+  font-size: 11px;
+  color: #555;
+}
+
+.note-modal-options {
+  border: 1px solid #ddd;
+  background: #fafafa;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.note-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.note-option:last-child {
+  border-bottom: none;
+}
+
+.note-option.active {
+  background: #e8ecff;
+}
+
+.note-option-title {
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.note-option-path {
+  font-size: 10px;
+  color: #666;
+  word-break: break-all;
+}
+
+.note-option-notes {
+  font-size: 10px;
+  color: #444;
+}
+
+.note-modal-hint {
+  font-size: 10px;
+  color: #666;
+}
+
+.note-context-menu {
+  position: fixed;
+  display: none;
+  min-width: 120px;
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  z-index: 190;
+}
+
+.note-context-menu.open {
+  display: block;
+}
+
+.note-context-action {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-context-action:hover {
+  background: #f2f2f2;
+}

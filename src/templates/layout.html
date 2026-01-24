@@ -5,7 +5,12 @@
   <title>LifePIM - {{ active_tab }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css') }}">
 </head>
-<body>
+{% set current_proj = request.args.get('proj') %}
+{% if current_proj in ['any', 'All', 'all', 'ALL', 'spacer'] %}
+  {% set current_proj = None %}
+{% endif %}
+{% set sidebar_label = current_proj or 'All Projects' %}
+<body data-active-tab="{{ active_tab }}" data-sidebar-label="{{ sidebar_label }}" data-sidebar-id="{{ current_proj or '' }}">
   <div class="topbar">
     <!-- Hamburger dropdown menu -->
     <div class="menu-wrapper">
@@ -22,10 +27,6 @@
     </div>
 
     <div class="top-nav-container">
-      {% set current_proj = request.args.get('proj') %}
-      {% if current_proj in ['any', 'All', 'all', 'ALL', 'spacer'] %}
-        {% set current_proj = None %}
-      {% endif %}
       {% for t in tabs %}
         {% set tab_href = '/' if t.id == 'home' else '/' ~ t.id %}
         <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="{{ tab_href }}{% if current_proj %}?proj={{ current_proj }}{% endif %}" title="{{t.desc}}">
@@ -49,9 +50,10 @@
   <div class="container">
     <aside class="side-tabs" id="sidebar">
       {% for s in side_tabs %}
-        {% set is_all = s.id in ['any', 'All', 'all', 'ALL'] %}
-        {% set is_active = (current_proj and s.id|lower == current_proj|lower) or (not current_proj and is_all) %}
-        <a class="side {% if is_active %}active{% endif %}" href="/{{active_tab}}{% if s.id not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{s.id}}{% endif %}">
+        {% set tab_proj = (s.proj if s.proj is defined and s.proj else s.id) %}
+        {% set is_all = tab_proj in ['any', 'All', 'all', 'ALL'] %}
+        {% set is_active = (current_proj and tab_proj and tab_proj|lower == current_proj|lower) or (not current_proj and is_all) %}
+        <a class="side {% if is_active %}active{% endif %}" href="/{{active_tab}}{% if tab_proj not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{tab_proj}}{% endif %}">
           <span class="ic">{{s.icon}}</span>
           <span class="lab">{{s.label}}</span>
         </a>
@@ -68,6 +70,7 @@
   </div>
 
   {% include "widgets/links_overlay.html" %}
+  {% include "widgets/note_overlay.html" %}
 
   <script>
     const menuToggle = document.getElementById('menuToggle');
@@ -102,5 +105,6 @@
     });
   </script>
   <script src="{{ url_for('static', filename='links.js') }}"></script>
+  <script src="{{ url_for('static', filename='notes.js') }}"></script>
 </body>
 </html>

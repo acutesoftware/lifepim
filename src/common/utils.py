@@ -37,57 +37,49 @@ def _norm_tab_value(value):
     return "".join(ch for ch in (value or "").lower() if ch.isalnum())
 
 
+def _tab_leaf(value, group_tokens):
+    text = (value or "").strip()
+    if not text:
+        return ""
+    if ">" in text:
+        return text.split(">")[-1].strip()
+    if "/" in text:
+        return text.split("/")[-1].strip()
+    parts = text.split()
+    if len(parts) > 1 and parts[0].upper() in group_tokens:
+        return " ".join(parts[1:]).strip()
+    return text
+
+
 def get_side_tabs():
-    mapping_tabs = _fetch_mapping_tabs()
     tabs = list(mod_cfg.SIDE_TABS)
-    if not any(t.get("id") == "Unmapped" for t in tabs):
-        tabs.insert(1, {"icon": "", "id": "Unmapped", "label": "Unmapped"})
+    mapping_tabs = _fetch_mapping_tabs()
     if not mapping_tabs:
         return tabs
     mapping_by_lower = {t.lower(): t for t in mapping_tabs}
-    mapping_by_norm = { _norm_tab_value(t): t for t in mapping_tabs if _norm_tab_value(t) }
-    ordered = [
-        {"icon": "*", "id": "All", "label": "All Projects"},
-        {"icon": "", "id": "Unmapped", "label": "Unmapped"},
-    ]
-    seen = {"All", "Unmapped"}
+    mapping_by_norm = {_norm_tab_value(t): t for t in mapping_tabs if _norm_tab_value(t)}
+    group_tokens = {t.get("label", "").upper() for t in tabs if t.get("id") == "spacer"}
+    group_tokens |= {t.get("id", "").upper() for t in getattr(mod_cfg, "SIDE_TABS_GROUPS", [])}
+    mapping_by_leaf_norm = {}
+    for t in mapping_tabs:
+        leaf = _tab_leaf(t, group_tokens)
+        leaf_norm = _norm_tab_value(leaf)
+        if leaf_norm and leaf_norm not in mapping_by_leaf_norm:
+            mapping_by_leaf_norm[leaf_norm] = t
+    ordered = []
     for t in tabs:
-        tab_id = t.get("id")
-        label = t.get("label") or ""
-        if tab_id == "spacer":
-            mapping_value = mapping_by_lower.get(label.lower())
+        entry = dict(t)
+        tab_id = entry.get("id")
+        label = entry.get("label") or ""
+        if tab_id and tab_id != "spacer":
+            mapping_value = mapping_by_lower.get(tab_id.lower()) or mapping_by_lower.get(label.lower())
             if not mapping_value:
                 mapping_value = mapping_by_norm.get(_norm_tab_value(label))
+            if not mapping_value:
+                mapping_value = mapping_by_leaf_norm.get(_norm_tab_value(label))
             if mapping_value:
-                if mapping_value in seen:
-                    continue
-                entry = dict(t)
-                entry["id"] = mapping_value
-                ordered.append(entry)
-                seen.add(mapping_value)
-            else:
-                ordered.append(dict(t))
-            continue
-        if tab_id in ("All",):
-            continue
-        mapping_value = mapping_by_lower.get(tab_id.lower()) or mapping_by_lower.get(label.lower())
-        if not mapping_value:
-            mapping_value = mapping_by_norm.get(_norm_tab_value(label))
-        if not mapping_value and tab_id:
-            mapping_value = tab_id
-        if not mapping_value:
-            continue
-        if mapping_value in seen:
-            continue
-        entry = dict(t)
-        entry["id"] = mapping_value
+                entry["proj"] = mapping_value
         ordered.append(entry)
-        seen.add(mapping_value)
-    for mapping_value in mapping_tabs:
-        if mapping_value in seen:
-            continue
-        ordered.append({"icon": "", "id": mapping_value, "label": mapping_value})
-        seen.add(mapping_value)
     return ordered
 
 def get_table_def(route_id):
