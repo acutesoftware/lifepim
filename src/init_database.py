@@ -5,6 +5,7 @@
 import os, sys, sqlite3, subprocess
 import etl_folder_mapping as folder_etl
 import common.config as cfg
+from lifepim.importer.schema import ensure_import_schema
 def main():
     reset_database(cfg.DB_FILE)
     _run_load_testing()
@@ -30,6 +31,7 @@ def reset_database(db_file):
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_contacts.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_links.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))
+    ensure_import_schema(db_conn)
     db_conn.commit()
     db_conn.close()
 
