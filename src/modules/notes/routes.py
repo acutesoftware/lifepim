@@ -11,6 +11,7 @@ from utils import hex_utils
 from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total, build_pagination
 from common import config as cfg
 import etl_folder_mapping as folder_etl
+from common import projects as projects_mod
 
 notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
                      template_folder='templates', static_folder='static')
@@ -299,6 +300,7 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None)
     tbl = get_table_def("notes")
     if not tbl:
         return []
+    projects_mod.ensure_projects_schema(data._get_conn())
     cols = ["id"] + tbl["col_list"]
     order_map = {
         "file_name": "t.file_name",
@@ -315,22 +317,52 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None)
     order_by = f"{sort_key} {sort_dir}"
     select_cols = [f"t.{col}" for col in cols]
     select_cols.append("t.rec_extract_date as updated")
-    select_cols.append("MAX(mpf.tab) as derived_project")
+    select_cols.append(
+        "("
+        "SELECT pf.project_id "
+        "FROM lp_project_folders pf "
+        "WHERE pf.is_enabled = 1 "
+        "  AND pf.folder_role IN ('default','include','archive','output') "
+        "  AND df.folder_path IS NOT NULL "
+        "  AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%' "
+        "ORDER BY CASE pf.folder_role "
+        "  WHEN 'default' THEN 0 "
+        "  WHEN 'include' THEN 1 "
+        "  WHEN 'output' THEN 2 "
+        "  WHEN 'archive' THEN 3 "
+        "  ELSE 9 END, pf.sort_order, pf.path_prefix "
+        "LIMIT 1"
+        ") as derived_project"
+    )
     params = []
     if project and project.lower() == "unmapped":
-        condition = "mpf.folder_id IS NULL"
+        condition = (
+            "NOT EXISTS ("
+            "  SELECT 1 FROM lp_project_folders pf "
+            "  WHERE pf.is_enabled = 1 "
+            "    AND pf.folder_role IN ('default','include','archive','output') "
+            "    AND df.folder_path IS NOT NULL "
+            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+            ")"
+        )
     elif project:
-        condition = "lower(mpf.tab) = lower(?) OR lower(t.project) = lower(?)"
-        params.extend([project, project])
+        condition = (
+            "EXISTS ("
+            "  SELECT 1 FROM lp_project_folders pf "
+            "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
+            "    AND pf.folder_role IN ('default','include','archive','output') "
+            "    AND df.folder_path IS NOT NULL "
+            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+            ")"
+        )
+        params.append(project)
     else:
         condition = "1=1"
     sql = (
         f"SELECT {', '.join(select_cols)} "
         f"FROM {tbl['name']} t "
-        "LEFT JOIN map_project_folder mpf "
-        "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+        "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
         f"WHERE {condition} "
-        "GROUP BY t.id "
         f"ORDER BY {order_by}"
     )
     if limit is not None:
@@ -370,6 +402,8 @@ def list_notes_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    project_info, project_folders = _project_context(project)
+    project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
     if not tbl:
         return render_template(
@@ -380,6 +414,8 @@ def list_notes_route():
             content_title="Notes",
             content_html="",
             notes=[],
+            project_info=project_info,
+            project_folders=project_folders,
             project=project,
             sort_col="date_modified",
             sort_dir="desc",
@@ -417,9 +453,11 @@ def list_notes_route():
         active_tab="notes",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project or 'All'})",
+        content_title=f"Notes ({project_label or 'All'})",
         content_html="",
         notes=notes,
+        project_info=project_info,
+        project_folders=project_folders,
         project=project,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -442,6 +480,8 @@ def list_notes_table_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    project_info, project_folders = _project_context(project)
+    project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
     if not tbl:
         return render_template(
@@ -452,6 +492,8 @@ def list_notes_table_route():
             content_title="Notes",
             content_html="",
             notes=[],
+            project_info=project_info,
+            project_folders=project_folders,
             project=project,
             sort_col="date_modified",
             sort_dir="desc",
@@ -486,9 +528,11 @@ def list_notes_table_route():
         active_tab="notes",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project or 'All'})",
+        content_title=f"Notes ({project_label or 'All'})",
         content_html="",
         notes=notes,
+        project_info=project_info,
+        project_folders=project_folders,
         project=project,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -511,6 +555,8 @@ def list_notes_list_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    project_info, project_folders = _project_context(project)
+    project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
     if not tbl:
         return render_template(
@@ -521,6 +567,8 @@ def list_notes_list_route():
             content_title="Notes",
             content_html="",
             notes=[],
+            project_info=project_info,
+            project_folders=project_folders,
             project=project,
             page=1,
             total_pages=1,
@@ -549,9 +597,11 @@ def list_notes_list_route():
         active_tab="notes",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project or 'All'})",
+        content_title=f"Notes ({project_label or 'All'})",
         content_html="",
         notes=notes,
+        project_info=project_info,
+        project_folders=project_folders,
         project=project,
         page=page,
         total_pages=total_pages,
@@ -569,6 +619,8 @@ def list_notes_cards_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    project_info, project_folders = _project_context(project)
+    project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
     if not tbl:
         return render_template(
@@ -580,6 +632,8 @@ def list_notes_cards_route():
             content_html="",
             notes=[],
             card_values=[],
+            project_info=project_info,
+            project_folders=project_folders,
             project=project,
             note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
             page=1,
@@ -613,10 +667,12 @@ def list_notes_cards_route():
         active_tab="notes",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project or 'All'})",
+        content_title=f"Notes ({project_label or 'All'})",
         content_html="",
         notes=notes,
         card_values=card_values,
+        project_info=project_info,
+        project_folders=project_folders,
         project=project,
         note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
         page=page,
@@ -634,15 +690,31 @@ def view_note_route(note_id):
     render_mode = request.args.get("format") or "markdown"
     tbl = get_table_def("notes")
     note = None
+    projects_mod.ensure_projects_schema(data._get_conn())
     if tbl:
         select_cols = [f"t.{col}" for col in (["id"] + tbl["col_list"])]
         select_cols.append("t.rec_extract_date as updated")
-        select_cols.append("MAX(mpf.tab) as derived_project")
+        select_cols.append(
+            "("
+            "SELECT pf.project_id "
+            "FROM lp_project_folders pf "
+            "WHERE pf.is_enabled = 1 "
+            "  AND pf.folder_role IN ('default','include','archive','output') "
+            "  AND df.folder_path IS NOT NULL "
+            "  AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%' "
+            "ORDER BY CASE pf.folder_role "
+            "  WHEN 'default' THEN 0 "
+            "  WHEN 'include' THEN 1 "
+            "  WHEN 'output' THEN 2 "
+            "  WHEN 'archive' THEN 3 "
+            "  ELSE 9 END, pf.sort_order, pf.path_prefix "
+            "LIMIT 1"
+            ") as derived_project"
+        )
         sql = (
             f"SELECT {', '.join(select_cols)} "
             f"FROM {tbl['name']} t "
-            "LEFT JOIN map_project_folder mpf "
-            "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
+            "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
             "WHERE t.id = ? "
             "GROUP BY t.id"
         )
@@ -713,33 +785,53 @@ def note_asset_route(note_id, asset_path):
 
 @notes_bp.route('/api/new-note-options')
 def new_note_options_route():
-    sidebar_label = (request.args.get("sidebar_label") or request.args.get("proj") or "").strip()
-    options, resolved_label = _select_write_root_candidates(sidebar_label)
+    project_id = (request.args.get("project_id") or request.args.get("proj") or "").strip()
+    if not project_id:
+        return jsonify({"error": "Project is required."}), 400
+    project = projects_mod.project_get(project_id)
+    if not project:
+        return jsonify({"error": "Project not found."}), 404
+    folders = projects_mod.project_folders_list(project_id, include_disabled=False)
+    default_folder = None
+    try:
+        default_path = projects_mod.project_default_folder_get(project_id)
+        if default_path:
+            default_folder = {"path_prefix": default_path}
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 500
     return jsonify({
-        "sidebar_label": resolved_label,
-        "options": options,
+        "project": project,
+        "default_folder": default_folder,
+        "folders": folders,
     })
 
 
 @notes_bp.route('/api/create-note', methods=["POST"])
 def create_note_route():
     payload = request.get_json(silent=True) or {}
-    sidebar_label = (payload.get("sidebar_label") or "").strip()
+    project_id = (payload.get("project_id") or "").strip()
     title = (payload.get("title") or "").strip()
     path_prefix = (payload.get("path_prefix") or "").strip()
+    if not project_id:
+        return jsonify({"error": "Project is required."}), 400
+    if not projects_mod.project_get(project_id):
+        return jsonify({"error": "Project not found."}), 404
     if not title:
         return jsonify({"error": "Title is required."}), 400
-    if not path_prefix:
-        options, resolved_label = _select_write_root_candidates(sidebar_label)
-        if not options:
-            return jsonify({"error": "No canonical write root found."}), 400
-        path_prefix = options[0].get("path_prefix") or ""
-        if not sidebar_label:
-            sidebar_label = resolved_label
+    try:
+        default_path = projects_mod.project_default_folder_get(project_id) or ""
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 500
+    if not default_path:
+        return jsonify({"error": "No default folder set for this project."}), 400
+    if path_prefix:
+        if folder_etl.norm_path(path_prefix) != folder_etl.norm_path(default_path):
+            return jsonify({"error": "Notes can only be created in the default folder for this project."}), 400
+    path_prefix = default_path
     if not path_prefix:
         return jsonify({"error": "Folder path is required."}), 400
     try:
-        created = _create_note_file(path_prefix, title, sidebar_label)
+        created = _create_note_file(path_prefix, title, project_id)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except OSError as exc:
@@ -770,7 +862,7 @@ def create_note_route():
         "folder_id": "",
         "size": size,
         "date_modified": date_modified,
-        "project": sidebar_label,
+        "project": project_id,
     }
     values = [values_map.get(col, "") for col in tbl["col_list"]]
     note_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
@@ -1023,6 +1115,16 @@ def _parse_datetime(value):
         except (ValueError, TypeError):
             continue
     return None
+
+
+def _project_context(project_id):
+    if not project_id or project_id.lower() == "unmapped":
+        return None, []
+    project = projects_mod.project_get(project_id)
+    if not project:
+        return None, []
+    folders = projects_mod.project_folders_list(project_id, include_disabled=True)
+    return project, folders
 
 
 def _sort_notes(notes, sort_col, sort_dir):

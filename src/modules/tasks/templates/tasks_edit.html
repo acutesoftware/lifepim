@@ -1,5 +1,8 @@
 {% extends "layout.html" %}
 {% block module_content %}
+  {% if error %}
+    <p style="color:#b00020;">{{ error }}</p>
+  {% endif %}
   <form method="POST">
     <label>Title:</label><br>
     <input type="text" name="title" value="{{ task.title if task else '' }}" required><br>

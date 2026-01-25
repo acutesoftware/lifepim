@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, make_response
 
 from common import data
+from common import projects as projects_mod
 from utils import importer
 from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination
 from common import config as cfg
@@ -82,8 +83,26 @@ def list_tasks_route():
 @tasks_bp.route('/add', methods=["GET", "POST"])
 def add_task_route():
     tbl = get_table_def("tasks")
-    project = request.args.get("proj") or "General"
+    project = (request.args.get("proj") or "").strip()
+    error = ""
+    if project:
+        try:
+            if not projects_mod.project_default_folder_get(project):
+                error = "No default folder set for this project. Set a default folder before creating tasks."
+        except ValueError as exc:
+            error = str(exc)
     if request.method == "POST" and tbl:
+        if error:
+            return render_template(
+                "tasks_edit.html",
+                active_tab="tasks",
+                tabs=get_tabs(),
+                side_tabs=get_side_tabs(),
+                content_title="Add Task",
+                task=None,
+                project=project,
+                error=error,
+            )
         values = [
             request.form.get("title", "").strip(),
             request.form.get("content", "").strip(),
@@ -101,6 +120,7 @@ def add_task_route():
         content_title="Add Task",
         task=None,
         project=project,
+        error=error,
     )
 
 

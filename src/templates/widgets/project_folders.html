@@ -1,0 +1,63 @@
+{% if project_info %}
+  <div class="project-folders">
+    <h4>Folders</h4>
+    <form method="post" action="{{ url_for('projects.project_folder_add_route') }}" class="project-folder-form">
+      <input type="hidden" name="project_id" value="{{ project_info.project_id }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <input type="text" name="path_prefix" placeholder="C:\\path\\to\\folder" style="width:60%;">
+      <select name="folder_role">
+        <option value="default">Default</option>
+        <option value="include" selected>Included</option>
+        <option value="archive">Archive</option>
+        <option value="output">Output</option>
+      </select>
+      <button type="submit">Add</button>
+    </form>
+    {% if project_folders %}
+      <table border="1" cellpadding="4" class="project-folders-table">
+        <tr>
+          <th>Role</th>
+          <th>Path</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+        {% for folder in project_folders %}
+          <tr>
+            <td>
+              {% if folder.folder_role == 'default' %}🏠{% elif folder.folder_role == 'include' %}🔗{% elif folder.folder_role == 'archive' %}🗄️{% else %}⚙️{% endif %}
+              {% if folder.folder_role == 'default' %}
+                Default (writes here)
+              {% elif folder.folder_role == 'include' %}
+                Included (read-only)
+              {% elif folder.folder_role == 'archive' %}
+                Archive
+              {% else %}
+                Output
+              {% endif %}
+            </td>
+            <td>{{ folder.path_prefix }}</td>
+            <td>{% if folder.is_enabled %}Enabled{% else %}Disabled{% endif %}</td>
+            <td>
+              {% if folder.folder_role != 'default' %}
+                <form method="post" action="{{ url_for('projects.project_folder_set_default_route', project_folder_id=folder.project_folder_id) }}" style="display:inline;">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <button type="submit">Set Default</button>
+                </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('projects.project_folder_toggle_route', project_folder_id=folder.project_folder_id) }}" style="display:inline;">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button type="submit">{% if folder.is_enabled %}Disable{% else %}Enable{% endif %}</button>
+              </form>
+              <form method="post" action="{{ url_for('projects.project_folder_remove_route', project_folder_id=folder.project_folder_id) }}" style="display:inline;">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button type="submit" onclick="return confirm('Remove folder?');">Remove</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p>No folders linked to this project.</p>
+    {% endif %}
+  </div>
+{% endif %}

@@ -8,6 +8,8 @@
   <a href="#" class="new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a>
   <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
 
+  {% include "widgets/project_folders.html" %}
+
   <ul style="list-style:none; padding:0; margin:8px 0;" data-notes-context="true">
     {% for n in notes %}
     <li style="padding:4px 0;">

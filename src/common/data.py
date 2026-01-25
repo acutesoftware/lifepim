@@ -11,6 +11,7 @@ import etl_folder_mapping as folder_etl
 
 from . import config as cfg
 from . import if_sqlite as mod_sql
+from common import projects as projects_mod
 
 
 DB_FILE = getattr(cfg, "DB_FILE", getattr(cfg, "db_name", "lifepim.db"))
@@ -220,34 +221,51 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
     cols = _qualify_cols(col_list, "t")
     params = []
     order_clause = order_by or "t.id DESC"
-    if tab and tab.lower() == "unmapped":
-        sql = (
-            f"SELECT {cols} FROM {tbl_name} t "
-            "LEFT JOIN map_project_folder mpf "
-            "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
-            "WHERE mpf.folder_id IS NULL "
-            f"ORDER BY {order_clause}"
-        )
-    elif tab:
-        if _has_project_col(col_list):
+    route_name = _route_for_table(tbl_name)
+    if route_name in {"notes", "media", "audio", "3d", "files", "apps"}:
+        projects_mod.ensure_projects_schema(conn)
+        if tab and tab.lower() == "unmapped":
             sql = (
                 f"SELECT {cols} FROM {tbl_name} t "
-                "LEFT JOIN map_project_folder mpf "
-                "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
-                "WHERE lower(mpf.tab) = lower(?) OR lower(t.project) = lower(?) "
+                "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+                "WHERE NOT EXISTS ("
+                "  SELECT 1 FROM lp_project_folders pf "
+                "  WHERE pf.is_enabled = 1 "
+                "    AND pf.folder_role IN ('default','include','archive','output') "
+                "    AND df.folder_path IS NOT NULL "
+                "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+                ") "
                 f"ORDER BY {order_clause}"
             )
-            params.extend([tab, tab])
-        else:
+        elif tab:
             sql = (
                 f"SELECT {cols} FROM {tbl_name} t "
-                "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
-                "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?) "
+                "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+                "WHERE EXISTS ("
+                "  SELECT 1 FROM lp_project_folders pf "
+                "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
+                "    AND pf.folder_role IN ('default','include','archive','output') "
+                "    AND df.folder_path IS NOT NULL "
+                "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+                ") "
                 f"ORDER BY {order_clause}"
             )
             params.append(tab)
+        else:
+            sql = f"SELECT {cols} FROM {tbl_name} t ORDER BY {order_clause}"
     else:
-        sql = f"SELECT {cols} FROM {tbl_name} t ORDER BY {order_clause}"
+        if tab:
+            if _has_project_col(col_list):
+                sql = (
+                    f"SELECT {cols} FROM {tbl_name} t "
+                    "WHERE lower(t.project) = lower(?) "
+                    f"ORDER BY {order_clause}"
+                )
+                params.append(tab)
+            else:
+                sql = f"SELECT {cols} FROM {tbl_name} t ORDER BY {order_clause}"
+        else:
+            sql = f"SELECT {cols} FROM {tbl_name} t ORDER BY {order_clause}"
     if limit is not None:
         sql += " LIMIT ?"
         params.append(int(limit))
@@ -261,31 +279,45 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
 def count_mapped_rows(conn, tbl_name, tab=None):
     conn = _get_conn() if conn is None else conn
     params = []
-    if tab and tab.lower() == "unmapped":
-        sql = (
-            f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
-            "LEFT JOIN map_project_folder mpf "
-            "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
-            "WHERE mpf.folder_id IS NULL"
-        )
-    elif tab:
-        if _table_has_project(conn, tbl_name):
+    route_name = _route_for_table(tbl_name)
+    if route_name in {"notes", "media", "audio", "3d", "files", "apps"}:
+        projects_mod.ensure_projects_schema(conn)
+        if tab and tab.lower() == "unmapped":
             sql = (
                 f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
-                "LEFT JOIN map_project_folder mpf "
-                "ON mpf.folder_id = t.folder_id AND mpf.is_primary=1 AND mpf.is_enabled=1 "
-                "WHERE lower(mpf.tab) = lower(?) OR lower(t.project) = lower(?)"
+                "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+                "WHERE NOT EXISTS ("
+                "  SELECT 1 FROM lp_project_folders pf "
+                "  WHERE pf.is_enabled = 1 "
+                "    AND pf.folder_role IN ('default','include','archive','output') "
+                "    AND df.folder_path IS NOT NULL "
+                "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+                ")"
             )
-            params.extend([tab, tab])
-        else:
+        elif tab:
             sql = (
                 f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
-                "JOIN map_project_folder mpf ON mpf.folder_id = t.folder_id "
-                "WHERE mpf.is_primary=1 AND mpf.is_enabled=1 AND lower(mpf.tab) = lower(?)"
+                "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+                "WHERE EXISTS ("
+                "  SELECT 1 FROM lp_project_folders pf "
+                "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
+                "    AND pf.folder_role IN ('default','include','archive','output') "
+                "    AND df.folder_path IS NOT NULL "
+                "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+                ")"
             )
             params.append(tab)
+        else:
+            sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
     else:
-        sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
+        if tab:
+            if _table_has_project(conn, tbl_name):
+                sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t WHERE lower(t.project) = lower(?)"
+                params.append(tab)
+            else:
+                sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
+        else:
+            sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
     row = conn.execute(sql, params).fetchone()
     return row["cnt"] if row else 0
 

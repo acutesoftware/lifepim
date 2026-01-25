@@ -44,13 +44,13 @@
     return Boolean(target.isContentEditable);
   }
 
-  function getSidebarLabel(explicitLabel) {
-    const explicit = (explicitLabel || "").trim();
+  function getProjectId(explicitId) {
+    const explicit = (explicitId || "").trim();
     if (explicit) {
       return explicit;
     }
-    const bodyLabel = (document.body && document.body.dataset.sidebarLabel) || "";
-    return bodyLabel.trim() || "All Projects";
+    const bodyId = (document.body && document.body.dataset.sidebarId) || "";
+    return bodyId.trim();
   }
 
   function promptForTitle(defaultTitle) {
@@ -66,15 +66,16 @@
     return trimmed;
   }
 
-  async function fetchOptions(sidebarLabel) {
-    const label = (sidebarLabel || "").trim();
-    if (OPTIONS_CACHE.has(label)) {
-      return OPTIONS_CACHE.get(label);
+  async function fetchProjectInfo(projectId) {
+    const pid = (projectId || "").trim();
+    if (!pid) {
+      throw new Error("Project is required.");
+    }
+    if (OPTIONS_CACHE.has(pid)) {
+      return OPTIONS_CACHE.get(pid);
     }
     const params = new URLSearchParams();
-    if (label) {
-      params.set("sidebar_label", label);
-    }
+    params.set("project_id", pid);
     const request = fetch(`/notes/api/new-note-options?${params.toString()}`)
       .then(async (resp) => {
         const data = await resp.json();
@@ -84,10 +85,10 @@
         return data;
       })
       .catch((err) => {
-        OPTIONS_CACHE.delete(label);
+        OPTIONS_CACHE.delete(pid);
         throw err;
       });
-    OPTIONS_CACHE.set(label, request);
+    OPTIONS_CACHE.set(pid, request);
     return request;
   }
 
@@ -100,6 +101,36 @@
     const data = await resp.json();
     if (!resp.ok) {
       throw new Error(data.error || "Unable to create note.");
+    }
+    return data;
+  }
+
+  async function setDefaultFolder(projectFolderId) {
+    const resp = await fetch(`/projects/api/folders/${projectFolderId}/set-default`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error || "Unable to set default folder.");
+    }
+    return data;
+  }
+
+  async function addDefaultFolder(projectId, pathPrefix) {
+    const resp = await fetch("/projects/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_id: projectId,
+        path_prefix: pathPrefix,
+        folder_role: "default",
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error || "Unable to add default folder.");
     }
     return data;
   }
@@ -162,25 +193,20 @@
     highlightOption(0);
   }
 
-  function openModal(options, title, sidebarLabel, resolvedLabel) {
+  function openModal(options, title, projectId, resolvedLabel) {
     if (!STATE.modal || !STATE.backdrop) {
       return;
     }
     STATE.options = options.slice(0, MAX_OPTIONS);
     STATE.pendingTitle = title;
-    STATE.pendingSidebar = sidebarLabel;
+    STATE.pendingSidebar = projectId;
     STATE.titleEl.textContent = `Title: ${title}`;
     if (STATE.projectEl) {
-      STATE.projectEl.textContent = `Project: ${sidebarLabel}`;
+      STATE.projectEl.textContent = `Project: ${projectId}`;
     }
     if (STATE.writeRootEl) {
-      if (resolvedLabel && resolvedLabel.toLowerCase() !== (sidebarLabel || "").toLowerCase()) {
-        STATE.writeRootEl.textContent = `Write root: ${resolvedLabel}`;
-        STATE.writeRootEl.style.display = "";
-      } else {
-        STATE.writeRootEl.textContent = "";
-        STATE.writeRootEl.style.display = "none";
-      }
+      STATE.writeRootEl.textContent = resolvedLabel ? `Choose default folder` : "";
+      STATE.writeRootEl.style.display = resolvedLabel ? "" : "none";
     }
     renderOptions();
     STATE.modal.classList.add("open");
@@ -209,9 +235,12 @@
     }
     STATE.creating = true;
     try {
+      if (option.project_folder_id) {
+        await setDefaultFolder(option.project_folder_id);
+      }
       const result = await createNote({
         title: STATE.pendingTitle,
-        sidebar_label: STATE.pendingSidebar,
+        project_id: STATE.pendingSidebar,
         path_prefix: option.path_prefix,
       });
       closeModal();
@@ -233,31 +262,30 @@
     if (!activeTabIsNotes()) {
       return;
     }
-    const label = getSidebarLabel(sidebarLabel);
+    const projectId = getProjectId(sidebarLabel);
+    if (!projectId) {
+      alert("Select a project first.");
+      return;
+    }
     const title = promptForTitle(defaultTitle);
     if (!title) {
       return;
     }
     let data;
     try {
-      data = await fetchOptions(label);
+      data = await fetchProjectInfo(projectId);
     } catch (err) {
       alert(err.message || "Unable to fetch note folders.");
       return;
     }
-    const options = (data.options || []).filter((opt) => opt.path_prefix);
-    const resolvedLabel = (data.sidebar_label || label).trim() || label;
-    const projectLabel = label || resolvedLabel;
-    if (!options.length) {
-      alert("No canonical write root found for this sidebar.");
-      return;
-    }
-    if (options.length === 1) {
+    const folders = (data.folders || []).filter((opt) => opt.path_prefix && opt.is_enabled !== 0);
+    const defaultFolder = data.default_folder ? data.default_folder.path_prefix : "";
+    if (defaultFolder) {
       try {
         const result = await createNote({
           title: title,
-          sidebar_label: projectLabel,
-          path_prefix: options[0].path_prefix,
+          project_id: projectId,
+          path_prefix: defaultFolder,
         });
         if (result.open_url) {
           window.location.href = result.open_url;
@@ -271,7 +299,30 @@
       }
       return;
     }
-    openModal(options, title, projectLabel, resolvedLabel);
+    if (folders.length) {
+      openModal(folders, title, projectId, "choose");
+      return;
+    }
+    const newPath = window.prompt("No default folder set. Enter a folder path:");
+    if (!newPath) {
+      return;
+    }
+    try {
+      await addDefaultFolder(projectId, newPath);
+      const result = await createNote({
+        title: title,
+        project_id: projectId,
+      });
+      if (result.open_url) {
+        window.location.href = result.open_url;
+      } else if (result.note_id) {
+        window.location.href = `/notes/view/${result.note_id}`;
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      alert(err.message || "Unable to create note.");
+    }
   }
 
   function initModal() {
@@ -388,7 +439,10 @@
     initHotkey();
     initContextMenu();
     if (activeTabIsNotes()) {
-      fetchOptions(getSidebarLabel()).catch(() => {});
+      const projectId = getProjectId();
+      if (projectId) {
+        fetchProjectInfo(projectId).catch(() => {});
+      }
     }
     window.create_new_note = create_new_note;
   });

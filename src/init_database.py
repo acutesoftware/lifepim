@@ -5,11 +5,13 @@
 import os, sys, sqlite3, subprocess
 import etl_folder_mapping as folder_etl
 import common.config as cfg
+from common import projects as projects_mod
 from lifepim.importer.schema import ensure_import_schema
 def main():
     reset_database(cfg.DB_FILE)
     _run_load_testing()
     _run_folder_mapping()
+    _run_projects_import()
     print(f"Initialized database at {cfg.DB_FILE}")
 
 
@@ -28,6 +30,7 @@ def reset_database(db_file):
     for tbl in cfg.table_def:
         create_table(db_conn, tbl)
     db_conn.executescript(folder_etl.DDL_RESET)
+    projects_mod.ensure_projects_schema(db_conn)
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_contacts.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_links.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))
@@ -106,6 +109,31 @@ def _run_folder_mapping():
             rules_csv,
         ]
     )
+
+
+def _run_projects_import():
+    rules_csv = getattr(cfg, "etl_rules_csv", "")
+    if not rules_csv or not os.path.exists(rules_csv):
+        print(f"Project rules CSV not found: {rules_csv}")
+        return
+    print("Importing projects + project folders...")
+    try:
+        projects_mod.import_project_mappings_csv(rules_csv)
+        updated = projects_mod.assign_defaults_if_missing()
+        if updated:
+            print(f"Assigned default folders for {updated} projects.")
+        issues = projects_mod.diagnose_projects()
+        missing = issues.get("missing_default") or []
+        if missing:
+            print(f"Projects missing default folder: {len(missing)}")
+        disabled = issues.get("disabled_default") or []
+        if disabled:
+            print(f"Projects with disabled default folder: {len(disabled)}")
+        multi = issues.get("multiple_default") or []
+        if multi:
+            print(f"Projects with multiple default folders: {len(multi)}")
+    except Exception as exc:
+        print(f"Project import failed: {exc}")
 
 
 if __name__ == "__main__":

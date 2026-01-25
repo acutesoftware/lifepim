@@ -9,6 +9,7 @@ from common.utils import get_tabs, get_side_tabs, get_table_def
 import common.config as mod_cfg
 from common import data as db
 from common import search as search_mod
+from common import projects as projects_mod
 
 def _dbg(msg):
     print(f"[app] {msg}", file=sys.stderr, flush=True)
@@ -16,6 +17,7 @@ def _dbg(msg):
 
 _dbg("Creating Flask app")
 app = Flask(__name__)
+projects_mod.ensure_projects_schema(db._get_conn())
 
 # Register blueprints
 _dbg("Importing blueprints")
@@ -35,6 +37,7 @@ from modules.contacts.routes import contacts_bp
 from modules.tasks.tasks import tasks_bp
 from modules.admin.routes import admin_bp
 from modules.links.routes import links_bp
+from modules.projects.routes import projects_bp
 
 _dbg("Registering blueprints")
 app.register_blueprint(calendar_bp, url_prefix="/calendar")
@@ -53,6 +56,7 @@ app.register_blueprint(contacts_bp, url_prefix="/contacts")
 app.register_blueprint(tasks_bp, url_prefix="/tasks")
 app.register_blueprint(admin_bp, url_prefix="/admin")
 app.register_blueprint(links_bp, url_prefix="/links")
+app.register_blueprint(projects_bp, url_prefix="/projects")
 _dbg("Blueprints registered")
 
 @app.route('/')

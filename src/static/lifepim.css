@@ -146,6 +146,7 @@ body {
   font-size: 12px;
 }
 
+
 .side:hover {
   background: #ddd;
 }
@@ -1535,6 +1536,26 @@ body.links-resizing {
   border: 1px solid #ccc;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   z-index: 190;
+}
+
+.project-folders {
+  margin: 8px 0;
+  padding: 6px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+}
+
+.project-folder-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.project-folders-table th,
+.project-folders-table td {
+  font-size: 11px;
 }
 
 .note-context-menu.open {
