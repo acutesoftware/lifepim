@@ -6,6 +6,8 @@
     modal: null,
     backdrop: null,
     titleEl: null,
+    projectEl: null,
+    writeRootEl: null,
     optionsEl: null,
     cancelBtn: null,
     closeBtn: null,
@@ -17,6 +19,7 @@
     open: false,
     creating: false,
   };
+  const OPTIONS_CACHE = new Map();
 
   function qs(selector, root) {
     return (root || document).querySelector(selector);
@@ -64,16 +67,28 @@
   }
 
   async function fetchOptions(sidebarLabel) {
+    const label = (sidebarLabel || "").trim();
+    if (OPTIONS_CACHE.has(label)) {
+      return OPTIONS_CACHE.get(label);
+    }
     const params = new URLSearchParams();
-    if (sidebarLabel) {
-      params.set("sidebar_label", sidebarLabel);
+    if (label) {
+      params.set("sidebar_label", label);
     }
-    const resp = await fetch(`/notes/api/new-note-options?${params.toString()}`);
-    const data = await resp.json();
-    if (!resp.ok) {
-      throw new Error(data.error || "Unable to fetch note folders.");
-    }
-    return data;
+    const request = fetch(`/notes/api/new-note-options?${params.toString()}`)
+      .then(async (resp) => {
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.error || "Unable to fetch note folders.");
+        }
+        return data;
+      })
+      .catch((err) => {
+        OPTIONS_CACHE.delete(label);
+        throw err;
+      });
+    OPTIONS_CACHE.set(label, request);
+    return request;
   }
 
   async function createNote(payload) {
@@ -147,7 +162,7 @@
     highlightOption(0);
   }
 
-  function openModal(options, title, sidebarLabel) {
+  function openModal(options, title, sidebarLabel, resolvedLabel) {
     if (!STATE.modal || !STATE.backdrop) {
       return;
     }
@@ -155,6 +170,18 @@
     STATE.pendingTitle = title;
     STATE.pendingSidebar = sidebarLabel;
     STATE.titleEl.textContent = `Title: ${title}`;
+    if (STATE.projectEl) {
+      STATE.projectEl.textContent = `Project: ${sidebarLabel}`;
+    }
+    if (STATE.writeRootEl) {
+      if (resolvedLabel && resolvedLabel.toLowerCase() !== (sidebarLabel || "").toLowerCase()) {
+        STATE.writeRootEl.textContent = `Write root: ${resolvedLabel}`;
+        STATE.writeRootEl.style.display = "";
+      } else {
+        STATE.writeRootEl.textContent = "";
+        STATE.writeRootEl.style.display = "none";
+      }
+    }
     renderOptions();
     STATE.modal.classList.add("open");
     STATE.modal.setAttribute("aria-hidden", "false");
@@ -220,6 +247,7 @@
     }
     const options = (data.options || []).filter((opt) => opt.path_prefix);
     const resolvedLabel = (data.sidebar_label || label).trim() || label;
+    const projectLabel = label || resolvedLabel;
     if (!options.length) {
       alert("No canonical write root found for this sidebar.");
       return;
@@ -228,7 +256,7 @@
       try {
         const result = await createNote({
           title: title,
-          sidebar_label: resolvedLabel,
+          sidebar_label: projectLabel,
           path_prefix: options[0].path_prefix,
         });
         if (result.open_url) {
@@ -243,13 +271,15 @@
       }
       return;
     }
-    openModal(options, title, resolvedLabel);
+    openModal(options, title, projectLabel, resolvedLabel);
   }
 
   function initModal() {
     STATE.modal = qs("#note-modal");
     STATE.backdrop = qs("#note-modal-backdrop");
     STATE.titleEl = qs("#note-modal-title");
+    STATE.projectEl = qs("#note-modal-project");
+    STATE.writeRootEl = qs("#note-modal-write-root");
     STATE.optionsEl = qs("#note-modal-options");
     STATE.cancelBtn = qs("#note-modal-cancel");
     STATE.closeBtn = qs("#note-modal-close");
@@ -357,6 +387,9 @@
     initButtons();
     initHotkey();
     initContextMenu();
+    if (activeTabIsNotes()) {
+      fetchOptions(getSidebarLabel()).catch(() => {});
+    }
     window.create_new_note = create_new_note;
   });
 })();

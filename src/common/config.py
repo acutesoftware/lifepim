@@ -20,8 +20,8 @@ export_data_folder_base = os.path.join(user_folder, 'export_data')
 etl_folders_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv"
 etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv"
 PATH_ALIASES = [
-    (r"E:\BK_fangorn\user\duncan", r"N:\duncan"),
-    (r"E:\BK_fangorn\user", r"N:\\"),
+    (r"N:\duncan", r"E:\BK_fangorn\user\duncan"),
+    (r"N:\\", r"E:\BK_fangorn\user"),
 ]
 
 
@@ -101,10 +101,11 @@ SIDE_TABS_GROUPS = [  # for possible sub folders
 
 SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
     { 'icon': '*', 'id': 'All', 'label': 'All Projects'},
+    { 'icon': '❓', 'id': 'unmapped', 'label': 'Unmapped'},
     { 'icon': '', 'id': 'spacer', 'label': 'PERS'}, 
 
     #{ 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},
-    { 'icon': '💊', 'id': 'health', 'label': 'Health'}, 
+    { 'icon': '💊', 'id': 'pers/health', 'label': 'Health'}, 
     { 'icon': '👪', 'id': 'family', 'label': 'Family'}, 
     { 'icon': '🏚️', 'id': 'house', 'label': 'House'}, 
     { 'icon': '🌴', 'id': 'garden', 'label': 'Garden'}, 

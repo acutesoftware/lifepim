@@ -28,6 +28,19 @@ def _sanitize_title(title):
     return cleaned or "Untitled"
 
 
+def _validate_note_filename(raw_title):
+    name = (raw_title or "").strip()
+    if not name:
+        raise ValueError("Title is required.")
+    if INVALID_TITLE_CHARS.search(name):
+        raise ValueError("Title contains invalid filename characters.")
+    if name.endswith(" ") or name.endswith("."):
+        raise ValueError("Title cannot end with a space or period.")
+    if "/" in name or "\\" in name:
+        raise ValueError("Title must be a file name only.")
+    return name
+
+
 def _table_exists(conn, table_name):
     row = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
@@ -254,24 +267,10 @@ def _note_template(title, created_utc, sidebar_label):
 
 
 def _write_note_file(folder_path, base_name, content):
-    for idx in range(1, 1000):
-        if idx == 1:
-            file_name = f"{base_name}.md"
-        else:
-            file_name = f"{base_name} ({idx}).md"
-        full_path = os.path.join(folder_path, file_name)
-        try:
-            with open(full_path, "x", encoding="utf-8") as handle:
-                handle.write(content)
-            return file_name, full_path
-        except FileExistsError:
-            continue
-    stamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
-    file_name = f"{stamp} {base_name}.md"
-    full_path = os.path.join(folder_path, file_name)
+    full_path = os.path.join(folder_path, base_name)
     with open(full_path, "x", encoding="utf-8") as handle:
         handle.write(content)
-    return file_name, full_path
+    return base_name, full_path
 
 
 def _create_note_file(folder_path, title, sidebar_label):
@@ -280,12 +279,14 @@ def _create_note_file(folder_path, title, sidebar_label):
     if not folder_path:
         raise ValueError("Missing folder path")
     os.makedirs(folder_path, exist_ok=True)
-    title_clean = _sanitize_title(title)
-    date_prefix = datetime.now().strftime("%Y-%m-%d")
-    base_name = f"{date_prefix} {title_clean}".strip().rstrip(". ")
+    raw_title = _validate_note_filename(title)
+    root_name, ext = os.path.splitext(raw_title)
+    file_name = raw_title if ext else f"{raw_title}.md"
+    title_base = root_name if ext.lower() == ".md" else raw_title
+    title_clean = _sanitize_title(title_base)
     created_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     content = _note_template(title_clean, created_utc, sidebar_label)
-    file_name, full_path = _write_note_file(folder_path, base_name, content)
+    file_name, full_path = _write_note_file(folder_path, file_name, content)
     return {
         "file_name": file_name,
         "full_path": full_path,
@@ -319,8 +320,8 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None)
     if project and project.lower() == "unmapped":
         condition = "mpf.folder_id IS NULL"
     elif project:
-        condition = "lower(mpf.tab) = lower(?)"
-        params.append(project)
+        condition = "lower(mpf.tab) = lower(?) OR lower(t.project) = lower(?)"
+        params.extend([project, project])
     else:
         condition = "1=1"
     sql = (
@@ -345,6 +346,24 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None)
         note["date_modified_dt"] = _parse_datetime(note.get("date_modified")) or note["updated"]
     return notes
 
+
+
+def _get_note_record(note_id):
+    tbl = get_table_def("notes")
+    if not tbl:
+        return None, None
+    rows = data.get_data(
+        data.conn,
+        tbl["name"],
+        ["id"] + tbl["col_list"] + ["rec_extract_date as updated"],
+        "id = ?",
+        [note_id],
+    )
+    if not rows:
+        return None, tbl
+    note = dict(rows[0])
+    note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
+    return note, tbl
 
 @notes_bp.route('/')
 def list_notes_route():
@@ -721,6 +740,8 @@ def create_note_route():
         return jsonify({"error": "Folder path is required."}), 400
     try:
         created = _create_note_file(path_prefix, title, sidebar_label)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except OSError as exc:
         return jsonify({"error": f"Unable to create note file: {exc}"}), 500
     except Exception as exc:
@@ -764,7 +785,7 @@ def create_note_route():
         "file_name": created["file_name"],
         "path": created["folder_path"],
         "full_path": created["full_path"],
-        "open_url": url_for("notes.view_note_route", note_id=note_id),
+        "open_url": url_for("notes.edit_note_route", note_id=note_id),
     })
 
 @notes_bp.route('/add', methods=["GET", "POST"])
@@ -798,42 +819,88 @@ def add_note_route():
 
 @notes_bp.route('/edit/<int:note_id>', methods=["GET", "POST"])
 def edit_note_route(note_id):
-    tbl = get_table_def("notes")
-    note = None
-    if tbl:
-        rows = data.get_data(
-            data.conn,
-            tbl["name"],
-            ["id"] + tbl["col_list"] + ["rec_extract_date as updated"],
-            "id = ?",
-            [note_id],
-        )
-        if rows:
-            note = dict(rows[0])
-            note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
-    if request.method == "POST" and tbl:
-        form_values = {col: request.form.get(col, "").strip() for col in tbl["col_list"]}
-        if not form_values.get("project"):
-            form_values["project"] = "General"
-        note_path = _build_note_path(form_values)
-        if note_path and os.path.isfile(note_path):
-            if not form_values.get("size"):
-                form_values["size"] = str(os.path.getsize(note_path))
-            if not form_values.get("date_modified"):
-                form_values["date_modified"] = datetime.fromtimestamp(
-                    os.path.getmtime(note_path)
-                ).strftime("%Y-%m-%d %H:%M:%S")
-        values = [form_values.get(col, "") for col in tbl["col_list"]]
-        data.update_record(data.conn, tbl["name"], note_id, tbl["col_list"], values)
-        return redirect(url_for("notes.view_note_route", note_id=note_id))
+    note, tbl = _get_note_record(note_id)
+    if request.method == "POST":
+        content = request.form.get("content")
+        if content is not None and note:
+            note_path = _build_note_path(note)
+            if note_path and not os.path.isdir(note_path):
+                try:
+                    dir_name = os.path.dirname(note_path)
+                    if dir_name:
+                        os.makedirs(dir_name, exist_ok=True)
+                    with open(note_path, "w", encoding="utf-8") as handle:
+                        handle.write(content)
+                except OSError:
+                    pass
+        return redirect(url_for("notes.edit_note_route", note_id=note_id))
+    note_text = ""
+    note_path = _build_note_path(note) if note else ""
+    file_exists = bool(note_path and os.path.isfile(note_path))
+    if file_exists:
+        note_text = _read_note_file(note_path)
+        try:
+            note["size"] = str(os.path.getsize(note_path))
+            note["date_modified"] = datetime.fromtimestamp(
+                os.path.getmtime(note_path)
+            ).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
     return render_template(
         "note_edit.html",
         active_tab="notes",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
         note=note,
+        note_text=note_text,
+        file_exists=file_exists,
+        note_path=note_path,
         content_title=f"Edit: {note.get('file_name')}" if note else "Edit Note",
     )
+
+@notes_bp.route('/api/save/<int:note_id>', methods=["POST"])
+def save_note_route(note_id):
+    payload = request.get_json(silent=True) or {}
+    content = payload.get("content")
+    if content is None:
+        return jsonify({"error": "Missing content."}), 400
+    note, tbl = _get_note_record(note_id)
+    if not note:
+        return jsonify({"error": "Note not found."}), 404
+    note_path = _build_note_path(note)
+    if not note_path or os.path.isdir(note_path):
+        return jsonify({"error": "Note path is invalid."}), 400
+    try:
+        dir_name = os.path.dirname(note_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write(content)
+    except OSError as exc:
+        return jsonify({"error": f"Unable to save note: {exc}"}), 500
+    try:
+        size = str(os.path.getsize(note_path))
+        date_modified = datetime.fromtimestamp(
+            os.path.getmtime(note_path)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        size = note.get("size") or ""
+        date_modified = note.get("date_modified") or ""
+
+    if tbl:
+        values_map = {col: note.get(col, "") for col in tbl["col_list"]}
+        if "size" in values_map:
+            values_map["size"] = size
+        if "date_modified" in values_map:
+            values_map["date_modified"] = date_modified
+        values = [values_map.get(col, "") for col in tbl["col_list"]]
+        data.update_record(data.conn, tbl["name"], note_id, tbl["col_list"], values)
+
+    return jsonify({
+        "ok": True,
+        "size": size,
+        "date_modified": date_modified,
+    })
 
 @notes_bp.route('/delete/<int:note_id>')
 def delete_note_route(note_id):

@@ -1,16 +1,30 @@
 {% extends 'layout.html' %}
 {% block module_content %}
-  <form method="POST">
-    <label>File Name:</label><br>
-    <input type="text" name="file_name" value="{{ note.file_name if note else '' }}"><br>
-    <label>Path:</label><br>
-    <input type="text" name="path" value="{{ note.path if note else '' }}"><br>
-    <label>Size:</label><br>
-    <input type="text" name="size" value="{{ note.size if note else '' }}"><br>
-    <label>Date Modified:</label><br>
-    <input type="text" name="date_modified" value="{{ note.date_modified if note else '' }}"><br>
-    <label>Project:</label><br>
-    <input type="text" name="project" value="{{ note.project if note else project }}"><br><br>
-    <button type="submit">Save</button>
-  </form>
+  {% if not note %}
+    <p>No note selected. Use "New Note" from the Notes list to create one.</p>
+  {% else %}
+    <div class="note-edit" data-note-id="{{ note.id }}">
+      <h4>{{ note.file_name }}</h4>
+      <table border="1" cellpadding="4">
+        <tr><th>File</th><td>{{ note.file_name }}</td></tr>
+        <tr><th>Path</th><td>{{ note.path }}</td></tr>
+        <tr><th>Folder ID</th><td>{{ note.folder_id }}</td></tr>
+        <tr><th>Size</th><td id="note-meta-size">{{ note.size }}</td></tr>
+        <tr><th>Date Modified</th><td id="note-meta-modified">{{ note.date_modified }}</td></tr>
+        <tr><th>Project</th><td>{{ note.project }}</td></tr>
+        <tr><th>Updated</th><td>{{ note.updated.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+      </table>
+
+      {% if not file_exists %}
+        <p>File not found: {{ note_path }}</p>
+      {% else %}
+        <div id="note-edit-status" style="margin:8px 0; font-size: 0.9em; color:#555;">Saved</div>
+        <textarea id="note-editor"
+                  data-save-url="{{ url_for('notes.save_note_route', note_id=note.id) }}"
+                  style="width:100%; min-height:60vh; font-family:inherit;">{{ note_text }}</textarea>
+        <div style="margin-top:6px; font-size:0.85em; color:#777;">Autosaves as you type.</div>
+      {% endif %}
+    </div>
+    <script src="{{ url_for('static', filename='note_editor.js') }}"></script>
+  {% endif %}
 {% endblock %}

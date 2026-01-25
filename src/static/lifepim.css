@@ -1476,6 +1476,12 @@ body.links-resizing {
   color: #555;
 }
 
+.note-modal-project,
+.note-modal-write-root {
+  font-size: 10px;
+  color: #666;
+}
+
 .note-modal-options {
   border: 1px solid #ddd;
   background: #fafafa;
