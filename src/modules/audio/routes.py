@@ -263,6 +263,9 @@ def list_audio_table_route():
     )
     tbl = _get_tbl()
     col_list = tbl["col_list"] if tbl else []
+    conn = _ensure_playlist_schema()
+    _ensure_default_playlist(conn)
+    playlists = _list_playlists(conn)
     return render_template(
         "audio_list_table.html",
         active_tab="audio",
@@ -273,6 +276,7 @@ def list_audio_table_route():
         items=items,
         col_list=col_list,
         project=project,
+        playlists=playlists,
         sort_col=sort_col,
         sort_dir=sort_dir,
         page=page,

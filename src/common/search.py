@@ -9,6 +9,7 @@ ROUTE_RECORD_TYPE = {
     "tasks": "task",
     "calendar": "event",
     "files": "file",
+    "media": "media",
     "contacts": "person",
     "places": "place",
 }
@@ -18,6 +19,7 @@ ROUTE_TITLE_FIELD = {
     "tasks": "title",
     "calendar": "title",
     "files": "filelist_name",
+    "media": "filename",
     "contacts": "display_name",
     "places": "name",
 }
@@ -131,6 +133,49 @@ def _search_table(route_name, terms, columns, view_route, id_param):
     return results
 
 
+def _search_media(terms):
+    tbl = get_table_def("media")
+    if not tbl:
+        return []
+    if not terms:
+        return []
+    search_cols = ["filename", "path", "ext", "media_type"]
+    term_conditions = []
+    params = []
+    for term in terms:
+        like_value = f"%{term}%"
+        condition = " OR ".join([f"lower({col}) LIKE ?" for col in search_cols])
+        term_conditions.append(f"({condition})")
+        params.extend([like_value] * len(search_cols))
+    where_clause = " AND ".join(term_conditions)
+    sql = (
+        "SELECT media_id as id, filename, path, ext, media_type "
+        f"FROM {tbl['name']} WHERE {where_clause}"
+    )
+    rows = data._get_conn().execute(sql, params).fetchall()
+    results = []
+    for row in rows:
+        item = dict(row)
+        match_field = _find_match_field(item, terms, search_cols)
+        match_value = item.get(match_field) or ""
+        results.append(
+            {
+                "table": tbl.get("display_name") or "Media",
+                "route": "media",
+                "id": item.get("id"),
+                "project": "",
+                "match_field": match_field,
+                "match_value": match_value,
+                "match_snippet": _build_snippet(match_value, terms),
+                "view_route": "media.view_media_route",
+                "id_param": "media_id",
+                "record_type": ROUTE_RECORD_TYPE.get("media", ""),
+                "title": item.get("filename") or "",
+            }
+        )
+    return results
+
+
 def _build_note_path(note):
     file_name = (note.get("file_name") or "").strip()
     path = (note.get("path") or "").strip()
@@ -222,13 +267,7 @@ def search_all(query, project=None, route=None, include_note_content=False):
         "audio.view_audio_route",
         "item_id",
     )
-    results += _search_table(
-        "media",
-        terms,
-        ["file_name", "path", "file_type"],
-        "media.view_media_route",
-        "item_id",
-    )
+    results += _search_media(terms)
     results += _search_table(
         "how",
         terms,

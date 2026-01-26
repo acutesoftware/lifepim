@@ -1,0 +1,423 @@
+{% extends "layout.html" %}
+{% macro media_url(query, extra) -%}
+  {{ url_for('media.media_explorer_route') }}{% if query or extra %}?{% endif %}{% if query %}{{ query }}{% endif %}{% if query and extra %}&{% endif %}{{ extra }}
+{%- endmacro %}
+
+{% macro render_items(items, view_mode, focus_item, focus_query) %}
+  {% if view_mode == 'table' %}
+    <table class="media-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Filename</th>
+          <th>Type</th>
+          <th>Date</th>
+          <th>Ext</th>
+          <th>Size</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        {% set is_focus = focus_item and focus_item.media_id == item.media_id %}
+        <tr class="media-row {% if is_focus %}focused{% endif %}">
+          <td>
+            <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
+          </td>
+          <td>
+            <a href="{{ media_url(focus_query, 'focus_id=' ~ item.media_id) }}">
+              {{ item.filename }}
+            </a>
+          </td>
+          <td>{{ item.media_type }}</td>
+          <td>{{ item.taken_utc or item.mtime_utc }}</td>
+          <td>{{ item.ext }}</td>
+          <td>{{ item.size_bytes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% elif view_mode == 'grid' %}
+    <div class="media-grid">
+      {% for item in items %}
+      {% set is_focus = focus_item and focus_item.media_id == item.media_id %}
+      <div class="media-card {% if is_focus %}focused{% endif %}">
+        <label class="media-select">
+          <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
+        </label>
+        <a class="media-thumb" href="{{ media_url(focus_query, 'focus_id=' ~ item.media_id) }}">
+          {% if item.media_type == 'video' %}
+            <video muted preload="metadata">
+              <source src="{{ url_for('media.media_file_route', media_id=item.media_id) }}">
+            </video>
+          {% else %}
+            <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
+          {% endif %}
+        </a>
+        <div class="media-card-title">{{ item.filename }}</div>
+        <div class="media-card-sub">{{ item.taken_utc or item.mtime_utc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <ul class="media-filmstrip">
+      {% for item in items %}
+      {% set is_focus = focus_item and focus_item.media_id == item.media_id %}
+      <li class="media-row {% if is_focus %}focused{% endif %}">
+        <label class="media-select">
+          <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
+        </label>
+        <a class="media-thumb" href="{{ media_url(focus_query, 'focus_id=' ~ item.media_id) }}">
+          {% if item.media_type == 'video' %}
+            <video muted preload="metadata">
+              <source src="{{ url_for('media.media_file_route', media_id=item.media_id) }}">
+            </video>
+          {% else %}
+            <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
+          {% endif %}
+        </a>
+        <div class="media-meta">
+          <div class="media-title">{{ item.filename }}</div>
+          <div class="media-sub">{{ item.taken_utc or item.mtime_utc }}</div>
+          <div class="media-sub">{{ item.media_type }} - {{ item.ext }} - {{ item.size_bytes }}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+
+{% block module_content %}
+  <div class="media-explorer">
+    <div class="media-toolbar">
+      <form class="media-toolbar-form" method="get" action="{{ url_for('media.media_explorer_route') }}">
+        <input type="hidden" name="view" value="{{ view }}">
+        {% if album_id %}<input type="hidden" name="album_id" value="{{ album_id }}">{% endif %}
+        {% if event_id %}<input type="hidden" name="event_id" value="{{ event_id }}">{% endif %}
+        {% if smart_view_id %}<input type="hidden" name="smart_view_id" value="{{ smart_view_id }}">{% endif %}
+        <input type="text" name="q" value="{{ q }}" placeholder="Search media">
+        <select name="media_type" title="Media type">
+          <option value="">All types</option>
+          <option value="image" {% if media_type == 'image' %}selected{% endif %}>Images</option>
+          <option value="video" {% if media_type == 'video' %}selected{% endif %}>Videos</option>
+        </select>
+        <select name="view_mode" title="View mode">
+          <option value="filmstrip" {% if view_mode == 'filmstrip' %}selected{% endif %}>Filmstrip</option>
+          <option value="grid" {% if view_mode == 'grid' %}selected{% endif %}>Grid</option>
+          <option value="table" {% if view_mode == 'table' %}selected{% endif %}>Table</option>
+        </select>
+        <select name="sort" title="Sort">
+          <option value="taken_desc" {% if sort_key == 'taken_desc' %}selected{% endif %}>Taken desc</option>
+          <option value="mtime_desc" {% if sort_key == 'mtime_desc' %}selected{% endif %}>Modified desc</option>
+          <option value="filename" {% if sort_key == 'filename' %}selected{% endif %}>Filename</option>
+        </select>
+        {% if view == 'timeline' %}
+          <select name="group" title="Group by">
+            <option value="year" {% if group_by == 'year' %}selected{% endif %}>Year</option>
+            <option value="month" {% if group_by == 'month' %}selected{% endif %}>Month</option>
+            <option value="day" {% if group_by == 'day' %}selected{% endif %}>Day</option>
+          </select>
+        {% endif %}
+        <label class="media-inline">
+          <input type="checkbox" name="search_everywhere" value="1" {% if search_everywhere %}checked{% endif %}>
+          Search everywhere
+        </label>
+        <button type="submit">Apply</button>
+      </form>
+
+      <form class="media-smart-save" method="post" action="{{ url_for('media.create_smart_view_route') }}">
+        <input type="hidden" name="q" value="{{ q }}">
+        <input type="hidden" name="media_type" value="{{ media_type }}">
+        <input type="hidden" name="sort" value="{{ sort_key }}">
+        <input type="hidden" name="view" value="{{ view }}">
+        <input type="text" name="title" placeholder="Save as Smart View">
+        <button type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="media-body">
+      <aside class="media-nav">
+        <div class="media-nav-section">
+          <div class="media-nav-title">Browse</div>
+          <a class="media-nav-link {% if view == 'all' %}active{% endif %}" href="{{ media_url(nav_query, 'view=all') }}">All Media</a>
+          <a class="media-nav-link {% if view == 'timeline' %}active{% endif %}" href="{{ media_url(nav_query, 'view=timeline') }}">Timeline</a>
+          <a class="media-nav-link {% if view == 'albums' %}active{% endif %}" href="{{ media_url(nav_query, 'view=albums') }}">Albums</a>
+          <a class="media-nav-link {% if view == 'events' %}active{% endif %}" href="{{ media_url(nav_query, 'view=events') }}">Events</a>
+          <a class="media-nav-link {% if view == 'smart' %}active{% endif %}" href="{{ media_url(nav_query, 'view=smart') }}">Smart Views</a>
+        </div>
+
+        <div class="media-nav-section">
+          <div class="media-nav-title">Albums</div>
+          <form class="media-nav-create" method="post" action="{{ url_for('media.create_album_route') }}">
+            {% for key, value in base_args.items() %}
+              <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+            <input type="text" name="title" placeholder="New album">
+            <button type="submit">+</button>
+          </form>
+          <ul class="media-nav-list">
+            {% for alb in albums %}
+            <li>
+              <a class="media-nav-link {% if album and album.album_id == alb.album_id %}active{% endif %}" href="{{ media_url(nav_query, 'view=albums&album_id=' ~ alb.album_id) }}">
+                <span>{{ alb.title }}</span>
+                <span class="media-count">{{ alb.item_count }}</span>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div class="media-nav-section">
+          <div class="media-nav-title">Events</div>
+          <ul class="media-nav-list">
+            {% for ev in events %}
+            <li>
+              <a class="media-nav-link {% if event and event.event_id == ev.event_id %}active{% endif %}" href="{{ media_url(nav_query, 'view=events&event_id=' ~ ev.event_id) }}">
+                <span>{{ ev.title }}</span>
+                <span class="media-count">{{ ev.item_count }}</span>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+          <form class="media-nav-inline" method="post" action="{{ url_for('media.rebuild_events_route') }}">
+            <input type="hidden" name="gap_hours" value="2">
+            <input type="hidden" name="split_on_day" value="1">
+            <button type="submit">Rebuild events</button>
+          </form>
+        </div>
+
+        <div class="media-nav-section">
+          <div class="media-nav-title">Smart Views</div>
+          <ul class="media-nav-list">
+            {% for sv in smart_views %}
+            <li>
+              <a class="media-nav-link {% if smart_view and smart_view.smart_view_id == sv.smart_view_id %}active{% endif %}" href="{{ media_url(nav_query, 'view=smart&smart_view_id=' ~ sv.smart_view_id) }}">
+                <span>{{ sv.title }}</span>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </aside>
+
+      <section class="media-main">
+        {% if view == 'albums' and not album %}
+          <div class="media-empty">Select an album or create a new one.</div>
+          <div class="media-album-grid">
+            {% for alb in albums %}
+            <a class="media-album-card" href="{{ media_url(nav_query, 'view=albums&album_id=' ~ alb.album_id) }}">
+              <div class="media-album-cover">
+                {% if alb.cover_media_id %}
+                  <img src="{{ url_for('media.media_file_route', media_id=alb.cover_media_id) }}" alt="{{ alb.title }}" loading="lazy">
+                {% else %}
+                  <div class="media-album-placeholder">No cover</div>
+                {% endif %}
+              </div>
+              <div class="media-album-title">{{ alb.title }}</div>
+              <div class="media-album-sub">{{ alb.item_count }} items</div>
+            </a>
+            {% endfor %}
+          </div>
+        {% elif view == 'events' and not event %}
+          <div class="media-empty">Select an event to view clustered media.</div>
+          <ul class="media-event-list">
+            {% for ev in events %}
+            <li>
+              <a href="{{ media_url(nav_query, 'view=events&event_id=' ~ ev.event_id) }}">
+                <div class="media-event-title">{{ ev.title }}</div>
+                <div class="media-event-sub">{{ ev.start_utc }} -> {{ ev.end_utc }}</div>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        {% elif view == 'smart' and not smart_view %}
+          <div class="media-empty">Select a Smart View or create one from the toolbar.</div>
+          <ul class="media-smart-list">
+            {% for sv in smart_views %}
+            <li>
+              <a href="{{ media_url(nav_query, 'view=smart&smart_view_id=' ~ sv.smart_view_id) }}">
+                <div class="media-smart-title">{{ sv.title }}</div>
+                <div class="media-smart-sub">{{ sv.description }}</div>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          {% if view == 'albums' and album %}
+            <div class="media-scope-header">
+              <div>
+                <strong>{{ album.title }}</strong>
+                <span class="media-scope-sub">{{ album.description }}</span>
+              </div>
+              <form method="post" action="{{ url_for('media.rename_album_route', album_id=album.album_id) }}" class="media-scope-form">
+                {% for key, value in base_args.items() %}
+                  <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <input type="text" name="title" value="{{ album.title }}">
+                <button type="submit">Rename</button>
+              </form>
+              <form method="post" action="{{ url_for('media.delete_album_route', album_id=album.album_id) }}">
+                <button type="submit">Delete</button>
+              </form>
+            </div>
+          {% elif view == 'events' and event %}
+            <div class="media-scope-header">
+              <div>
+                <strong>{{ event.title }}</strong>
+                <span class="media-scope-sub">{{ event.start_utc }} -> {{ event.end_utc }}</span>
+              </div>
+              <form method="post" action="{{ url_for('media.rename_event_route', event_id=event.event_id) }}" class="media-scope-form">
+                {% for key, value in base_args.items() %}
+                  <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <input type="text" name="title" value="{{ event.title }}">
+                <button type="submit">Rename</button>
+              </form>
+            </div>
+          {% elif view == 'smart' and smart_view %}
+            <div class="media-scope-header">
+              <div>
+                <strong>{{ smart_view.title }}</strong>
+                <span class="media-scope-sub">{{ smart_view.description }}</span>
+              </div>
+              <form method="post" action="{{ url_for('media.rename_smart_view_route', smart_view_id=smart_view.smart_view_id) }}" class="media-scope-form">
+                {% for key, value in base_args.items() %}
+                  <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <input type="text" name="title" value="{{ smart_view.title }}">
+                <button type="submit">Rename</button>
+              </form>
+              <form method="post" action="{{ url_for('media.delete_smart_view_route', smart_view_id=smart_view.smart_view_id) }}">
+                <button type="submit">Delete</button>
+              </form>
+            </div>
+          {% endif %}
+
+          <form class="media-actions-form" method="post" action="{{ url_for('media.media_actions_route') }}">
+            {% for key, value in base_args.items() %}
+              <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+            <div class="media-actions-bar">
+              <label class="media-inline">
+                <input type="checkbox" class="media-select-all">
+                Select all
+              </label>
+              <span class="media-selected-count" data-empty="No selection">0 selected</span>
+              <select name="action" class="media-action-select">
+                <option value="">Actions</option>
+                <option value="add_to_album">Add to album</option>
+                {% if view == 'albums' and album %}
+                  <option value="remove_from_album">Remove from album</option>
+                {% endif %}
+                <option value="tag">Tag</option>
+                <option value="copy_paths">Copy paths</option>
+              </select>
+              <select name="album_id" class="media-action-album">
+                <option value="">Choose album</option>
+                {% for alb in albums %}
+                  <option value="{{ alb.album_id }}" {% if album and alb.album_id == album.album_id %}selected{% endif %}>
+                    {{ alb.title }}
+                  </option>
+                {% endfor %}
+              </select>
+              <input type="text" name="tags" class="media-action-tags" placeholder="Tags">
+              <button type="submit" class="media-action-btn" disabled>Apply</button>
+            </div>
+
+            {% if items %}
+              {% if view == 'timeline' %}
+                {% for group in groups %}
+                  <div class="media-group">
+                    <div class="media-group-title">{{ group.label }}</div>
+                    {{ render_items(group["items"], view_mode, focus_item, focus_query) }}
+                  </div>
+                {% endfor %}
+              {% else %}
+                {{ render_items(items, view_mode, focus_item, focus_query) }}
+              {% endif %}
+            {% else %}
+              <div class="media-empty">No media found.</div>
+            {% endif %}
+
+            {% include "widgets/wid_pagination.html" %}
+          </form>
+        {% endif %}
+      </section>
+
+      <aside class="media-inspector">
+        {% if focus_item %}
+          <div class="media-inspector-preview">
+            {% if focus_item.media_type == 'video' %}
+              <video controls preload="metadata">
+                <source src="{{ url_for('media.media_file_route', media_id=focus_item.media_id) }}">
+              </video>
+            {% else %}
+              <img src="{{ url_for('media.media_file_route', media_id=focus_item.media_id) }}" alt="{{ focus_item.filename }}" loading="lazy">
+            {% endif %}
+          </div>
+          <div class="media-inspector-title">{{ focus_item.filename }}</div>
+          <div class="media-inspector-meta">
+            <div><span>Path</span><span class="media-path">{{ focus_item.path }}</span></div>
+            <div><span>Type</span><span>{{ focus_item.media_type }}</span></div>
+            <div><span>Ext</span><span>{{ focus_item.ext }}</span></div>
+            <div><span>Taken</span><span>{{ focus_item.taken_utc }}</span></div>
+            <div><span>Modified</span><span>{{ focus_item.mtime_utc }}</span></div>
+            <div><span>Size</span><span>{{ focus_item.size_bytes }}</span></div>
+            <div><span>Camera</span><span>{{ focus_item.camera_make }} {{ focus_item.camera_model }}</span></div>
+            <div><span>Dims</span><span>{{ focus_item.width }} x {{ focus_item.height }}</span></div>
+            {% if focus_item.duration_sec %}
+              <div><span>Duration</span><span>{{ focus_item.duration_sec }}</span></div>
+            {% endif %}
+          </div>
+
+          <div class="media-inspector-section">
+            <div class="media-inspector-section-title">Tags</div>
+            {% if focus_tags %}
+              <div class="media-tag-list">
+                {% for tag in focus_tags %}
+                  <span class="media-tag">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="media-empty">No tags</div>
+            {% endif %}
+          </div>
+
+          <div class="media-inspector-section">
+            <div class="media-inspector-section-title">Albums</div>
+            {% if focus_albums %}
+              <ul class="media-inline-list">
+                {% for alb in focus_albums %}
+                <li>{{ alb.title }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="media-empty">Not in albums</div>
+            {% endif %}
+          </div>
+
+          <div class="media-inspector-section">
+            <div class="media-inspector-section-title">Events</div>
+            {% if focus_events %}
+              <ul class="media-inline-list">
+                {% for ev in focus_events %}
+                <li>{{ ev.title }}</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="media-empty">Not in events</div>
+            {% endif %}
+          </div>
+
+          <div class="media-inspector-actions">
+            <button type="button" class="media-copy-btn" data-copy-path="{{ focus_item.path }}">Copy path</button>
+            <a href="file://{{ focus_item.path }}">Reveal</a>
+          </div>
+        {% else %}
+          <div class="media-empty">Select a media item to inspect.</div>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='media_explorer.js') }}"></script>
+{% endblock %}

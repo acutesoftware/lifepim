@@ -12,19 +12,20 @@ if root_folder not in sys.path:
 
 from common import data
 from common import utils
+from common.media_schema import ensure_media_schema
 
 
 PROJECT_LOAD_TEST = "LoadTest"
 
-test_type = 'FULL'
-#test_type = 'Light'
+#test_type = 'FULL'
+test_type = 'Light'
 
 
 
 if test_type == 'Light':
     FOLDER_AUDIO = r"E:\BK_fangorn\music\mixing_djm"
     FOLDER_MEDIA = r"E:\BK_fangorn\photo\__new_from_camera\2023"
-    FOLDER_NOTES = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes\40-Dev\43-LifePIM"
+    FOLDER_NOTES = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes"
     FOLDER_TASKS = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes\00-META\02-Tasks"
     FOLDER_EVENTS = r"N:\duncan\LifePIM_Data\calendar"
     FOLDER_GOALS = r"N:\duncan\LifePIM_Data\goals"
@@ -32,10 +33,10 @@ if test_type == 'Light':
     FOLDER_DATA = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\SQL"
     FOLDER_FILES = r"E:\BK_fangorn\user\duncan\LifePIM_Data\index"
     FOLDER_3D = r"E:\BK_fangorn\user\duncan\C\user\docs\designs\blender"
-    FOLDER_APPS = r"C:\apps\UE_5.6\Engine\Binaries\Win64"
+    FOLDER_APPS = r"C:\apps\UE_5.6"
 else:
-    FOLDER_AUDIO = r"E:\BK_fangorn\music\Music\_Techno\_Top 1500 Best Techno Of All Time"
-    FOLDER_MEDIA = r"E:\BK_fangorn\photo\__new_from_camera\2023"
+    FOLDER_AUDIO = r"E:\BK_fangorn\music\Music"
+    FOLDER_MEDIA = r"E:\BK_fangorn\photo"
     FOLDER_NOTES = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes"
     FOLDER_TASKS = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes\00-META\02-Tasks"
     FOLDER_EVENTS = r"N:\duncan\LifePIM_Data\calendar"
@@ -224,24 +225,55 @@ def load_files(folder_path=FOLDER_FILES, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_media(folder_path=FOLDER_MEDIA, project=PROJECT_LOAD_TEST):
-    tbl = _get_tbl("media")
+def load_media(folder_path=FOLDER_MEDIA):
+    conn = data._get_conn()
+    ensure_media_schema(conn)
     count = 0
+    image_exts = {
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "bmp",
+        "webp",
+        "tif",
+        "tiff",
+        "heic",
+        "heif",
+    }
+    video_exts = {"mp4", "mov", "avi", "mkv", "webm", "mpg", "mpeg", "wmv"}
     for full_path in _iter_files(folder_path):
         info = os.stat(full_path)
         ext = os.path.splitext(full_path)[1].lower().lstrip(".")
-        values_map = {
-            "file_name": os.path.basename(full_path),
-            "path": os.path.dirname(full_path),
-            "file_type": ext,
-            "size": str(info.st_size),
-            "date_modified": datetime.fromtimestamp(info.st_mtime).strftime("%Y-%m-%d"),
-            "width": "",
-            "length": "",
-            "project": project,
-        }
-        if _add_record(tbl, values_map):
+        if ext in image_exts:
+            media_type = "image"
+        elif ext in video_exts:
+            media_type = "video"
+        else:
+            continue
+        filename = os.path.basename(full_path)
+        mtime_utc = datetime.utcfromtimestamp(info.st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ctime_utc = datetime.utcfromtimestamp(info.st_ctime).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO lp_media "
+                "(path, filename, ext, media_type, size_bytes, mtime_utc, ctime_utc, hash) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    full_path,
+                    filename,
+                    ext,
+                    media_type,
+                    int(info.st_size),
+                    mtime_utc,
+                    ctime_utc,
+                    None,
+                ),
+            )
             count += 1
+        except Exception:
+            continue
+    conn.commit()
     print(f"Media loaded: {count}")
     return count
 

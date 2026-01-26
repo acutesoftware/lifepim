@@ -164,6 +164,14 @@ def search_route():
         if project:
             params["proj"] = project
         item["url"] = url_for(item["view_route"], **params)
+    audio_playlists = []
+    has_audio = any(item.get("route") == "audio" for item in results["primary"] + results["secondary"])
+    if has_audio:
+        from modules.audio import routes as audio_routes
+
+        conn = audio_routes._ensure_playlist_schema()
+        audio_routes._ensure_default_playlist(conn)
+        audio_playlists = audio_routes._list_playlists(conn)
     return render_template(
         "search_results.html",
         active_tab=active_tab,
@@ -176,6 +184,7 @@ def search_route():
         route=route,
         results_primary=results["primary"],
         results_secondary=results["secondary"],
+        audio_playlists=audio_playlists,
     )
 
 if __name__ == "__main__":

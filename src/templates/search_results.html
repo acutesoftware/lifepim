@@ -11,68 +11,166 @@
   {% else %}
     {% if results_primary %}
       <h4>Matches in current context</h4>
-      <table class="search-results" border="1" cellpadding="5">
-        <colgroup>
-          <col class="search-col-table">
-          <col class="search-col-match">
-        </colgroup>
-        <tr>
-          <th>Table</th>
-          <th>Match</th>
-        </tr>
-        {% for item in results_primary %}
-        <tr class="link-draggable"
-            {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
-          <td class="table-col">{{ item.table }}</td>
-          {% if item.match_field == 'content' %}
-            <td class="search-match match-col" title="{{ item.match_value }}">
-              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
-              <span class="search-match-sep"> - </span>
-              <span class="search-match-text">{{ item.match_value }}</span>
-            </td>
-          {% else %}
-            <td class="search-match match-col" title="{{ item.match_snippet }}">
-              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
-              <span class="search-match-sep"> - </span>
-              <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
-            </td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </table>
+      {% set audio_primary = results_primary|selectattr('route', 'equalto', 'audio')|list %}
+      {% if audio_primary and audio_playlists %}
+        <form method="post" action="{{ url_for('audio.add_playlist_items_route', proj=project) }}">
+          <div class="audio-list-actions">
+            <label>
+              Add selected audio to
+              <select name="playlist_id">
+                {% for pl in audio_playlists %}
+                <option value="{{ pl.playlist_id }}" {% if pl.is_default %}selected{% endif %}>{{ pl.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit">Add</button>
+          </div>
+          <table class="search-results" border="1" cellpadding="5">
+            <colgroup>
+              <col style="width:18px;">
+              <col class="search-col-table">
+              <col class="search-col-match">
+            </colgroup>
+            <tr>
+              <th></th>
+              <th>Table</th>
+              <th>Match</th>
+            </tr>
+            {% for item in results_primary %}
+            <tr class="link-draggable"
+                {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
+              <td>{% if item.route == 'audio' %}<input type="checkbox" name="item_id" value="{{ item.id }}">{% endif %}</td>
+              <td class="table-col">{{ item.table }}</td>
+              {% if item.match_field == 'content' %}
+                <td class="search-match match-col" title="{{ item.match_value }}">
+                  <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
+                  <span class="search-match-sep"> - </span>
+                  <span class="search-match-text">{{ item.match_value }}</span>
+                </td>
+              {% else %}
+                <td class="search-match match-col" title="{{ item.match_snippet }}">
+                  <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
+                  <span class="search-match-sep"> - </span>
+                  <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
+                </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </table>
+        </form>
+      {% else %}
+        <table class="search-results" border="1" cellpadding="5">
+          <colgroup>
+            <col class="search-col-table">
+            <col class="search-col-match">
+          </colgroup>
+          <tr>
+            <th>Table</th>
+            <th>Match</th>
+          </tr>
+          {% for item in results_primary %}
+          <tr class="link-draggable"
+              {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
+            <td class="table-col">{{ item.table }}</td>
+            {% if item.match_field == 'content' %}
+              <td class="search-match match-col" title="{{ item.match_value }}">
+                <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
+                <span class="search-match-sep"> - </span>
+                <span class="search-match-text">{{ item.match_value }}</span>
+              </td>
+            {% else %}
+              <td class="search-match match-col" title="{{ item.match_snippet }}">
+                <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
+                <span class="search-match-sep"> - </span>
+                <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
+              </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
     {% endif %}
 
     {% if results_secondary %}
       <h4>Other matches</h4>
-      <table class="search-results" border="1" cellpadding="5">
-        <colgroup>
-          <col class="search-col-table">
-          <col class="search-col-match">
-        </colgroup>
-        <tr>
-          <th>Table</th>
-          <th>Match</th>
-        </tr>
-        {% for item in results_secondary %}
-        <tr class="link-draggable"
-            {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
-          <td class="table-col">{{ item.table }}</td>
-          {% if item.match_field == 'content' %}
-            <td class="search-match match-col" title="{{ item.match_value }}">
-              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
-              <span class="search-match-sep"> - </span>
-              <span class="search-match-text">{{ item.match_value }}</span>
-            </td>
-          {% else %}
-            <td class="search-match match-col" title="{{ item.match_snippet }}">
-              <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
-              <span class="search-match-sep"> - </span>
-              <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
-            </td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </table>
+      {% set audio_secondary = results_secondary|selectattr('route', 'equalto', 'audio')|list %}
+      {% if audio_secondary and audio_playlists %}
+        <form method="post" action="{{ url_for('audio.add_playlist_items_route', proj=project) }}">
+          <div class="audio-list-actions">
+            <label>
+              Add selected audio to
+              <select name="playlist_id">
+                {% for pl in audio_playlists %}
+                <option value="{{ pl.playlist_id }}" {% if pl.is_default %}selected{% endif %}>{{ pl.name }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit">Add</button>
+          </div>
+          <table class="search-results" border="1" cellpadding="5">
+            <colgroup>
+              <col style="width:18px;">
+              <col class="search-col-table">
+              <col class="search-col-match">
+            </colgroup>
+            <tr>
+              <th></th>
+              <th>Table</th>
+              <th>Match</th>
+            </tr>
+            {% for item in results_secondary %}
+            <tr class="link-draggable"
+                {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
+              <td>{% if item.route == 'audio' %}<input type="checkbox" name="item_id" value="{{ item.id }}">{% endif %}</td>
+              <td class="table-col">{{ item.table }}</td>
+              {% if item.match_field == 'content' %}
+                <td class="search-match match-col" title="{{ item.match_value }}">
+                  <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
+                  <span class="search-match-sep"> - </span>
+                  <span class="search-match-text">{{ item.match_value }}</span>
+                </td>
+              {% else %}
+                <td class="search-match match-col" title="{{ item.match_snippet }}">
+                  <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
+                  <span class="search-match-sep"> - </span>
+                  <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
+                </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </table>
+        </form>
+      {% else %}
+        <table class="search-results" border="1" cellpadding="5">
+          <colgroup>
+            <col class="search-col-table">
+            <col class="search-col-match">
+          </colgroup>
+          <tr>
+            <th>Table</th>
+            <th>Match</th>
+          </tr>
+          {% for item in results_secondary %}
+          <tr class="link-draggable"
+              {% if item.record_type %}data-record-type="{{ item.record_type }}" data-record-id="{{ item.id }}" data-record-title="{{ item.title or item.match_value or item.id }}"{% endif %}>
+            <td class="table-col">{{ item.table }}</td>
+            {% if item.match_field == 'content' %}
+              <td class="search-match match-col" title="{{ item.match_value }}">
+                <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.id }}</a>
+                <span class="search-match-sep"> - </span>
+                <span class="search-match-text">{{ item.match_value }}</span>
+              </td>
+            {% else %}
+              <td class="search-match match-col" title="{{ item.match_snippet }}">
+                <a class="search-match-title" href="{{ item.url }}">{{ item.title or item.match_value or item.id }}</a>
+                <span class="search-match-sep"> - </span>
+                <span class="search-match-text">{{ item.match_field }}: {{ item.match_snippet }}</span>
+              </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
     {% endif %}
 
     {% if query and not results_primary and not results_secondary %}

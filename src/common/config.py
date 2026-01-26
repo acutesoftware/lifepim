@@ -47,8 +47,8 @@ print('DB_FILE = ' + DB_FILE)
 table_def = [
 	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'folder_id', 'size', 'date_modified', 'project']},
 	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'project', 'start_date', 'due_date']},
-	{'name':'lp_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
-	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
+	{'name':'lp_calendar_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
+	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['path', 'filename', 'ext', 'media_type', 'size_bytes', 'mtime_utc', 'ctime_utc', 'hash']},
 	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'artist', 'album', 'song', 'project']},
 	{'name':'lp_3d', 'route':'3d', 'display_name':'3D', 'col_list':['file_name','path', 'folder_id', 'size', 'date_modified', 'project']},
 	{'name':'lp_apps', 'route':'apps', 'display_name':'Apps', 'col_list':['file_path', 'folder_id', 'title','icon', 'project']},
@@ -58,9 +58,6 @@ table_def = [
 	{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'project']},
 	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'folder_id', 'file_type', 'project']},
 	{'name':'lp_places', 'route':'places', 'display_name':'Places', 'col_list':['name','desc', 'address_street', 'suburb', 'postcode', 'state', 'country', 'gps_lat', 'gps_long']},
-
-	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'width', 'length', 'project']},
-	
 
 ]
 

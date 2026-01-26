@@ -6,6 +6,7 @@ import os, sys, sqlite3, subprocess
 import etl_folder_mapping as folder_etl
 import common.config as cfg
 from common import projects as projects_mod
+from common.media_schema import ensure_media_schema
 from lifepim.importer.schema import ensure_import_schema
 def main():
     reset_database(cfg.DB_FILE)
@@ -28,12 +29,15 @@ def reset_database(db_file):
         os.remove(db_file)
     db_conn = sqlite3.connect(db_file)
     for tbl in cfg.table_def:
+        if tbl.get("name") == "lp_media":
+            continue
         create_table(db_conn, tbl)
     db_conn.executescript(folder_etl.DDL_RESET)
     projects_mod.ensure_projects_schema(db_conn)
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_contacts.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_links.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))
+    ensure_media_schema(db_conn)
     ensure_import_schema(db_conn)
     db_conn.commit()
     db_conn.close()
