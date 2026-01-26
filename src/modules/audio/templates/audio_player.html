@@ -54,7 +54,7 @@
 
     <section class="player-playlist">
       <div class="playlist-header">
-        <span>Playlist</span>
+        <span>{{ playlist_name or "Playlist" }}</span>
         <span class="playlist-count">{{ tracks|length }} tracks</span>
       </div>
       <div class="playlist-list" id="playlist"></div>

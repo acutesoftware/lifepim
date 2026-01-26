@@ -1,22 +1,59 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div>
-    <a href="{{ url_for('audio.list_audio_table_route', proj=project) }}">Table</a> |
-    <a href="{{ url_for('audio.list_audio_list_route', proj=project) }}">List</a> |
-    <a href="{{ url_for('audio.import_audio_route', proj=project) }}">Add Audio</a> |
-    <a href="{{ url_for('audio.audio_player_route', proj=project) }}" onclick="window.open(this.href, 'audio_player', 'width=420,height=640,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
-  </div>
+  <div class="audio-list-layout">
+    <div class="audio-list-main">
+      <div class="audio-list-nav">
+        <a href="{{ url_for('audio.list_audio_table_route', proj=project) }}">Table</a> |
+        <a href="{{ url_for('audio.list_audio_list_route', proj=project) }}">List</a> |
+        <a href="{{ url_for('audio.import_audio_route', proj=project) }}">Add Audio</a> |
+        <a href="{{ url_for('audio.audio_player_route', proj=project) }}" onclick="window.open(this.href, 'audio_player', 'width=420,height=640,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
+      </div>
 
-  <ul style="list-style:none; padding:0; margin:8px 0;">
-    {% for item in items %}
-    <li style="padding:4px 0;">
-      <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item.file_name }}</a>{% if item.artist %} - {{ item.artist }}{% endif %}
-      <span>
-        <a href="{{ url_for('audio.edit_audio_route', item_id=item.id, proj=project) }}">Edit</a> |
-        <a href="{{ url_for('audio.delete_audio_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
-      </span>
-    </li>
-    {% endfor %}
-  </ul>
-  {% include "widgets/wid_pagination.html" %}
+      <form class="audio-list-form" method="post" action="{{ url_for('audio.add_playlist_items_route', proj=project) }}">
+        <div class="audio-list-actions">
+          <label>
+            Add selected to
+            <select name="playlist_id">
+              {% for pl in playlists %}
+              <option value="{{ pl.playlist_id }}" {% if pl.is_default %}selected{% endif %}>{{ pl.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit">Add</button>
+        </div>
+
+        <ul class="audio-list">
+          {% for item in items %}
+          <li class="audio-list-item">
+            <input type="checkbox" name="item_id" value="{{ item.id }}">
+            <div class="audio-list-info">
+              <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item.file_name }}</a>{% if item.artist %} - {{ item.artist }}{% endif %}
+            </div>
+            <div class="audio-list-item-actions">
+              <a href="{{ url_for('audio.edit_audio_route', item_id=item.id, proj=project) }}">Edit</a> |
+              <a href="{{ url_for('audio.delete_audio_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </form>
+      {% include "widgets/wid_pagination.html" %}
+    </div>
+
+    <aside class="audio-playlists-panel">
+      <div class="audio-playlists-header">Playlists</div>
+      <ul class="audio-playlists-list">
+        {% for pl in playlists %}
+        <li class="audio-playlists-item">
+          <a href="{{ url_for('audio.view_playlist_route', playlist_id=pl.playlist_id, proj=project) }}">{{ pl.name }}</a>
+          <span class="audio-playlists-count">{{ pl.track_count }} tracks</span>
+        </li>
+        {% endfor %}
+      </ul>
+      <form class="audio-playlists-create" method="post" action="{{ url_for('audio.create_playlist_route', proj=project) }}">
+        <input type="text" name="playlist_name" placeholder="New playlist">
+        <button type="submit">Create</button>
+      </form>
+    </aside>
+  </div>
 {% endblock %}

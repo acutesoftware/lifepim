@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="audio-playlist-toolbar">
+    <div>
+      <a href="{{ url_for('audio.list_audio_list_route', proj=project) }}">Back to Audio</a> |
+      <a href="{{ player_url }}" onclick="window.open(this.href, 'audio_player', 'width=420,height=640,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
+    </div>
+    <form method="post" action="{{ url_for('audio.delete_playlist_route', playlist_id=playlist.playlist_id, proj=project) }}">
+      <button type="submit" onclick="return confirm('Delete this playlist?');">Delete playlist</button>
+    </form>
+  </div>
+
+  <div class="audio-playlist-meta">
+    <span>{{ playlist.name }}</span>
+    <span>{{ items|length }} tracks</span>
+  </div>
+
+  <ul class="audio-playlist-items">
+    {% for item in items %}
+    <li class="audio-playlist-item">
+      <div class="audio-playlist-row">
+        <div class="audio-playlist-title">
+          <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item.song or item.file_name }}</a>
+          {% if item.artist %} - {{ item.artist }}{% endif %}
+          {% if item.album %} ({{ item.album }}){% endif %}
+        </div>
+        <form method="post" action="{{ url_for('audio.remove_playlist_item_route', playlist_id=playlist.playlist_id, audio_id=item.id, proj=project) }}">
+          <button type="submit" onclick="return confirm('Remove this track from the playlist?');">Delete</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+{% endblock %}

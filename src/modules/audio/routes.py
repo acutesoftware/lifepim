@@ -1,5 +1,7 @@
 import mimetypes
 import os
+import sqlite3
+from datetime import datetime, timezone
 
 from flask import Blueprint, render_template, request, url_for, send_file, abort, redirect
 
@@ -15,6 +17,181 @@ audio_bp = Blueprint(
     template_folder="templates",
     static_folder="static",
 )
+
+
+AUDIO_PLAYLIST_SCHEMA = """
+CREATE TABLE IF NOT EXISTS lp_audio_playlists (
+    playlist_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    created_utc TEXT NOT NULL,
+    updated_utc TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_audio_playlists_name
+ON lp_audio_playlists (name);
+
+CREATE TABLE IF NOT EXISTS lp_audio_playlist_items (
+    playlist_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    playlist_id INTEGER NOT NULL,
+    audio_id INTEGER NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    added_utc TEXT NOT NULL,
+    UNIQUE (playlist_id, audio_id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_audio_playlist_items_playlist
+ON lp_audio_playlist_items (playlist_id, sort_order);
+
+CREATE INDEX IF NOT EXISTS ix_audio_playlist_items_audio
+ON lp_audio_playlist_items (audio_id);
+"""
+
+DEFAULT_PLAYLIST_NAME = "Recent 50"
+
+
+def _utc_now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _ensure_playlist_schema(conn=None):
+    conn = db._get_conn() if conn is None else conn
+    conn.executescript(AUDIO_PLAYLIST_SCHEMA)
+    conn.commit()
+    return conn
+
+
+def _get_playlist(conn, playlist_id):
+    if not playlist_id:
+        return None
+    row = conn.execute(
+        "SELECT playlist_id, name, description, is_default "
+        "FROM lp_audio_playlists WHERE playlist_id = ?",
+        (playlist_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _list_playlists(conn):
+    rows = conn.execute(
+        "SELECT p.playlist_id, p.name, p.description, p.is_default, "
+        "  (SELECT COUNT(1) FROM lp_audio_playlist_items i WHERE i.playlist_id = p.playlist_id) AS track_count "
+        "FROM lp_audio_playlists p "
+        "ORDER BY p.is_default DESC, p.name"
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _seed_default_playlist(conn, playlist_id):
+    if not playlist_id:
+        return
+    row = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_audio_playlist_items WHERE playlist_id = ?",
+        (playlist_id,),
+    ).fetchone()
+    if row and row["cnt"]:
+        return
+    tbl = _get_tbl()
+    if not tbl:
+        return
+    audio_exts = [
+        "mp3",
+        "wav",
+        "flac",
+        "aac",
+        "m4a",
+        "m4b",
+        "ogg",
+        "opus",
+        "wma",
+        "aiff",
+        "aif",
+        "alac",
+    ]
+    file_name_clause = " OR ".join(["lower(file_name) LIKE ?" for _ in audio_exts])
+    file_type_clause = " OR ".join(["lower(file_type) = ?" for _ in audio_exts])
+    if file_name_clause and file_type_clause:
+        where_clause = f"({file_name_clause} OR {file_type_clause})"
+    elif file_name_clause:
+        where_clause = f"({file_name_clause})"
+    else:
+        where_clause = "1=1"
+    params = [f"%.{ext}" for ext in audio_exts] + audio_exts
+    rows = conn.execute(
+        f"SELECT id FROM {tbl['name']} WHERE {where_clause} "
+        "ORDER BY COALESCE(NULLIF(date_modified, ''), rec_extract_date) DESC, id DESC "
+        "LIMIT 50",
+        params,
+    ).fetchall()
+    now = _utc_now()
+    sort_order = 1
+    for row in rows:
+        audio_id = row["id"] if isinstance(row, sqlite3.Row) else row[0]
+        conn.execute(
+            "INSERT OR IGNORE INTO lp_audio_playlist_items "
+            "(playlist_id, audio_id, sort_order, added_utc) VALUES (?, ?, ?, ?)",
+            (playlist_id, audio_id, sort_order, now),
+        )
+        sort_order += 1
+    conn.commit()
+
+
+def _ensure_default_playlist(conn):
+    row = conn.execute(
+        "SELECT playlist_id, name, description, is_default "
+        "FROM lp_audio_playlists WHERE is_default = 1 ORDER BY playlist_id LIMIT 1"
+    ).fetchone()
+    if not row:
+        now = _utc_now()
+        try:
+            conn.execute(
+                "INSERT INTO lp_audio_playlists "
+                "(name, description, is_default, created_utc, updated_utc) "
+                "VALUES (?, ?, 1, ?, ?)",
+                (DEFAULT_PLAYLIST_NAME, "Auto playlist (50 most recent songs)", now, now),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            pass
+        row = conn.execute(
+            "SELECT playlist_id, name, description, is_default "
+            "FROM lp_audio_playlists WHERE name = ? ORDER BY playlist_id LIMIT 1",
+            (DEFAULT_PLAYLIST_NAME,),
+        ).fetchone()
+        if row and not row["is_default"]:
+            conn.execute(
+                "UPDATE lp_audio_playlists SET is_default = 1, updated_utc = ? WHERE playlist_id = ?",
+                (now, row["playlist_id"]),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT playlist_id, name, description, is_default "
+                "FROM lp_audio_playlists WHERE playlist_id = ?",
+                (row["playlist_id"],),
+            ).fetchone()
+    playlist = dict(row) if row else None
+    if playlist:
+        _seed_default_playlist(conn, playlist["playlist_id"])
+    return playlist
+
+
+def _fetch_playlist_items(conn, playlist_id):
+    tbl = _get_tbl()
+    if not tbl or not playlist_id:
+        return []
+    cols = ["id"] + tbl["col_list"]
+    select_cols = ", ".join([f"a.{col}" for col in cols])
+    rows = conn.execute(
+        "SELECT "
+        f"{select_cols}, i.sort_order, i.added_utc "
+        "FROM lp_audio_playlist_items i "
+        f"JOIN {tbl['name']} a ON a.id = i.audio_id "
+        "WHERE i.playlist_id = ? "
+        "ORDER BY i.sort_order, i.playlist_item_id",
+        (playlist_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def _get_tbl():
@@ -126,6 +303,9 @@ def list_audio_list_route():
         page,
         total_pages,
     )
+    conn = _ensure_playlist_schema()
+    _ensure_default_playlist(conn)
+    playlists = _list_playlists(conn)
     return render_template(
         "audio_list_list.html",
         active_tab="audio",
@@ -135,6 +315,7 @@ def list_audio_list_route():
         content_html="",
         items=items,
         project=project,
+        playlists=playlists,
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
@@ -152,7 +333,18 @@ def audio_player_route():
     sort_dir = request.args.get("dir") or "asc"
     limit = request.args.get("limit", type=int) or 200
     start_id = request.args.get("id", type=int)
-    items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
+    playlist_id = request.args.get("playlist_id", type=int)
+    playlist_name = None
+    if playlist_id:
+        conn = _ensure_playlist_schema()
+        playlist = _get_playlist(conn, playlist_id)
+        if playlist:
+            playlist_name = playlist.get("name")
+            items = _fetch_playlist_items(conn, playlist_id)
+        else:
+            items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
+    else:
+        items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
     tracks = []
     for item in items:
         audio_url = url_for("audio.audio_file_route", item_id=item.get("id"))
@@ -174,8 +366,112 @@ def audio_player_route():
         sort_col=sort_col,
         sort_dir=sort_dir,
         limit=limit,
+        playlist_name=playlist_name,
         show_freq_bar=(getattr(cfg, "AUDIO_SHOW_FREQ_BAR", "Y") or "Y").upper() == "Y",
     )
+
+
+@audio_bp.route("/playlists/create", methods=["POST"])
+def create_playlist_route():
+    project = request.args.get("proj")
+    name = (request.form.get("playlist_name") or "").strip()
+    if not name:
+        return redirect(url_for("audio.list_audio_list_route", proj=project))
+    conn = _ensure_playlist_schema()
+    now = _utc_now()
+    try:
+        conn.execute(
+            "INSERT INTO lp_audio_playlists "
+            "(name, description, is_default, created_utc, updated_utc) "
+            "VALUES (?, '', 0, ?, ?)",
+            (name, now, now),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass
+    return redirect(url_for("audio.list_audio_list_route", proj=project))
+
+
+@audio_bp.route("/playlists/add", methods=["POST"])
+def add_playlist_items_route():
+    project = request.args.get("proj")
+    playlist_id = request.form.get("playlist_id", type=int)
+    item_ids = []
+    for val in request.form.getlist("item_id"):
+        if not val:
+            continue
+        try:
+            item_ids.append(int(val))
+        except (TypeError, ValueError):
+            continue
+    if not playlist_id or not item_ids:
+        return redirect(url_for("audio.list_audio_list_route", proj=project))
+    conn = _ensure_playlist_schema()
+    playlist = _get_playlist(conn, playlist_id)
+    if not playlist:
+        return redirect(url_for("audio.list_audio_list_route", proj=project))
+    row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) AS max_sort "
+        "FROM lp_audio_playlist_items WHERE playlist_id = ?",
+        (playlist_id,),
+    ).fetchone()
+    sort_order = (row["max_sort"] if row else 0) + 1
+    now = _utc_now()
+    for item_id in item_ids:
+        conn.execute(
+            "INSERT OR IGNORE INTO lp_audio_playlist_items "
+            "(playlist_id, audio_id, sort_order, added_utc) VALUES (?, ?, ?, ?)",
+            (playlist_id, item_id, sort_order, now),
+        )
+        sort_order += 1
+    conn.commit()
+    return redirect(url_for("audio.list_audio_list_route", proj=project))
+
+
+@audio_bp.route("/playlists/<int:playlist_id>")
+def view_playlist_route(playlist_id):
+    project = request.args.get("proj")
+    conn = _ensure_playlist_schema()
+    _ensure_default_playlist(conn)
+    playlist = _get_playlist(conn, playlist_id)
+    if not playlist:
+        return redirect(url_for("audio.list_audio_list_route", proj=project))
+    items = _fetch_playlist_items(conn, playlist_id)
+    player_url = url_for("audio.audio_player_route", playlist_id=playlist_id)
+    return render_template(
+        "audio_playlist_view.html",
+        active_tab="audio",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Playlist: {playlist.get('name')}",
+        content_html="",
+        playlist=playlist,
+        items=items,
+        project=project,
+        player_url=player_url,
+    )
+
+
+@audio_bp.route("/playlists/<int:playlist_id>/delete", methods=["POST"])
+def delete_playlist_route(playlist_id):
+    project = request.args.get("proj")
+    conn = _ensure_playlist_schema()
+    conn.execute("DELETE FROM lp_audio_playlist_items WHERE playlist_id = ?", (playlist_id,))
+    conn.execute("DELETE FROM lp_audio_playlists WHERE playlist_id = ?", (playlist_id,))
+    conn.commit()
+    return redirect(url_for("audio.list_audio_list_route", proj=project))
+
+
+@audio_bp.route("/playlists/<int:playlist_id>/remove/<int:audio_id>", methods=["POST"])
+def remove_playlist_item_route(playlist_id, audio_id):
+    project = request.args.get("proj")
+    conn = _ensure_playlist_schema()
+    conn.execute(
+        "DELETE FROM lp_audio_playlist_items WHERE playlist_id = ? AND audio_id = ?",
+        (playlist_id, audio_id),
+    )
+    conn.commit()
+    return redirect(url_for("audio.view_playlist_route", playlist_id=playlist_id, proj=project))
 
 
 @audio_bp.route("/import", methods=["GET", "POST"])
