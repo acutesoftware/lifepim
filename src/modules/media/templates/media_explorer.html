@@ -292,6 +292,18 @@
             </div>
           {% endif %}
 
+          {% if view == 'timeline' and timeline_years %}
+            <div class="media-timeline-index">
+              <span class="media-timeline-label">Jump</span>
+              <a class="media-year-chip {% if not timeline_year %}active{% endif %}" href="{{ media_url(nav_query, 'view=timeline') }}">All</a>
+              {% for yr in timeline_years %}
+                <a class="media-year-chip {% if timeline_year and timeline_year|string == yr.yr %}active{% endif %}" href="{{ media_url(nav_query, 'view=timeline&year=' ~ yr.yr) }}">
+                  {{ yr.yr }}
+                </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+
           <form class="media-actions-form" method="post" action="{{ url_for('media.media_actions_route') }}">
             {% for key, value in base_args.items() %}
               <input type="hidden" name="{{ key }}" value="{{ value }}">

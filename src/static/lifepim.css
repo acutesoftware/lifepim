@@ -2250,6 +2250,39 @@ body.links-resizing {
   padding: 2px 4px;
 }
 
+.media-timeline-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #f8f8f8;
+  font-size: 11px;
+}
+
+.media-timeline-label {
+  font-weight: bold;
+  color: #444;
+  margin-right: 4px;
+}
+
+.media-year-chip {
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid #c5c5c5;
+  text-decoration: none;
+  color: #333;
+  font-size: 10px;
+}
+
+.media-year-chip.active {
+  background: #dde7ff;
+  border-color: #9fb4ff;
+  font-weight: bold;
+}
+
 @media (max-width: 1000px) {
   .media-body {
     grid-template-columns: 180px minmax(0, 1fr);

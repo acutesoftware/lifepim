@@ -156,6 +156,7 @@ def _build_media_filters(
     media_type,
     base_terms,
     extra_terms,
+    year_filter,
 ):
     joins = []
     where = ["1=1"]
@@ -169,6 +170,9 @@ def _build_media_filters(
     if media_type:
         where.append("m.media_type = ?")
         params.append(media_type)
+    if year_filter:
+        where.append("substr(COALESCE(meta.taken_utc, m.mtime_utc), 1, 4) = ?")
+        params.append(str(year_filter))
     _build_search_conditions(base_terms, where, params)
     _build_search_conditions(extra_terms, where, params)
     return joins, where, params
@@ -248,6 +252,27 @@ def _count_media(conn, joins, where, params):
     )
     row = conn.execute(sql, params).fetchone()
     return row["cnt"] if row else 0
+
+
+def _fetch_timeline_years(conn, joins, where, params):
+    sql = (
+        "SELECT substr(COALESCE(meta.taken_utc, m.mtime_utc), 1, 4) AS yr, "
+        "COUNT(1) AS cnt "
+        "FROM lp_media m "
+        "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
+        + (" ".join(joins) + " " if joins else "")
+        + "WHERE "
+        + " AND ".join(where)
+        + " GROUP BY yr "
+        " ORDER BY yr DESC"
+    )
+    rows = conn.execute(sql, params).fetchall()
+    results = []
+    for row in rows:
+        item = dict(row)
+        if item.get("yr"):
+            results.append(item)
+    return results
 
 
 def _group_media(items, group_by):
@@ -542,6 +567,7 @@ def media_explorer_route():
     raw_sort = request.args.get("sort")
     sort_key = _normalize_sort(raw_sort)
     group_by = _normalize_group(request.args.get("group"))
+    year_filter = request.args.get("year", type=int)
     raw_media_type = (request.args.get("media_type") or "").strip().lower()
     media_type = raw_media_type
     q = (request.args.get("q") or "").strip()
@@ -585,6 +611,7 @@ def media_explorer_route():
         media_type,
         base_terms,
         extra_terms,
+        year_filter,
     )
 
     focus_id = request.args.get("focus_id", type=int)
@@ -593,6 +620,7 @@ def media_explorer_route():
         "view_mode": view_mode,
         "sort": sort_key,
         "group": group_by,
+        "year": year_filter or None,
         "media_type": media_type or None,
         "q": q or None,
         "search_everywhere": "1" if search_everywhere else None,
@@ -603,7 +631,7 @@ def media_explorer_route():
     }
     base_args_clean = {k: v for k, v in base_args.items() if v not in (None, "", False)}
     nav_args = dict(base_args_clean)
-    for key in ("view", "album_id", "event_id", "smart_view_id", "focus_id"):
+    for key in ("view", "year", "album_id", "event_id", "smart_view_id", "focus_id"):
         nav_args.pop(key, None)
     focus_args = dict(base_args_clean)
     focus_args.pop("focus_id", None)
@@ -619,6 +647,20 @@ def media_explorer_route():
 
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
+    timeline_years = []
+    if view == "timeline":
+        year_joins, year_where, year_params = _build_media_filters(
+            scope,
+            album_id,
+            event_id,
+            search_everywhere,
+            media_type,
+            base_terms,
+            extra_terms,
+            None,
+        )
+        timeline_years = _fetch_timeline_years(conn, year_joins, year_where, year_params)
+
     if skip_results:
         items = []
         groups = []
@@ -689,6 +731,8 @@ def media_explorer_route():
         focus_tags=focus_tags,
         focus_albums=focus_albums,
         focus_events=focus_events,
+        timeline_years=timeline_years,
+        timeline_year=year_filter,
         page=page,
         total_pages=total_pages,
         pages=pages,
@@ -849,7 +893,7 @@ def media_player_route():
     conn = db._get_conn()
     sort_key = _normalize_sort(request.args.get("sort"))
     limit = request.args.get("limit", type=int) or 200
-    joins, where, params = _build_media_filters("all", None, None, False, "", [], [])
+    joins, where, params = _build_media_filters("all", None, None, False, "", [], [], None)
     items = _fetch_media(conn, joins, where, params, sort_key, limit=limit, offset=0)
     playlist = []
     for item in items:
@@ -903,6 +947,7 @@ def _redirect_args(form):
         "view_mode",
         "sort",
         "group",
+        "year",
         "media_type",
         "q",
         "search_everywhere",
