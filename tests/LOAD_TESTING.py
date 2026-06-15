@@ -17,8 +17,8 @@ from common.media_schema import ensure_media_schema
 
 PROJECT_LOAD_TEST = "LoadTest"
 
-#test_type = 'FULL'
-test_type = 'Light'
+test_type = 'FULL'
+#test_type = 'Light'
 
 
 

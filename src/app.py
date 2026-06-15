@@ -188,9 +188,23 @@ def search_route():
     )
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    #app.run(debug=True)
+
+    app.run(
+        host=mod_cfg.base_url,
+        port=mod_cfg.port_num,
+        debug=False
+    )
+
 
 """
+
+
+port_num=9741           # port to browse to, eg. http://127.0.0.1:9741/
+WEB_VERSION = "DEV"     # to show debug lines in web server
+base_url = 'https://www.lifepim.com'    # testing, point to live site for API
+base_url = '127.0.0.1'             # running local (default)
+
 # Auto-register all modules as blueprints
 for _, modname, _ in pkgutil.iter_modules(['modules']):
     module = importlib.import_module(f'modules.{modname}.views')

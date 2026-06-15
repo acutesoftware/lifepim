@@ -309,7 +309,7 @@ current_index_list = [
 port_num=9741           # port to browse to, eg. http://127.0.0.1:9741/
 WEB_VERSION = "DEV"     # to show debug lines in web server
 base_url = 'https://www.lifepim.com'    # testing, point to live site for API
-base_url = '127.0.0.1:5000'             # running local (default)
+base_url = '127.0.0.1'             # running local (default)
 
 # ----------------------------------------------------------------------------
 # Calendar view configuration
