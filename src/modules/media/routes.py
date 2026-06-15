@@ -236,6 +236,18 @@ def _fetch_media(conn, joins, where, params, sort_key, limit=None, offset=None):
     return [dict(row) for row in rows]
 
 
+def _fetch_media_by_id(conn, media_id):
+    items = _fetch_media(
+        conn,
+        [],
+        ["m.media_id = ?"],
+        [media_id],
+        "taken_desc",
+        limit=1,
+    )
+    return items[0] if items else None
+
+
 def _count_media(conn, joins, where, params):
     sql = (
         "SELECT COUNT(1) AS cnt FROM lp_media m "
@@ -695,7 +707,9 @@ def media_explorer_route():
     if focus_id:
         focus_list = [item for item in items if item.get("media_id") == focus_id]
         focus_item = focus_list[0] if focus_list else None
-    if not focus_item and items:
+        if not focus_item:
+            focus_item = _fetch_media_by_id(conn, focus_id)
+    if not focus_id and not focus_item and items:
         focus_item = items[0]
     if focus_item:
         focus_tags = _fetch_tags_for_media(conn, focus_item["media_id"])
@@ -920,7 +934,31 @@ def media_player_route():
 
 @media_bp.route("/view/<int:media_id>")
 def view_media_route(media_id):
-    return redirect(url_for("media.media_explorer_route", focus_id=media_id, view="all"))
+    _ensure_schema()
+    conn = db._get_conn()
+    item = _fetch_media_by_id(conn, media_id)
+    if not item:
+        abort(404)
+
+    view_mode = (request.args.get("view") or "normal").strip().lower()
+    if view_mode not in {"normal", "full"}:
+        view_mode = "normal"
+
+    full_path = _build_media_path(item)
+    return render_template(
+        "media_view.html",
+        active_tab="media",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=item.get("filename") or "Media",
+        content_html="",
+        item=item,
+        media_url=url_for("media.media_file_route", media_id=media_id),
+        file_exists=os.path.exists(full_path),
+        is_video=_is_video(item),
+        view_mode=view_mode,
+        project=request.args.get("proj"),
+    )
 
 
 @media_bp.route("/file/<int:media_id>")

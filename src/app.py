@@ -1,4 +1,5 @@
 import sys
+import socket
 
 from datetime import date, datetime
 
@@ -13,6 +14,32 @@ from common import projects as projects_mod
 
 def _dbg(msg):
     print(f"[app] {msg}", file=sys.stderr, flush=True)
+
+
+def _connect_host_for_bind_host(host):
+    if host in ("", "0.0.0.0", "::"):
+        return "127.0.0.1"
+    return host
+
+
+def _is_port_in_use(host, port):
+    connect_host = _connect_host_for_bind_host(host)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1)
+        return sock.connect_ex((connect_host, int(port))) == 0
+
+
+def _exit_if_server_already_running(host, port):
+    if not _is_port_in_use(host, port):
+        return
+
+    print(
+        f"LifePIM server appears to already be running at http://{host}:{port}. "
+        "Exiting without starting another copy.",
+        file=sys.stderr,
+        flush=True,
+    )
+    sys.exit(0)
 
 
 _dbg("Creating Flask app")
@@ -189,6 +216,7 @@ def search_route():
 
 if __name__ == "__main__":
     #app.run(debug=True)
+    _exit_if_server_already_running(mod_cfg.base_url, mod_cfg.port_num)
 
     app.run(
         host=mod_cfg.base_url,
