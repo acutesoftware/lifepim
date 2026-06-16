@@ -1,5 +1,6 @@
 import os
 import re
+import tempfile
 from datetime import datetime, timezone
 
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
@@ -918,26 +919,20 @@ def edit_note_route(note_id):
             note_path = _build_note_path(note)
             if note_path and not os.path.isdir(note_path):
                 try:
-                    dir_name = os.path.dirname(note_path)
-                    if dir_name:
-                        os.makedirs(dir_name, exist_ok=True)
-                    with open(note_path, "w", encoding="utf-8") as handle:
-                        handle.write(content)
+                    _write_note_file_content(note_path, content)
                 except OSError:
                     pass
         return redirect(url_for("notes.edit_note_route", note_id=note_id))
     note_text = ""
+    note_state = None
     note_path = _build_note_path(note) if note else ""
     file_exists = bool(note_path and os.path.isfile(note_path))
     if file_exists:
         note_text = _read_note_file(note_path)
-        try:
-            note["size"] = str(os.path.getsize(note_path))
-            note["date_modified"] = datetime.fromtimestamp(
-                os.path.getmtime(note_path)
-            ).strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            pass
+        note_state = _note_file_state(note_path)
+        if note_state:
+            note["size"] = note_state["size"]
+            note["date_modified"] = note_state["date_modified"]
     return render_template(
         "note_edit.html",
         active_tab="notes",
@@ -947,6 +942,7 @@ def edit_note_route(note_id):
         note_text=note_text,
         file_exists=file_exists,
         note_path=note_path,
+        note_state=note_state,
         content_title=f"Edit: {note.get('file_name')}" if note else "Edit Note",
     )
 
@@ -962,22 +958,29 @@ def save_note_route(note_id):
     note_path = _build_note_path(note)
     if not note_path or os.path.isdir(note_path):
         return jsonify({"error": "Note path is invalid."}), 400
+    base_mtime_ns = payload.get("base_mtime_ns")
+    current_state = _note_file_state(note_path)
+    if base_mtime_ns not in (None, ""):
+        if not current_state or str(current_state.get("mtime_ns")) != str(base_mtime_ns):
+            return jsonify({
+                "error": "The note changed on disk after this editor loaded. Reload before saving to avoid overwriting another edit.",
+                "conflict": True,
+                "size": current_state.get("size") if current_state else "",
+                "date_modified": current_state.get("date_modified") if current_state else "",
+                "mtime_ns": current_state.get("mtime_ns") if current_state else "",
+            }), 409
     try:
-        dir_name = os.path.dirname(note_path)
-        if dir_name:
-            os.makedirs(dir_name, exist_ok=True)
-        with open(note_path, "w", encoding="utf-8") as handle:
-            handle.write(content)
+        saved_state = _write_note_file_content(note_path, content)
     except OSError as exc:
         return jsonify({"error": f"Unable to save note: {exc}"}), 500
-    try:
-        size = str(os.path.getsize(note_path))
-        date_modified = datetime.fromtimestamp(
-            os.path.getmtime(note_path)
-        ).strftime("%Y-%m-%d %H:%M:%S")
-    except Exception:
+    if saved_state:
+        size = saved_state["size"]
+        date_modified = saved_state["date_modified"]
+        mtime_ns = saved_state["mtime_ns"]
+    else:
         size = note.get("size") or ""
         date_modified = note.get("date_modified") or ""
+        mtime_ns = ""
 
     if tbl:
         values_map = {col: note.get(col, "") for col in tbl["col_list"]}
@@ -992,6 +995,7 @@ def save_note_route(note_id):
         "ok": True,
         "size": size,
         "date_modified": date_modified,
+        "mtime_ns": mtime_ns,
     })
 
 @notes_bp.route('/delete/<int:note_id>')
@@ -1157,6 +1161,47 @@ def _read_note_file(note_path):
             return handle.read()
     except OSError:
         return ""
+
+
+def _note_file_state(note_path):
+    try:
+        stat = os.stat(note_path)
+    except OSError:
+        return None
+    return {
+        "size": str(stat.st_size),
+        "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+        "mtime_ns": stat.st_mtime_ns,
+    }
+
+
+def _write_note_file_content(note_path, content):
+    dir_name = os.path.dirname(note_path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    temp_dir = dir_name or "."
+    base_name = os.path.basename(note_path) or "note"
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=temp_dir,
+            prefix=f".{base_name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = handle.name
+            handle.write(content)
+        os.replace(temp_path, note_path)
+        return _note_file_state(note_path)
+    except OSError:
+        if temp_path:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise
 
 
 def _parse_size(value):

@@ -14,11 +14,13 @@
   const sizeEl = qs("#note-meta-size");
   const modifiedEl = qs("#note-meta-modified");
   const saveUrl = editor.dataset.saveUrl || "";
+  const saveDelayMs = 1500;
 
   let saveTimer = null;
   let inflight = false;
   let pending = false;
   let lastSaved = editor.value;
+  let fileMtimeNs = editor.dataset.fileMtimeNs || "";
 
   function setStatus(text, isError) {
     if (!statusEl) {
@@ -40,7 +42,7 @@
         return;
       }
       void doSave();
-    }, 800);
+    }, saveDelayMs);
   }
 
   async function doSave() {
@@ -61,13 +63,17 @@
       const resp = await fetch(saveUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, base_mtime_ns: fileMtimeNs }),
       });
       const data = await resp.json();
       if (!resp.ok) {
         throw new Error(data.error || "Unable to save note.");
       }
       lastSaved = content;
+      if (data.mtime_ns !== undefined) {
+        fileMtimeNs = String(data.mtime_ns || "");
+        editor.dataset.fileMtimeNs = fileMtimeNs;
+      }
       if (sizeEl && data.size !== undefined) {
         sizeEl.textContent = data.size;
       }

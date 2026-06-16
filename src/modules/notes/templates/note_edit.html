@@ -21,8 +21,9 @@
         <div id="note-edit-status" style="margin:8px 0; font-size: 0.9em; color:#555;">Saved</div>
         <textarea id="note-editor"
                   data-save-url="{{ url_for('notes.save_note_route', note_id=note.id) }}"
+                  data-file-mtime-ns="{{ note_state.mtime_ns if note_state else '' }}"
                   style="width:100%; min-height:60vh; font-family:inherit;">{{ note_text }}</textarea>
-        <div style="margin-top:6px; font-size:0.85em; color:#777;">Autosaves as you type.</div>
+        <div style="margin-top:6px; font-size:0.85em; color:#777;">Autosaves after you pause typing.</div>
       {% endif %}
     </div>
     <script src="{{ url_for('static', filename='note_editor.js') }}"></script>

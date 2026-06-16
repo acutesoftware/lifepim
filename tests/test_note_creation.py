@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from datetime import datetime
 
+from flask import Flask
+
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
 if root_folder not in sys.path:
     sys.path.append(root_folder)
@@ -155,6 +157,30 @@ class TestNoteCreation(unittest.TestCase):
         unmapped_notes = notes_routes._fetch_notes("unmapped")
         unmapped_ids = {n.get("id") for n in unmapped_notes}
         self.assertIn(note_id, unmapped_ids)
+
+    def test_autosave_rejects_stale_note_file(self):
+        note_dir = os.path.join(self.tmpdir.name, "stale_save")
+        note_id, created = self._create_note_record("note_creation_test_stale", note_dir, project="")
+        full_path = created["full_path"]
+        loaded_state = notes_routes._note_file_state(full_path)
+        self.assertIsNotNone(loaded_state)
+
+        with open(full_path, "w", encoding="utf-8") as handle:
+            handle.write("changed elsewhere")
+        bumped_ns = int(loaded_state["mtime_ns"]) + 1_000_000_000
+        os.utime(full_path, ns=(bumped_ns, bumped_ns))
+
+        app = Flask(__name__)
+        app.register_blueprint(notes_routes.notes_bp)
+        resp = app.test_client().post(
+            f"/notes/api/save/{note_id}",
+            json={"content": "browser edit", "base_mtime_ns": loaded_state["mtime_ns"]},
+        )
+
+        self.assertEqual(resp.status_code, 409)
+        self.assertTrue(resp.get_json().get("conflict"))
+        with open(full_path, "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "changed elsewhere")
 
 
 if __name__ == "__main__":
