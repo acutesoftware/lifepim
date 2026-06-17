@@ -381,6 +381,55 @@ def _count_events(conn, year_filter=None):
     return row["cnt"] if row else 0
 
 
+def _event_media_join_sql():
+    return (
+        "FROM lp_events e "
+        "JOIN lp_event_items ei ON ei.event_id = e.event_id "
+        "JOIN lp_media m ON m.media_id = ei.media_id "
+        "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
+        "LEFT JOIN ("
+        "  SELECT mt.media_id, group_concat(t.tag, ' ') AS tags_text "
+        "  FROM lp_media_tags mt "
+        "  JOIN lp_tags t ON t.tag_id = mt.tag_id "
+        "  GROUP BY mt.media_id"
+        ") tags ON tags.media_id = m.media_id "
+    )
+
+
+def _list_events_for_media_filters(conn, where, params, limit=None, offset=None):
+    sql = (
+        "SELECT e.event_id, e.title, e.start_utc, e.end_utc, e.location_label, e.event_source, "
+        "COUNT(DISTINCT ei.media_id) AS item_count "
+        + _event_media_join_sql()
+        + "WHERE "
+        + " AND ".join(where)
+        + " GROUP BY e.event_id, e.title, e.start_utc, e.end_utc, e.location_label, e.event_source "
+        "ORDER BY e.start_utc DESC"
+    )
+    sql_params = list(params)
+    if limit is not None:
+        sql += " LIMIT ?"
+        sql_params.append(int(limit))
+        if offset:
+            sql += " OFFSET ?"
+            sql_params.append(int(offset))
+    rows = conn.execute(sql, sql_params).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _count_events_for_media_filters(conn, where, params):
+    sql = (
+        "SELECT COUNT(1) AS cnt FROM ("
+        "SELECT e.event_id "
+        + _event_media_join_sql()
+        + "WHERE "
+        + " AND ".join(where)
+        + " GROUP BY e.event_id)"
+    )
+    row = conn.execute(sql, list(params)).fetchone()
+    return row["cnt"] if row else 0
+
+
 def _fetch_event_years(conn):
     rows = conn.execute(
         "SELECT substr(start_utc, 1, 4) AS yr, COUNT(1) AS cnt "
@@ -390,6 +439,23 @@ def _fetch_event_years(conn):
         "ORDER BY yr DESC"
     ).fetchall()
     return [dict(row) for row in rows if row["yr"]]
+
+
+def _build_param_pagination(route_name, base_args, page, total_pages, page_param):
+    pages = []
+    for num in range(1, total_pages + 1):
+        args = dict(base_args)
+        args[page_param] = num
+        pages.append({"num": num, "url": url_for(route_name, **args), "current": num == page})
+    first_args = dict(base_args)
+    first_args[page_param] = 1
+    last_args = dict(base_args)
+    last_args[page_param] = total_pages
+    return {
+        "pages": pages,
+        "first_url": url_for(route_name, **first_args),
+        "last_url": url_for(route_name, **last_args),
+    }
 
 
 def _get_event(conn, event_id):
@@ -637,6 +703,7 @@ def media_explorer_route():
     album_id = request.args.get("album_id", type=int)
     event_id = request.args.get("event_id", type=int)
     smart_view_id = request.args.get("smart_view_id", type=int)
+    nav_event_page = request.args.get("nav_event_page", type=int) or 1
 
     albums = _list_albums(conn)
     smart_views = _list_smart_views(conn)
@@ -688,6 +755,7 @@ def media_explorer_route():
         "event_id": event_id if event_id else None,
         "smart_view_id": smart_view_id if smart_view_id else None,
         "focus_id": focus_id if focus_id else None,
+        "nav_event_page": nav_event_page if nav_event_page > 1 else None,
     }
     base_args_clean = {k: v for k, v in base_args.items() if v not in (None, "", False)}
     nav_args = dict(base_args_clean)
@@ -714,14 +782,61 @@ def media_explorer_route():
     event_last_url = ""
     event_total_pages = 1
     event_page = 1
-    nav_events = _list_events(conn, year_filter, limit=per_page) if year_filter else _list_events(conn)
+    nav_event_pages = []
+    nav_event_first_url = ""
+    nav_event_last_url = ""
+    nav_event_total_pages = 1
+    _, nav_event_where, nav_event_params = _build_media_filters(
+        "all",
+        None,
+        None,
+        search_everywhere,
+        media_type,
+        base_terms,
+        extra_terms,
+        year_filter,
+    )
+    nav_event_total = _count_events_for_media_filters(conn, nav_event_where, nav_event_params)
+    nav_event_page_data = paginate_total(nav_event_total, nav_event_page, per_page)
+    nav_event_page = nav_event_page_data["page"]
+    nav_event_total_pages = nav_event_page_data["total_pages"]
+    if nav_event_page > 1:
+        base_args_clean["nav_event_page"] = nav_event_page
+    else:
+        base_args_clean.pop("nav_event_page", None)
+    nav_event_offset = (nav_event_page - 1) * per_page
+    nav_events = _list_events_for_media_filters(
+        conn,
+        nav_event_where,
+        nav_event_params,
+        limit=per_page,
+        offset=nav_event_offset,
+    )
+    nav_event_base_args = dict(base_args_clean)
+    nav_event_base_args.pop("nav_event_page", None)
+    nav_event_pagination = _build_param_pagination(
+        "media.media_explorer_route",
+        nav_event_base_args,
+        nav_event_page,
+        nav_event_total_pages,
+        "nav_event_page",
+    )
+    nav_event_pages = nav_event_pagination["pages"]
+    nav_event_first_url = nav_event_pagination["first_url"]
+    nav_event_last_url = nav_event_pagination["last_url"]
     if view == "events" and not event:
-        event_total = _count_events(conn, year_filter)
+        event_total = _count_events_for_media_filters(conn, nav_event_where, nav_event_params)
         event_page_data = paginate_total(event_total, page, per_page)
         event_page = event_page_data["page"]
         event_total_pages = event_page_data["total_pages"]
         event_offset = (event_page - 1) * per_page
-        events = _list_events(conn, year_filter, limit=per_page, offset=event_offset)
+        events = _list_events_for_media_filters(
+            conn,
+            nav_event_where,
+            nav_event_params,
+            limit=per_page,
+            offset=event_offset,
+        )
         event_pagination = build_pagination(
             url_for,
             "media.media_explorer_route",
@@ -733,7 +848,7 @@ def media_explorer_route():
         event_first_url = event_pagination["first_url"]
         event_last_url = event_pagination["last_url"]
     else:
-        events = _list_events(conn)
+        events = nav_events
     if view == "timeline":
         year_joins, year_where, year_params = _build_media_filters(
             scope,
@@ -834,6 +949,11 @@ def media_explorer_route():
         event_pages=event_pages,
         event_first_url=event_first_url,
         event_last_url=event_last_url,
+        nav_event_page=nav_event_page,
+        nav_event_total_pages=nav_event_total_pages,
+        nav_event_pages=nav_event_pages,
+        nav_event_first_url=nav_event_first_url,
+        nav_event_last_url=nav_event_last_url,
         base_args=base_args_clean,
         nav_args=nav_args,
         base_query=base_query,

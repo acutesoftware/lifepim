@@ -181,6 +181,14 @@
               <li class="media-empty">No events{% if timeline_year %} in {{ timeline_year }}{% endif %}</li>
             {% endif %}
           </ul>
+          {% set page = nav_event_page %}
+          {% set total_pages = nav_event_total_pages %}
+          {% set pages = nav_event_pages %}
+          {% set first_url = nav_event_first_url %}
+          {% set last_url = nav_event_last_url %}
+          <div class="media-nav-pagination">
+            {% include "widgets/wid_pagination.html" %}
+          </div>
           <form class="media-nav-inline" method="post" action="{{ url_for('media.rebuild_events_route') }}">
             <input type="hidden" name="gap_hours" value="2">
             <input type="hidden" name="split_on_day" value="1">
