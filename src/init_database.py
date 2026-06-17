@@ -7,6 +7,7 @@ import etl_folder_mapping as folder_etl
 import common.config as cfg
 from common import projects as projects_mod
 from common.media_schema import ensure_media_schema
+from common.settings import ensure_settings_schema
 from lifepim.importer.schema import ensure_import_schema
 def main():
     reset_database(cfg.DB_FILE)
@@ -39,6 +40,7 @@ def reset_database(db_file):
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))
     ensure_media_schema(db_conn)
     ensure_import_schema(db_conn)
+    ensure_settings_schema(db_conn)
     db_conn.commit()
     db_conn.close()
 

@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% set settings_tabs = [
+    ('calendar', 'Calendar'),
+    ('media', 'Media'),
+    ('files', 'Files'),
+    ('general', 'General')
+  ] %}
+
+  {% if message %}
+    <div class="settings-message">{{ message }}</div>
+  {% endif %}
+
+  <div class="settings-shell">
+    <nav class="settings-tabs" aria-label="Settings sections">
+      {% for tab_id, tab_label in settings_tabs %}
+        <a class="{% if active_settings_tab == tab_id %}active{% endif %}" href="{{ url_for('admin.settings_route', tab=tab_id) }}">
+          {{ tab_label }}
+        </a>
+      {% endfor %}
+    </nav>
+
+    <section class="settings-panel">
+      {% if active_settings_tab == 'calendar' %}
+        <h4>Calendar</h4>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="calendar">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Default View Sources</div>
+            <label>
+              <input type="checkbox" name="show_events" value="1" {% if calendar_view.events %}checked{% endif %}>
+              Events
+            </label>
+            <label>
+              <input type="checkbox" name="show_files" value="1" {% if calendar_view.files %}checked{% endif %}>
+              Files and images
+            </label>
+            <label>
+              <input type="checkbox" name="show_usage" value="1" {% if calendar_view.usage %}checked{% endif %}>
+              Usage
+            </label>
+          </div>
+          <button type="submit">Save settings</button>
+        </form>
+      {% elif active_settings_tab == 'media' %}
+        <h4>Media</h4>
+        <p class="settings-empty">No Media settings yet.</p>
+      {% elif active_settings_tab == 'files' %}
+        <h4>Files</h4>
+        <p class="settings-empty">No Files settings yet.</p>
+      {% else %}
+        <h4>General</h4>
+        <table class="settings-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Value</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for setting in all_settings %}
+            <tr>
+              <td>{{ setting.setting_key }}</td>
+              <td>{{ setting.setting_value }}</td>
+              <td>{{ setting.updated_utc }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

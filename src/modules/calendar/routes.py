@@ -1,9 +1,11 @@
 import calendar as cal
+import os
 from datetime import date, datetime, timedelta
 
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data
+from common import settings as settings_mod
 from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination
 import common.config as cfg
 from utils import importer
@@ -78,6 +80,149 @@ def _fetch_events(project=None, start_date=None, end_date=None):
     return [_event_from_row(row) for row in rows]
 
 
+def _table_columns(conn, table_name):
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    except Exception:
+        return set()
+    columns = set()
+    for row in rows:
+        try:
+            columns.add(row["name"])
+        except (KeyError, TypeError):
+            columns.add(row[1])
+    return columns
+
+
+def _parse_day_sources(args):
+    defaults = settings_mod.get_calendar_view_settings(data.conn)
+
+    def checked(name, default=False):
+        values = args.getlist(name) if hasattr(args, "getlist") else []
+        value = values[-1] if values else args.get(name)
+        if value is None:
+            return default
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    sources = {
+        "events": checked("show_events", defaults["events"]),
+        "files": checked("show_files", defaults["files"]),
+        "usage": checked("show_usage", defaults["usage"]),
+    }
+    if any(key in args for key in ("show_events", "show_files", "show_usage")):
+        settings_mod.save_calendar_view_settings(sources, data.conn)
+    params = {
+        "show_events": "1" if sources["events"] else "0",
+        "show_files": "1" if sources["files"] else "0",
+        "show_usage": "1" if sources["usage"] else "0",
+    }
+    return sources, params
+
+
+def _source_hidden_fields(**values):
+    return [{"name": key, "value": value} for key, value in values.items() if value not in (None, "")]
+
+
+def _fetch_image_media(conn, start_day, end_day):
+    cols = _table_columns(conn, "lp_media")
+    if not {"media_id", "path", "filename", "media_type", "mtime_utc"}.issubset(cols):
+        return []
+    start_str = start_day.strftime("%Y-%m-%d")
+    end_str = end_day.strftime("%Y-%m-%d")
+    meta_cols = _table_columns(conn, "lp_media_meta")
+    if {"media_id", "taken_utc"}.issubset(meta_cols):
+        rows = conn.execute(
+            "SELECT m.media_id, m.path, m.filename, m.ext, m.media_type, "
+            "m.size_bytes, m.mtime_utc, meta.taken_utc, "
+            "COALESCE(meta.taken_utc, m.mtime_utc) AS display_date "
+            "FROM lp_media m "
+            "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
+            "WHERE m.media_type = 'image' "
+            "AND substr(COALESCE(meta.taken_utc, m.mtime_utc), 1, 10) >= ? "
+            "AND substr(COALESCE(meta.taken_utc, m.mtime_utc), 1, 10) < ? "
+            "ORDER BY display_date, lower(m.filename)",
+            (start_str, end_str),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT media_id, path, filename, ext, media_type, size_bytes, "
+            "mtime_utc, NULL AS taken_utc, mtime_utc AS display_date "
+            "FROM lp_media "
+            "WHERE media_type = 'image' "
+            "AND substr(mtime_utc, 1, 10) >= ? "
+            "AND substr(mtime_utc, 1, 10) < ? "
+            "ORDER BY display_date, lower(filename)",
+            (start_str, end_str),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _fetch_day_media(conn, day):
+    return _fetch_image_media(conn, day, day + timedelta(days=1))
+
+
+def _group_media_by_date(items):
+    grouped = {}
+    for item in items:
+        display_date = (item.get("display_date") or item.get("mtime_utc") or "")[:10]
+        try:
+            day = datetime.strptime(display_date, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+        grouped.setdefault(day, []).append(item)
+    return grouped
+
+
+def _group_media_by_month_day(items):
+    grouped = {}
+    for item in items:
+        display_date = (item.get("display_date") or item.get("mtime_utc") or "")[:10]
+        try:
+            parsed = datetime.strptime(display_date, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+        grouped.setdefault(parsed.month, set()).add(parsed.day)
+    return grouped
+
+
+def _fetch_day_files(conn, day):
+    cols = _table_columns(conn, "lp_files")
+    if not {"path", "mtime_utc"}.issubset(cols):
+        return []
+    select_cols = ["id" if "id" in cols else "rowid AS id", "path", "mtime_utc"]
+    if "filelist_name" in cols:
+        select_cols.append("filelist_name")
+    if "file_type" in cols:
+        select_cols.append("file_type")
+    if "size" in cols:
+        select_cols.append("size")
+    day_str = day.strftime("%Y-%m-%d")
+    where = ["substr(mtime_utc, 1, 10) = ?"]
+    if "is_deleted" in cols:
+        where.append("COALESCE(is_deleted, 0) = 0")
+    rows = conn.execute(
+        "SELECT "
+        + ", ".join(select_cols)
+        + " FROM lp_files "
+        + "WHERE "
+        + " AND ".join(where)
+        + " ORDER BY mtime_utc, lower(path)",
+        (day_str,),
+    ).fetchall()
+    files = []
+    media_exts = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".mp4", ".mov", ".avi", ".mkv", ".webm"}
+    for row in rows:
+        item = dict(row)
+        path = item.get("path") or ""
+        ext = os.path.splitext(path)[1].lower()
+        file_type = (item.get("file_type") or "").strip().lower()
+        if ext in media_exts or file_type in {"image", "images", "media", "photo", "video"}:
+            continue
+        item["filename"] = item.get("filelist_name") or os.path.basename(path) or path
+        files.append(item)
+    return files
+
+
 def _parse_time_to_minutes(time_str):
     if not time_str:
         return None
@@ -129,6 +274,7 @@ def month_view_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    day_sources, day_source_params = _parse_day_sources(request.args)
 
     first_day = date(year, month, 1)
     next_month = month + 1
@@ -137,7 +283,7 @@ def month_view_route():
         next_month = 1
         next_year += 1
     end_day = date(next_year, next_month, 1)
-    events = _fetch_events(project=project, start_date=first_day, end_date=end_day)
+    events = _fetch_events(project=project, start_date=first_day, end_date=end_day) if day_sources["events"] else []
     events_by_day = {}
     for event in events:
         try:
@@ -145,6 +291,11 @@ def month_view_route():
         except (IndexError, ValueError, AttributeError):
             continue
         events_by_day.setdefault(day, []).append(event)
+    month_media = _fetch_image_media(data.conn, first_day, end_day) if day_sources["files"] else []
+    media_by_date = _group_media_by_date(month_media)
+    media_by_day = {}
+    for media_day, items in media_by_date.items():
+        media_by_day[media_day.day] = items
 
     month_weeks = cal.monthcalendar(year, month)
     prev_year, prev_month, next_year, next_month = _month_nav(year, month)
@@ -162,13 +313,19 @@ def month_view_route():
         year=year,
         month_name=cal.month_name[month],
         events_by_day=events_by_day,
-        days_with_events=set(events_by_day.keys()),
+        media_by_day=media_by_day,
+        days_with_events=set(events_by_day.keys()) | set(media_by_day.keys()),
+        days_with_images=set(media_by_day.keys()),
         today=date.today(),
         prev_year=prev_year,
         prev_month=prev_month,
         next_year=next_year,
         next_month=next_month,
         project=project,
+        day_sources=day_sources,
+        day_source_params=day_source_params,
+        source_action_url=url_for("calendar.month_view_route"),
+        source_hidden_fields=_source_hidden_fields(year=year, month=month, proj=project),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
         col_bg_day=cfg.CAL_COL_BG_DAY,
@@ -184,10 +341,11 @@ def week_view_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    day_sources, day_source_params = _parse_day_sources(request.args)
     anchor = _parse_date_param(date_param) or today
     week_start = anchor - timedelta(days=anchor.weekday())
     week_end = week_start + timedelta(days=7)
-    events = _fetch_events(project=project, start_date=week_start, end_date=week_end)
+    events = _fetch_events(project=project, start_date=week_start, end_date=week_end) if day_sources["events"] else []
     events_by_day = {}
     for event in events:
         try:
@@ -196,6 +354,7 @@ def week_view_route():
             continue
         events_by_day.setdefault(day, []).append(event)
     week_days = [week_start + timedelta(days=offset) for offset in range(7)]
+    media_by_day = _group_media_by_date(_fetch_image_media(data.conn, week_start, week_end)) if day_sources["files"] else {}
     prev_week = week_start - timedelta(days=7)
     next_week = week_start + timedelta(days=7)
     timeslots = _build_timeslots()
@@ -225,9 +384,14 @@ def week_view_route():
         timeslots=timeslots,
         timed_events=timed_events,
         all_day_events=all_day_events,
+        media_by_day=media_by_day,
         prev_week=prev_week,
         next_week=next_week,
         project=project,
+        day_sources=day_sources,
+        day_source_params=day_source_params,
+        source_action_url=url_for("calendar.week_view_route"),
+        source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
         today=date.today(),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
@@ -248,10 +412,14 @@ def day_view_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    day_sources, day_source_params = _parse_day_sources(request.args)
     anchor = _parse_date_param(date_param) or today
     next_day = anchor + timedelta(days=1)
-    events = _fetch_events(project=project, start_date=anchor, end_date=next_day)
+    events = _fetch_events(project=project, start_date=anchor, end_date=next_day) if day_sources["events"] else []
     events = sorted(events, key=lambda e: (e.get("time", ""), e.get("title", "")))
+    day_files = _fetch_day_files(data.conn, anchor) if day_sources["files"] else []
+    day_media = _fetch_day_media(data.conn, anchor) if day_sources["files"] else []
+    usage_items = []
     month_weeks = cal.monthcalendar(anchor.year, anchor.month)
     month_start = date(anchor.year, anchor.month, 1)
     next_month = anchor.month + 1
@@ -260,7 +428,7 @@ def day_view_route():
         next_month = 1
         next_year += 1
     month_end = date(next_year, next_month, 1)
-    month_events = _fetch_events(project=project, start_date=month_start, end_date=month_end)
+    month_events = _fetch_events(project=project, start_date=month_start, end_date=month_end) if day_sources["events"] else []
     events_by_day = {}
     for event in month_events:
         try:
@@ -268,6 +436,9 @@ def day_view_route():
         except (IndexError, ValueError, AttributeError):
             continue
         events_by_day.setdefault(day, []).append(event)
+    month_media = _fetch_image_media(data.conn, month_start, month_end) if day_sources["files"] else []
+    media_by_month_day = _group_media_by_date(month_media)
+    days_with_images = {media_day.day for media_day in media_by_month_day}
     prev_day = anchor - timedelta(days=1)
     return render_template(
         "calendar_day.html",
@@ -285,7 +456,15 @@ def day_view_route():
         year=anchor.year,
         month_name=cal.month_name[anchor.month],
         events=events,
-        days_with_events=set(events_by_day.keys()),
+        day_files=day_files,
+        day_media=day_media,
+        usage_items=usage_items,
+        day_sources=day_sources,
+        day_source_params=day_source_params,
+        source_action_url=url_for("calendar.day_view_route"),
+        source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
+        days_with_events=set(events_by_day.keys()) | days_with_images,
+        days_with_images=days_with_images,
         today=date.today(),
         project=project,
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
@@ -303,6 +482,14 @@ def year_view_route():
     project = request.args.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
+    day_sources, day_source_params = _parse_day_sources(request.args)
+    year_start = date(year, 1, 1)
+    year_end = date(year + 1, 1, 1)
+    media_days_by_month = (
+        _group_media_by_month_day(_fetch_image_media(data.conn, year_start, year_end))
+        if day_sources["files"]
+        else {}
+    )
     months = []
     for month in range(1, 13):
         month_weeks = cal.monthcalendar(year, month)
@@ -313,7 +500,7 @@ def year_view_route():
             next_month = 1
             next_year += 1
         month_end = date(next_year, next_month, 1)
-        month_events = _fetch_events(project=project, start_date=month_start, end_date=month_end)
+        month_events = _fetch_events(project=project, start_date=month_start, end_date=month_end) if day_sources["events"] else []
         events_by_day = {}
         for event in month_events:
             try:
@@ -321,12 +508,14 @@ def year_view_route():
             except (IndexError, ValueError, AttributeError):
                 continue
             events_by_day.setdefault(day, []).append(event)
+        days_with_images = media_days_by_month.get(month, set())
         months.append(
             {
                 "month": month,
                 "month_name": cal.month_name[month],
                 "month_weeks": month_weeks,
-                "days_with_events": set(events_by_day.keys()),
+                "days_with_events": set(events_by_day.keys()) | days_with_images,
+                "days_with_images": days_with_images,
             }
         )
     return render_template(
@@ -340,6 +529,10 @@ def year_view_route():
         months=months,
         today=today,
         project=project,
+        day_sources=day_sources,
+        day_source_params=day_source_params,
+        source_action_url=url_for("calendar.year_view_route"),
+        source_hidden_fields=_source_hidden_fields(year=year, proj=project),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
         col_bg_day=cfg.CAL_COL_BG_DAY,

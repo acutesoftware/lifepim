@@ -167,16 +167,19 @@
         </div>
 
         <div class="media-nav-section">
-          <div class="media-nav-title">Events</div>
+          <div class="media-nav-title">Events{% if timeline_year %} {{ timeline_year }}{% endif %}</div>
           <ul class="media-nav-list">
-            {% for ev in events %}
+            {% for ev in nav_events %}
             <li>
-              <a class="media-nav-link {% if event and event.event_id == ev.event_id %}active{% endif %}" href="{{ media_url(nav_query, 'view=events&event_id=' ~ ev.event_id) }}">
+              <a class="media-nav-link {% if event and event.event_id == ev.event_id %}active{% endif %}" href="{{ media_url(nav_query, 'view=events&event_id=' ~ ev.event_id ~ ('&year=' ~ timeline_year if timeline_year else '')) }}">
                 <span>{{ ev.title }}</span>
                 <span class="media-count">{{ ev.item_count }}</span>
               </a>
             </li>
             {% endfor %}
+            {% if not nav_events %}
+              <li class="media-empty">No events{% if timeline_year %} in {{ timeline_year }}{% endif %}</li>
+            {% endif %}
           </ul>
           <form class="media-nav-inline" method="post" action="{{ url_for('media.rebuild_events_route') }}">
             <input type="hidden" name="gap_hours" value="2">
@@ -219,16 +222,33 @@
           </div>
         {% elif view == 'events' and not event %}
           <div class="media-empty">Select an event to view clustered media.</div>
+          {% if event_years %}
+            <div class="media-timeline-index">
+              <span class="media-timeline-label">Jump</span>
+              <a class="media-year-chip {% if not timeline_year %}active{% endif %}" href="{{ media_url(nav_query, 'view=events') }}">All</a>
+              {% for yr in event_years %}
+                <a class="media-year-chip {% if timeline_year and timeline_year|string == yr.yr %}active{% endif %}" href="{{ media_url(nav_query, 'view=events&year=' ~ yr.yr) }}">
+                  {{ yr.yr }} ({{ yr.cnt }})
+                </a>
+              {% endfor %}
+            </div>
+          {% endif %}
           <ul class="media-event-list">
             {% for ev in events %}
             <li>
               <a href="{{ media_url(nav_query, 'view=events&event_id=' ~ ev.event_id) }}">
                 <div class="media-event-title">{{ ev.title }}</div>
-                <div class="media-event-sub">{{ ev.start_utc }} -> {{ ev.end_utc }}</div>
+                <div class="media-event-sub">{{ ev.start_utc }} -> {{ ev.end_utc }} - {{ ev.item_count }} items</div>
               </a>
             </li>
             {% endfor %}
           </ul>
+          {% set page = event_page %}
+          {% set total_pages = event_total_pages %}
+          {% set pages = event_pages %}
+          {% set first_url = event_first_url %}
+          {% set last_url = event_last_url %}
+          {% include "widgets/wid_pagination.html" %}
         {% elif view == 'smart' and not smart_view %}
           <div class="media-empty">Select a Smart View or create one from the toolbar.</div>
           <ul class="media-smart-list">
@@ -356,6 +376,10 @@
       </section>
 
       <aside class="media-inspector">
+        <div class="media-inspector-resize">
+          <label for="media-inspector-width">Pane width</label>
+          <input id="media-inspector-width" class="media-inspector-width" type="range" min="220" max="560" step="20" value="280">
+        </div>
         {% if focus_item %}
           <div class="media-inspector-preview">
             {% if focus_item.media_type == 'video' %}
@@ -367,19 +391,24 @@
             {% endif %}
           </div>
           <div class="media-inspector-title">{{ focus_item.filename }}</div>
-          <div class="media-inspector-meta">
-            <div><span>Path</span><span class="media-path">{{ focus_item.path }}</span></div>
-            <div><span>Type</span><span>{{ focus_item.media_type }}</span></div>
-            <div><span>Ext</span><span>{{ focus_item.ext }}</span></div>
-            <div><span>Taken</span><span>{{ focus_item.taken_utc }}</span></div>
-            <div><span>Modified</span><span>{{ focus_item.mtime_utc }}</span></div>
-            <div><span>Size</span><span>{{ focus_item.size_bytes }}</span></div>
-            <div><span>Camera</span><span>{{ focus_item.camera_make }} {{ focus_item.camera_model }}</span></div>
-            <div><span>Dims</span><span>{{ focus_item.width }} x {{ focus_item.height }}</span></div>
+          <table class="media-inspector-meta">
+            <tbody>
+              <tr><th>Path</th><td class="media-path">{{ focus_item.path }}</td></tr>
+              {% if focus_item.folder_path %}
+                <tr><th>Folder</th><td class="media-path">{{ focus_item.folder_path }}</td></tr>
+              {% endif %}
+              <tr><th>Type</th><td>{{ focus_item.media_type }}</td></tr>
+              <tr><th>Ext</th><td>{{ focus_item.ext }}</td></tr>
+              <tr><th>Taken</th><td>{{ focus_item.taken_utc }}</td></tr>
+              <tr><th>Modified</th><td>{{ focus_item.mtime_utc }}</td></tr>
+              <tr><th>Size</th><td>{{ focus_item.size_bytes }}</td></tr>
+              <tr><th>Camera</th><td>{{ focus_item.camera_make }} {{ focus_item.camera_model }}</td></tr>
+              <tr><th>Dims</th><td>{{ focus_item.width }} x {{ focus_item.height }}</td></tr>
             {% if focus_item.duration_sec %}
-              <div><span>Duration</span><span>{{ focus_item.duration_sec }}</span></div>
+              <tr><th>Duration</th><td>{{ focus_item.duration_sec }}</td></tr>
             {% endif %}
-          </div>
+            </tbody>
+          </table>
 
           <div class="media-inspector-section">
             <div class="media-inspector-section-title">Tags</div>
@@ -422,7 +451,9 @@
 
           <div class="media-inspector-actions">
             <button type="button" class="media-copy-btn" data-copy-path="{{ focus_item.path }}">Copy path</button>
-            <a href="file://{{ focus_item.path }}">Reveal</a>
+            {% if focus_item.folder_path %}
+              <a href="{{ url_for('media.open_media_folder_route', media_id=focus_item.media_id) }}">Open folder</a>
+            {% endif %}
           </div>
         {% else %}
           <div class="media-empty">Select a media item to inspect.</div>

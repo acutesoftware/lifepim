@@ -2,16 +2,17 @@
 {% block module_content %}
 <div class="calendar-controls">
   <div class="calendar-views">
-    <a href="{{ url_for('calendar.month_view_route', year=year, month=1, proj=project) }}">Monthly</a> |
-    <a href="{{ url_for('calendar.week_view_route', date=year ~ '-01-01', proj=project) }}">Weekly</a> |
-    <a href="{{ url_for('calendar.day_view_route', date=year ~ '-01-01', proj=project) }}">Daily</a> |
-    <a href="{{ url_for('calendar.year_view_route', year=year, proj=project) }}">Yearly</a> |
+    <a href="{{ url_for('calendar.month_view_route', year=year, month=1, proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Monthly</a> |
+    <a href="{{ url_for('calendar.week_view_route', date=year ~ '-01-01', proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Weekly</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=year ~ '-01-01', proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Daily</a> |
+    <a href="{{ url_for('calendar.year_view_route', year=year, proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Yearly</a> |
     <a href="{{ url_for('calendar.list_view_route', proj=project) }}">List</a>
   </div>
-  <a class="calendar-nav" href="{{ url_for('calendar.year_view_route', year=year-1, proj=project) }}">Prev</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.year_view_route', year=year-1, proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Prev</a>
   <div class="calendar-title">{{ year }}</div>
-  <a class="calendar-nav" href="{{ url_for('calendar.year_view_route', year=year+1, proj=project) }}">Next</a>
-  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Today</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.year_view_route', year=year+1, proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Next</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Today</a>
+  {% include "widgets/wid_calendar_source_box.html" %}
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
 
@@ -21,6 +22,7 @@
     {% set month_name = month.month_name %}
     {% set month_weeks = month.month_weeks %}
     {% set days_with_events = month.days_with_events %}
+    {% set days_with_images = month.days_with_images %}
     {% set month_num = month.month %}
     {% set year_num = year %}
     {% set year = year_num %}

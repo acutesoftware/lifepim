@@ -11,6 +11,7 @@ import common.config as mod_cfg
 from common import data as db
 from common import search as search_mod
 from common import projects as projects_mod
+from common import settings as settings_mod
 
 def _dbg(msg):
     print(f"[app] {msg}", file=sys.stderr, flush=True)
@@ -45,6 +46,7 @@ def _exit_if_server_already_running(host, port):
 _dbg("Creating Flask app")
 app = Flask(__name__)
 projects_mod.ensure_projects_schema(db._get_conn())
+settings_mod.ensure_settings_schema(db._get_conn())
 
 # Register blueprints
 _dbg("Importing blueprints")

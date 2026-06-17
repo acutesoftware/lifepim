@@ -74,6 +74,7 @@ There should not be separate get_tasks, add_tasks in the data.py
 
 # Pagination
 RECS_PER_PAGE = 200
+IMAGES_PER_PAGE = 50
 
 # Search result snippet length for content matches
 SEARCH_CONTENT_SNIPPET_LEN = 400

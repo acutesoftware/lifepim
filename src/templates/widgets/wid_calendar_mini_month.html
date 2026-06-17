@@ -26,10 +26,15 @@
       {% endif %}
       <td class="calendar-cell {% if day == 0 %}empty{% endif %}" {% if day != 0 %}style="background: {{ cell_bg }};"{% endif %}>
         {% if day != 0 %}
+        {% if day_source_params is defined %}
+        <a href="{{ url_for('calendar.day_view_route', date='%04d-%02d-%02d'|format(year, month, day), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">
+        {% else %}
         <a href="{{ url_for('calendar.day_view_route', date='%04d-%02d-%02d'|format(year, month, day), proj=project) }}">
+        {% endif %}
           {% set has_events = day in days_with_events %}
+          {% set has_images = days_with_images is defined and day in days_with_images %}
           <span
-            {% if highlight_day_today == 'Red' and is_today %}style="color:#b00020;font-weight:bold;"{% elif highlight_day_data == 'Bold' and has_events %}style="font-weight:bold;"{% endif %}>
+            {% if highlight_day_today == 'Red' and is_today %}style="color:#b00020;font-weight:bold;{% if has_images %}box-shadow: inset 0 -2px #2f6fed;{% endif %}"{% elif highlight_day_data == 'Bold' and has_events %}style="font-weight:bold;{% if has_images %}box-shadow: inset 0 -2px #2f6fed;{% endif %}"{% elif has_images %}style="box-shadow: inset 0 -2px #2f6fed;"{% endif %}>
             {{ day }}
           </span>
         </a>

@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
 from common import config as cfg
+from common import settings as settings_mod
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr
 
 
@@ -121,6 +122,45 @@ def admin_mapping_route():
         counts=counts,
         db_file=cfg.DB_FILE,
         unmapped_only=unmapped_only,
+        now=datetime.now(),
+    )
+
+
+@admin_bp.route("/settings", methods=["GET", "POST"])
+def settings_route():
+    message = ""
+    active_settings_tab = (request.args.get("tab") or request.form.get("tab") or "calendar").strip().lower()
+    if active_settings_tab not in {"calendar", "media", "files", "general"}:
+        active_settings_tab = "calendar"
+
+    conn = db.conn if db.conn is not None else None
+    conn = db._get_conn() if conn is None else conn
+    settings_mod.ensure_settings_schema(conn)
+
+    if request.method == "POST":
+        if active_settings_tab == "calendar":
+            sources = {
+                "events": request.form.get("show_events") == "1",
+                "files": request.form.get("show_files") == "1",
+                "usage": request.form.get("show_usage") == "1",
+            }
+            settings_mod.save_calendar_view_settings(sources, conn)
+            message = "Calendar settings saved."
+
+    calendar_view = settings_mod.get_calendar_view_settings(conn)
+    all_settings = settings_mod.list_settings(conn)
+
+    return render_template(
+        "admin_settings.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Settings",
+        content_html="",
+        message=message,
+        active_settings_tab=active_settings_tab,
+        calendar_view=calendar_view,
+        all_settings=all_settings,
         now=datetime.now(),
     )
 

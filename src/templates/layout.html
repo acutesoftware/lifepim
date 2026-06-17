@@ -20,7 +20,7 @@
         <a href="#" id="hideSidebar">Hide project list</a>
         <a href="#">Edit projects</a>
         <div class="menu-spacer"></div>
-        <a href="#">Settings</a>
+        <a href="{{ url_for('admin.settings_route') }}">Settings</a>
         <a href="#">Help</a>
         <a href="{{ url_for('admin.user_history_route') }}">User history</a>
       </div>

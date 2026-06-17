@@ -1,0 +1,13 @@
+<form class="calendar-source-box" method="get" action="{{ source_action_url }}">
+  {% for field in source_hidden_fields %}
+    <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
+  {% endfor %}
+  <span class="calendar-source-caption">View:</span>
+  <input type="hidden" name="show_events" value="0">
+  <label><input type="checkbox" name="show_events" value="1" {% if day_sources.events %}checked{% endif %}> Events</label>
+  <input type="hidden" name="show_files" value="0">
+  <label><input type="checkbox" name="show_files" value="1" {% if day_sources.files %}checked{% endif %}> Files</label>
+  <input type="hidden" name="show_usage" value="0">
+  <label><input type="checkbox" name="show_usage" value="1" {% if day_sources.usage %}checked{% endif %}> Usage</label>
+  <button type="submit">Apply</button>
+</form>

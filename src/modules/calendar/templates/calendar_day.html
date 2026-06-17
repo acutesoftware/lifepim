@@ -4,15 +4,16 @@
   <div class="calendar-views">
     <a href="{{ url_for('calendar.month_view_route', year=view_date.year, month=view_date.month, proj=project) }}">Monthly</a> |
     <a href="{{ url_for('calendar.week_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
-    <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Daily</a> |
     <a href="{{ url_for('calendar.year_view_route', year=view_date.year, proj=project) }}">Yearly</a> |
     <a href="{{ url_for('calendar.list_view_route', proj=project) }}">List</a>
   </div>
-  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=prev_day.strftime('%Y-%m-%d'), proj=project) }}">Prev</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=prev_day.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Prev</a>
   <div class="calendar-title">{{ day_date.strftime('%Y-%m-%d') }}</div>
-  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=next_day.strftime('%Y-%m-%d'), proj=project) }}">Next</a>
-  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Today</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=next_day.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Next</a>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Today</a>
   <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=day_date.strftime('%Y-%m-%d'), proj=project) }}">Add Event</a>
+  {% include "widgets/wid_calendar_source_box.html" %}
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
 
@@ -21,6 +22,7 @@
     {% include "widgets/wid_calendar_mini_month.html" %}
   </div>
   <div style="flex:2;">
+    {% if day_sources.events %}
     <h5>Events</h5>
     {% if events %}
     <ul style="list-style:none; padding:0; margin:0;">
@@ -38,6 +40,47 @@
     </ul>
     {% else %}
     <p>No events for this day.</p>
+    {% endif %}
+    {% endif %}
+
+    {% if day_sources.files %}
+    <h5>Files</h5>
+    {% if day_media %}
+      <div class="calendar-media-grid">
+        {% for item in day_media %}
+        <a class="calendar-media-thumb" href="{{ url_for('media.media_explorer_route', focus_id=item.media_id, view='all') }}" title="{{ item.filename }}">
+          {% if item.media_type == 'video' %}
+            <video muted preload="metadata">
+              <source src="{{ url_for('media.media_file_route', media_id=item.media_id) }}">
+            </video>
+          {% else %}
+            <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
+          {% endif %}
+          <span>{{ item.filename }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if day_files %}
+      <ul class="calendar-file-list">
+        {% for item in day_files %}
+        <li>
+          <span>{{ item.filename }}</span>
+          <span class="calendar-file-path">{{ item.path }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if not day_media and not day_files %}
+      <p>No files for this day.</p>
+    {% endif %}
+    {% endif %}
+
+    {% if day_sources.usage %}
+    <h5>Usage</h5>
+    <p>Usage lookups are not wired yet.</p>
     {% endif %}
   </div>
 </div>

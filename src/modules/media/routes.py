@@ -1,6 +1,8 @@
 import json
 import mimetypes
 import os
+import subprocess
+import sys
 from urllib.parse import urlencode
 from datetime import datetime, timedelta, timezone
 
@@ -74,6 +76,18 @@ def _build_media_path(item):
     if path_value and filename:
         return os.path.join(path_value, filename)
     return path_value or filename
+
+
+def _build_media_folder_path(item):
+    full_path = _build_media_path(item)
+    if full_path and os.path.isfile(full_path):
+        return os.path.dirname(full_path)
+    if full_path and os.path.isdir(full_path):
+        return full_path
+    path_value = (item.get("path") or "").strip()
+    if path_value and os.path.isdir(path_value):
+        return path_value
+    return ""
 
 
 def _is_video(item):
@@ -334,13 +348,48 @@ def _get_album(conn, album_id):
     return dict(row) if row else None
 
 
-def _list_events(conn):
-    rows = conn.execute(
+def _list_events(conn, year_filter=None, limit=None, offset=None):
+    where = []
+    params = []
+    if year_filter:
+        where.append("substr(e.start_utc, 1, 4) = ?")
+        params.append(str(year_filter))
+    sql = (
         "SELECT e.event_id, e.title, e.start_utc, e.end_utc, e.location_label, e.event_source, "
         "  (SELECT COUNT(1) FROM lp_event_items i WHERE i.event_id = e.event_id) AS item_count "
-        "FROM lp_events e ORDER BY e.start_utc DESC"
-    ).fetchall()
+        "FROM lp_events e "
+        + ("WHERE " + " AND ".join(where) + " " if where else "")
+        + "ORDER BY e.start_utc DESC"
+    )
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+        if offset:
+            sql += " OFFSET ?"
+            params.append(int(offset))
+    rows = conn.execute(sql, params).fetchall()
     return [dict(row) for row in rows]
+
+
+def _count_events(conn, year_filter=None):
+    params = []
+    sql = "SELECT COUNT(1) AS cnt FROM lp_events e"
+    if year_filter:
+        sql += " WHERE substr(e.start_utc, 1, 4) = ?"
+        params.append(str(year_filter))
+    row = conn.execute(sql, params).fetchone()
+    return row["cnt"] if row else 0
+
+
+def _fetch_event_years(conn):
+    rows = conn.execute(
+        "SELECT substr(start_utc, 1, 4) AS yr, COUNT(1) AS cnt "
+        "FROM lp_events "
+        "WHERE start_utc IS NOT NULL AND start_utc != '' "
+        "GROUP BY yr "
+        "ORDER BY yr DESC"
+    ).fetchall()
+    return [dict(row) for row in rows if row["yr"]]
 
 
 def _get_event(conn, event_id):
@@ -590,7 +639,6 @@ def media_explorer_route():
     smart_view_id = request.args.get("smart_view_id", type=int)
 
     albums = _list_albums(conn)
-    events = _list_events(conn)
     smart_views = _list_smart_views(conn)
 
     album = _get_album(conn, album_id)
@@ -658,8 +706,34 @@ def media_explorer_route():
     )
 
     page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
+    per_page = cfg.IMAGES_PER_PAGE
     timeline_years = []
+    event_years = _fetch_event_years(conn)
+    event_pages = []
+    event_first_url = ""
+    event_last_url = ""
+    event_total_pages = 1
+    event_page = 1
+    nav_events = _list_events(conn, year_filter, limit=per_page) if year_filter else _list_events(conn)
+    if view == "events" and not event:
+        event_total = _count_events(conn, year_filter)
+        event_page_data = paginate_total(event_total, page, per_page)
+        event_page = event_page_data["page"]
+        event_total_pages = event_page_data["total_pages"]
+        event_offset = (event_page - 1) * per_page
+        events = _list_events(conn, year_filter, limit=per_page, offset=event_offset)
+        event_pagination = build_pagination(
+            url_for,
+            "media.media_explorer_route",
+            base_args_clean,
+            event_page,
+            event_total_pages,
+        )
+        event_pages = event_pagination["pages"]
+        event_first_url = event_pagination["first_url"]
+        event_last_url = event_pagination["last_url"]
+    else:
+        events = _list_events(conn)
     if view == "timeline":
         year_joins, year_where, year_params = _build_media_filters(
             scope,
@@ -715,6 +789,7 @@ def media_explorer_route():
         focus_tags = _fetch_tags_for_media(conn, focus_item["media_id"])
         focus_albums = _fetch_album_memberships(conn, focus_item["media_id"])
         focus_events = _fetch_event_memberships(conn, focus_item["media_id"])
+        focus_item["folder_path"] = _build_media_folder_path(focus_item)
 
     return render_template(
         "media_explorer.html",
@@ -738,6 +813,7 @@ def media_explorer_route():
         smart_views=smart_views,
         album=album,
         event=event,
+        nav_events=nav_events,
         smart_view=smart_view,
         items=items,
         groups=groups,
@@ -746,12 +822,18 @@ def media_explorer_route():
         focus_albums=focus_albums,
         focus_events=focus_events,
         timeline_years=timeline_years,
+        event_years=event_years,
         timeline_year=year_filter,
         page=page,
         total_pages=total_pages,
         pages=pages,
         first_url=first_url,
         last_url=last_url,
+        event_page=event_page,
+        event_total_pages=event_total_pages,
+        event_pages=event_pages,
+        event_first_url=event_first_url,
+        event_last_url=event_last_url,
         base_args=base_args_clean,
         nav_args=nav_args,
         base_query=base_query,
@@ -977,6 +1059,25 @@ def media_file_route(media_id):
         abort(404)
     mime_type, _ = mimetypes.guess_type(full_path)
     return send_file(full_path, mimetype=mime_type or "application/octet-stream")
+
+
+@media_bp.route("/folder/<int:media_id>")
+def open_media_folder_route(media_id):
+    _ensure_schema()
+    conn = db._get_conn()
+    item = _fetch_media_by_id(conn, media_id)
+    if not item:
+        abort(404)
+    folder_path = _build_media_folder_path(item)
+    if not folder_path or not os.path.isdir(folder_path):
+        abort(404)
+    if sys.platform.startswith("win"):
+        os.startfile(folder_path)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", folder_path])
+    else:
+        subprocess.Popen(["xdg-open", folder_path])
+    return redirect(request.referrer or url_for("media.media_explorer_route", focus_id=media_id))
 
 
 def _redirect_args(form):

@@ -147,8 +147,51 @@
     });
   }
 
+  function initInspectorResize() {
+    const slider = qs(".media-inspector-width");
+    const body = qs(".media-body");
+    if (!slider || !body) {
+      return;
+    }
+    const storageKey = "lifepim.media.inspectorWidth";
+    const min = Number(slider.min) || 220;
+    const max = Number(slider.max) || 560;
+
+    function clamp(value) {
+      const width = Number(value);
+      if (!Number.isFinite(width)) {
+        return Number(slider.value) || 280;
+      }
+      return Math.min(max, Math.max(min, width));
+    }
+
+    function applyWidth(value) {
+      const width = clamp(value);
+      slider.value = String(width);
+      body.style.setProperty("--media-inspector-width", `${width}px`);
+      try {
+        window.localStorage.setItem(storageKey, String(width));
+      } catch (err) {
+        // Ignore storage failures; the slider should still work for this page.
+      }
+    }
+
+    try {
+      const savedWidth = window.localStorage.getItem(storageKey);
+      if (savedWidth) {
+        slider.value = String(clamp(savedWidth));
+      }
+    } catch (err) {
+      // Ignore storage failures; use the template default.
+    }
+
+    applyWidth(slider.value);
+    slider.addEventListener("input", () => applyWidth(slider.value));
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     initSelection();
     initCopyButtons();
+    initInspectorResize();
   });
 })();
