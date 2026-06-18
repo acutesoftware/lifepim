@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<section class="help-page">
+  <header class="help-header">
+    <h1>{{ app_name }}</h1>
+    <div class="help-version">Version {{ app_version }}</div>
+  </header>
+
+  <section class="help-meta" aria-label="Application details">
+    <div class="help-meta-item">
+      <span class="help-meta-label">Date source last updated</span>
+      <span class="help-meta-value">{{ last_data_update }}</span>
+    </div>
+    {% for label, value in paths %}
+    <div class="help-meta-item">
+      <span class="help-meta-label">{{ label }}</span>
+      <span class="help-meta-value">{{ value or "Not configured" }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="help-about">
+    <h2>About</h2>
+    <p>
+      LifePIM Desktop is a local personal information manager for bringing notes,
+      tasks, calendar events, files, media, audio, people, places, and project data
+      into one searchable workspace. It keeps sensitive data on this PC while giving
+      you a fast browser-based interface for browsing, editing, and reviewing your
+      LifePIM data.
+    </p>
+    <p>
+      Source code:
+      <a href="{{ github_repo_url }}" target="_blank" rel="noopener noreferrer">{{ github_repo_url }}</a>
+    </p>
+  </section>
+</section>
+{% endblock %}

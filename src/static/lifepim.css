@@ -1269,6 +1269,80 @@ table tr:last-child td {
   text-align: left;
 }
 
+.help-page {
+  max-width: 980px;
+  padding: 8px 2px 24px;
+}
+
+.help-header {
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+}
+
+.help-header h1 {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1.05;
+  font-weight: 700;
+}
+
+.help-version {
+  color: #555;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.help-meta {
+  display: grid;
+  grid-template-columns: minmax(170px, 240px) minmax(0, 1fr);
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.help-meta-item {
+  display: contents;
+}
+
+.help-meta-label,
+.help-meta-value {
+  border-bottom: 1px solid #eee;
+  padding: 7px 9px;
+}
+
+.help-meta-item:last-child .help-meta-label,
+.help-meta-item:last-child .help-meta-value {
+  border-bottom: none;
+}
+
+.help-meta-label {
+  background: #f6f7f8;
+  color: #444;
+  font-weight: bold;
+}
+
+.help-meta-value {
+  font-family: Consolas, "Courier New", monospace;
+  overflow-wrap: anywhere;
+}
+
+.help-about {
+  max-width: 760px;
+}
+
+.help-about h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.help-about p {
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1278,6 +1352,15 @@ table tr:last-child td {
 
 .overview-card {
   padding: 6px;
+}
+
+.apps-launch-error {
+  margin: 8px 0;
+  padding: 6px 8px;
+  border: 1px solid #d6a2a2;
+  background: #fff4f4;
+  color: #7a1d1d;
+  border-radius: 4px;
 }
 
 @media (max-width: 600px) {

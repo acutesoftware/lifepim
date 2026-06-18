@@ -12,6 +12,7 @@
     <li style="padding:4px 0;">
       <a href="{{ url_for('apps.view_app_route', item_id=item.id, proj=project) }}">{{ item.title }}</a>
       <span>
+        <a href="{{ url_for('apps.launch_app_route', item_id=item.id, proj=project) }}" target="_blank" rel="noopener noreferrer">Launch</a> |
         <a href="{{ url_for('apps.edit_app_route', item_id=item.id, proj=project) }}">Edit</a> |
         <a href="{{ url_for('apps.delete_app_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
       </span>

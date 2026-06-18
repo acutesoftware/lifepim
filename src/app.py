@@ -1,5 +1,6 @@
 import sys
 import socket
+import os
 
 from datetime import date, datetime
 
@@ -12,6 +13,10 @@ from common import data as db
 from common import search as search_mod
 from common import projects as projects_mod
 from common import settings as settings_mod
+
+
+APP_NAME = "LifePIM"
+GITHUB_REPO_URL = "https://github.com/acutesoftware/lifepim"
 
 def _dbg(msg):
     print(f"[app] {msg}", file=sys.stderr, flush=True)
@@ -41,6 +46,59 @@ def _exit_if_server_already_running(host, port):
         flush=True,
     )
     sys.exit(0)
+
+
+def _table_has_column(conn, table_name, column_name):
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    except Exception:
+        return False
+    return any(row["name"] == column_name for row in rows)
+
+
+def _table_exists(conn, table_name):
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
+            [table_name],
+        ).fetchone()
+    except Exception:
+        return False
+    return row is not None
+
+
+def _last_data_source_update(conn):
+    latest = None
+    for table_def in getattr(mod_cfg, "table_def", []):
+        table_name = table_def.get("name")
+        if not table_name or not _table_exists(conn, table_name):
+            continue
+        if not _table_has_column(conn, table_name, "rec_extract_date"):
+            continue
+        try:
+            row = conn.execute(f"SELECT MAX(rec_extract_date) AS updated FROM {table_name}").fetchone()
+        except Exception:
+            continue
+        updated = row["updated"] if row else None
+        if updated and (latest is None or updated > latest):
+            latest = updated
+    return latest
+
+
+def _help_paths():
+    src_folder = os.path.dirname(os.path.abspath(__file__))
+    app_root = os.path.abspath(os.path.join(src_folder, os.pardir))
+    return [
+        ("Launch folder", os.getcwd()),
+        ("Application root", app_root),
+        ("Source folder", src_folder),
+        ("User data folder", getattr(mod_cfg, "user_folder", "")),
+        ("Database file", getattr(mod_cfg, "DB_FILE", "")),
+        ("Data folder", getattr(mod_cfg, "data_folder", "")),
+        ("Index folder", getattr(mod_cfg, "index_folder", "")),
+        ("Calendar folder", getattr(mod_cfg, "calendar_folder", "")),
+        ("Export data folder", getattr(mod_cfg, "export_data_folder_base", "")),
+    ]
 
 
 _dbg("Creating Flask app")
@@ -214,6 +272,25 @@ def search_route():
         results_primary=results["primary"],
         results_secondary=results["secondary"],
         audio_playlists=audio_playlists,
+    )
+
+
+@app.route("/help")
+def help_route():
+    conn = db.conn if db.conn is not None else None
+    conn = db._get_conn() if conn is None else conn
+    return render_template(
+        "help.html",
+        active_tab="help",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="",
+        content_html="",
+        app_name=APP_NAME,
+        app_version=getattr(mod_cfg, "WEB_VERSION", "DEV"),
+        last_data_update=_last_data_source_update(conn) or "No imported data found",
+        paths=_help_paths(),
+        github_repo_url=GITHUB_REPO_URL,
     )
 
 if __name__ == "__main__":

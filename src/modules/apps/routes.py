@@ -1,6 +1,7 @@
 import os
+from urllib.parse import urlparse
 
-from flask import Blueprint, render_template, request, url_for, redirect
+from flask import Blueprint, render_template, request, url_for, redirect, abort, send_from_directory
 
 from common import data as db
 from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
@@ -49,6 +50,32 @@ def _fetch_items(project=None, sort_col=None, sort_dir=None, limit=None, offset=
 def _sort_items(items, sort_col, sort_dir):
     reverse = sort_dir == "desc"
     return sorted(items, key=lambda i: (i.get(sort_col) or ""), reverse=reverse)
+
+
+def _fetch_item(item_id):
+    tbl = _get_tbl()
+    if not tbl:
+        return None
+    rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [item_id])
+    return dict(rows[0]) if rows else None
+
+
+def _is_web_url(value):
+    parsed = urlparse(value or "")
+    return parsed.scheme.lower() in {"http", "https"}
+
+
+def _is_html_file(path_value):
+    return os.path.splitext(path_value or "")[1].lower() in {".html", ".htm"}
+
+
+def _app_display_title(path_value):
+    base = os.path.basename(path_value)
+    name, ext = os.path.splitext(base)
+    if ext.lower() in {".html", ".htm"} and name.lower() == "index":
+        folder_name = os.path.basename(os.path.dirname(path_value))
+        return folder_name or name
+    return name or base
 
 
 @apps_bp.route("/")
@@ -157,7 +184,7 @@ def list_apps_cards_route():
         page,
         total_pages,
     )
-    card_values = [[i.get("title"), i.get("file_path"), url_for("apps.view_app_route", item_id=i.get("id"))] for i in items]
+    card_values = [[i.get("title"), i.get("file_path"), url_for("apps.launch_app_route", item_id=i.get("id"), proj=project)] for i in items]
     return render_template(
         "apps_list_cards.html",
         active_tab="apps",
@@ -179,12 +206,7 @@ def list_apps_cards_route():
 @apps_bp.route("/view/<int:item_id>")
 def view_app_route(item_id):
     project = request.args.get("proj")
-    tbl = _get_tbl()
-    item = None
-    if tbl:
-        rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [item_id])
-        if rows:
-            item = dict(rows[0])
+    item = _fetch_item(item_id)
     if not item:
         return list_apps_table_route()
     return render_template(
@@ -199,15 +221,71 @@ def view_app_route(item_id):
     )
 
 
+@apps_bp.route("/launch/<int:item_id>")
+def launch_app_route(item_id):
+    project = request.args.get("proj")
+    item = _fetch_item(item_id)
+    if not item:
+        abort(404)
+
+    file_path = (item.get("file_path") or "").strip()
+    if not file_path:
+        abort(404)
+    if _is_web_url(file_path):
+        return redirect(file_path)
+    if _is_html_file(file_path):
+        return redirect(url_for("apps.run_local_html_route", item_id=item_id))
+    if not os.path.exists(file_path):
+        return render_template(
+            "apps_view.html",
+            active_tab="apps",
+            tabs=get_tabs(),
+            side_tabs=get_side_tabs(),
+            content_title=item.get("title", "App"),
+            content_html="",
+            item=item,
+            project=project,
+            launch_error=f"File not found: {file_path}",
+        )
+
+    try:
+        os.startfile(file_path)
+    except OSError as exc:
+        return render_template(
+            "apps_view.html",
+            active_tab="apps",
+            tabs=get_tabs(),
+            side_tabs=get_side_tabs(),
+            content_title=item.get("title", "App"),
+            content_html="",
+            item=item,
+            project=project,
+            launch_error=f"Could not launch file: {exc}",
+        )
+    return redirect(url_for("apps.view_app_route", item_id=item_id, proj=project))
+
+
+@apps_bp.route("/run/<int:item_id>/", defaults={"rel_path": None})
+@apps_bp.route("/run/<int:item_id>/<path:rel_path>")
+def run_local_html_route(item_id, rel_path):
+    item = _fetch_item(item_id)
+    if not item:
+        abort(404)
+
+    file_path = os.path.abspath((item.get("file_path") or "").strip())
+    if not _is_html_file(file_path) or not os.path.isfile(file_path):
+        abort(404)
+
+    base_dir = os.path.dirname(file_path)
+    target_rel = rel_path or os.path.basename(file_path)
+    return send_from_directory(base_dir, target_rel)
+
+
 @apps_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
 def edit_app_route(item_id):
     project = request.args.get("proj")
     tbl = _get_tbl()
-    item = None
-    if tbl:
-        rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [item_id])
-        if rows:
-            item = dict(rows[0])
+    item = _fetch_item(item_id)
     if request.method == "POST" and tbl:
         values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
         db.update_record(db.conn, tbl["name"], item_id, tbl["col_list"], values)
@@ -250,14 +328,16 @@ def import_apps_route():
             error = "Folder not found."
         else:
             count = 0
+            launchable_exts = {".exe", ".bat", ".cmd", ".lnk", ".html", ".htm"}
             for root, _, files in os.walk(folder_path):
                 for name in files:
-                    if not name.lower().endswith(".exe"):
+                    ext = os.path.splitext(name)[1].lower()
+                    if ext not in launchable_exts:
                         continue
                     full_path = os.path.join(root, name)
                     if not os.path.isfile(full_path):
                         continue
-                    title = os.path.splitext(name)[0]
+                    title = _app_display_title(full_path)
                     values = [
                         full_path,
                         title,
