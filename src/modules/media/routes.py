@@ -31,6 +31,7 @@ MEDIA_SEARCH_COLS = [
     "m.filename",
     "m.path",
     "m.ext",
+    "m.media_type",
     "meta.camera_make",
     "meta.camera_model",
     "tags.tags_text",
@@ -155,11 +156,13 @@ def _query_string(args):
 def _build_search_conditions(terms, where, params):
     if not terms:
         return
+    term_conditions = []
     for term in terms:
         like_value = f"%{term.lower()}%"
         clause = " OR ".join([f"lower({col}) LIKE ?" for col in MEDIA_SEARCH_COLS])
-        where.append(f"({clause})")
+        term_conditions.append(f"({clause})")
         params.extend([like_value] * len(MEDIA_SEARCH_COLS))
+    where.append("(" + " AND ".join(term_conditions) + ")")
 
 
 def _build_media_filters(
@@ -286,6 +289,12 @@ def _fetch_timeline_years(conn, joins, where, params):
         "COUNT(1) AS cnt "
         "FROM lp_media m "
         "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
+        "LEFT JOIN ("
+        "  SELECT mt.media_id, group_concat(t.tag, ' ') AS tags_text "
+        "  FROM lp_media_tags mt "
+        "  JOIN lp_tags t ON t.tag_id = mt.tag_id "
+        "  GROUP BY mt.media_id"
+        ") tags ON tags.media_id = m.media_id "
         + (" ".join(joins) + " " if joins else "")
         + "WHERE "
         + " AND ".join(where)
@@ -865,6 +874,7 @@ def media_explorer_route():
     if skip_results:
         items = []
         groups = []
+        total = 0
         page = 1
         total_pages = 1
         pages = []
@@ -919,6 +929,7 @@ def media_explorer_route():
         group_by=group_by,
         media_type=media_type,
         q=q,
+        total=total,
         search_everywhere=search_everywhere,
         album_id=album_id,
         event_id=event_id,

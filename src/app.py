@@ -48,43 +48,6 @@ def _exit_if_server_already_running(host, port):
     sys.exit(0)
 
 
-def _table_has_column(conn, table_name, column_name):
-    try:
-        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
-    except Exception:
-        return False
-    return any(row["name"] == column_name for row in rows)
-
-
-def _table_exists(conn, table_name):
-    try:
-        row = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
-            [table_name],
-        ).fetchone()
-    except Exception:
-        return False
-    return row is not None
-
-
-def _last_data_source_update(conn):
-    latest = None
-    for table_def in getattr(mod_cfg, "table_def", []):
-        table_name = table_def.get("name")
-        if not table_name or not _table_exists(conn, table_name):
-            continue
-        if not _table_has_column(conn, table_name, "rec_extract_date"):
-            continue
-        try:
-            row = conn.execute(f"SELECT MAX(rec_extract_date) AS updated FROM {table_name}").fetchone()
-        except Exception:
-            continue
-        updated = row["updated"] if row else None
-        if updated and (latest is None or updated > latest):
-            latest = updated
-    return latest
-
-
 def _help_paths():
     src_folder = os.path.dirname(os.path.abspath(__file__))
     app_root = os.path.abspath(os.path.join(src_folder, os.pardir))
@@ -99,6 +62,30 @@ def _help_paths():
         ("Calendar folder", getattr(mod_cfg, "calendar_folder", "")),
         ("Export data folder", getattr(mod_cfg, "export_data_folder_base", "")),
     ]
+
+
+def _last_python_source_update():
+    src_folder = os.path.dirname(os.path.abspath(__file__))
+    latest_mtime = None
+    latest_path = ""
+    for root, dirs, files in os.walk(src_folder):
+        dirs[:] = [name for name in dirs if name != "__pycache__"]
+        for file_name in files:
+            if not file_name.lower().endswith(".py"):
+                continue
+            path = os.path.join(root, file_name)
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            if latest_mtime is None or mtime > latest_mtime:
+                latest_mtime = mtime
+                latest_path = path
+    if latest_mtime is None:
+        return "No Python source files found"
+    timestamp = datetime.fromtimestamp(latest_mtime).strftime("%Y-%m-%d %H:%M:%S")
+    rel_path = os.path.relpath(latest_path, src_folder)
+    return f"{timestamp} ({rel_path})"
 
 
 _dbg("Creating Flask app")
@@ -259,6 +246,13 @@ def search_route():
         conn = audio_routes._ensure_playlist_schema()
         audio_routes._ensure_default_playlist(conn)
         audio_playlists = audio_routes._list_playlists(conn)
+    total_results = len(results["primary"]) + len(results["secondary"])
+    search_all_areas_url = ""
+    if query and route in tab_ids and route != "home":
+        all_areas_args = {"q": query, "route": "home", "scope": scope}
+        if project:
+            all_areas_args["proj"] = project
+        search_all_areas_url = url_for("search_route", **all_areas_args)
     return render_template(
         "search_results.html",
         active_tab=active_tab,
@@ -269,6 +263,8 @@ def search_route():
         query=query,
         project=project,
         route=route,
+        total_results=total_results,
+        search_all_areas_url=search_all_areas_url,
         results_primary=results["primary"],
         results_secondary=results["secondary"],
         audio_playlists=audio_playlists,
@@ -277,8 +273,6 @@ def search_route():
 
 @app.route("/help")
 def help_route():
-    conn = db.conn if db.conn is not None else None
-    conn = db._get_conn() if conn is None else conn
     return render_template(
         "help.html",
         active_tab="help",
@@ -288,7 +282,7 @@ def help_route():
         content_html="",
         app_name=APP_NAME,
         app_version=getattr(mod_cfg, "WEB_VERSION", "DEV"),
-        last_data_update=_last_data_source_update(conn) or "No imported data found",
+        last_source_update=_last_python_source_update(),
         paths=_help_paths(),
         github_repo_url=GITHUB_REPO_URL,
     )

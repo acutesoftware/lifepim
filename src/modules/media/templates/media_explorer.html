@@ -121,6 +121,9 @@
           <input type="checkbox" name="search_everywhere" value="1" {% if search_everywhere %}checked{% endif %}>
           Search everywhere
         </label>
+        {% if q %}
+          <span class="media-search-summary">{{ total }} result{% if total != 1 %}s{% endif %} for "{{ q }}"</span>
+        {% endif %}
         <button type="submit">Apply</button>
       </form>
 

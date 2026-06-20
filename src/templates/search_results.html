@@ -1,9 +1,15 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div>
-    <strong>Query:</strong> {{ query or '' }}
-    {% if project %}<span> | <strong>Project:</strong> {{ project }}</span>{% endif %}
-    {% if route %}<span> | <strong>Tab:</strong> {{ route }}</span>{% endif %}
+  <div class="search-summary-line">
+    <div>
+      <strong>Query:</strong> {{ query or '' }}
+      {% if project %}<span> | <strong>Project:</strong> {{ project }}</span>{% endif %}
+      {% if route %}<span> | <strong>Tab:</strong> {{ route }}</span>{% endif %}
+      {% if query %}<span> | {{ total_results }} result{% if total_results != 1 %}s{% endif %}</span>{% endif %}
+    </div>
+    {% if search_all_areas_url %}
+      <a href="{{ search_all_areas_url }}">Search "{{ query }}" in all areas</a>
+    {% endif %}
   </div>
 
   {% if not query %}
