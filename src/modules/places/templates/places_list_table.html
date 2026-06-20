@@ -39,6 +39,12 @@
     <td>
       <a href="{{ url_for('places.edit_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation();">Edit</a> |
       <a href="{{ url_for('places.delete_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation(); return confirm('Delete item?');">Del</a>
+      {% if item.map_actions %}
+        <span class="places-action-sep">|</span>
+        {% for action in item.map_actions %}
+          <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">{{ action.label }}</a>{% if not loop.last %} {% endif %}
+        {% endfor %}
+      {% endif %}
     </td>
   </tr>
   {% endfor %}

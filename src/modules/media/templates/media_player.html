@@ -24,6 +24,7 @@
       <div class="media-player-stage">
         <img id="media-image" alt="">
         <video id="media-video" preload="metadata"></video>
+        <audio id="media-audio" preload="metadata"></audio>
       </div>
     </section>
 
@@ -42,11 +43,13 @@
     const statusEl = document.getElementById("media-status");
     const imgEl = document.getElementById("media-image");
     const videoEl = document.getElementById("media-video");
+    const audioEl = document.getElementById("media-audio");
     const playBtn = document.getElementById("media-play-toggle");
     const prevBtn = document.getElementById("media-prev");
     const nextBtn = document.getElementById("media-next");
     let currentIndex = 0;
     let currentIsVideo = false;
+    let currentPlayer = null;
 
     function setPlayButton(isPlaying) {
       playBtn.textContent = isPlaying ? "||" : ">";
@@ -67,19 +70,34 @@
       titleEl.textContent = item.title || "Untitled";
       pathEl.textContent = item.path || "";
       currentIsVideo = !!item.is_video;
-      imgEl.style.display = currentIsVideo ? "none" : "block";
+      currentPlayer = item.is_audio ? audioEl : (currentIsVideo ? videoEl : null);
+      imgEl.style.display = currentPlayer ? "none" : "block";
       videoEl.style.display = currentIsVideo ? "block" : "none";
+      audioEl.style.display = item.is_audio ? "block" : "none";
+      videoEl.pause();
+      audioEl.pause();
       if (currentIsVideo) {
         imgEl.removeAttribute("src");
+        audioEl.removeAttribute("src");
         videoEl.src = item.url;
         videoEl.load();
         setPlayButton(false);
         playBtn.disabled = false;
         updateStatus("Video ready");
-      } else {
-        videoEl.pause();
+      } else if (item.is_audio) {
+        imgEl.removeAttribute("src");
         videoEl.removeAttribute("src");
         videoEl.load();
+        audioEl.src = item.url;
+        audioEl.load();
+        setPlayButton(false);
+        playBtn.disabled = false;
+        updateStatus("Audio ready");
+      } else {
+        videoEl.removeAttribute("src");
+        videoEl.load();
+        audioEl.removeAttribute("src");
+        audioEl.load();
         imgEl.src = item.url;
         setPlayButton(false);
         playBtn.disabled = true;
@@ -88,13 +106,13 @@
     }
 
     playBtn.addEventListener("click", () => {
-      if (!currentIsVideo) {
+      if (!currentPlayer) {
         return;
       }
-      if (videoEl.paused) {
-        videoEl.play();
+      if (currentPlayer.paused) {
+        currentPlayer.play();
       } else {
-        videoEl.pause();
+        currentPlayer.pause();
       }
     });
 
@@ -104,6 +122,9 @@
     videoEl.addEventListener("play", () => setPlayButton(true));
     videoEl.addEventListener("pause", () => setPlayButton(false));
     videoEl.addEventListener("ended", () => setPlayButton(false));
+    audioEl.addEventListener("play", () => setPlayButton(true));
+    audioEl.addEventListener("pause", () => setPlayButton(false));
+    audioEl.addEventListener("ended", () => setPlayButton(false));
 
     if (items.length) {
       const startIndex = startId

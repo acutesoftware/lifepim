@@ -886,6 +886,10 @@ table tr:last-child td {
   width: auto;
 }
 
+.media-player-stage audio {
+  width: calc(100% - 24px);
+}
+
 .media-player-controls {
   display: flex;
   align-items: center;
@@ -1388,6 +1392,40 @@ table tr:last-child td {
   margin: 6px 0;
   color: #666;
   font-style: italic;
+}
+
+.places-map-tooltip {
+  max-width: 280px;
+  white-space: normal;
+}
+
+.places-map-tooltip-title {
+  font-weight: bold;
+  margin-bottom: 3px;
+}
+
+.places-map-tooltip-row {
+  line-height: 1.35;
+}
+
+.places-map-popup {
+  min-width: 150px;
+}
+
+.places-map-popup-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.places-map-popup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.places-action-sep {
+  color: #777;
+  margin: 0 3px;
 }
 
 .money-toolbar {

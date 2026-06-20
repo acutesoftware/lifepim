@@ -15,6 +15,11 @@
   <p>
     <a href="{{ url_for('places.edit_place_route', place_id=item.id, proj=project) }}">Edit</a> |
     <a href="{{ url_for('places.delete_place_route', place_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    {% if item.map_actions %}
+      {% for action in item.map_actions %}
+        | <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer">{{ action.label }}</a>
+      {% endfor %}
+    {% endif %}
   </p>
   {% set link_record_type = "place" %}
   {% set link_record_id = item.id %}

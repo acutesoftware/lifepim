@@ -1,3 +1,5 @@
+from urllib.parse import quote_plus
+
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
@@ -74,6 +76,68 @@ def _parse_float(value):
         return None
 
 
+def _join_place_parts(*values):
+    return " ".join([str(value).strip() for value in values if str(value or "").strip()])
+
+
+def _format_place_address(item):
+    street = _join_place_parts(item.get("address_street"))
+    suburb_line = _join_place_parts(item.get("suburb"), item.get("state"), item.get("postcode"))
+    country = _join_place_parts(item.get("country"))
+    return ", ".join([part for part in (street, suburb_line, country) if part])
+
+
+def _build_marker_details(item, lat, lon):
+    details = []
+    description = (item.get("desc") or "").strip()
+    address = _format_place_address(item)
+    if description:
+        details.append(description)
+    if address:
+        details.append(address)
+    details.append(f"{lat:.6f}, {lon:.6f}")
+    return details
+
+
+def _build_external_map_links(item, lat, lon):
+    name = (item.get("name") or "").strip()
+    address = _format_place_address(item)
+    context = {
+        "lat": f"{lat:.6f}",
+        "lon": f"{lon:.6f}",
+        "name": quote_plus(name),
+        "address": quote_plus(address),
+    }
+    links = []
+    for spec in getattr(cfg, "PLACES_MAP_EXTERNAL_URLS", []):
+        label = (spec.get("label") or "").strip()
+        template = (spec.get("url") or "").strip()
+        if not label or not template:
+            continue
+        try:
+            link_url = template.format(**context)
+        except (KeyError, ValueError):
+            continue
+        links.append({"label": label, "url": link_url})
+    return links
+
+
+def _place_map_actions(item):
+    lat = _parse_float(item.get("gps_lat"))
+    lon = _parse_float(item.get("gps_long"))
+    if lat is None or lon is None:
+        return []
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return []
+    return _build_external_map_links(item, lat, lon)
+
+
+def _attach_place_map_actions(items):
+    for item in items:
+        item["map_actions"] = _place_map_actions(item)
+    return items
+
+
 def _build_fields(col_list):
     fields = build_form_fields(col_list)
     for field in fields:
@@ -100,6 +164,7 @@ def list_places_table_route():
     total = _count_places(project)
     offset = (page - 1) * per_page
     items = _fetch_places(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    _attach_place_map_actions(items)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
@@ -148,6 +213,8 @@ def list_places_map_route():
             {
                 "id": item.get("id"),
                 "name": item.get("name") or "",
+                "details": _build_marker_details(item, lat, lon),
+                "actions": _build_external_map_links(item, lat, lon),
                 "lat": lat,
                 "lon": lon,
                 "url": url_for("places.view_place_route", place_id=item.get("id"), proj=project),
@@ -177,6 +244,7 @@ def view_place_route(place_id):
             item = dict(rows[0])
     if not item:
         return redirect(url_for("places.list_places_table_route", proj=project))
+    item["map_actions"] = _place_map_actions(item)
     return render_template(
         "places_view.html",
         active_tab="places",

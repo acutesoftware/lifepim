@@ -82,6 +82,25 @@ SEARCH_CONTENT_SNIPPET_LEN = 400
 # Audio player settings
 AUDIO_SHOW_FREQ_BAR = "Y"
 
+# Places map settings
+PLACES_MAP_EXTERNAL_URLS = [
+    {
+        "label": "Google Maps",
+        "url": "https://www.google.com/maps/search/?api=1&query={lat},{lon}",
+    },
+    {
+        "label": "Street View",
+        "url": "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lon}",
+    },
+    {
+        "label": "OpenStreetMap",
+        "url": "https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=18/{lat}/{lon}",
+    },
+]
+
+# Development server settings
+APP_AUTO_RELOAD = True
+
 # Project list default
 proj_list = ['Dev','Design','Fun','Games','Family','Car',
              'Business','Web','Home','Study','Health','Work',

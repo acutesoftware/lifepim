@@ -38,6 +38,20 @@ MEDIA_SEARCH_COLS = [
 ]
 
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".mpg", ".mpeg", ".wmv"}
+AUDIO_EXTS = {
+    ".mp3",
+    ".wav",
+    ".flac",
+    ".aac",
+    ".m4a",
+    ".m4b",
+    ".ogg",
+    ".opus",
+    ".wma",
+    ".aiff",
+    ".aif",
+    ".alac",
+}
 
 
 def _ensure_schema():
@@ -96,6 +110,34 @@ def _is_video(item):
         return True
     ext = (item.get("ext") or "").lower()
     return f".{ext}" in VIDEO_EXTS
+
+
+def _normalized_ext(value):
+    ext = (value or "").strip().lower()
+    if not ext:
+        return ""
+    return ext if ext.startswith(".") else f".{ext}"
+
+
+def _is_audio(item):
+    if (item.get("media_type") or "").lower() == "audio":
+        return True
+    return _normalized_ext(item.get("ext")) in AUDIO_EXTS
+
+
+def _add_audio_media_filter(where, params):
+    ext_conditions = []
+    for ext in sorted(AUDIO_EXTS):
+        ext_text = ext.lstrip(".")
+        ext_conditions.append("lower(m.ext) = ?")
+        params.append(ext_text)
+        ext_conditions.append("lower(m.ext) = ?")
+        params.append(ext)
+        ext_conditions.append("lower(m.filename) LIKE ?")
+        params.append(f"%{ext}")
+        ext_conditions.append("lower(m.path) LIKE ?")
+        params.append(f"%{ext}")
+    where.append("(lower(m.media_type) = 'audio' OR " + " OR ".join(ext_conditions) + ")")
 
 
 def _coerce_int_list(values):
@@ -1121,6 +1163,7 @@ def media_player_route():
     sort_key = _normalize_sort(request.args.get("sort"))
     limit = request.args.get("limit", type=int) or 200
     joins, where, params = _build_media_filters("all", None, None, False, "", [], [], None)
+    _add_audio_media_filter(where, params)
     items = _fetch_media(conn, joins, where, params, sort_key, limit=limit, offset=0)
     playlist = []
     for item in items:
@@ -1131,6 +1174,7 @@ def media_player_route():
                 "path": item.get("path") or "",
                 "url": url_for("media.media_file_route", media_id=item.get("media_id")),
                 "is_video": _is_video(item),
+                "is_audio": _is_audio(item),
             }
         )
     start_id = request.args.get("id", type=int)

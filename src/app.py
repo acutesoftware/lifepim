@@ -64,23 +64,29 @@ def _help_paths():
     ]
 
 
+def _python_source_files():
+    src_folder = os.path.dirname(os.path.abspath(__file__))
+    files = []
+    for root, dirs, file_names in os.walk(src_folder):
+        dirs[:] = [name for name in dirs if name != "__pycache__"]
+        for file_name in file_names:
+            if file_name.lower().endswith(".py"):
+                files.append(os.path.join(root, file_name))
+    return files
+
+
 def _last_python_source_update():
     src_folder = os.path.dirname(os.path.abspath(__file__))
     latest_mtime = None
     latest_path = ""
-    for root, dirs, files in os.walk(src_folder):
-        dirs[:] = [name for name in dirs if name != "__pycache__"]
-        for file_name in files:
-            if not file_name.lower().endswith(".py"):
-                continue
-            path = os.path.join(root, file_name)
-            try:
-                mtime = os.path.getmtime(path)
-            except OSError:
-                continue
-            if latest_mtime is None or mtime > latest_mtime:
-                latest_mtime = mtime
-                latest_path = path
+    for path in _python_source_files():
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            continue
+        if latest_mtime is None or mtime > latest_mtime:
+            latest_mtime = mtime
+            latest_path = path
     if latest_mtime is None:
         return "No Python source files found"
     timestamp = datetime.fromtimestamp(latest_mtime).strftime("%Y-%m-%d %H:%M:%S")
@@ -289,12 +295,17 @@ def help_route():
 
 if __name__ == "__main__":
     #app.run(debug=True)
-    _exit_if_server_already_running(mod_cfg.base_url, mod_cfg.port_num)
+    auto_reload = bool(getattr(mod_cfg, "APP_AUTO_RELOAD", False))
+    is_reloader_child = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+    if not (auto_reload and is_reloader_child):
+        _exit_if_server_already_running(mod_cfg.base_url, mod_cfg.port_num)
 
     app.run(
         host=mod_cfg.base_url,
         port=mod_cfg.port_num,
-        debug=False
+        debug=False,
+        use_reloader=auto_reload,
+        extra_files=_python_source_files(),
     )
 
 

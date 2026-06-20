@@ -34,6 +34,7 @@
     "\"": "&quot;",
     "'": "&#39;"
   }[ch]));
+  const escapeAttr = escapeHtml;
   if (markers.length) {
     const map = L.map("places-map");
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -45,8 +46,33 @@
     markers.forEach((m) => {
       const marker = L.marker([m.lat, m.lon]).addTo(map);
       const label = escapeHtml(m.name || "View place");
-      marker.bindPopup('<a href="' + m.url + '">' + label + "</a>");
-      marker.on("click", () => { window.location = m.url; });
+      const detailRows = (m.details || []).map((line) => (
+        '<div class="places-map-tooltip-row">' + escapeHtml(line) + "</div>"
+      )).join("");
+      const tooltipHtml = (
+        '<div class="places-map-tooltip-title">' + label + "</div>" + detailRows
+      );
+      marker.bindTooltip(tooltipHtml, {
+        className: "places-map-tooltip",
+        direction: "top",
+        offset: [0, -8],
+        opacity: 0.96,
+        sticky: true
+      });
+      const actionLinks = [
+        '<a href="' + escapeAttr(m.url) + '">View place</a>',
+        ...((m.actions || []).map((action) => (
+          '<a href="' + escapeAttr(action.url) + '" target="_blank" rel="noopener noreferrer">' +
+          escapeHtml(action.label) +
+          "</a>"
+        )))
+      ].join("");
+      marker.bindPopup(
+        '<div class="places-map-popup">' +
+          '<div class="places-map-popup-title">' + label + "</div>" +
+          '<div class="places-map-popup-actions">' + actionLinks + "</div>" +
+        "</div>"
+      );
     });
   }
   </script>
