@@ -4,9 +4,7 @@
     <p>No note selected. Use "New Note" from the Notes list to create one.</p>
   {% else %}
     <div class="note-edit" data-note-id="{{ note.id }}">
-      <h4>{{ note.file_name }}</h4>
       <table border="1" cellpadding="4">
-        <tr><th>File</th><td>{{ note.file_name }}</td></tr>
         <tr><th>Path</th><td>{{ note.path }}</td></tr>
         <tr><th>Folder ID</th><td>{{ note.folder_id }}</td></tr>
         <tr><th>Size</th><td id="note-meta-size">{{ note.size }}</td></tr>

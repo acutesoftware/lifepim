@@ -1,7 +1,14 @@
 {% extends 'layout.html' %}
 {% block module_content %}
   <div class="note-view">
-    <div>
+    {% if note_breadcrumb %}
+      <div class="note-breadcrumb">
+        {% for crumb in note_breadcrumb %}
+          <a href="{{ crumb.url }}">{{ crumb.label }}</a>{% if not loop.last %}<span>&gt;</span>{% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+    <div class="note-view-toolbar">
       {% set btn_style = "display:inline-block;padding:2px 8px;border:1px solid #999;border-radius:4px;text-decoration:none;margin-right:4px;" %}
       <a href="{{ url_for('notes.view_note_route', note_id=note.id, format='text') }}"
          style="{{ btn_style }}{% if render_mode == 'text' %}background:#ddd;font-weight:bold;{% endif %}">Text</a>
@@ -9,11 +16,11 @@
          style="{{ btn_style }}{% if render_mode == 'markdown' %}background:#ddd;font-weight:bold;{% endif %}">Markdown</a>
       <a href="{{ url_for('notes.view_note_route', note_id=note.id, format='hex') }}"
          style="{{ btn_style }}{% if render_mode == 'hex' %}background:#ddd;font-weight:bold;{% endif %}">Hex</a>
+      <a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}"
+         style="{{ btn_style }}">Edit</a>
     </div>
-    <h4>{{ note.file_name }}</h4>
 
     <table border="1" cellpadding="4">
-      <tr><th>File</th><td>{{ note.file_name }}</td></tr>
       <tr><th>Path</th><td>{{ note.path }}</td></tr>
       <tr><th>Folder ID</th><td>{{ note.folder_id }}</td></tr>
       <tr><th>Size</th><td>{{ note.size }}</td></tr>
@@ -45,7 +52,6 @@
         <pre style="white-space: pre-wrap; font-family: inherit;">{{ note_text }}</pre>
       {% endif %}
     {% endif %}
-    <p><a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}">Edit</a></p>
   </div>
   {% set link_record_type = "note" %}
   {% set link_record_id = note.id %}

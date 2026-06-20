@@ -1,19 +1,32 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div>
-    <a href="{{ url_for('notes.list_notes_table_route', proj=project) }}">Table</a> |
-    <a href="{{ url_for('notes.list_notes_list_route', proj=project) }}">List</a> |
-    <a href="{{ url_for('notes.list_notes_cards_route', proj=project) }}">Card</a>
+  <div class="note-list-toolbar">
+    <a href="{{ url_for('notes.list_notes_table_route', proj=project, folder=folder_filter) }}">Table</a> |
+    <a href="{{ url_for('notes.list_notes_list_route', proj=project, folder=folder_filter) }}">List</a> |
+    <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter) }}">Card</a> |
+    <a href="#" class="new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a> |
+    <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
+    <span class="note-status">{{ total_notes|default(notes|length) }} notes</span>
+    {% set link_list_type = "note" %}
+    {% set link_list_context_id = "notes_list" %}
+    {% set link_table_id = "notes-table" %}
+    {% include "widgets/links_bulk_toolbar.html" %}
   </div>
-  <a href="#" class="new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a>
-  <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
-
+  <div class="note-breadcrumb">
+    {% for crumb in note_breadcrumb %}
+      <a href="{{ crumb.url }}">{{ crumb.label }}</a>{% if not loop.last %}<span>&gt;</span>{% endif %}
+    {% endfor %}
+  </div>
   {% include "widgets/project_folders.html" %}
 
-{% set link_list_type = "note" %}
-{% set link_list_context_id = "notes_list" %}
-{% set link_table_id = "notes-table" %}
-{% include "widgets/links_bulk_toolbar.html" %}
+{% if note_subfolders %}
+  <div class="note-folder-list">
+    <div class="note-folder-title">Folders</div>
+    {% for folder in note_subfolders %}
+      <a class="note-folder-link" href="{{ folder.url }}">{{ folder.label }}</a>
+    {% endfor %}
+  </div>
+{% endif %}
 
 <table border="1" cellpadding="5" id="notes-table" data-notes-context="true">
   <tr>
@@ -26,31 +39,31 @@
     {% set dir_derived = 'asc' if sort_col != 'derived_project' or sort_dir == 'desc' else 'desc' %}
     {% set dir_modified = 'asc' if sort_col != 'date_modified' or sort_dir == 'desc' else 'desc' %}
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='file_name', dir=dir_file) }}">File</a>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='file_name', dir=dir_file) }}">File</a>
       {% if sort_col == 'file_name' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='path', dir=dir_path) }}">Path</a>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='path', dir=dir_path) }}">Path</a>
       {% if sort_col == 'path' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='folder_id', dir=dir_folder_id) }}">Folder ID</a>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='folder_id', dir=dir_folder_id) }}">Folder ID</a>
       {% if sort_col == 'folder_id' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='size', dir=dir_size) }}">Size</a>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='size', dir=dir_size) }}">Size</a>
       {% if sort_col == 'size' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='project', dir=dir_project) }}">Project</a>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='project', dir=dir_project) }}">Project</a>
       {% if sort_col == 'project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='derived_project', dir=dir_derived) }}">Derived</a>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='derived_project', dir=dir_derived) }}">Derived</a>
       {% if sort_col == 'derived_project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
-      <a href="{{ url_for(route_name, proj=project, sort='date_modified', dir=dir_modified) }}">Modified</a>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='date_modified', dir=dir_modified) }}">Modified</a>
       {% if sort_col == 'date_modified' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>Actions</th>

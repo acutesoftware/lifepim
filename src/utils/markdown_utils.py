@@ -32,6 +32,6 @@ def render_markdown(text, asset_resolver=None):
         return ""
     text = _convert_obsidian_images(text, asset_resolver)
     if md_lib:
-        return md_lib.markdown(text)
+        return md_lib.markdown(text, extensions=["nl2br", "sane_lists", "tables"])
     escaped = html.escape(text)
     return escaped.replace("\n", "<br>")

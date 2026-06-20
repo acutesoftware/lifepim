@@ -1923,7 +1923,7 @@ body.links-resizing {
   display: flex;
   gap: 6px;
   align-items: center;
-  margin: 6px 0;
+  margin: 0;
 }
 
 .link-bulk-count {
@@ -1944,6 +1944,11 @@ body.links-resizing {
   cursor: pointer;
   z-index: 125;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.links-drawer-handle.active {
+  background: #e9edf5;
+  font-weight: bold;
 }
 
 .links-drawer-handle.hidden {
@@ -2058,6 +2063,82 @@ body.links-resizing {
 .note-modal-hint {
   font-size: 10px;
   color: #666;
+}
+
+.note-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.note-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0 6px;
+  font-size: 12px;
+}
+
+.note-status {
+  border-left: 1px solid #ccc;
+  padding-left: 8px;
+  color: #444;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.note-breadcrumb a {
+  color: #223;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.note-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.note-breadcrumb span {
+  color: #777;
+}
+
+.note-view-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.note-folder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.note-folder-title {
+  font-weight: bold;
+  color: #555;
+  margin-right: 2px;
+}
+
+.note-folder-link {
+  border: 1px solid #ccc;
+  background: #f6f7f8;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #223;
+  text-decoration: none;
+}
+
+.note-folder-link:hover {
+  background: #eceff3;
+  text-decoration: underline;
 }
 
 .note-context-menu {

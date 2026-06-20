@@ -297,7 +297,201 @@ def _create_note_file(folder_path, title, sidebar_label):
         "title": title_clean,
     }
 
-def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None):
+
+def _normalize_project(project):
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        return None
+    return project
+
+
+def _normalize_folder_filter(folder_path):
+    folder_path = (folder_path or "").strip()
+    if not folder_path:
+        return None
+    return folder_etl.norm_path(folder_path) or folder_path
+
+
+def _notes_base_condition(project, folder_path=None):
+    params = []
+    if project and project.lower() == "unmapped":
+        condition = (
+            "NOT EXISTS ("
+            "  SELECT 1 FROM lp_project_folders pf "
+            "  WHERE pf.is_enabled = 1 "
+            "    AND pf.folder_role IN ('default','include','archive','output') "
+            "    AND df.folder_path IS NOT NULL "
+            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+            ")"
+        )
+    elif project:
+        condition = (
+            "EXISTS ("
+            "  SELECT 1 FROM lp_project_folders pf "
+            "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
+            "    AND pf.folder_role IN ('default','include','archive','output') "
+            "    AND df.folder_path IS NOT NULL "
+            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+            ")"
+        )
+        params.append(project)
+    else:
+        condition = "1=1"
+    if folder_path:
+        condition = f"({condition}) AND lower(rtrim(replace(t.path, '/', '\\'))) = lower(?)"
+        params.append(folder_path)
+    return condition, params
+
+
+def _count_notes(project, folder_path=None):
+    tbl = get_table_def("notes")
+    if not tbl:
+        return 0
+    projects_mod.ensure_projects_schema(data._get_conn())
+    condition, params = _notes_base_condition(project, folder_path)
+    row = data._get_conn().execute(
+        f"SELECT COUNT(1) AS cnt FROM {tbl['name']} t "
+        "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+        f"WHERE {condition}",
+        params,
+    ).fetchone()
+    return row["cnt"] if row else 0
+
+
+def _notes_url_args(project=None, folder_path=None, **extra):
+    args = {}
+    if project:
+        args["proj"] = project
+    if folder_path:
+        args["folder"] = folder_path
+    for key, value in extra.items():
+        if value not in (None, "", False):
+            args[key] = value
+    return args
+
+
+def _notes_root_path(project=None):
+    tbl = get_table_def("notes")
+    if not tbl:
+        return None
+    projects_mod.ensure_projects_schema(data._get_conn())
+    condition, params = _notes_base_condition(project)
+    sql = (
+        f"SELECT rtrim(t.path) AS path "
+        f"FROM {tbl['name']} t "
+        "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+        f"WHERE {condition} "
+        "AND lower(replace(t.path, '/', '\\')) LIKE '%\\data\\notes%' "
+        "ORDER BY LENGTH(t.path) ASC "
+        "LIMIT 1"
+    )
+    row = data._get_conn().execute(sql, params).fetchone()
+    if not row:
+        return None
+    parts = [part for part in _normalize_folder_filter(row["path"]).split("\\") if part]
+    for idx in range(len(parts) - 1):
+        if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
+            return "\\".join(parts[: idx + 2])
+    return None
+
+
+def _note_folder_breadcrumb(folder_path, project=None):
+    folder_path = _normalize_folder_filter(folder_path)
+    if not folder_path:
+        root_path = _notes_root_path(project)
+        if root_path:
+            return [
+                {
+                    "label": "notes",
+                    "url": url_for(
+                        "notes.list_notes_table_route",
+                        **_notes_url_args(folder_path=root_path),
+                    ),
+                }
+            ]
+        return [{"label": "notes", "url": url_for("notes.list_notes_table_route")}]
+    parts = [part for part in folder_path.replace("/", "\\").split("\\") if part]
+    root_idx = None
+    for idx in range(len(parts) - 1):
+        if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
+            root_idx = idx + 1
+            break
+    if root_idx is None:
+        return []
+
+    root_parts = parts[: root_idx + 1]
+    rel_parts = parts[root_idx + 1 :]
+    current = "\\".join(root_parts)
+    crumbs = [
+        {
+            "label": "notes",
+            "url": url_for(
+                "notes.list_notes_table_route",
+                **_notes_url_args(folder_path=current),
+            ),
+        }
+    ]
+    for part in rel_parts:
+        current = current + "\\" + part
+        crumbs.append(
+            {
+                "label": part,
+                "url": url_for(
+                    "notes.list_notes_table_route",
+                    **_notes_url_args(folder_path=current),
+                ),
+            }
+        )
+    return crumbs
+
+
+def _path_prefix_value(folder_path):
+    folder_path = _normalize_folder_filter(folder_path)
+    if not folder_path:
+        return None
+    return folder_path + "\\%"
+
+
+def _fetch_note_subfolders(project, folder_path=None):
+    folder_path = _normalize_folder_filter(folder_path)
+    if not folder_path:
+        return []
+    tbl = get_table_def("notes")
+    if not tbl:
+        return []
+    projects_mod.ensure_projects_schema(data._get_conn())
+    condition, params = _notes_base_condition(project)
+    sql = (
+        f"SELECT DISTINCT rtrim(t.path) AS path "
+        f"FROM {tbl['name']} t "
+        "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+        f"WHERE {condition} "
+        "AND lower(rtrim(replace(t.path, '/', '\\'))) LIKE lower(?)"
+    )
+    params.append(_path_prefix_value(folder_path))
+    rows = data._get_conn().execute(sql, params).fetchall()
+    base = folder_path.rstrip("\\")
+    base_lower = base.lower()
+    subfolders = {}
+    for row in rows:
+        path = _normalize_folder_filter(row["path"])
+        if not path or path.lower() == base_lower:
+            continue
+        prefix = base + "\\"
+        if not path.lower().startswith(prefix.lower()):
+            continue
+        child = path[len(prefix) :].split("\\", 1)[0].strip()
+        if not child:
+            continue
+        child_path = prefix + child
+        subfolders[child.lower()] = {
+            "label": child,
+            "path": child_path,
+            "url": url_for("notes.list_notes_table_route", **_notes_url_args(folder_path=child_path)),
+        }
+    return [subfolders[key] for key in sorted(subfolders)]
+
+
+def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None):
     tbl = get_table_def("notes")
     if not tbl:
         return []
@@ -335,30 +529,7 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None)
         "LIMIT 1"
         ") as derived_project"
     )
-    params = []
-    if project and project.lower() == "unmapped":
-        condition = (
-            "NOT EXISTS ("
-            "  SELECT 1 FROM lp_project_folders pf "
-            "  WHERE pf.is_enabled = 1 "
-            "    AND pf.folder_role IN ('default','include','archive','output') "
-            "    AND df.folder_path IS NOT NULL "
-            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
-            ")"
-        )
-    elif project:
-        condition = (
-            "EXISTS ("
-            "  SELECT 1 FROM lp_project_folders pf "
-            "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
-            "    AND pf.folder_role IN ('default','include','archive','output') "
-            "    AND df.folder_path IS NOT NULL "
-            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
-            ")"
-        )
-        params.append(project)
-    else:
-        condition = "1=1"
+    condition, params = _notes_base_condition(project, folder_path)
     sql = (
         f"SELECT {', '.join(select_cols)} "
         f"FROM {tbl['name']} t "
@@ -400,9 +571,8 @@ def _get_note_record(note_id):
 
 @notes_bp.route('/')
 def list_notes_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    project = _normalize_project(request.args.get("proj"))
+    folder_filter = _normalize_folder_filter(request.args.get("folder"))
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
@@ -418,6 +588,10 @@ def list_notes_route():
             project_info=project_info,
             project_folders=project_folders,
             project=project,
+            folder_filter=folder_filter,
+            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+            note_subfolders=_fetch_note_subfolders(project, folder_filter),
+            total_notes=0,
             sort_col="date_modified",
             sort_dir="desc",
             route_name="notes.list_notes_table_route",
@@ -429,14 +603,14 @@ def list_notes_route():
         )
     view_pref = request.cookies.get("notes_view")
     if view_pref in ("list", "cards"):
-        return redirect(url_for(f"notes.list_notes_{view_pref}_route", proj=project))
+        return redirect(url_for(f"notes.list_notes_{view_pref}_route", **_notes_url_args(project, folder_filter)))
     sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
@@ -444,7 +618,7 @@ def list_notes_route():
     pagination = build_pagination(
         url_for,
         route_name,
-        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -460,6 +634,10 @@ def list_notes_route():
         project_info=project_info,
         project_folders=project_folders,
         project=project,
+        folder_filter=folder_filter,
+        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+        note_subfolders=_fetch_note_subfolders(project, folder_filter),
+        total_notes=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
         route_name=route_name,
@@ -478,9 +656,8 @@ def list_notes_route():
 
 @notes_bp.route('/table')
 def list_notes_table_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    project = _normalize_project(request.args.get("proj"))
+    folder_filter = _normalize_folder_filter(request.args.get("folder"))
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
@@ -496,6 +673,10 @@ def list_notes_table_route():
             project_info=project_info,
             project_folders=project_folders,
             project=project,
+            folder_filter=folder_filter,
+            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+            note_subfolders=_fetch_note_subfolders(project, folder_filter),
+            total_notes=0,
             sort_col="date_modified",
             sort_dir="desc",
             route_name="notes.list_notes_table_route",
@@ -509,9 +690,9 @@ def list_notes_table_route():
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
@@ -519,7 +700,7 @@ def list_notes_table_route():
     pagination = build_pagination(
         url_for,
         route_name,
-        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -535,6 +716,10 @@ def list_notes_table_route():
         project_info=project_info,
         project_folders=project_folders,
         project=project,
+        folder_filter=folder_filter,
+        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+        note_subfolders=_fetch_note_subfolders(project, folder_filter),
+        total_notes=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
         route_name=route_name,
@@ -553,9 +738,8 @@ def list_notes_table_route():
 
 @notes_bp.route('/list')
 def list_notes_list_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    project = _normalize_project(request.args.get("proj"))
+    folder_filter = _normalize_folder_filter(request.args.get("folder"))
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
@@ -571,6 +755,10 @@ def list_notes_list_route():
             project_info=project_info,
             project_folders=project_folders,
             project=project,
+            folder_filter=folder_filter,
+            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+            note_subfolders=_fetch_note_subfolders(project, folder_filter),
+            total_notes=0,
             page=1,
             total_pages=1,
             pages=[],
@@ -579,16 +767,16 @@ def list_notes_list_route():
         )
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, limit=per_page, offset=offset)
+    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "notes.list_notes_list_route",
-        {"proj": project},
+        _notes_url_args(project, folder_filter),
         page,
         total_pages,
     )
@@ -604,6 +792,10 @@ def list_notes_list_route():
         project_info=project_info,
         project_folders=project_folders,
         project=project,
+        folder_filter=folder_filter,
+        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+        note_subfolders=_fetch_note_subfolders(project, folder_filter),
+        total_notes=total,
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
@@ -617,9 +809,8 @@ def list_notes_list_route():
 
 @notes_bp.route('/cards')
 def list_notes_cards_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    project = _normalize_project(request.args.get("proj"))
+    folder_filter = _normalize_folder_filter(request.args.get("folder"))
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
@@ -636,6 +827,10 @@ def list_notes_cards_route():
             project_info=project_info,
             project_folders=project_folders,
             project=project,
+            folder_filter=folder_filter,
+            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+            note_subfolders=_fetch_note_subfolders(project, folder_filter),
+            total_notes=0,
             note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
             page=1,
             total_pages=1,
@@ -645,16 +840,16 @@ def list_notes_cards_route():
         )
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = data.count_mapped_rows(data.conn, tbl["name"], tab=project)
+    total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, limit=per_page, offset=offset)
+    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "notes.list_notes_cards_route",
-        {"proj": project},
+        _notes_url_args(project, folder_filter),
         page,
         total_pages,
     )
@@ -675,6 +870,10 @@ def list_notes_cards_route():
         project_info=project_info,
         project_folders=project_folders,
         project=project,
+        folder_filter=folder_filter,
+        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
+        note_subfolders=_fetch_note_subfolders(project, folder_filter),
+        total_notes=total,
         note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
         page=page,
         total_pages=total_pages,
@@ -726,6 +925,8 @@ def view_note_route(note_id):
     if not note:
         return redirect(url_for("notes.list_notes_route"))
     note_path = _build_note_path(note)
+    note_folder = _normalize_folder_filter(note.get("path"))
+    breadcrumb_project = note.get("derived_project") or note.get("project")
     file_exists = note_path and os.path.isfile(note_path)
     note_text = ""
     if file_exists:
@@ -736,7 +937,8 @@ def view_note_route(note_id):
         def _asset_url(asset_name):
             return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
 
-        content_html = markdown_utils.render_markdown(note_text, asset_resolver=_asset_url)
+        display_text = _without_duplicate_title_heading(note_text, note.get("file_name"))
+        content_html = markdown_utils.render_markdown(display_text, asset_resolver=_asset_url)
     elif render_mode == "hex":
         hex_rows = hex_utils.hex_dump(note_text)
     return render_template(
@@ -753,6 +955,7 @@ def view_note_route(note_id):
         note_text=note_text,
         file_exists=file_exists,
         note_path=note_path,
+        note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_project),
     )
 
 
@@ -1161,6 +1364,29 @@ def _read_note_file(note_path):
             return handle.read()
     except OSError:
         return ""
+
+
+def _without_duplicate_title_heading(note_text, file_name):
+    title = (file_name or "").strip()
+    if not title:
+        return note_text
+    title_stem, _ = os.path.splitext(title)
+    title_values = {title.lower()}
+    if title_stem:
+        title_values.add(title_stem.lower())
+    lines = note_text.splitlines(keepends=True)
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = re.match(r"^#{1,6}\s+(.+?)\s*#*\s*$", stripped)
+        if not match:
+            return note_text
+        heading = match.group(1).strip().lower()
+        if heading in title_values:
+            return "".join(lines[:idx] + lines[idx + 1 :])
+        return note_text
+    return note_text
 
 
 def _note_file_state(note_path):

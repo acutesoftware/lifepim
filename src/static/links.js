@@ -101,8 +101,17 @@
     if (STATE.drawerHandle) {
       STATE.drawerHandle.addEventListener("click", () => {
         if (STATE.drawer) {
-          setDrawerOpen(true);
-          STATE.drawer.focus();
+          setDrawerOpen(!STATE.drawerOpen);
+          if (STATE.drawerOpen) {
+            STATE.drawer.focus();
+          }
+          return;
+        }
+        const bulkBtn = qs(".link-bulk-open");
+        if (bulkBtn && !bulkBtn.disabled) {
+          bulkBtn.click();
+        } else if (bulkBtn) {
+          showToast({ message: "Select one or more records first." });
         }
       });
     }
@@ -110,7 +119,11 @@
     if (drawer) {
       initDrawer(drawer);
     } else if (STATE.drawerHandle) {
-      STATE.drawerHandle.classList.add("hidden");
+      const bulkBtn = qs(".link-bulk-open");
+      STATE.drawerHandle.classList.toggle("hidden", !bulkBtn);
+      if (bulkBtn) {
+        STATE.drawerHandle.textContent = "Link to";
+      }
     }
     initDragSources();
     initBulkToolbars();
@@ -207,7 +220,9 @@
     STATE.drawer.classList.toggle("open", open);
     document.body.classList.toggle("has-links-drawer", open);
     if (STATE.drawerHandle) {
-      STATE.drawerHandle.classList.toggle("hidden", open);
+      STATE.drawerHandle.classList.remove("hidden");
+      STATE.drawerHandle.classList.toggle("active", open);
+      STATE.drawerHandle.textContent = open ? "Hide links" : "Links";
     }
   }
 
