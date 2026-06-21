@@ -21,11 +21,19 @@ CALENDAR_VIEW_DEFAULTS = {
 }
 
 
+GENERAL_DEFAULTS = {
+    "general.freeze_headers": ("0", "General", "Freeze headers"),
+}
+
+
 def ensure_settings_schema(conn=None):
     conn = db._get_conn() if conn is None else conn
     conn.executescript(SETTINGS_SCHEMA_SQL)
     now = _utc_now()
-    for key, (value, category, label) in CALENDAR_VIEW_DEFAULTS.items():
+    for key, (value, category, label) in {
+        **CALENDAR_VIEW_DEFAULTS,
+        **GENERAL_DEFAULTS,
+    }.items():
         conn.execute(
             "INSERT OR IGNORE INTO sys_settings "
             "(setting_key, setting_value, category, label, updated_utc) "
@@ -67,6 +75,22 @@ def get_calendar_view_settings(conn=None):
         "files": _as_bool(get_setting("calendar.view.files", "0", conn)),
         "usage": _as_bool(get_setting("calendar.view.usage", "0", conn)),
     }
+
+
+def get_general_settings(conn=None):
+    return {
+        "freeze_headers": _as_bool(get_setting("general.freeze_headers", "0", conn)),
+    }
+
+
+def save_general_settings(values, conn=None):
+    set_setting(
+        "general.freeze_headers",
+        "1" if values.get("freeze_headers") else "0",
+        "General",
+        "Freeze headers",
+        conn,
+    )
 
 
 def save_calendar_view_settings(sources, conn=None):

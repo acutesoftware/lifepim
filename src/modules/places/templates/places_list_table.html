@@ -11,6 +11,7 @@
 {% set link_table_id = "places-table" %}
 {% include "widgets/links_bulk_toolbar.html" %}
 
+<div class="tabular-scroll">
 <table border="1" cellpadding="5" id="places-table">
   <tr>
     <th><input type="checkbox" class="link-select-all"></th>
@@ -50,4 +51,5 @@
   {% endfor %}
 </table>
 {% include "widgets/wid_pagination.html" %}
+</div>
 {% endblock %}

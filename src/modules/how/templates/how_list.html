@@ -2,6 +2,7 @@
 {% block module_content %}
   <a href="{{ url_for('how.add_how_route', proj=project) }}">Add How</a>
 
+<div class="tabular-scroll">
 <table border="1" cellpadding="5">
   <tr>
     {% for col in col_list %}
@@ -23,4 +24,5 @@
   {% endfor %}
 </table>
 {% include "widgets/wid_pagination.html" %}
+</div>
 {% endblock %}

@@ -4,6 +4,20 @@
     <p>No note selected. Use "New Note" from the Notes list to create one.</p>
   {% else %}
     <div class="note-edit" data-note-id="{{ note.id }}">
+      {% if note_breadcrumb %}
+        <div class="note-breadcrumb">
+          {% for crumb in note_breadcrumb %}
+            <a href="{{ crumb.url }}">{{ crumb.label }}</a>{% if not loop.last %}<span>&gt;</span>{% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+      <div class="note-view-toolbar">
+        {% set btn_style = "display:inline-block;padding:2px 8px;border:1px solid #999;border-radius:4px;text-decoration:none;margin-right:4px;" %}
+        <a href="{{ url_for('notes.view_note_route', note_id=note.id) }}" style="{{ btn_style }}">View</a>
+        <a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}" style="{{ btn_style }}background:#ddd;font-weight:bold;">Edit</a>
+      </div>
+
+      <div class="tabular-scroll">
       <table border="1" cellpadding="4">
         <tr><th>Path</th><td>{{ note.path }}</td></tr>
         <tr><th>Folder ID</th><td>{{ note.folder_id }}</td></tr>
@@ -23,6 +37,7 @@
                   style="width:100%; min-height:60vh; font-family:inherit;">{{ note_text }}</textarea>
         <div style="margin-top:6px; font-size:0.85em; color:#777;">Autosaves after you pause typing.</div>
       {% endif %}
+      </div>
     </div>
     <script src="{{ url_for('static', filename='note_editor.js') }}"></script>
   {% endif %}

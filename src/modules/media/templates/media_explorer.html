@@ -366,6 +366,7 @@
               <button type="submit" class="media-action-btn" disabled>Apply</button>
             </div>
 
+            <div class="tabular-scroll">
             {% if items %}
               {% if view == 'timeline' %}
                 {% for group in groups %}
@@ -382,6 +383,7 @@
             {% endif %}
 
             {% include "widgets/wid_pagination.html" %}
+            </div>
           </form>
         {% endif %}
       </section>

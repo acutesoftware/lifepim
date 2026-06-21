@@ -9,6 +9,11 @@ REM and the venv is located at:
 REM   <LifePIM root>\.venv\
 REM ============================================================
 
+REM note - to run this manually from a command line, use the line below
+REM D:\DATA_LLM\dev\lifepim-desktop\.venv\Scripts\python.exe app.py
+REM from the D:\DATA_LLM\dev\lifepim-desktop\src folder
+
+
 REM Move to the LifePIM root folder, one level above /src
 cd /d "%~dp0\.."
 

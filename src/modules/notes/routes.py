@@ -1136,6 +1136,8 @@ def edit_note_route(note_id):
         if note_state:
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
+    note_folder = _normalize_folder_filter(note.get("path")) if note else ""
+    breadcrumb_project = note.get("derived_project") or note.get("project") if note else None
     return render_template(
         "note_edit.html",
         active_tab="notes",
@@ -1146,6 +1148,7 @@ def edit_note_route(note_id):
         file_exists=file_exists,
         note_path=note_path,
         note_state=note_state,
+        note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_project),
         content_title=f"Edit: {note.get('file_name')}" if note else "Edit Note",
     )
 

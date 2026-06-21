@@ -139,6 +139,14 @@ app.register_blueprint(links_bp, url_prefix="/links")
 app.register_blueprint(projects_bp, url_prefix="/projects")
 _dbg("Blueprints registered")
 
+
+@app.context_processor
+def inject_layout_settings():
+    return {
+        "freeze_headers": settings_mod.get_general_settings().get("freeze_headers", False),
+    }
+
+
 @app.route('/')
 def index():
     today = date.today()

@@ -20,6 +20,7 @@
          style="{{ btn_style }}">Edit</a>
     </div>
 
+    <div class="tabular-scroll">
     <table border="1" cellpadding="4">
       <tr><th>Path</th><td>{{ note.path }}</td></tr>
       <tr><th>Folder ID</th><td>{{ note.folder_id }}</td></tr>
@@ -52,6 +53,7 @@
         <pre style="white-space: pre-wrap; font-family: inherit;">{{ note_text }}</pre>
       {% endif %}
     {% endif %}
+    </div>
   </div>
   {% set link_record_type = "note" %}
   {% set link_record_id = note.id %}

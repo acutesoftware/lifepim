@@ -10,7 +10,7 @@
   {% set current_proj = None %}
 {% endif %}
 {% set sidebar_label = current_proj or 'All Projects' %}
-<body data-active-tab="{{ active_tab }}" data-sidebar-label="{{ sidebar_label }}" data-sidebar-id="{{ current_proj or '' }}">
+<body class="{% if freeze_headers %}freeze-headers{% endif %}" data-active-tab="{{ active_tab }}" data-sidebar-label="{{ sidebar_label }}" data-sidebar-id="{{ current_proj or '' }}">
   <div class="topbar">
     <!-- Hamburger dropdown menu -->
     <div class="menu-wrapper">
@@ -64,8 +64,8 @@
       <h3>{{ content_title or active_tab }}</h3>
       <div class="content">
         {{ content_html|safe }}
+        {% block module_content %}{% endblock %}
       </div>
-      {% block module_content %}{% endblock %}
     </main>
   </div>
 

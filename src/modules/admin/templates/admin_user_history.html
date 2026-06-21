@@ -14,6 +14,7 @@
     <a href="{{ url_for('admin.user_history_route', limit=limit) }}">Reset sort</a>
   </div>
 
+  <div class="tabular-scroll">
   <table border="1" cellpadding="5">
     <tr>
       {% set dir_id = 'asc' if sort_col != 'id' or sort_dir == 'desc' else 'desc' %}
@@ -86,4 +87,5 @@
     </tr>
     {% endfor %}
   </table>
+  </div>
 {% endblock %}

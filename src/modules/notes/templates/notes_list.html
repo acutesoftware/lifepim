@@ -28,6 +28,7 @@
   </div>
 {% endif %}
 
+<div class="tabular-scroll">
 <table border="1" cellpadding="5" id="notes-table" data-notes-context="true">
   <tr>
     <th><input type="checkbox" class="link-select-all"></th>
@@ -86,4 +87,5 @@
   {% endfor %}
 </table>
   {% include "widgets/wid_pagination.html" %}
+</div>
 {% endblock %}

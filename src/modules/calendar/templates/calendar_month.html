@@ -17,6 +17,7 @@
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
 
+<div class="tabular-scroll">
 <table class="calendar-grid">
   <thead>
     <tr>
@@ -85,4 +86,5 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endblock %}

@@ -16,6 +16,11 @@ body {
   color: #222;
 }
 
+body.freeze-headers {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -133,6 +138,12 @@ body {
   min-height: calc(100vh - 30px);
 }
 
+body.freeze-headers .container {
+  height: calc(100vh - 30px);
+  min-height: 0;
+  overflow: hidden;
+}
+
 .side-tabs {
   width: 140px;
   background: #f2f2f2;
@@ -140,6 +151,10 @@ body {
   display: flex;
   flex-direction: column;
   padding: 2px 0 2px 2px;
+}
+
+body.freeze-headers .side-tabs {
+  overflow-y: auto;
 }
 
 .side-tabs.hidden {
@@ -174,6 +189,116 @@ body {
   overflow-x: auto;
   background: #fff;
   border-left: none;
+}
+
+.main h3 {
+  margin: 0 0 8px;
+}
+
+.content {
+  min-width: 0;
+}
+
+body.freeze-headers .main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.freeze-headers .content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+body.freeze-headers .content:has(.tabular-scroll) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tabular-scroll {
+  min-width: 0;
+}
+
+body.freeze-headers .tabular-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+body.freeze-headers .audio-list-layout,
+body.freeze-headers .audio-list-main,
+body.freeze-headers .audio-list-main > form,
+body.freeze-headers .media-explorer,
+body.freeze-headers .media-body,
+body.freeze-headers .media-main,
+body.freeze-headers .media-actions-form,
+body.freeze-headers .note-edit,
+body.freeze-headers .note-view,
+body.freeze-headers .settings-shell,
+body.freeze-headers .settings-panel {
+  min-height: 0;
+}
+
+body.freeze-headers .audio-list-layout,
+body.freeze-headers .media-explorer,
+body.freeze-headers .note-edit,
+body.freeze-headers .note-view,
+body.freeze-headers .settings-shell,
+body.freeze-headers .settings-panel {
+  flex: 1;
+}
+
+body.freeze-headers .audio-list-main,
+body.freeze-headers .audio-list-main > form,
+body.freeze-headers .media-main,
+body.freeze-headers .media-actions-form,
+body.freeze-headers .note-edit,
+body.freeze-headers .note-view,
+body.freeze-headers .settings-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+body.freeze-headers .audio-list-main,
+body.freeze-headers .audio-list-main > form,
+body.freeze-headers .media-main,
+body.freeze-headers .media-actions-form,
+body.freeze-headers .note-edit,
+body.freeze-headers .note-view,
+body.freeze-headers .settings-panel {
+  flex: 1;
+}
+
+body.freeze-headers .audio-list-layout,
+body.freeze-headers .media-body {
+  align-items: stretch;
+}
+
+body.freeze-headers .media-body {
+  flex: 1;
+  min-height: 0;
+}
+
+body.freeze-headers .audio-playlists-panel,
+body.freeze-headers .media-nav,
+body.freeze-headers .media-inspector {
+  max-height: 100%;
+  overflow: auto;
+}
+
+body.freeze-headers .tabular-scroll table thead th,
+body.freeze-headers .tabular-scroll table tr:first-child th,
+body.freeze-headers .content:not(:has(.tabular-scroll)) table thead th,
+body.freeze-headers .content:not(:has(.tabular-scroll)) table tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 table {

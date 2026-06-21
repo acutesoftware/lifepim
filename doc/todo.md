@@ -2,6 +2,16 @@
 
 Generated from a repository review on 2026-06-15.
 
+
+#### REMINDER
+
+- [ ] always launch LifePIM from Aggie > LifePIM (thise uses prod data)
+
+- [ ] notes folders works old way, BUT you should use new side bar. The old notes DID get mapped, may need some tweaking but trust the new method!
+
+- [ ] remember to run DEPLOY_TO_PROD.bat after ANY code change
+
+
 ## Privacy
 
 - [ ] Run a dedicated secret scan before every public push. Initial text search did not find obvious committed passwords, tokens, or API keys, but use a tool such as `gitleaks` or `detect-secrets` to catch patterns missed by `rg`.

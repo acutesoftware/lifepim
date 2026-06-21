@@ -53,6 +53,7 @@
   <div>Unscheduled items: {{ summary.unscheduled or 0 }}</div>
 </div>
 
+<div class="tabular-scroll">
 <table class="money-table">
   <thead>
     <tr>
@@ -89,6 +90,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 <div class="money-panel" id="moneyPanel" aria-hidden="true">
   <form id="moneyForm" class="money-form">

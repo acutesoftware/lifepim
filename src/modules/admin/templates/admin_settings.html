@@ -50,6 +50,17 @@
         <p class="settings-empty">No Files settings yet.</p>
       {% else %}
         <h4>General</h4>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="general">
+          <div class="settings-fieldset">
+            <label>
+              <input type="checkbox" name="freeze_headers" value="1" {% if general_settings.freeze_headers %}checked{% endif %}>
+              Freeze headers
+            </label>
+          </div>
+          <button type="submit">Save settings</button>
+        </form>
+        <div class="tabular-scroll">
         <table class="settings-table">
           <thead>
             <tr>
@@ -68,6 +79,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       {% endif %}
     </section>
   </div>

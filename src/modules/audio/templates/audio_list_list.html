@@ -22,6 +22,7 @@
           <button type="submit">Add</button>
         </div>
 
+        <div class="tabular-scroll">
         <ul class="audio-list">
           {% for item in items %}
           <li class="audio-list-item">
@@ -36,8 +37,9 @@
           </li>
           {% endfor %}
         </ul>
+        {% include "widgets/wid_pagination.html" %}
+        </div>
       </form>
-      {% include "widgets/wid_pagination.html" %}
     </div>
 
     <aside class="audio-playlists-panel">

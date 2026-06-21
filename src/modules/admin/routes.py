@@ -146,8 +146,17 @@ def settings_route():
             }
             settings_mod.save_calendar_view_settings(sources, conn)
             message = "Calendar settings saved."
+        elif active_settings_tab == "general":
+            settings_mod.save_general_settings(
+                {
+                    "freeze_headers": request.form.get("freeze_headers") == "1",
+                },
+                conn,
+            )
+            message = "General settings saved."
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
+    general_settings = settings_mod.get_general_settings(conn)
     all_settings = settings_mod.list_settings(conn)
 
     return render_template(
@@ -160,6 +169,7 @@ def settings_route():
         message=message,
         active_settings_tab=active_settings_tab,
         calendar_view=calendar_view,
+        general_settings=general_settings,
         all_settings=all_settings,
         now=datetime.now(),
     )

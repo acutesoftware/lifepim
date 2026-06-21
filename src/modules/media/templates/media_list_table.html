@@ -8,6 +8,7 @@
     <a href="{{ url_for('media.media_player_route', proj=project) }}" onclick="window.open(this.href, 'media_player', 'width=520,height=620,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
   </div>
 
+<div class="tabular-scroll">
 <table border="1" cellpadding="5">
   <tr>
     {% for col in col_list %}
@@ -39,4 +40,5 @@
   {% endfor %}
 </table>
 {% include "widgets/wid_pagination.html" %}
+</div>
 {% endblock %}
