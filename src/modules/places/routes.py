@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
 from common import config as cfg
+from common import settings as settings_mod
 from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
 
 
@@ -230,6 +231,7 @@ def list_places_map_route():
         items=items,
         markers=markers,
         project=project,
+        map_names_english=settings_mod.get_general_settings().get("map_names_english", True),
     )
 
 

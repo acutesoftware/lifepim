@@ -13,7 +13,7 @@ import time
 import socket
 import csv
 import datetime
-import win32security
+#import win32security
 
 hostname = socket.gethostname()
 print(f"The hostname is: {hostname}")
@@ -28,6 +28,16 @@ if hostname == 'treebeard':
                  #'R:', 
                  #'S:'
                  ]
+elif hostname == 'oak':    
+    fldr_list = [ "P:\\",
+                "W:\\",
+                "M:\\",
+                "I:\\", 
+                "D:\\", 
+                "C:\\",
+                "N:\\DATA",
+                "N:\\duncan"                
+                 ]    
 else:
     fldr_list = ['D:', 'C:']
 
@@ -70,7 +80,7 @@ excluded_files = [
 
 def collect_raw_filelists():
     lg('START', 'filelist')
-    for fldr in fldr_list[0:3]:
+    for fldr in fldr_list[3:]:
         print('scanning folder ' + fldr)
         op_fname = get_index_filename_from_path(fldr)
         res_fl = mod_fl.FileList([fldr], ['*.*'], excluded_files, op_fname)

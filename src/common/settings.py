@@ -23,6 +23,7 @@ CALENDAR_VIEW_DEFAULTS = {
 
 GENERAL_DEFAULTS = {
     "general.freeze_headers": ("0", "General", "Freeze headers"),
+    "general.map_names_english": ("1", "General", "Map names English"),
 }
 
 
@@ -80,17 +81,19 @@ def get_calendar_view_settings(conn=None):
 def get_general_settings(conn=None):
     return {
         "freeze_headers": _as_bool(get_setting("general.freeze_headers", "0", conn)),
+        "map_names_english": _as_bool(get_setting("general.map_names_english", "1", conn)),
     }
 
 
 def save_general_settings(values, conn=None):
-    set_setting(
-        "general.freeze_headers",
-        "1" if values.get("freeze_headers") else "0",
-        "General",
-        "Freeze headers",
-        conn,
-    )
+    conn = db._get_conn() if conn is None else conn
+    ensure_settings_schema(conn)
+    updates = {
+        "general.freeze_headers": ("1" if values.get("freeze_headers") else "0", "Freeze headers"),
+        "general.map_names_english": ("1" if values.get("map_names_english") else "0", "Map names English"),
+    }
+    for key, (value, label) in updates.items():
+        set_setting(key, value, "General", label, conn)
 
 
 def save_calendar_view_settings(sources, conn=None):

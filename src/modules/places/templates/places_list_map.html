@@ -27,6 +27,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
   const markers = {{ markers | tojson }};
+  const mapNamesEnglish = {{ map_names_english | tojson }};
   const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;",
     "<": "&lt;",
@@ -37,9 +38,18 @@
   const escapeAttr = escapeHtml;
   if (markers.length) {
     const map = L.map("places-map");
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const tileLayer = mapNamesEnglish
+      ? {
+          url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        }
+      : {
+          url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          attribution: "&copy; OpenStreetMap contributors"
+        };
+    L.tileLayer(tileLayer.url, {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution: tileLayer.attribution
     }).addTo(map);
     const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lon]));
     map.fitBounds(bounds, {padding: [20, 20]});

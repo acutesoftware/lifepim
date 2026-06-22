@@ -150,6 +150,7 @@ def settings_route():
             settings_mod.save_general_settings(
                 {
                     "freeze_headers": request.form.get("freeze_headers") == "1",
+                    "map_names_english": request.form.get("map_names_english") == "1",
                 },
                 conn,
             )

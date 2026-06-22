@@ -2247,9 +2247,24 @@ body.links-resizing {
 }
 
 .note-folder-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-weight: bold;
   color: #555;
   margin-right: 2px;
+}
+
+.note-folder-toggle {
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.note-folder-body {
+  display: contents;
 }
 
 .note-folder-link {
@@ -2281,6 +2296,29 @@ body.links-resizing {
   padding: 6px;
   border: 1px solid #ddd;
   background: #fafafa;
+}
+
+.project-folders-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.project-folders-header h4 {
+  margin: 0;
+}
+
+.project-folders-toggle {
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.project-folders.collapsed .project-folders-header {
+  margin-bottom: 0;
 }
 
 .project-folder-form {

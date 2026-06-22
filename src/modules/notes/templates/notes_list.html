@@ -20,11 +20,16 @@
   {% include "widgets/project_folders.html" %}
 
 {% if note_subfolders %}
-  <div class="note-folder-list">
-    <div class="note-folder-title">Folders</div>
+  <div class="note-folder-list" data-collapsible="note-subfolders">
+    <div class="note-folder-title">
+      <span>Folders</span>
+      <button type="button" class="note-folder-toggle" aria-expanded="true">[-]</button>
+    </div>
+    <div class="note-folder-body">
     {% for folder in note_subfolders %}
       <a class="note-folder-link" href="{{ folder.url }}">{{ folder.label }}</a>
     {% endfor %}
+    </div>
   </div>
 {% endif %}
 

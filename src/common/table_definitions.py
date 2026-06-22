@@ -44,8 +44,8 @@ def_lp_job_steps = [ # job_id, job_num, step_num, job_type, details, sql_to_run
     [ 'LOAD_REF', 0, 14, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\d_note.csv', '', 'data - notes', '', ''],
 
 
-    [ 'LOAD_RAW_FILELIST', 1, 1, 'CSV', r'N:\duncan\LifePIM_Data\index\raw_treebeard_*.csv', '', 'Load multiple CSV files into own tables', '', ''],
-    [ 'LOAD_RAW_FILELIST', 1, 2, 'CREATE_FROM_MULT', 'raw_treebeard_%', 's_filelist_raw', 'Create table from  multiple tables', '', ''],
+    [ 'LOAD_RAW_FILELIST', 1, 1, 'CSV', r'N:\duncan\LifePIM_Data\index\raw_oak_*.csv', '', 'Load multiple CSV files into own tables', '', ''],
+    [ 'LOAD_RAW_FILELIST', 1, 2, 'CREATE_FROM_MULT', 'raw_oak_%', 's_filelist_raw', 'Create table from  multiple tables', '', ''],
 
     [ 'LOAD_FILE_MASTER', 2, 1, 'DEL', '', 'c_filelist_files', 'clean dest table', 'DELETE FROM c_filelist_files', ''],
     [ 'LOAD_FILE_MASTER', 2, 2, 'INS', 's_filelist_raw', 'c_filelist_files', 'agg path list', 'INSERT INTO c_filelist_files (file_name, path, size, date) SELECT name, path, size, date FROM s_filelist_raw', ''],

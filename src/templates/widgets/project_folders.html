@@ -1,6 +1,10 @@
 {% if project_info %}
-  <div class="project-folders">
-    <h4>Folders</h4>
+  <div class="project-folders" data-collapsible="project-folders">
+    <div class="project-folders-header">
+      <h4>Folders</h4>
+      <button type="button" class="project-folders-toggle" aria-expanded="true">[-]</button>
+    </div>
+    <div class="project-folders-body">
     <form method="post" action="{{ url_for('projects.project_folder_add_route') }}" class="project-folder-form">
       <input type="hidden" name="project_id" value="{{ project_info.project_id }}">
       <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -59,5 +63,39 @@
     {% else %}
       <p>No folders linked to this project.</p>
     {% endif %}
+    </div>
   </div>
+  <script>
+    (function () {
+      const root = document.currentScript.previousElementSibling;
+      if (!root || root.dataset.collapsible !== "project-folders") {
+        return;
+      }
+      const toggle = root.querySelector(".project-folders-toggle");
+      const body = root.querySelector(".project-folders-body");
+      const storageKey = "lifepim.projectFolders.collapsed";
+
+      function setCollapsed(collapsed) {
+        root.classList.toggle("collapsed", collapsed);
+        body.hidden = collapsed;
+        toggle.textContent = collapsed ? "[+]" : "[-]";
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        try {
+          localStorage.setItem(storageKey, collapsed ? "1" : "0");
+        } catch (err) {
+          // Ignore storage failures; the toggle still works for this page.
+        }
+      }
+
+      try {
+        setCollapsed(localStorage.getItem(storageKey) === "1");
+      } catch (err) {
+        setCollapsed(false);
+      }
+
+      toggle.addEventListener("click", function () {
+        setCollapsed(!root.classList.contains("collapsed"));
+      });
+    })();
+  </script>
 {% endif %}

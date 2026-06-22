@@ -56,12 +56,12 @@ import table_definitions as mod_tbl_defs
 db_file = r'C:\DATA\LifePIM_cache\lifepim_etl.db'
 db_img = r'C:\DATA\LifePIM_cache\lp_images.db'
 
-#db_file = r'N:\duncan\LifePIM_Data\DATA\SQL\lifepim_etl.db'
+db_file = r'N:\duncan\LifePIM_Data\DATA\SQL\lifepim_etl.db'
 #db_img = r'N:\duncan\LifePIM_Data\DATA\SQL\lp_images.db'
 
 def main():
     
-    #rebuild_lifepim_etl()
+    rebuild_lifepim_etl()
     #rebuild_images_db()
     fix_paths()
     show_summary()
@@ -97,7 +97,7 @@ def fix_paths():
             continue
 
         processed += 1
-        if processed % 500 == 0:
+        if processed % 50000 == 0:
             conn.commit()
             print(f"{processed}/{total} paths committed...")
 

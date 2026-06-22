@@ -48,7 +48,10 @@ import sys
 import sqlite3
 import pandas as pd
 
-from . import table_definitions as tbl_def
+# from . import table_definitions as tbl_def
+
+
+import table_definitions as tbl_def
 
 
 LOG_ERROR = 3

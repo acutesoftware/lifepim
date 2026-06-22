@@ -357,6 +357,39 @@
     });
   }
 
+  function initFolderToggles() {
+    qsa("[data-collapsible='note-subfolders']").forEach((root) => {
+      const toggle = qs(".note-folder-toggle", root);
+      const body = qs(".note-folder-body", root);
+      if (!toggle || !body) {
+        return;
+      }
+      const storageKey = "lifepim.noteSubfolders.collapsed";
+
+      function setCollapsed(collapsed) {
+        root.classList.toggle("collapsed", collapsed);
+        body.hidden = collapsed;
+        toggle.textContent = collapsed ? "[+]" : "[-]";
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        try {
+          localStorage.setItem(storageKey, collapsed ? "1" : "0");
+        } catch (err) {
+          // Ignore storage failures; the current page state still changes.
+        }
+      }
+
+      try {
+        setCollapsed(localStorage.getItem(storageKey) === "1");
+      } catch (err) {
+        setCollapsed(false);
+      }
+
+      toggle.addEventListener("click", () => {
+        setCollapsed(!root.classList.contains("collapsed"));
+      });
+    });
+  }
+
   function initHotkey() {
     document.addEventListener("keydown", (evt) => {
       if (STATE.open) {
@@ -436,6 +469,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     initModal();
     initButtons();
+    initFolderToggles();
     initHotkey();
     initContextMenu();
     if (activeTabIsNotes()) {
