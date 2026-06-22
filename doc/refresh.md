@@ -2,6 +2,20 @@
 
 Short operator notes for refreshing LifePIM Desktop data.
 
+
+
+NOTE - there is a gap here, INIT_ALL_DATA.py in the src/common folder 
+succesfully colledcts file metadata but into the lifepim_etl.db
+
+not sure how lifepim_etl.db gets populated into the lifepim.db
+There have been a LOT of changes recently - best method I think 
+is to drop all old methods, and start again - have ONE program that 
+manages the refresh, checks for sql folder list, updates slowly
+
+Probably best via InfoLink
+
+
+
 ## Refresh Model
 
 LifePIM should read large/slow sources from a local working copy where possible.
