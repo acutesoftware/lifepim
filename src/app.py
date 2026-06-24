@@ -295,7 +295,7 @@ def help_route():
         content_title="",
         content_html="",
         app_name=APP_NAME,
-        app_version=getattr(mod_cfg, "WEB_VERSION", "DEV"),
+        app_version=getattr(mod_cfg, "APP_VERSION", "DEV"),
         last_source_update=_last_python_source_update(),
         paths=_help_paths(),
         github_repo_url=GITHUB_REPO_URL,

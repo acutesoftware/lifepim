@@ -2,11 +2,15 @@
 # coding: utf-8
 # config.py
 
+
 import os
 
 # ----------------------------------------------------------------------------
 # Folder Locations
 # 
+
+APP_VERSION = "3.1.001"
+
 
 #user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
 user_folder = r"D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data"

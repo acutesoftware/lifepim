@@ -382,6 +382,11 @@
               <div class="media-empty">No media found.</div>
             {% endif %}
 
+            {% set page = item_page %}
+            {% set total_pages = item_total_pages %}
+            {% set pages = item_pages %}
+            {% set first_url = item_first_url %}
+            {% set last_url = item_last_url %}
             {% include "widgets/wid_pagination.html" %}
             </div>
           </form>

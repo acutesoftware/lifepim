@@ -48,10 +48,10 @@ import sys
 import sqlite3
 import pandas as pd
 
-# from . import table_definitions as tbl_def
+from . import table_definitions as tbl_def
 
 
-import table_definitions as tbl_def
+# import table_definitions as tbl_def  # use this for INIT_ALL_DATA until you fix it
 
 
 LOG_ERROR = 3

@@ -2,6 +2,11 @@ import os
 import sqlite3
 import sys
 import unittest
+from datetime import datetime, timedelta
+from html import unescape
+from urllib.parse import urlparse, parse_qs
+
+from flask import Flask
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
 if root_folder not in sys.path:
@@ -108,6 +113,112 @@ class TestMediaSearch(unittest.TestCase):
         rows = media_routes._fetch_media(self.conn, joins, where, params, "filename")
 
         self.assertEqual([row["filename"] for row in rows], ["song_one.mp3", "song_two.m4a"])
+
+
+class TestMediaExplorerPagination(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:")
+        self.conn.row_factory = sqlite3.Row
+        self._old_conn = data.conn
+        self._old_schema_ready = media_routes._MEDIA_SCHEMA_READY
+        data.conn = self.conn
+        media_routes._MEDIA_SCHEMA_READY = False
+        ensure_media_schema(self.conn)
+
+        template_folder = os.path.join(root_folder, "templates")
+        self.app = Flask(__name__, template_folder=template_folder)
+        self.app.register_blueprint(media_routes.media_bp)
+        self.app.add_url_rule("/settings", endpoint="admin.settings_route", view_func=lambda: "")
+        self.app.add_url_rule("/help", endpoint="help_route", view_func=lambda: "")
+        self.app.add_url_rule("/history", endpoint="admin.user_history_route", view_func=lambda: "")
+        self.app.add_url_rule("/search", endpoint="search_route", view_func=lambda: "")
+        self.app.config["TESTING"] = True
+
+    def tearDown(self):
+        data.conn = self._old_conn
+        media_routes._MEDIA_SCHEMA_READY = self._old_schema_ready
+        self.conn.close()
+
+    def _insert_media(self, filename, taken_utc):
+        cur = self.conn.execute(
+            "INSERT INTO lp_media "
+            "(path, filename, ext, media_type, size_bytes, mtime_utc, ctime_utc, hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (os.path.join("C:\\photos", filename), filename, "jpg", "image", 100, taken_utc, None, filename),
+        )
+        media_id = cur.lastrowid
+        self.conn.execute(
+            "INSERT INTO lp_media_meta (media_id, taken_utc) VALUES (?, ?)",
+            (media_id, taken_utc),
+        )
+        return media_id
+
+    def _insert_event(self, media_id, start_utc):
+        cur = self.conn.execute(
+            "INSERT INTO lp_events (title, start_utc, end_utc, event_source, created_utc) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (f"Event {media_id}", start_utc, start_utc, "test", start_utc),
+        )
+        event_id = cur.lastrowid
+        self.conn.execute(
+            "INSERT INTO lp_event_items (event_id, media_id, confidence) VALUES (?, ?, ?)",
+            (event_id, media_id, 1.0),
+        )
+        return event_id
+
+    def _add_event_item(self, event_id, media_id):
+        self.conn.execute(
+            "INSERT OR IGNORE INTO lp_event_items (event_id, media_id, confidence) VALUES (?, ?, ?)",
+            (event_id, media_id, 1.0),
+        )
+
+    def test_item_pagination_uses_item_page_not_sidebar_event_page(self):
+        base = datetime(2026, 1, 1, 12, 0, 0)
+        for idx in range(55):
+            stamp = (base + timedelta(minutes=idx)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            media_id = self._insert_media(f"photo_{idx:03}.jpg", stamp)
+            self._insert_event(media_id, stamp)
+        self.conn.commit()
+
+        with self.app.test_client() as client:
+            response = client.get("/media/?view=all&view_mode=filmstrip&sort=taken_desc&group=month&nav_event_page=2")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("page=2", html)
+
+        after_items = html.split('<form class="media-actions-form"', 1)[1]
+        item_page_links = []
+        for part in after_items.split('href="')[1:]:
+            href = unescape(part.split('"', 1)[0])
+            if parse_qs(urlparse(href).query).get("page") == ["2"]:
+                item_page_links.append(href)
+
+        self.assertTrue(item_page_links)
+
+    def test_filtered_event_does_not_show_sidebar_event_pagination_under_items(self):
+        base = datetime(2026, 1, 1, 12, 0, 0)
+        selected_event_id = None
+        for idx in range(55):
+            stamp = (base + timedelta(minutes=idx)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            media_id = self._insert_media(f"photo_{idx:03}.jpg", stamp)
+            event_id = self._insert_event(media_id, stamp)
+            if idx == 0:
+                selected_event_id = event_id
+            elif idx < 5:
+                self._add_event_item(selected_event_id, media_id)
+        self.conn.commit()
+
+        with self.app.test_client() as client:
+            response = client.get(
+                f"/media/?view=events&event_id={selected_event_id}&view_mode=filmstrip"
+                "&sort=taken_desc&group=month&nav_event_page=2"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        after_items = response.get_data(as_text=True).split('<form class="media-actions-form"', 1)[1]
+
+        self.assertNotIn('<div style="margin:8px 0;">', after_items)
 
 
 if __name__ == "__main__":
