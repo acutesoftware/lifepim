@@ -70,6 +70,13 @@ def set_setting(key, value, category="General", label="", conn=None):
     conn.commit()
 
 
+def delete_setting(key, conn=None):
+    conn = db._get_conn() if conn is None else conn
+    ensure_settings_schema(conn)
+    conn.execute("DELETE FROM sys_settings WHERE setting_key = ?", (key,))
+    conn.commit()
+
+
 def get_calendar_view_settings(conn=None):
     return {
         "events": _as_bool(get_setting("calendar.view.events", "1", conn)),

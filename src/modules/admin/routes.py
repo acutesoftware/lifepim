@@ -130,7 +130,7 @@ def admin_mapping_route():
 def settings_route():
     message = ""
     active_settings_tab = (request.args.get("tab") or request.form.get("tab") or "calendar").strip().lower()
-    if active_settings_tab not in {"calendar", "media", "files", "general"}:
+    if active_settings_tab not in {"calendar", "media", "files", "general", "config"}:
         active_settings_tab = "calendar"
 
     conn = db.conn if db.conn is not None else None
@@ -155,9 +155,48 @@ def settings_route():
                 conn,
             )
             message = "General settings saved."
+        elif active_settings_tab == "config":
+            names = request.form.getlist("config_name")
+            existing_override_names = {
+                item["name"]
+                for item in cfg.list_config_settings(conn)
+                if item.get("has_override")
+            }
+            saved_count = 0
+            reset_count = 0
+            errors = []
+            for name in names:
+                if name not in cfg._CONFIG_DEFAULTS:
+                    continue
+                key = f"{cfg.CONFIG_SETTING_PREFIX}{name}"
+                if request.form.get(f"reset_{name}") == "1" or request.form.get(f"use_override_{name}") != "1":
+                    settings_mod.delete_setting(key, conn)
+                    if name in existing_override_names or request.form.get(f"reset_{name}") == "1":
+                        reset_count += 1
+                    continue
+                raw_value = request.form.get(f"value_{name}", "")
+                try:
+                    parsed_value = cfg.parse_config_value(name, raw_value)
+                except Exception as exc:
+                    errors.append(f"{name}: {exc}")
+                    continue
+                settings_mod.set_setting(
+                    key,
+                    cfg.serialize_config_value(parsed_value),
+                    "Config",
+                    name,
+                    conn,
+                )
+                saved_count += 1
+            cfg.refresh_config_overrides()
+            if errors:
+                message = "Some config settings were not saved: " + "; ".join(errors[:3])
+            else:
+                message = f"Config settings saved ({saved_count} updated, {reset_count} reset)."
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
+    config_settings = cfg.list_config_settings(conn)
     all_settings = settings_mod.list_settings(conn)
 
     return render_template(
@@ -171,6 +210,7 @@ def settings_route():
         active_settings_tab=active_settings_tab,
         calendar_view=calendar_view,
         general_settings=general_settings,
+        config_settings=config_settings,
         all_settings=all_settings,
         now=datetime.now(),
     )

@@ -4,6 +4,7 @@
     ('calendar', 'Calendar'),
     ('media', 'Media'),
     ('files', 'Files'),
+    ('config', 'Config'),
     ('general', 'General')
   ] %}
 
@@ -48,6 +49,62 @@
       {% elif active_settings_tab == 'files' %}
         <h4>Files</h4>
         <p class="settings-empty">No Files settings yet.</p>
+      {% elif active_settings_tab == 'config' %}
+        <h4>Config</h4>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form settings-form-wide">
+          <input type="hidden" name="tab" value="config">
+          <div class="tabular-scroll">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th>Override</th>
+                <th>Name</th>
+                <th>Value</th>
+                <th>Default</th>
+                <th>Type</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for setting in config_settings %}
+              <tr>
+                <td>
+                  <input type="hidden" name="config_name" value="{{ setting.name }}">
+                  <label>
+                    <input type="checkbox" name="use_override_{{ setting.name }}" value="1" {% if setting.has_override %}checked{% endif %}>
+                    Saved
+                  </label>
+                  {% if setting.has_override %}
+                    <label>
+                      <input type="checkbox" name="reset_{{ setting.name }}" value="1">
+                      Reset
+                    </label>
+                  {% endif %}
+                </td>
+                <td>{{ setting.name }}</td>
+                <td>
+                  {% if setting.is_complex %}
+                    <textarea name="value_{{ setting.name }}" rows="5">{{ setting.effective_value }}</textarea>
+                  {% else %}
+                    <input type="text" name="value_{{ setting.name }}" value="{{ setting.effective_value }}">
+                  {% endif %}
+                </td>
+                <td>
+                  {% if setting.is_complex %}
+                    <textarea rows="5" readonly>{{ setting.default_value }}</textarea>
+                  {% else %}
+                    <input type="text" value="{{ setting.default_value }}" readonly>
+                  {% endif %}
+                </td>
+                <td>{{ setting.value_type }}</td>
+                <td>{{ setting.updated_utc }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          <button type="submit">Save settings</button>
+        </form>
       {% else %}
         <h4>General</h4>
         <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">

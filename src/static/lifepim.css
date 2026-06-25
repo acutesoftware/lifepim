@@ -275,6 +275,26 @@ body.freeze-headers .settings-panel {
   flex: 1;
 }
 
+body.freeze-headers .settings-form-wide {
+  flex: 1;
+  min-height: 0;
+}
+
+body.freeze-headers .settings-form-wide .tabular-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+body.freeze-headers .settings-form-wide button[type="submit"] {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-top: 0;
+  background: #fff;
+  border: 1px solid #bbb;
+}
+
 body.freeze-headers .audio-list-layout,
 body.freeze-headers .media-body {
   align-items: stretch;
@@ -1356,6 +1376,42 @@ table tr:last-child td {
   max-width: 420px;
 }
 
+.settings-form-wide {
+  max-width: none;
+  max-height: calc(100vh - 125px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-panel:has(.settings-form-wide) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 90px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-form-wide {
+  flex: 1;
+}
+
+.settings-form-wide .tabular-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 165px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.settings-form-wide button[type="submit"] {
+  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: #fff;
+  border: 1px solid #bbb;
+}
+
 .settings-fieldset {
   display: flex;
   flex-direction: column;
@@ -1399,6 +1455,14 @@ table tr:last-child td {
   padding: 4px 6px;
   font-size: 11px;
   text-align: left;
+}
+
+.settings-table input[type="text"],
+.settings-table textarea {
+  width: 100%;
+  min-width: 220px;
+  box-sizing: border-box;
+  font: inherit;
 }
 
 .help-page {

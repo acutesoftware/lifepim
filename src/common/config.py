@@ -3,7 +3,12 @@
 # config.py
 
 
+import copy
+import json
 import os
+import sqlite3
+import sys
+import types
 
 # ----------------------------------------------------------------------------
 # Folder Locations
@@ -360,10 +365,174 @@ OVERVIEW_GRID_H = '600px'
 
 def get_conn_str():
 	conn_str = {}
-	with open(logon_file, 'r') as f:
+	with open(get_config_value('logon_file'), 'r') as f:
 		conn_str['host'] = f.readline().strip(' ').strip('\n')
 		conn_str['user'] = f.readline().strip(' ').strip('\n')
 		conn_str['pass'] = f.readline().strip(' ').strip('\n')
 		conn_str['db'] = f.readline().strip(' ').strip('\n')
 
 	return conn_str
+
+
+# --------------------------------------------------------
+# Runtime settings overrides
+#
+# Values above are defaults. Saved rows in sys_settings with keys like
+# config.RECS_PER_PAGE override those defaults when the app reads this module.
+
+CONFIG_SETTING_PREFIX = "config."
+_CONFIG_DEFAULTS = {}
+_CONFIG_OVERRIDE_CACHE = {}
+_CONFIG_OVERRIDE_CACHE_LOADED = False
+_CONFIG_OVERRIDE_LOADING = False
+
+
+def _is_config_setting_value(value):
+	return isinstance(value, (str, int, float, bool, list, tuple, dict)) or value is None
+
+
+def _capture_config_defaults():
+	excluded = {
+		"copy",
+		"json",
+		"os",
+		"sqlite3",
+		"sys",
+		"types",
+		"CONFIG_SETTING_PREFIX",
+	}
+	return {
+		key: copy.deepcopy(value)
+		for key, value in globals().items()
+		if not key.startswith("_")
+		and key not in excluded
+		and _is_config_setting_value(value)
+	}
+
+
+def _settings_db_file():
+	value = _CONFIG_DEFAULTS.get("DB_FILE") or _CONFIG_DEFAULTS.get("db_name") or "lifepim.db"
+	if not os.path.isabs(value):
+		value = os.path.abspath(os.path.join(os.path.dirname(__file__), value))
+	return value
+
+
+def _ensure_override_cache():
+	global _CONFIG_OVERRIDE_CACHE_LOADED, _CONFIG_OVERRIDE_LOADING
+	if _CONFIG_OVERRIDE_CACHE_LOADED or _CONFIG_OVERRIDE_LOADING:
+		return
+	_CONFIG_OVERRIDE_LOADING = True
+	try:
+		db_file = _settings_db_file()
+		if not os.path.exists(db_file):
+			_CONFIG_OVERRIDE_CACHE_LOADED = True
+			return
+		conn = sqlite3.connect(db_file)
+		try:
+			rows = conn.execute(
+				"SELECT setting_key, setting_value FROM sys_settings WHERE setting_key LIKE ?",
+				(CONFIG_SETTING_PREFIX + "%",),
+			).fetchall()
+		finally:
+			conn.close()
+		_CONFIG_OVERRIDE_CACHE.update(
+			(row[0][len(CONFIG_SETTING_PREFIX):], row[1])
+			for row in rows
+			if row[0].startswith(CONFIG_SETTING_PREFIX)
+		)
+	except Exception:
+		# Config must remain importable before the database/settings schema exists.
+		pass
+	finally:
+		_CONFIG_OVERRIDE_LOADING = False
+		_CONFIG_OVERRIDE_CACHE_LOADED = True
+
+
+def refresh_config_overrides():
+	global _CONFIG_OVERRIDE_CACHE_LOADED
+	_CONFIG_OVERRIDE_CACHE.clear()
+	_CONFIG_OVERRIDE_CACHE_LOADED = False
+	_ensure_override_cache()
+
+
+def serialize_config_value(value):
+	if isinstance(value, (list, tuple, dict, bool)) or value is None:
+		return json.dumps(value, ensure_ascii=True)
+	return str(value)
+
+
+def parse_config_value(name, value):
+	default = _CONFIG_DEFAULTS.get(name)
+	if isinstance(default, bool):
+		return str(value).strip().lower() in {"1", "true", "yes", "on"}
+	if isinstance(default, int) and not isinstance(default, bool):
+		return int(str(value).strip())
+	if isinstance(default, float):
+		return float(str(value).strip())
+	if isinstance(default, (list, tuple, dict)) or default is None:
+		parsed = json.loads(value)
+		return tuple(parsed) if isinstance(default, tuple) else parsed
+	return str(value)
+
+
+def deserialize_config_value(name, value):
+	try:
+		return parse_config_value(name, value)
+	except Exception:
+		return copy.deepcopy(_CONFIG_DEFAULTS.get(name))
+
+
+def get_config_value(name):
+	if name not in _CONFIG_DEFAULTS:
+		return globals().get(name)
+	_ensure_override_cache()
+	if name in _CONFIG_OVERRIDE_CACHE:
+		return deserialize_config_value(name, _CONFIG_OVERRIDE_CACHE[name])
+	return copy.deepcopy(_CONFIG_DEFAULTS[name])
+
+
+def list_config_settings(conn=None):
+	saved = {}
+	if conn is not None:
+		try:
+			rows = conn.execute(
+				"SELECT setting_key, setting_value, updated_utc FROM sys_settings WHERE setting_key LIKE ?",
+				(CONFIG_SETTING_PREFIX + "%",),
+			).fetchall()
+			for row in rows:
+				key = row["setting_key"] if hasattr(row, "keys") else row[0]
+				name = key[len(CONFIG_SETTING_PREFIX):]
+				saved[name] = {
+					"value": row["setting_value"] if hasattr(row, "keys") else row[1],
+					"updated_utc": row["updated_utc"] if hasattr(row, "keys") else row[2],
+				}
+		except Exception:
+			saved = {}
+	return [
+		{
+			"name": name,
+			"key": CONFIG_SETTING_PREFIX + name,
+			"default_value": serialize_config_value(default),
+			"saved_value": saved.get(name, {}).get("value"),
+			"effective_value": serialize_config_value(get_config_value(name)),
+			"updated_utc": saved.get(name, {}).get("updated_utc", ""),
+			"has_override": name in saved,
+			"is_complex": isinstance(default, (list, tuple, dict)),
+			"value_type": type(default).__name__,
+		}
+		for name, default in sorted(_CONFIG_DEFAULTS.items(), key=lambda item: item[0].lower())
+	]
+
+
+class _ConfigModule(types.ModuleType):
+	def __getattribute__(self, name):
+		if name.startswith("_"):
+			return super().__getattribute__(name)
+		defaults = super().__getattribute__("__dict__").get("_CONFIG_DEFAULTS", {})
+		if name in defaults:
+			return get_config_value(name)
+		return super().__getattribute__(name)
+
+
+_CONFIG_DEFAULTS = _capture_config_defaults()
+sys.modules[__name__].__class__ = _ConfigModule
