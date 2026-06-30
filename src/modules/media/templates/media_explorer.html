@@ -46,9 +46,7 @@
         </label>
         <a class="media-thumb" href="{{ media_url(focus_query, 'focus_id=' ~ item.media_id) }}">
           {% if item.media_type == 'video' %}
-            <video muted preload="metadata">
-              <source src="{{ url_for('media.media_file_route', media_id=item.media_id) }}">
-            </video>
+            <span class="media-video-thumb" aria-label="Video">{{ item.ext|upper or 'VIDEO' }}</span>
           {% else %}
             <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
           {% endif %}
@@ -68,9 +66,7 @@
         </label>
         <a class="media-thumb" href="{{ media_url(focus_query, 'focus_id=' ~ item.media_id) }}">
           {% if item.media_type == 'video' %}
-            <video muted preload="metadata">
-              <source src="{{ url_for('media.media_file_route', media_id=item.media_id) }}">
-            </video>
+            <span class="media-video-thumb" aria-label="Video">{{ item.ext|upper or 'VIDEO' }}</span>
           {% else %}
             <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
           {% endif %}
@@ -401,7 +397,7 @@
         {% if focus_item %}
           <div class="media-inspector-preview">
             {% if focus_item.media_type == 'video' %}
-              <video controls preload="metadata">
+              <video controls preload="none">
                 <source src="{{ url_for('media.media_file_route', media_id=focus_item.media_id) }}">
               </video>
             {% else %}

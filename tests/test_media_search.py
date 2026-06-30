@@ -139,12 +139,12 @@ class TestMediaExplorerPagination(unittest.TestCase):
         media_routes._MEDIA_SCHEMA_READY = self._old_schema_ready
         self.conn.close()
 
-    def _insert_media(self, filename, taken_utc):
+    def _insert_media(self, filename, taken_utc, ext="jpg", media_type="image"):
         cur = self.conn.execute(
             "INSERT INTO lp_media "
             "(path, filename, ext, media_type, size_bytes, mtime_utc, ctime_utc, hash) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (os.path.join("C:\\photos", filename), filename, "jpg", "image", 100, taken_utc, None, filename),
+            (os.path.join("C:\\photos", filename), filename, ext, media_type, 100, taken_utc, None, filename),
         )
         media_id = cur.lastrowid
         self.conn.execute(
@@ -219,6 +219,20 @@ class TestMediaExplorerPagination(unittest.TestCase):
         after_items = response.get_data(as_text=True).split('<form class="media-actions-form"', 1)[1]
 
         self.assertNotIn('<div style="margin:8px 0;">', after_items)
+
+    def test_video_thumbnails_do_not_preload_media_files(self):
+        stamp = datetime(2026, 1, 1, 12, 0, 0).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self._insert_media("clip.mp4", stamp, ext="mp4", media_type="video")
+        self.conn.commit()
+
+        with self.app.test_client() as client:
+            response = client.get("/media/?view=all&media_type=video&view_mode=filmstrip")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("media-video-thumb", html)
+        self.assertIn('preload="none"', html)
+        self.assertNotIn('<video muted preload="metadata">', html)
 
 
 if __name__ == "__main__":

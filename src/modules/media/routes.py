@@ -245,7 +245,23 @@ def _media_order_clause(sort_key):
     return "sort_utc DESC"
 
 
+def _tags_join_sql():
+    return (
+        "LEFT JOIN ("
+        "  SELECT mt.media_id, group_concat(t.tag, ' ') AS tags_text "
+        "  FROM lp_media_tags mt "
+        "  JOIN lp_tags t ON t.tag_id = mt.tag_id "
+        "  GROUP BY mt.media_id"
+        ") tags ON tags.media_id = m.media_id "
+    )
+
+
+def _needs_tags_join(where):
+    return any("tags." in clause for clause in where)
+
+
 def _fetch_media(conn, joins, where, params, sort_key, limit=None, offset=None):
+    needs_tags = _needs_tags_join(where)
     select_cols = [
         "m.media_id",
         "m.path",
@@ -264,7 +280,7 @@ def _fetch_media(conn, joins, where, params, sort_key, limit=None, offset=None):
         "meta.codec",
         "meta.camera_make",
         "meta.camera_model",
-        "tags.tags_text",
+        "tags.tags_text" if needs_tags else "NULL AS tags_text",
         "COALESCE(meta.taken_utc, m.mtime_utc) AS sort_utc",
     ]
     sql = (
@@ -272,12 +288,7 @@ def _fetch_media(conn, joins, where, params, sort_key, limit=None, offset=None):
         + ", ".join(select_cols)
         + " FROM lp_media m "
         + "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
-        + "LEFT JOIN ("
-        "  SELECT mt.media_id, group_concat(t.tag, ' ') AS tags_text "
-        "  FROM lp_media_tags mt "
-        "  JOIN lp_tags t ON t.tag_id = mt.tag_id "
-        "  GROUP BY mt.media_id"
-        ") tags ON tags.media_id = m.media_id "
+        + (_tags_join_sql() if needs_tags else "")
         + (" ".join(joins) + " " if joins else "")
         + "WHERE "
         + " AND ".join(where)
@@ -311,12 +322,7 @@ def _count_media(conn, joins, where, params):
     sql = (
         "SELECT COUNT(1) AS cnt FROM lp_media m "
         "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
-        "LEFT JOIN ("
-        "  SELECT mt.media_id, group_concat(t.tag, ' ') AS tags_text "
-        "  FROM lp_media_tags mt "
-        "  JOIN lp_tags t ON t.tag_id = mt.tag_id "
-        "  GROUP BY mt.media_id"
-        ") tags ON tags.media_id = m.media_id "
+        + (_tags_join_sql() if _needs_tags_join(where) else "")
         + (" ".join(joins) + " " if joins else "")
         + "WHERE "
         + " AND ".join(where)
@@ -331,12 +337,7 @@ def _fetch_timeline_years(conn, joins, where, params):
         "COUNT(1) AS cnt "
         "FROM lp_media m "
         "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
-        "LEFT JOIN ("
-        "  SELECT mt.media_id, group_concat(t.tag, ' ') AS tags_text "
-        "  FROM lp_media_tags mt "
-        "  JOIN lp_tags t ON t.tag_id = mt.tag_id "
-        "  GROUP BY mt.media_id"
-        ") tags ON tags.media_id = m.media_id "
+        + (_tags_join_sql() if _needs_tags_join(where) else "")
         + (" ".join(joins) + " " if joins else "")
         + "WHERE "
         + " AND ".join(where)
@@ -432,18 +433,13 @@ def _count_events(conn, year_filter=None):
     return row["cnt"] if row else 0
 
 
-def _event_media_join_sql():
+def _event_media_join_sql(include_tags=False):
     return (
         "FROM lp_events e "
         "JOIN lp_event_items ei ON ei.event_id = e.event_id "
         "JOIN lp_media m ON m.media_id = ei.media_id "
         "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
-        "LEFT JOIN ("
-        "  SELECT mt.media_id, group_concat(t.tag, ' ') AS tags_text "
-        "  FROM lp_media_tags mt "
-        "  JOIN lp_tags t ON t.tag_id = mt.tag_id "
-        "  GROUP BY mt.media_id"
-        ") tags ON tags.media_id = m.media_id "
+        + (_tags_join_sql() if include_tags else "")
     )
 
 
@@ -451,7 +447,7 @@ def _list_events_for_media_filters(conn, where, params, limit=None, offset=None)
     sql = (
         "SELECT e.event_id, e.title, e.start_utc, e.end_utc, e.location_label, e.event_source, "
         "COUNT(DISTINCT ei.media_id) AS item_count "
-        + _event_media_join_sql()
+        + _event_media_join_sql(_needs_tags_join(where))
         + "WHERE "
         + " AND ".join(where)
         + " GROUP BY e.event_id, e.title, e.start_utc, e.end_utc, e.location_label, e.event_source "
@@ -472,7 +468,7 @@ def _count_events_for_media_filters(conn, where, params):
     sql = (
         "SELECT COUNT(1) AS cnt FROM ("
         "SELECT e.event_id "
-        + _event_media_join_sql()
+        + _event_media_join_sql(_needs_tags_join(where))
         + "WHERE "
         + " AND ".join(where)
         + " GROUP BY e.event_id)"
