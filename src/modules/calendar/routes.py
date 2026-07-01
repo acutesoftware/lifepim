@@ -57,6 +57,18 @@ def _parse_date_param(date_str):
         return None
 
 
+def _calendar_jump_context(current_view, selected_date, project=None, day_source_params=None):
+    current_year = date.today().year
+    return {
+        "jump_current_view": current_view,
+        "jump_selected_date": selected_date,
+        "jump_years": list(range(current_year - 20, current_year + 6)),
+        "jump_months": [(month, cal.month_name[month]) for month in range(1, 13)],
+        "jump_project": project,
+        "jump_day_source_params": day_source_params or {},
+    }
+
+
 def _get_calendar_table():
     return get_table_def("calendar")
 
@@ -266,6 +278,41 @@ def _read_csv_headers(csv_file_name):
     return importer.read_csv_headers(csv_file_name)
 
 
+@calendar_bp.route("/jump", methods=["POST"])
+def jump_route():
+    current_view = request.form.get("view") or "day"
+    project = request.form.get("proj") or None
+    try:
+        target = date(
+            int(request.form.get("year", "")),
+            int(request.form.get("month", "")),
+            int(request.form.get("day", "")),
+        )
+    except (TypeError, ValueError):
+        target = date.today()
+
+    params = {"proj": project}
+    for key in ("show_events", "show_files", "show_usage"):
+        value = request.form.get(key)
+        if value in ("0", "1"):
+            params[key] = value
+
+    if current_view == "month":
+        return redirect(
+            url_for(
+                "calendar.month_view_route",
+                year=target.year,
+                month=target.month,
+                **params,
+            )
+        )
+    if current_view == "week":
+        return redirect(url_for("calendar.week_view_route", date=target.strftime("%Y-%m-%d"), **params))
+    if current_view == "year":
+        return redirect(url_for("calendar.year_view_route", year=target.year, **params))
+    return redirect(url_for("calendar.day_view_route", date=target.strftime("%Y-%m-%d"), **params))
+
+
 @calendar_bp.route("/")
 def month_view_route():
     today = date.today()
@@ -326,6 +373,7 @@ def month_view_route():
         day_source_params=day_source_params,
         source_action_url=url_for("calendar.month_view_route"),
         source_hidden_fields=_source_hidden_fields(year=year, month=month, proj=project),
+        **_calendar_jump_context("month", first_day, project, day_source_params),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
         col_bg_day=cfg.CAL_COL_BG_DAY,
@@ -392,6 +440,7 @@ def week_view_route():
         day_source_params=day_source_params,
         source_action_url=url_for("calendar.week_view_route"),
         source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
+        **_calendar_jump_context("week", anchor, project, day_source_params),
         today=date.today(),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
@@ -463,6 +512,7 @@ def day_view_route():
         day_source_params=day_source_params,
         source_action_url=url_for("calendar.day_view_route"),
         source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
+        **_calendar_jump_context("day", anchor, project, day_source_params),
         days_with_events=set(events_by_day.keys()) | days_with_images,
         days_with_images=days_with_images,
         today=date.today(),
@@ -533,6 +583,7 @@ def year_view_route():
         day_source_params=day_source_params,
         source_action_url=url_for("calendar.year_view_route"),
         source_hidden_fields=_source_hidden_fields(year=year, proj=project),
+        **_calendar_jump_context("year", year_start, project, day_source_params),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
         col_bg_day=cfg.CAL_COL_BG_DAY,
@@ -588,6 +639,7 @@ def list_view_route():
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
         now=date.today(),
+        **_calendar_jump_context("list", date.today(), project),
     )
 
 

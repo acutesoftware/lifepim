@@ -1,0 +1,103 @@
+<button class="calendar-nav calendar-jump-open" type="button" data-calendar-jump-open>Jump</button>
+<dialog class="calendar-jump-dialog" data-calendar-jump-dialog>
+  <form method="post" action="{{ url_for('calendar.jump_route') }}" data-calendar-jump-form>
+    <input type="hidden" name="view" value="{{ jump_current_view }}">
+    {% if jump_project %}
+      <input type="hidden" name="proj" value="{{ jump_project }}">
+    {% endif %}
+    {% for name, value in jump_day_source_params.items() %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}
+    <h4>Jump to Date</h4>
+    <label>
+      Year
+      <input
+        type="number"
+        name="year"
+        list="calendar-jump-years"
+        min="1"
+        max="9999"
+        value="{{ jump_selected_date.year }}"
+        required
+        data-calendar-jump-year>
+    </label>
+    <datalist id="calendar-jump-years">
+      {% for year in jump_years %}
+        <option value="{{ year }}"></option>
+      {% endfor %}
+    </datalist>
+    <label>
+      Month
+      <select name="month" required data-calendar-jump-month>
+        {% for month, month_name in jump_months %}
+          <option value="{{ month }}" {% if month == jump_selected_date.month %}selected{% endif %}>{{ month_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Day
+      <select name="day" required data-calendar-jump-day data-selected-day="{{ jump_selected_date.day }}">
+        {% for day in range(1, 32) %}
+          <option value="{{ day }}" {% if day == jump_selected_date.day %}selected{% endif %}>{{ day }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="calendar-jump-actions">
+      <button type="button" data-calendar-jump-cancel>Cancel</button>
+      <button type="submit">OK</button>
+    </div>
+  </form>
+</dialog>
+<script>
+(() => {
+  const script = document.currentScript;
+  const dialog = script.previousElementSibling;
+  const openButton = dialog ? dialog.previousElementSibling : null;
+  if (!dialog || !openButton || dialog.dataset.calendarJumpReady === "1") {
+    return;
+  }
+  dialog.dataset.calendarJumpReady = "1";
+  const form = dialog.querySelector("[data-calendar-jump-form]");
+  const yearInput = dialog.querySelector("[data-calendar-jump-year]");
+  const monthSelect = dialog.querySelector("[data-calendar-jump-month]");
+  const daySelect = dialog.querySelector("[data-calendar-jump-day]");
+  const cancelButton = dialog.querySelector("[data-calendar-jump-cancel]");
+
+  const updateDays = () => {
+    const year = Number.parseInt(yearInput.value, 10);
+    const month = Number.parseInt(monthSelect.value, 10);
+    const previousDay = Number.parseInt(daySelect.value || daySelect.dataset.selectedDay, 10) || 1;
+    const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const daysInMonth = Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12
+      ? monthLengths[month - 1] + (month === 2 && isLeapYear ? 1 : 0)
+      : 31;
+    daySelect.innerHTML = "";
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const option = document.createElement("option");
+      option.value = String(day);
+      option.textContent = String(day);
+      if (day === Math.min(previousDay, daysInMonth)) {
+        option.selected = true;
+      }
+      daySelect.appendChild(option);
+    }
+  };
+
+  openButton.addEventListener("click", () => {
+    updateDays();
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  });
+  cancelButton.addEventListener("click", () => {
+    dialog.close();
+  });
+  form.addEventListener("submit", updateDays);
+  yearInput.addEventListener("input", updateDays);
+  monthSelect.addEventListener("change", updateDays);
+  updateDays();
+})();
+</script>

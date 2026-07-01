@@ -1092,6 +1092,49 @@ table tr:last-child td {
   color: #333;
 }
 
+button.calendar-nav {
+  font: inherit;
+  cursor: pointer;
+}
+
+.calendar-jump-dialog {
+  width: min(320px, calc(100vw - 32px));
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  padding: 14px;
+  color: #222;
+  background: #fff;
+}
+
+.calendar-jump-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.calendar-jump-dialog h4 {
+  margin: 0 0 12px;
+}
+
+.calendar-jump-dialog label {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.calendar-jump-dialog input,
+.calendar-jump-dialog select {
+  min-height: 28px;
+  padding: 3px 6px;
+  font: inherit;
+}
+
+.calendar-jump-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .calendar-grid {
   width: 100%;
   border-collapse: collapse;

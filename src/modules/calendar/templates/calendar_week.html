@@ -12,6 +12,7 @@
   <div class="calendar-title">Week of {{ week_days[0].strftime('%Y-%m-%d') }}</div>
   <a class="calendar-nav" href="{{ url_for('calendar.week_view_route', date=next_week.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Next</a>
   <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">Today</a>
+  {% include "widgets/wid_calendar_jump.html" %}
   <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Add Event</a>
   {% include "widgets/wid_calendar_source_box.html" %}
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
