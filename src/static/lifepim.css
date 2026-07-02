@@ -1660,22 +1660,68 @@ button.calendar-nav {
   margin: 0 3px;
 }
 
+.money-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.money-section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid #ccc;
+}
+
+.money-section-tab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 7px;
+  border: 1px solid #ccc;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: #f5f5f5;
+  color: #222;
+  text-decoration: none;
+}
+
+.money-section-tab.active {
+  background: #fff;
+  font-weight: bold;
+  margin-bottom: -1px;
+}
+
+.money-section-tab small {
+  color: #555;
+  font-weight: normal;
+  font-size: 10px;
+}
+
 .money-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 
 .money-title {
   font-weight: bold;
 }
 
+.money-subtitle {
+  color: #555;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
 .money-actions {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .money-btn {
@@ -1697,44 +1743,87 @@ button.calendar-nav {
   cursor: not-allowed;
 }
 
-.money-filters {
+.money-search {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
+  gap: 4px;
+  align-items: center;
 }
 
-.money-filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 11px;
+.money-search input {
+  font-size: 12px;
+  padding: 2px 4px;
 }
 
-.money-summary {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
+.money-notice {
+  border: 1px solid #c6d6a6;
+  background: #f3f8e9;
+  padding: 4px 6px;
   font-size: 11px;
-  margin-bottom: 6px;
-  color: #333;
 }
 
 .money-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 12px;
 }
 
 .money-table th,
 .money-table td {
   border: 1px solid #ccc;
   padding: 4px 6px;
+  vertical-align: top;
 }
 
-.money-row.selected {
-  background: #eef2ff;
+.money-table th {
+  white-space: nowrap;
+}
+
+.money-cell-long {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.money-actions-col {
+  width: 92px;
+}
+
+.money-row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.money-row-actions form {
+  margin: 0;
+}
+
+.money-link-btn {
+  padding: 1px 4px;
+  border: 1px solid #bbb;
+  background: #f7f7f7;
+  border-radius: 3px;
+  color: #222;
+  cursor: pointer;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.money-link-btn.danger {
+  border-color: #c88;
+  background: #fff0f0;
+}
+
+.money-positive {
+  color: #176b2c;
+  font-weight: bold;
+}
+
+.money-negative {
+  color: #a12626;
+  font-weight: bold;
 }
 
 .money-empty {
@@ -1746,9 +1835,11 @@ button.calendar-nav {
 .money-panel {
   position: fixed;
   top: 60px;
-  right: -420px;
-  width: 360px;
+  right: -460px;
+  width: 400px;
   max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 80px);
+  overflow: auto;
   background: #fff;
   border: 1px solid #ccc;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -1759,6 +1850,14 @@ button.calendar-nav {
 
 .money-panel.open {
   right: 10px;
+}
+
+.money-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .money-panel-backdrop {
@@ -1794,6 +1893,8 @@ button.calendar-nav {
 .money-form textarea {
   font-size: 12px;
   padding: 2px 4px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .money-panel-actions {

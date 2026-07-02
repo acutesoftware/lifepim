@@ -14,7 +14,7 @@ import types
 # Folder Locations
 # 
 
-APP_VERSION = "3.1.002"
+APP_VERSION = "3.1.003"
 
 
 #user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'
@@ -80,6 +80,167 @@ There should not be separate get_tasks, add_tasks in the data.py
 
 # ----------------------------------------------------------------------------
 # Interface configuration
+
+MONEY_FREQUENCIES = ["weekly", "fortnightly", "monthly", "quarterly", "yearly", "once"]
+MONEY_ASSET_TYPES = ["house", "shares", "super", "car", "bank", "other"]
+MONEY_LOAN_TYPES = ["home loan 1", "home loan 2", "credit card", "student loan", "other"]
+MONEY_INCOME_TYPES = ["wages", "dividends", "rent", "business", "royalties", "other"]
+MONEY_BILL_TYPES = ["loan repayments", "electricity", "phone", "insurance", "rates", "internet", "other"]
+MONEY_PLAN_STATUSES = ["idea", "planned", "bought", "cancelled"]
+MONEY_SHARE_MARKETS = [
+    "Australia (ASX)",
+    "United States (US)",
+    "United Kingdom (LSE)",
+    "Canada (TSX)",
+    "India (NSE)",
+    "Manual / Yahoo symbol",
+]
+
+MONEY_SECTIONS = [
+    {
+        "id": "assets",
+        "label": "Assets",
+        "table": "lp_money_assets",
+        "pk": "asset_id",
+        "default_sort": "asset_type ASC, name ASC",
+        "summary": "sum:current_value",
+        "columns": [
+            {"name": "asset_type", "label": "Type", "type": "select", "options": MONEY_ASSET_TYPES, "required": True},
+            {"name": "name", "label": "Name", "type": "text", "required": True},
+            {"name": "institution", "label": "Institution / Location", "type": "text"},
+            {"name": "current_value", "label": "Current Value", "type": "money"},
+            {"name": "purchase_value", "label": "Purchase Value", "type": "money"},
+            {"name": "valuation_date", "label": "Valuation Date", "type": "date"},
+            {"name": "notes", "label": "Notes", "type": "textarea"},
+        ],
+    },
+    {
+        "id": "loans",
+        "label": "Loans",
+        "table": "lp_money_loans",
+        "pk": "loan_id",
+        "default_sort": "loan_type ASC, lender ASC",
+        "summary": "sum:balance",
+        "columns": [
+            {"name": "loan_type", "label": "Type", "type": "select", "options": MONEY_LOAN_TYPES, "required": True},
+            {"name": "lender", "label": "Lender", "type": "text", "required": True},
+            {"name": "balance", "label": "Balance", "type": "money"},
+            {"name": "interest_rate", "label": "Interest Rate %", "type": "number"},
+            {"name": "repayment_amount", "label": "Repayment", "type": "money"},
+            {"name": "repayment_frequency", "label": "Frequency", "type": "select", "options": MONEY_FREQUENCIES, "default": "monthly"},
+            {"name": "next_payment_date", "label": "Next Payment", "type": "date"},
+            {"name": "notes", "label": "Notes", "type": "textarea"},
+        ],
+    },
+    {
+        "id": "income",
+        "label": "Income",
+        "table": "lp_money_income",
+        "pk": "income_id",
+        "default_sort": "income_type ASC, source ASC",
+        "summary": "annualized:amount:frequency",
+        "columns": [
+            {"name": "income_type", "label": "Type", "type": "select", "options": MONEY_INCOME_TYPES, "required": True},
+            {"name": "source", "label": "Source", "type": "text", "required": True},
+            {"name": "amount", "label": "Amount", "type": "money"},
+            {"name": "frequency", "label": "Frequency", "type": "select", "options": MONEY_FREQUENCIES, "default": "monthly"},
+            {"name": "next_date", "label": "Next Date", "type": "date"},
+            {"name": "taxable", "label": "Taxable", "type": "checkbox", "default": 1},
+            {"name": "notes", "label": "Notes", "type": "textarea"},
+        ],
+    },
+    {
+        "id": "bills",
+        "label": "Bills",
+        "table": "lp_money_bills",
+        "pk": "bill_id",
+        "default_sort": "due_date ASC, supplier ASC",
+        "summary": "annualized:amount:frequency",
+        "columns": [
+            {"name": "bill_type", "label": "Type", "type": "select", "options": MONEY_BILL_TYPES, "required": True},
+            {"name": "supplier", "label": "Supplier", "type": "text", "required": True},
+            {"name": "amount", "label": "Amount", "type": "money"},
+            {"name": "frequency", "label": "Frequency", "type": "select", "options": MONEY_FREQUENCIES, "default": "monthly"},
+            {"name": "due_date", "label": "Due Date", "type": "date"},
+            {"name": "autopay", "label": "Autopay", "type": "checkbox"},
+            {"name": "notes", "label": "Notes", "type": "textarea"},
+        ],
+    },
+    {
+        "id": "tax",
+        "label": "Tax Deductions",
+        "table": "lp_money_tax_deductions",
+        "pk": "deduction_id",
+        "default_sort": "purchase_date DESC, supplier ASC",
+        "summary": "sum:amount",
+        "columns": [
+            {"name": "purchase_date", "label": "Date", "type": "date", "required": True},
+            {"name": "supplier", "label": "Supplier", "type": "text", "required": True},
+            {"name": "item", "label": "Item", "type": "text", "required": True},
+            {"name": "amount", "label": "Amount", "type": "money"},
+            {"name": "reason", "label": "Reason", "type": "textarea", "required": True},
+            {"name": "tax_year", "label": "Tax Year", "type": "text"},
+            {"name": "receipt_path", "label": "Receipt Path", "type": "text"},
+        ],
+    },
+    {
+        "id": "planned",
+        "label": "Planned",
+        "table": "lp_money_plans",
+        "pk": "plan_id",
+        "default_sort": "(target_date IS NULL) ASC, target_date ASC, priority ASC",
+        "summary": "sum:estimated_cost",
+        "columns": [
+            {"name": "item", "label": "Item", "type": "text", "required": True},
+            {"name": "domain", "label": "Reason / Domain", "type": "text", "default": "General"},
+            {"name": "estimated_cost", "label": "Estimated Cost", "type": "money"},
+            {"name": "target_date", "label": "Target Date", "type": "date"},
+            {"name": "priority", "label": "Priority", "type": "number", "default": 3},
+            {"name": "status", "label": "Status", "type": "select", "options": MONEY_PLAN_STATUSES, "default": "planned"},
+            {"name": "notes", "label": "Notes", "type": "textarea"},
+        ],
+    },
+    {
+        "id": "watchlist",
+        "label": "Share Watchlist",
+        "table": "lp_money_share_watchlist",
+        "pk": "watch_id",
+        "default_sort": "symbol ASC",
+        "summary": "count",
+        "columns": [
+            {"name": "symbol", "label": "Symbol", "type": "text", "required": True},
+            {"name": "market", "label": "Market", "type": "select", "options": MONEY_SHARE_MARKETS, "default": "Australia (ASX)"},
+            {"name": "company_name", "label": "Company", "type": "text"},
+            {"name": "target_price", "label": "Target Price", "type": "money"},
+            {"name": "current_price", "label": "Delayed Price", "type": "money", "readonly": True},
+            {"name": "price_updated_at", "label": "Price Updated", "type": "text", "readonly": True},
+            {"name": "notes", "label": "Notes", "type": "textarea"},
+        ],
+    },
+    {
+        "id": "pretend",
+        "label": "Pretend Purchases",
+        "table": "lp_money_share_trades",
+        "pk": "trade_id",
+        "default_sort": "trade_date DESC, symbol ASC",
+        "summary": "sum:profit_loss",
+        "derived_columns": [{"name": "profit_loss", "label": "P/L", "type": "money"}],
+        "columns": [
+            {"name": "symbol", "label": "Symbol", "type": "text", "required": True},
+            {"name": "market", "label": "Market", "type": "select", "options": MONEY_SHARE_MARKETS, "default": "Australia (ASX)"},
+            {"name": "trade_date", "label": "Pretend Buy Date", "type": "date"},
+            {"name": "quantity", "label": "Quantity", "type": "number"},
+            {"name": "pretend_buy_price", "label": "Buy Price", "type": "money"},
+            {"name": "current_price", "label": "Delayed Price", "type": "money", "readonly": True},
+            {"name": "fees", "label": "Fees", "type": "money"},
+            {"name": "price_updated_at", "label": "Price Updated", "type": "text", "readonly": True},
+            {"name": "notes", "label": "Notes", "type": "textarea"},
+        ],
+    },
+]
+
+MONEY_QUOTE_PROVIDER = "yahoo_chart"
+MONEY_QUOTE_DELAY_MINUTES = 15
 
 # Pagination
 RECS_PER_PAGE = 200

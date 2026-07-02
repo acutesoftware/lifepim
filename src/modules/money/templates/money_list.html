@@ -1,164 +1,177 @@
 {% extends "layout.html" %}
 
+{% macro money_value(value) -%}
+  ${{ '%.2f'|format(value or 0) }}
+{%- endmacro %}
+
 {% block module_content %}
-<div class="money-toolbar">
-  <div class="money-title">Money</div>
-  <div class="money-actions">
-    <button class="money-btn" type="button" id="moneyAdd">+ Add Plan</button>
-    <button class="money-btn" type="button" id="moneyBought" disabled>Mark Bought</button>
-    <button class="money-btn danger" type="button" id="moneyDelete" disabled>Delete</button>
+<div class="money-shell"
+     data-section-id="{{ active_section.id }}"
+     data-primary-key="{{ active_section.pk }}"
+     data-columns='{{ active_section.columns|tojson }}'>
+  <div class="money-section-tabs">
+    {% for section in sections %}
+      {% set summary = summaries.get(section.id) %}
+      <a class="money-section-tab {% if section.id == active_section.id %}active{% endif %}"
+         href="{{ url_for('money.money_section_route', section_id=section.id) }}">
+        <span>{{ section.label }}</span>
+        {% if summary %}
+          <small>
+            {% if summary.kind == 'money' %}
+              {{ money_value(summary.value) }}
+            {% else %}
+              {{ summary.value }}
+            {% endif %}
+          </small>
+        {% endif %}
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="money-toolbar">
+    <div>
+      <div class="money-title">{{ active_section.label }}</div>
+      {% if active_section.id in ['watchlist', 'pretend'] %}
+        <div class="money-subtitle">Prices are refreshed from a delayed public quote feed when available.</div>
+      {% endif %}
+    </div>
+    <div class="money-actions">
+      <form class="money-search" method="get" action="{{ url_for('money.money_section_route', section_id=active_section.id) }}">
+        <input type="text" name="q" value="{{ search }}" placeholder="Filter">
+        <button class="money-btn" type="submit">Filter</button>
+      </form>
+      {% if active_section.id in ['watchlist', 'pretend'] %}
+        <form method="post" action="{{ url_for('money.refresh_quotes_route', section_id=active_section.id) }}">
+          <button class="money-btn" type="submit">Refresh Prices</button>
+        </form>
+      {% endif %}
+      <button class="money-btn" type="button" id="moneyAdd">Add</button>
+    </div>
+  </div>
+
+  {% if request.args.get('refreshed') %}
+    <div class="money-notice">Updated {{ request.args.get('refreshed') }} quote rows.</div>
+  {% endif %}
+
+  <div class="tabular-scroll">
+    <table class="money-table">
+      <thead>
+        <tr>
+          {% for col in active_section.columns %}
+            <th>{{ col.label }}</th>
+          {% endfor %}
+          {% for col in active_section.get('derived_columns', []) %}
+            <th>{{ col.label }}</th>
+          {% endfor %}
+          <th class="money-actions-col"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="money-row"
+              data-record='{{ row|tojson }}'>
+            {% for col in active_section.columns %}
+              {% set value = row.get(col.name) %}
+              <td>
+                {% if col.type == 'money' %}
+                  {{ money_value(value) }}
+                {% elif col.type == 'checkbox' %}
+                  {{ 'Yes' if value else 'No' }}
+                {% elif col.type == 'textarea' %}
+                  <span class="money-cell-long">{{ value }}</span>
+                {% else %}
+                  {{ value or '' }}
+                {% endif %}
+              </td>
+            {% endfor %}
+            {% for col in active_section.get('derived_columns', []) %}
+              {% set value = row.get(col.name) %}
+              <td class="{% if value and value < 0 %}money-negative{% elif value and value > 0 %}money-positive{% endif %}">
+                {% if col.type == 'money' %}{{ money_value(value) }}{% else %}{{ value }}{% endif %}
+              </td>
+            {% endfor %}
+            <td class="money-row-actions">
+              <button class="money-link-btn money-edit" type="button">Edit</button>
+              <form method="post"
+                    action="{{ url_for('money.delete_money_route', section_id=active_section.id, record_id=row.get(active_section.pk)) }}"
+                    onsubmit="return confirm('Delete this Money record?');">
+                <button class="money-link-btn danger" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="{{ active_section.columns|length + active_section.get('derived_columns', [])|length + 1 }}" class="money-empty">
+              No {{ active_section.label|lower }} records yet.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 
-<form class="money-filters" method="get" action="{{ url_for('money.list_money_route') }}">
-  <label>
-    Domain
-    <select name="domain">
-      <option value="all" {% if domain_filter == 'all' %}selected{% endif %}>All</option>
-      {% for domain in domains %}
-        <option value="{{ domain }}" {% if domain_filter == domain %}selected{% endif %}>{{ domain }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    Status
-    <select name="status">
-      {% for value, label in status_options %}
-        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    Date
-    <select name="date">
-      {% for value, label in date_options %}
-        <option value="{{ value }}" {% if date_filter == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    Sort
-    <select name="sort">
-      {% for value, label in sort_options %}
-        <option value="{{ value }}" {% if sort_key == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <button class="money-btn" type="submit">Apply</button>
-</form>
-
-<div class="money-summary">
-  <div>Next 30 days: ${{ '%.2f'|format(summary.next_30 or 0) }}</div>
-  <div>Next 90 days: ${{ '%.2f'|format(summary.next_90 or 0) }}</div>
-  <div>Unscheduled items: {{ summary.unscheduled or 0 }}</div>
-</div>
-
-<div class="tabular-scroll">
-<table class="money-table">
-  <thead>
-    <tr>
-      <th>Target Date</th>
-      <th>Item</th>
-      <th>Domain</th>
-      <th>Est. Cost</th>
-      <th>Priority</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for plan in plans %}
-      <tr class="money-row"
-          data-plan-id="{{ plan.plan_id }}"
-          data-item="{{ plan.item|e }}"
-          data-domain="{{ plan.domain|e }}"
-          data-cost="{{ plan.estimated_cost }}"
-          data-target-date="{{ plan.target_date or '' }}"
-          data-priority="{{ plan.priority }}"
-          data-status="{{ plan.status|e }}"
-          data-notes="{{ plan.notes|default('', true)|e }}">
-        <td>{{ plan.target_date or '-' }}</td>
-        <td>{{ plan.item }}</td>
-        <td>{{ plan.domain }}</td>
-        <td>${{ '%.2f'|format(plan.estimated_cost or 0) }}</td>
-        <td>{{ plan.priority }}</td>
-        <td>{{ plan.status }}</td>
-      </tr>
-    {% else %}
-      <tr>
-        <td colspan="6" class="money-empty">No plans yet.</td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-
+<div class="money-panel-backdrop" id="moneyBackdrop" aria-hidden="true"></div>
 <div class="money-panel" id="moneyPanel" aria-hidden="true">
-  <form id="moneyForm" class="money-form">
-    <input type="hidden" name="plan_id" id="moneyPlanId">
-    <label>
-      Item
-      <input type="text" name="item" id="moneyItem" required>
-    </label>
-    <label>
-      Domain
-      <input type="text" name="domain" id="moneyDomain" placeholder="General">
-    </label>
-    <label>
-      Estimated cost
-      <input type="number" name="estimated_cost" id="moneyCost" min="0" step="0.01" required>
-    </label>
-    <label>
-      Target date
-      <input type="date" name="target_date" id="moneyTargetDate">
-    </label>
-    <label>
-      Priority
-      <input type="number" name="priority" id="moneyPriority" min="1" max="5" value="3" required>
-    </label>
-    <label>
-      Status
-      <select name="status" id="moneyStatus">
-        <option value="idea">Idea</option>
-        <option value="planned">Planned</option>
-        <option value="bought">Bought</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-    </label>
-    <label>
-      Notes
-      <textarea name="notes" id="moneyNotes" rows="5"></textarea>
-    </label>
+  <div class="money-panel-header">
+    <strong id="moneyPanelTitle">Add</strong>
+    <button class="money-link-btn" type="button" id="moneyCancel">Close</button>
+  </div>
+  <form id="moneyForm"
+        class="money-form"
+        method="post"
+        action="{{ url_for('money.save_money_route', section_id=active_section.id) }}">
+    <input type="hidden" name="{{ active_section.pk }}" id="moneyRecordId">
+    <div id="moneyFields"></div>
     <div class="money-panel-actions">
       <button class="money-btn" type="submit">Save</button>
-      <button class="money-btn" type="button" id="moneyCancel">Cancel</button>
     </div>
   </form>
 </div>
-<div class="money-panel-backdrop" id="moneyBackdrop" aria-hidden="true"></div>
 
 <script>
-  const addBtn = document.getElementById('moneyAdd');
-  const boughtBtn = document.getElementById('moneyBought');
-  const deleteBtn = document.getElementById('moneyDelete');
+  const shell = document.querySelector('.money-shell');
+  const columns = JSON.parse(shell.dataset.columns || '[]');
+  const primaryKey = shell.dataset.primaryKey;
   const panel = document.getElementById('moneyPanel');
   const backdrop = document.getElementById('moneyBackdrop');
-  const form = document.getElementById('moneyForm');
-  const cancelBtn = document.getElementById('moneyCancel');
-  let selectedId = null;
+  const fields = document.getElementById('moneyFields');
+  const recordInput = document.getElementById('moneyRecordId');
+  const panelTitle = document.getElementById('moneyPanelTitle');
 
-  function openPanel(data) {
+  function fieldControl(col, value) {
+    const fallback = col.default === null || col.default === undefined ? '' : col.default;
+    const safeValue = value === null || value === undefined || value === '' ? fallback : value;
+    if (col.type === 'textarea') {
+      return `<textarea name="${col.name}" rows="4" ${col.required ? 'required' : ''}>${escapeHtml(safeValue)}</textarea>`;
+    }
+    if (col.type === 'select') {
+      const options = (col.options || []).map((opt) => {
+        const selected = String(opt) === String(safeValue) ? 'selected' : '';
+        return `<option value="${escapeHtml(opt)}" ${selected}>${escapeHtml(opt)}</option>`;
+      }).join('');
+      return `<select name="${col.name}" ${col.required ? 'required' : ''}>${options}</select>`;
+    }
+    if (col.type === 'checkbox') {
+      return `<input type="checkbox" name="${col.name}" value="1" ${safeValue ? 'checked' : ''}>`;
+    }
+    const inputType = col.type === 'date' ? 'date' : (col.type === 'money' || col.type === 'number' ? 'number' : 'text');
+    const step = col.type === 'money' || col.type === 'number' ? 'step="0.01"' : '';
+    const readonly = col.readonly ? 'readonly' : '';
+    return `<input type="${inputType}" name="${col.name}" value="${escapeHtml(safeValue)}" ${step} ${readonly} ${col.required ? 'required' : ''}>`;
+  }
+
+  function openPanel(record) {
+    fields.innerHTML = columns.filter((col) => !col.readonly).map((col) => {
+      const value = record[col.name];
+      return `<label><span>${escapeHtml(col.label)}</span>${fieldControl(col, value)}</label>`;
+    }).join('');
+    recordInput.value = record[primaryKey] || '';
+    panelTitle.textContent = record[primaryKey] ? 'Edit' : 'Add';
     panel.classList.add('open');
     panel.setAttribute('aria-hidden', 'false');
     backdrop.classList.add('open');
     backdrop.setAttribute('aria-hidden', 'false');
-    document.getElementById('moneyPlanId').value = data.plan_id || '';
-    document.getElementById('moneyItem').value = data.item || '';
-    document.getElementById('moneyDomain').value = data.domain || 'General';
-    document.getElementById('moneyCost').value = data.estimated_cost || '';
-    document.getElementById('moneyTargetDate').value = data.target_date || '';
-    document.getElementById('moneyPriority').value = data.priority || 3;
-    document.getElementById('moneyStatus').value = data.status || 'planned';
-    document.getElementById('moneyNotes').value = data.notes || '';
   }
 
   function closePanel() {
@@ -168,131 +181,24 @@
     backdrop.setAttribute('aria-hidden', 'true');
   }
 
-  function setSelected(row) {
-    document.querySelectorAll('.money-row').forEach((r) => r.classList.remove('selected'));
-    if (row) {
-      row.classList.add('selected');
-      selectedId = row.dataset.planId;
-      boughtBtn.disabled = false;
-      deleteBtn.disabled = false;
-    } else {
-      selectedId = null;
-      boughtBtn.disabled = true;
-      deleteBtn.disabled = true;
-    }
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   }
 
-  document.querySelectorAll('.money-row').forEach((row) => {
-    row.addEventListener('click', () => {
-      setSelected(row);
-      openPanel({
-        plan_id: row.dataset.planId,
-        item: row.dataset.item,
-        domain: row.dataset.domain,
-        estimated_cost: row.dataset.cost,
-        target_date: row.dataset.targetDate,
-        priority: row.dataset.priority,
-        status: row.dataset.status,
-        notes: row.dataset.notes,
-      });
-    });
-  });
-
-  addBtn.addEventListener('click', () => {
-    setSelected(null);
-    openPanel({
-      plan_id: '',
-      item: '',
-      domain: 'General',
-      estimated_cost: '',
-      target_date: '',
-      priority: 3,
-      status: 'planned',
-      notes: '',
-    });
-  });
-
-  cancelBtn.addEventListener('click', closePanel);
+  document.getElementById('moneyAdd').addEventListener('click', () => openPanel({}));
+  document.getElementById('moneyCancel').addEventListener('click', closePanel);
   backdrop.addEventListener('click', closePanel);
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const payload = {
-      item: document.getElementById('moneyItem').value,
-      domain: document.getElementById('moneyDomain').value,
-      estimated_cost: document.getElementById('moneyCost').value,
-      target_date: document.getElementById('moneyTargetDate').value,
-      priority: document.getElementById('moneyPriority').value,
-      status: document.getElementById('moneyStatus').value,
-      notes: document.getElementById('moneyNotes').value,
-    };
-    const planId = document.getElementById('moneyPlanId').value;
-    const method = planId ? 'PUT' : 'POST';
-    const url = planId ? `/money/api/plans/${planId}` : '/money/api/plans';
-    try {
-      const resp = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await resp.json();
-      if (!resp.ok) {
-        alert(data.error || 'Unable to save plan');
-        return;
-      }
-      window.location.reload();
-    } catch (err) {
-      alert('Unable to save plan');
-    }
-  });
-
-  boughtBtn.addEventListener('click', async () => {
-    if (!selectedId) {
-      return;
-    }
-    try {
-      const resp = await fetch(`/money/api/plans/${selectedId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          item: document.getElementById('moneyItem').value,
-          domain: document.getElementById('moneyDomain').value,
-          estimated_cost: document.getElementById('moneyCost').value,
-          target_date: document.getElementById('moneyTargetDate').value,
-          priority: document.getElementById('moneyPriority').value,
-          status: 'bought',
-          notes: document.getElementById('moneyNotes').value,
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) {
-        alert(data.error || 'Unable to mark as bought');
-        return;
-      }
-      window.location.reload();
-    } catch (err) {
-      alert('Unable to mark as bought');
-    }
-  });
-
-  deleteBtn.addEventListener('click', async () => {
-    if (!selectedId) {
-      return;
-    }
-    if (!confirm('Delete this plan?')) {
-      return;
-    }
-    try {
-      const resp = await fetch(`/money/api/plans/${selectedId}`, { method: 'DELETE' });
-      if (!resp.ok) {
-        const data = await resp.json();
-        alert(data.error || 'Unable to delete plan');
-        return;
-      }
-      window.location.reload();
-    } catch (err) {
-      alert('Unable to delete plan');
-    }
+  document.querySelectorAll('.money-edit').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const row = event.target.closest('.money-row');
+      openPanel(JSON.parse(row.dataset.record || '{}'));
+    });
   });
 </script>
 {% endblock %}
