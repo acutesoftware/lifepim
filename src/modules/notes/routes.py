@@ -1,5 +1,6 @@
 import os
 import re
+import hashlib
 import tempfile
 from datetime import datetime, timezone
 
@@ -1165,16 +1166,21 @@ def save_note_route(note_id):
     if not note_path or os.path.isdir(note_path):
         return jsonify({"error": "Note path is invalid."}), 400
     base_mtime_ns = payload.get("base_mtime_ns")
+    base_hash = payload.get("base_hash") or ""
     current_state = _note_file_state(note_path)
     if base_mtime_ns not in (None, ""):
         if not current_state or str(current_state.get("mtime_ns")) != str(base_mtime_ns):
-            return jsonify({
-                "error": "The note changed on disk after this editor loaded. Reload before saving to avoid overwriting another edit.",
-                "conflict": True,
-                "size": current_state.get("size") if current_state else "",
-                "date_modified": current_state.get("date_modified") if current_state else "",
-                "mtime_ns": current_state.get("mtime_ns") if current_state else "",
-            }), 409
+            if base_hash and current_state and current_state.get("sha256") == base_hash:
+                pass
+            else:
+                return jsonify({
+                    "error": "The note changed on disk after this editor loaded. Reload before saving to avoid overwriting another edit.",
+                    "conflict": True,
+                    "size": current_state.get("size") if current_state else "",
+                    "date_modified": current_state.get("date_modified") if current_state else "",
+                    "mtime_ns": current_state.get("mtime_ns") if current_state else "",
+                    "sha256": current_state.get("sha256") if current_state else "",
+                }), 409
     try:
         saved_state = _write_note_file_content(note_path, content)
     except OSError as exc:
@@ -1183,10 +1189,12 @@ def save_note_route(note_id):
         size = saved_state["size"]
         date_modified = saved_state["date_modified"]
         mtime_ns = saved_state["mtime_ns"]
+        sha256 = saved_state["sha256"]
     else:
         size = note.get("size") or ""
         date_modified = note.get("date_modified") or ""
         mtime_ns = ""
+        sha256 = ""
 
     if tbl:
         values_map = {col: note.get(col, "") for col in tbl["col_list"]}
@@ -1202,6 +1210,7 @@ def save_note_route(note_id):
         "size": size,
         "date_modified": date_modified,
         "mtime_ns": mtime_ns,
+        "sha256": sha256,
     })
 
 @notes_bp.route('/delete/<int:note_id>')
@@ -1395,12 +1404,17 @@ def _without_duplicate_title_heading(note_text, file_name):
 def _note_file_state(note_path):
     try:
         stat = os.stat(note_path)
+        digest = hashlib.sha256()
+        with open(note_path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
     except OSError:
         return None
     return {
         "size": str(stat.st_size),
         "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
         "mtime_ns": stat.st_mtime_ns,
+        "sha256": digest.hexdigest(),
     }
 
 

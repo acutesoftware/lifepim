@@ -174,13 +174,43 @@ class TestNoteCreation(unittest.TestCase):
         app.register_blueprint(notes_routes.notes_bp)
         resp = app.test_client().post(
             f"/notes/api/save/{note_id}",
-            json={"content": "browser edit", "base_mtime_ns": loaded_state["mtime_ns"]},
+            json={
+                "content": "browser edit",
+                "base_mtime_ns": loaded_state["mtime_ns"],
+                "base_hash": loaded_state["sha256"],
+            },
         )
 
         self.assertEqual(resp.status_code, 409)
         self.assertTrue(resp.get_json().get("conflict"))
         with open(full_path, "r", encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "changed elsewhere")
+
+    def test_autosave_allows_timestamp_only_change(self):
+        note_dir = os.path.join(self.tmpdir.name, "timestamp_only_save")
+        note_id, created = self._create_note_record("note_creation_test_timestamp", note_dir, project="")
+        full_path = created["full_path"]
+        loaded_state = notes_routes._note_file_state(full_path)
+        self.assertIsNotNone(loaded_state)
+
+        bumped_ns = int(loaded_state["mtime_ns"]) + 1_000_000_000
+        os.utime(full_path, ns=(bumped_ns, bumped_ns))
+
+        app = Flask(__name__)
+        app.register_blueprint(notes_routes.notes_bp)
+        resp = app.test_client().post(
+            f"/notes/api/save/{note_id}",
+            json={
+                "content": "browser edit after timestamp drift",
+                "base_mtime_ns": loaded_state["mtime_ns"],
+                "base_hash": loaded_state["sha256"],
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json().get("ok"))
+        with open(full_path, "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "browser edit after timestamp drift")
 
 
 if __name__ == "__main__":
