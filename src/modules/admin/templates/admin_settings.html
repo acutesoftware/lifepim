@@ -4,6 +4,7 @@
     ('calendar', 'Calendar'),
     ('media', 'Media'),
     ('files', 'Files'),
+    ('notes', 'Notes'),
     ('config', 'Config'),
     ('general', 'General')
   ] %}
@@ -49,6 +50,26 @@
       {% elif active_settings_tab == 'files' %}
         <h4>Files</h4>
         <p class="settings-empty">No Files settings yet.</p>
+      {% elif active_settings_tab == 'notes' %}
+        <h4>Notes</h4>
+        <form method="post" action="{{ url_for('notes.migrate_notes_source_route') }}" class="settings-form">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Migrate notes to new source</div>
+            <label>
+              Notes root
+              <input type="text" name="notes_folder" placeholder="N:\duncan\LifePIM_Data\DATA\notes">
+            </label>
+            <label>
+              Project
+              <input type="text" name="project" placeholder="Leave blank for derived project mapping">
+            </label>
+            <label>
+              <input type="checkbox" name="confirm_migrate" value="1">
+              Delete existing notes and note links before importing this folder
+            </label>
+          </div>
+          <button type="submit">Migrate notes source</button>
+        </form>
       {% elif active_settings_tab == 'config' %}
         <h4>Config</h4>
         <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form settings-form-wide">

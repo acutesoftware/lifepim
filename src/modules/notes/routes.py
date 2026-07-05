@@ -10,7 +10,7 @@ from common import data
 from utils import importer
 from utils import markdown_utils
 from utils import hex_utils
-from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total, build_pagination
+from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total, build_pagination, lg_usr
 from common import config as cfg
 import etl_folder_mapping as folder_etl
 from common import projects as projects_mod
@@ -21,6 +21,63 @@ notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
 INVALID_TITLE_CHARS = re.compile(r'[<>:"/\\|?*]')
 WHITESPACE_RE = re.compile(r"\s+")
 NOTE_TITLE_MAX_LEN = 80
+
+
+def _normalize_project_param(project):
+    project = (project or "").strip()
+    if project in ("any", "All", "all", "ALL", "spacer"):
+        return ""
+    return project
+
+
+def _normalize_note_path(path_value):
+    """Normalize a notes path without applying global mirror/NAS aliases."""
+    path_value = (path_value or "").strip().strip('"').strip()
+    if not path_value:
+        return ""
+    path_value = path_value.replace("/", "\\")
+    if len(path_value) >= 2 and path_value[1] == ":":
+        path_value = path_value[0].upper() + path_value[1:]
+    if len(path_value) > 3 and path_value.endswith("\\"):
+        path_value = path_value.rstrip("\\")
+    return path_value
+
+
+def _path_startswith(path_value, prefix):
+    path_value = _normalize_note_path(path_value)
+    prefix = _normalize_note_path(prefix)
+    return bool(prefix and (path_value.lower() == prefix.lower() or path_value.lower().startswith(prefix.lower() + "\\")))
+
+
+def _replace_path_prefix(path_value, old_prefix, new_prefix):
+    path_norm = _normalize_note_path(path_value)
+    old_norm = _normalize_note_path(old_prefix)
+    new_norm = _normalize_note_path(new_prefix)
+    if not old_norm or not _path_startswith(path_norm, old_norm):
+        return path_norm
+    return new_norm + path_norm[len(old_norm):]
+
+
+def _notes_root_from_path(path_value):
+    path_norm = _normalize_note_path(path_value)
+    parts = [part for part in path_norm.split("\\") if part]
+    for idx in range(len(parts) - 1):
+        if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
+            return "\\".join(parts[: idx + 2])
+    return ""
+
+
+def _alias_counterpart_roots(path_value):
+    path_norm = _normalize_note_path(path_value)
+    roots = []
+    for src, dst in getattr(cfg, "PATH_ALIASES", []):
+        src_norm = _normalize_note_path(src)
+        dst_norm = _normalize_note_path(dst)
+        if src_norm and _path_startswith(path_norm, src_norm):
+            roots.append(dst_norm + path_norm[len(src_norm):])
+        if dst_norm and _path_startswith(path_norm, dst_norm):
+            roots.append(src_norm + path_norm[len(dst_norm):])
+    return [_normalize_note_path(root) for root in roots if root]
 
 
 def _sanitize_title(title):
@@ -196,7 +253,7 @@ def _dedupe_candidates(rows):
     seen = set()
     for row in rows or []:
         path_prefix = (row.get("path_prefix") or "").strip()
-        norm_path = folder_etl.norm_path(path_prefix)
+        norm_path = _normalize_note_path(path_prefix)
         if not norm_path:
             continue
         key = norm_path.lower()
@@ -277,7 +334,7 @@ def _write_note_file(folder_path, base_name, content):
 
 
 def _create_note_file(folder_path, title, sidebar_label):
-    folder_norm = folder_etl.norm_path(folder_path)
+    folder_norm = _normalize_note_path(folder_path)
     folder_path = folder_norm or folder_path
     if not folder_path:
         raise ValueError("Missing folder path")
@@ -309,7 +366,7 @@ def _normalize_folder_filter(folder_path):
     folder_path = (folder_path or "").strip()
     if not folder_path:
         return None
-    return folder_etl.norm_path(folder_path) or folder_path
+    return _normalize_note_path(folder_path) or folder_path
 
 
 def _notes_base_condition(project, folder_path=None):
@@ -521,7 +578,7 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
         "  AND pf.folder_role IN ('default','include','archive','output') "
         "  AND df.folder_path IS NOT NULL "
         "  AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%' "
-        "ORDER BY CASE pf.folder_role "
+        "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
         "  WHEN 'default' THEN 0 "
         "  WHEN 'include' THEN 1 "
         "  WHEN 'output' THEN 2 "
@@ -903,10 +960,10 @@ def view_note_route(note_id):
             "  AND pf.folder_role IN ('default','include','archive','output') "
             "  AND df.folder_path IS NOT NULL "
             "  AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%' "
-            "ORDER BY CASE pf.folder_role "
-            "  WHEN 'default' THEN 0 "
-            "  WHEN 'include' THEN 1 "
-            "  WHEN 'output' THEN 2 "
+        "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
+        "  WHEN 'default' THEN 0 "
+        "  WHEN 'include' THEN 1 "
+        "  WHEN 'output' THEN 2 "
             "  WHEN 'archive' THEN 3 "
             "  ELSE 9 END, pf.sort_order, pf.path_prefix "
             "LIMIT 1"
@@ -1030,7 +1087,7 @@ def create_note_route():
     if not default_path:
         return jsonify({"error": "No default folder set for this project."}), 400
     if path_prefix:
-        if folder_etl.norm_path(path_prefix) != folder_etl.norm_path(default_path):
+        if _normalize_note_path(path_prefix).lower() != _normalize_note_path(default_path).lower():
             return jsonify({"error": "Notes can only be created in the default folder for this project."}), 400
     path_prefix = default_path
     if not path_prefix:
@@ -1077,6 +1134,7 @@ def create_note_route():
         except Exception:
             pass
         return jsonify({"error": "Unable to insert note record."}), 500
+    _set_note_folder_id(data._get_conn(), tbl["name"], note_id, created["folder_path"])
     return jsonify({
         "note_id": note_id,
         "file_name": created["file_name"],
@@ -1273,9 +1331,7 @@ def import_notes_route():
 
 @notes_bp.route('/import-folder', methods=["GET", "POST"])
 def import_notes_folder_route():
-    project = request.args.get("proj") or ""
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = ""
+    project = _normalize_project_param(request.args.get("proj") or "")
     tbl = get_table_def("notes")
     imported = None
     error = ""
@@ -1288,28 +1344,8 @@ def import_notes_folder_route():
         elif not tbl:
             error = "Notes table not found."
         else:
-            count = 0
-            for root, _, files in os.walk(folder_path):
-                for name in files:
-                    if not name.lower().endswith(".md"):
-                        continue
-                    full_path = os.path.join(root, name)
-                    if not os.path.isfile(full_path):
-                        continue
-                    values_map = {
-                        "file_name": name,
-                        "path": root,
-                        "size": str(os.path.getsize(full_path)),
-                        "date_modified": datetime.fromtimestamp(os.path.getmtime(full_path)).strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        ),
-                        "project": project,
-                    }
-                    values = [values_map.get(col, "") for col in tbl["col_list"]]
-                    record_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
-                    if record_id:
-                        count += 1
-            imported = count
+            rows = _collect_note_import_rows(folder_path, project)
+            imported = _insert_note_import_rows(tbl, rows)
     return render_template(
         "notes_import_folder.html",
         active_tab="notes",
@@ -1321,6 +1357,249 @@ def import_notes_folder_route():
         imported=imported,
         error=error,
     )
+
+
+def _collect_note_import_rows(folder_path, project):
+    rows = []
+    for root, _, files in os.walk(folder_path):
+        for name in files:
+            if not name.lower().endswith(".md"):
+                continue
+            full_path = os.path.join(root, name)
+            if not os.path.isfile(full_path):
+                continue
+            try:
+                stat = os.stat(full_path)
+            except OSError:
+                continue
+            rows.append(
+                {
+                    "file_name": name,
+                    "path": root,
+                    "size": str(stat.st_size),
+                    "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                    "project": project,
+                }
+            )
+    return rows
+
+
+def _insert_note_import_rows(tbl, rows):
+    count = 0
+    conn = data._get_conn()
+    for values_map in rows:
+        values = [values_map.get(col, "") for col in tbl["col_list"]]
+        record_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
+        if record_id:
+            _set_note_folder_id(conn, tbl["name"], record_id, values_map.get("path", ""))
+            count += 1
+    return count
+
+
+def _upsert_note_dim_folder(conn, folder_path):
+    folder_path = _normalize_note_path(folder_path)
+    if not folder_path:
+        return None
+    conn.execute("INSERT OR IGNORE INTO dim_folder(folder_path) VALUES (?)", (folder_path,))
+    conn.execute(
+        "UPDATE dim_folder SET last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'), is_active=1 WHERE folder_path=?",
+        (folder_path,),
+    )
+    row = conn.execute("SELECT folder_id FROM dim_folder WHERE folder_path = ?", (folder_path,)).fetchone()
+    return row["folder_id"] if row else None
+
+
+def _set_note_folder_id(conn, tbl_name, record_id, folder_path):
+    folder_id = _upsert_note_dim_folder(conn, folder_path)
+    if not folder_id:
+        return
+    conn.execute(f"UPDATE {tbl_name} SET folder_id = ? WHERE id = ?", (folder_id, record_id))
+    conn.commit()
+
+
+def _count_note_links(conn):
+    if not _table_exists(conn, "lp_links"):
+        return 0
+    row = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_links "
+        "WHERE lower(src_type) IN ('note', 'notes') OR lower(dst_type) IN ('note', 'notes')"
+    ).fetchone()
+    return row["cnt"] if row else 0
+
+
+def _delete_note_links(conn):
+    if not _table_exists(conn, "lp_links"):
+        return 0
+    cur = conn.execute(
+        "DELETE FROM lp_links "
+        "WHERE lower(src_type) IN ('note', 'notes') OR lower(dst_type) IN ('note', 'notes')"
+    )
+    return cur.rowcount if cur.rowcount is not None else 0
+
+
+def _clear_notes_table(conn, tbl_name):
+    if not _table_exists(conn, tbl_name):
+        return 0
+    row = conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl_name}").fetchone()
+    before_count = row["cnt"] if row else 0
+    conn.execute(f"DELETE FROM {tbl_name}")
+    try:
+        conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (tbl_name,))
+    except Exception:
+        pass
+    return before_count
+
+
+def _current_note_roots(conn, tbl_name):
+    roots = set()
+    if not _table_exists(conn, tbl_name):
+        return []
+    for row in conn.execute(f"SELECT DISTINCT path FROM {tbl_name} WHERE COALESCE(path, '') != ''").fetchall():
+        root = _notes_root_from_path(row["path"])
+        if root:
+            roots.add(root)
+    return sorted(roots)
+
+
+def _rewrite_lp_project_folder_paths(conn, old_root, new_root):
+    if not _table_exists(conn, "lp_project_folders"):
+        return 0
+    updated = 0
+    rows = conn.execute(
+        "SELECT project_folder_id, project_id, path_prefix FROM lp_project_folders "
+        "WHERE lower(path_prefix) = lower(?) OR lower(path_prefix) LIKE lower(?)",
+        (_normalize_note_path(old_root), _normalize_note_path(old_root) + "\\%"),
+    ).fetchall()
+    for row in rows:
+        next_path = _replace_path_prefix(row["path_prefix"], old_root, new_root)
+        if not next_path or next_path.lower() == (row["path_prefix"] or "").lower():
+            continue
+        try:
+            conn.execute(
+                "UPDATE lp_project_folders SET path_prefix = ?, updated_utc = ? WHERE project_folder_id = ?",
+                (next_path, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), row["project_folder_id"]),
+            )
+            updated += 1
+        except Exception:
+            conflict = conn.execute(
+                "SELECT project_folder_id FROM lp_project_folders WHERE project_id = ? AND path_prefix = ?",
+                (row["project_id"], next_path),
+            ).fetchone()
+            if conflict:
+                conn.execute(
+                    "DELETE FROM lp_project_folders WHERE project_folder_id = ?",
+                    (row["project_folder_id"],),
+                )
+                updated += 1
+    return updated
+
+
+def _rewrite_map_folder_project_paths(conn, old_root, new_root):
+    if not _table_exists(conn, "map_folder_project"):
+        return 0
+    updated = 0
+    rows = conn.execute(
+        "SELECT map_id, path_prefix, tab, grp, project, is_primary FROM map_folder_project "
+        "WHERE lower(path_prefix) = lower(?) OR lower(path_prefix) LIKE lower(?)",
+        (_normalize_note_path(old_root), _normalize_note_path(old_root) + "\\%"),
+    ).fetchall()
+    for row in rows:
+        next_path = _replace_path_prefix(row["path_prefix"], old_root, new_root)
+        if not next_path or next_path.lower() == (row["path_prefix"] or "").lower():
+            continue
+        try:
+            conn.execute(
+                "UPDATE map_folder_project SET path_prefix = ? WHERE map_id = ?",
+                (next_path, row["map_id"]),
+            )
+            updated += 1
+        except Exception:
+            conflict = conn.execute(
+                "SELECT map_id FROM map_folder_project "
+                "WHERE path_prefix = ? AND tab = ? AND grp = ? AND project = ? AND is_primary = ?",
+                (next_path, row["tab"], row["grp"], row["project"], row["is_primary"]),
+            ).fetchone()
+            if conflict:
+                conn.execute("DELETE FROM map_folder_project WHERE map_id = ?", (row["map_id"],))
+                updated += 1
+    return updated
+
+
+def _migrate_notes_mapping_roots(conn, new_root, old_roots):
+    new_root = _normalize_note_path(new_root)
+    rewritten = 0
+    candidate_roots = set()
+    for root in old_roots or []:
+        root = _normalize_note_path(root)
+        if root and root.lower() != new_root.lower():
+            candidate_roots.add(root)
+    for alias_root in _alias_counterpart_roots(new_root):
+        alias_notes_root = _notes_root_from_path(alias_root) or alias_root
+        if alias_notes_root.lower() != new_root.lower():
+            candidate_roots.add(alias_notes_root)
+    for old_root in sorted(candidate_roots, key=len, reverse=True):
+        rewritten += _rewrite_lp_project_folder_paths(conn, old_root, new_root)
+        rewritten += _rewrite_map_folder_project_paths(conn, old_root, new_root)
+    try:
+        rewritten += folder_etl.rebuild_map_project_folder(conn)
+    except Exception:
+        pass
+    return rewritten
+
+
+@notes_bp.route('/migrate-source', methods=["POST"])
+def migrate_notes_source_route():
+    folder_path = request.form.get("notes_folder", "").strip()
+    folder_path = _normalize_note_path(folder_path)
+    project = _normalize_project_param(request.form.get("project", ""))
+    confirmed = request.form.get("confirm_migrate") == "1"
+    tbl = get_table_def("notes")
+    if not confirmed:
+        msg = "Migration not run: confirmation checkbox is required."
+    elif not folder_path:
+        msg = "Migration not run: no notes folder provided."
+    elif not os.path.isdir(folder_path):
+        msg = "Migration not run: folder not found."
+    elif not tbl:
+        msg = "Migration not run: notes table not found."
+    else:
+        rows = _collect_note_import_rows(folder_path, project)
+        if not rows:
+            msg = "Migration not run: no markdown files found in the selected folder."
+        else:
+            conn = data._get_conn()
+            new_root = _notes_root_from_path(folder_path) or folder_path
+            old_roots = _current_note_roots(conn, tbl["name"])
+            notes_before = conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
+            links_before = _count_note_links(conn)
+            links_deleted = _delete_note_links(conn)
+            notes_deleted = _clear_notes_table(conn, tbl["name"])
+            mappings_rewritten = _migrate_notes_mapping_roots(conn, new_root, old_roots)
+            conn.commit()
+            imported = _insert_note_import_rows(tbl, rows)
+            lg_usr(
+                action="notes_migrate_source",
+                entity_type=tbl["name"],
+                before={"notes": notes_before, "note_links": links_before},
+                after={"notes": imported, "note_links": 0},
+                context_type="notes_migrate_source",
+                context_id=folder_path,
+                extra={
+                    "folder_path": folder_path,
+                    "project": project,
+                    "notes_deleted": notes_deleted,
+                    "note_links_deleted": links_deleted,
+                    "notes_imported": imported,
+                    "mappings_rewritten": mappings_rewritten,
+                },
+                conn=conn,
+            )
+            msg = (
+                f"Migrated notes source. Deleted {notes_deleted} old notes and "
+                f"{links_deleted} note links, updated {mappings_rewritten} folder mappings, "
+                f"then imported {imported} notes."
+            )
+    return redirect(url_for("admin.settings_route", tab="notes", message=msg))
 
 
 def _parse_datetime(value):

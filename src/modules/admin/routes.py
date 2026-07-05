@@ -128,9 +128,9 @@ def admin_mapping_route():
 
 @admin_bp.route("/settings", methods=["GET", "POST"])
 def settings_route():
-    message = ""
+    message = request.args.get("message", "")
     active_settings_tab = (request.args.get("tab") or request.form.get("tab") or "calendar").strip().lower()
-    if active_settings_tab not in {"calendar", "media", "files", "general", "config"}:
+    if active_settings_tab not in {"calendar", "media", "files", "notes", "general", "config"}:
         active_settings_tab = "calendar"
 
     conn = db.conn if db.conn is not None else None
