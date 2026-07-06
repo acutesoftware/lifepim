@@ -1,4 +1,5 @@
 from datetime import datetime
+import sqlite3
 
 from common import data as db
 
@@ -26,10 +27,19 @@ GENERAL_DEFAULTS = {
     "general.map_names_english": ("1", "General", "Map names English"),
 }
 
+_SCHEMA_READY_CONN_IDS = set()
+
 
 def ensure_settings_schema(conn=None):
     conn = db._get_conn() if conn is None else conn
+    if not isinstance(conn, sqlite3.Connection):
+        raise TypeError("settings schema requires a sqlite3.Connection")
+    conn_id = id(conn)
+    if conn_id in _SCHEMA_READY_CONN_IDS:
+        return
+
     conn.executescript(SETTINGS_SCHEMA_SQL)
+    _ensure_settings_columns(conn)
     now = _utc_now()
     for key, (value, category, label) in {
         **CALENDAR_VIEW_DEFAULTS,
@@ -42,6 +52,21 @@ def ensure_settings_schema(conn=None):
             (key, value, category, label, now),
         )
     conn.commit()
+    _SCHEMA_READY_CONN_IDS.add(conn_id)
+
+
+def _ensure_settings_columns(conn):
+    rows = conn.execute("PRAGMA table_info(sys_settings)").fetchall()
+    existing = {_row_value(row, "name", 1).lower() for row in rows}
+    columns = {
+        "setting_value": "TEXT NOT NULL DEFAULT ''",
+        "category": "TEXT NOT NULL DEFAULT 'General'",
+        "label": "TEXT NOT NULL DEFAULT ''",
+        "updated_utc": "TEXT NOT NULL DEFAULT ''",
+    }
+    for name, col_type in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE sys_settings ADD COLUMN {name} {col_type}")
 
 
 def get_setting(key, default="", conn=None):
@@ -51,7 +76,7 @@ def get_setting(key, default="", conn=None):
         "SELECT setting_value FROM sys_settings WHERE setting_key = ?",
         (key,),
     ).fetchone()
-    return row["setting_value"] if row else default
+    return _row_value(row, "setting_value", 0) if row else default
 
 
 def set_setting(key, value, category="General", label="", conn=None):
@@ -134,6 +159,12 @@ def list_settings(conn=None):
         "FROM sys_settings ORDER BY category, setting_key"
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def _row_value(row, key, index):
+    if hasattr(row, "keys"):
+        return row[key]
+    return row[index]
 
 
 def _as_bool(value):

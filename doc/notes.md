@@ -1,205 +1,162 @@
-# Notes Source Deployment
+# Notes
 
-Short operator notes for pointing LifePIM Desktop at a markdown notes source.
+LifePIM Notes are markdown files on disk with metadata stored in SQLite.
 
-## Two Different Actions
+## Overview
 
-Use the right action for the job:
+The Notes tab lists markdown files that have been imported into the `lp_notes` table. The database stores metadata only:
 
-- Add another notes folder: use `Notes tab -> Import Folder`.
-- Replace the current notes source: use `Settings -> Notes -> Migrate notes source`.
+- `file_name`
+- `path`
+- `folder_id`
+- `size`
+- `date_modified`
+- `project`
 
-Do not use `tests/LOAD_TESTING.py` as the normal notes deployment/import path. It was a bulk test loader and should be phased out of deployment.
+The note body remains in the `.md` file on disk. Viewing or editing a note reads/writes the markdown file directly.
 
-## Add Notes Folder
+### View Notes
 
-Use this when adding extra notes without deleting existing note records.
+Open the Notes tab from the top navigation.
 
-1. Start LifePIM Desktop.
-2. Open the Notes tab.
-3. Click `Import Folder`.
-4. Enter the notes folder root, for example:
+Use the left project/sidebar tabs to filter notes by mapped project folders. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current project folder.
 
-   ```text
-   N:\duncan\LifePIM_Data\DATA\notes
-   ```
+### Add Notes
 
-5. Click `Import Folder`.
-6. Confirm the imported count is sensible.
+New notes can be created from the Notes UI. The app writes a new `.md` file into the selected project's default notes folder and inserts a matching row into `lp_notes`.
 
-This is append-only. It does not delete old notes, does not deduplicate by path, and does not touch links.
+The project must have a default folder configured before new-note creation can write to the correct place.
 
-## Migrate Notes Source
+### Edit Notes
 
-Use this when changing from one root source to another, for example from `E:\BK_fangorn\...` to the live NAS folder.
+Open a note and click `Edit`.
 
-1. Back up the SQLite database.
+Saving a note updates the markdown file on disk. The app also updates the note metadata in `lp_notes`, including:
 
-2. Start LifePIM Desktop.
+- `size`
+- `date_modified`
+- `rec_extract_date`
 
-3. Open:
+This means edits made through LifePIM keep the database metadata current.
 
-   ```text
-   Settings -> Notes
-   ```
+### Import Folder
 
-4. In `Migrate notes to new source`, enter the new notes root, for example:
-
-   ```text
-   N:\duncan\LifePIM_Data\DATA\notes
-   ```
-
-5. Leave `Project` blank unless you intentionally want every imported note to get the same explicit `project` value.
-
-6. Tick:
-
-   ```text
-   Delete existing notes and note links before importing this folder
-   ```
-
-7. Click:
-
-   ```text
-   Migrate notes source
-   ```
-
-The migration pre-scans the selected folder before deleting anything. If the folder does not exist or contains no markdown files, it stops without clearing existing notes.
-
-## What Migration Deletes
-
-The migration route is:
+Use:
 
 ```text
-src/modules/notes/routes.py -> migrate_notes_source_route()
+Notes tab -> Import Folder
 ```
 
-It deletes:
+Use this when adding another notes folder without deleting existing notes.
 
-- all rows in `lp_notes`
-- links where `lp_links.src_type` is `note` or `notes`
-- links where `lp_links.dst_type` is `note` or `notes`
+`Import Folder` is append-only:
 
-It also updates project/folder mapping paths for the notes source:
+- imports `.md` files recursively
+- creates rows in `lp_notes`
+- leaves existing notes alone
+- leaves existing links alone
+- does not deduplicate by path
 
-- rewrites matching `lp_project_folders.path_prefix` values from the old notes root to the new notes root
-- rewrites matching `map_folder_project.path_prefix` values from the old notes root to the new notes root
-- rebuilds `map_project_folder`
+Do not import the same folder twice unless duplicate rows are acceptable.
 
-This is what moves project/sidebar filtering away from old mirror paths such as:
+## Migrate
 
-```text
-E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes
-```
+Use migration when changing the notes source to an existing notes folder, such as moving from a local mirror to the live NAS folder.
 
-to the selected live notes root, for example:
+Example live notes root:
 
 ```text
 N:\duncan\LifePIM_Data\DATA\notes
 ```
 
-It does not delete markdown files on disk.
-
-It does not delete old `dim_folder` rows. Old folder rows may remain in the folder cache, but migrated notes are assigned to folder IDs for the selected source path. This avoids accidentally removing folders that other tables may still use.
-
-## What Import Stores
-
-Both `Import Folder` and `Migrate notes source` use the same notes import helper.
-
-They:
-
-1. Walk the selected folder recursively.
-2. Import `.md` files only.
-3. Insert one row per markdown file into `lp_notes`.
-4. Store metadata only:
-   - `file_name`
-   - `path`
-   - `size`
-   - `date_modified`
-   - `project`
-5. Leave the note body in the markdown file on disk.
-6. Use `common.data.add_record()`, which also sets:
-   - `user_name`
-   - `rec_extract_date`
-   - `folder_id`
-
-Because `folder_id` is populated during `add_record()`, no separate folder-id backfill is needed for notes.
-
-For notes, the import keeps the selected source path as the note path. It does not use the global mirror alias to rewrite `N:\...` back to `E:\BK_fangorn\...`.
-
-## Links And Notes
-
-Links are ID-based:
+Run:
 
 ```text
-lp_links.src_type / lp_links.src_id
-lp_links.dst_type / lp_links.dst_id
+Settings -> Notes -> Migrate notes source
 ```
 
-For notes, those IDs are `lp_notes.id` values. When the notes source is replaced, imported notes get new IDs, so old note links cannot safely be reused. The migration deletes note-touching links so they can be recreated against the new note records.
+Steps:
 
-Practical rule:
+1. Back up the SQLite database.
+2. Open `Settings -> Notes`.
+3. Enter the new notes root.
+4. Leave `Project` blank unless every imported note should get one explicit project value.
+5. Tick `Delete existing notes and note links before importing this folder`.
+6. Click `Migrate notes source`.
 
-- Fresh DB plus `Import Folder`: no link reset needed.
-- Adding an extra folder with `Import Folder`: existing links are preserved.
-- Replacing the notes root: use `Migrate notes source`, which clears note links and notes before importing.
+Migration pre-scans the target folder before deleting anything. If the folder does not exist or contains no markdown files, migration stops.
 
-## Config To Check
+Migration deletes:
 
-Primary config file:
+- all rows in `lp_notes`
+- links where `lp_links.src_type` is `note` or `notes`
+- links where `lp_links.dst_type` is `note` or `notes`
+
+Migration does not delete markdown files on disk.
+
+Migration also updates project/folder mapping paths for the notes source:
+
+- rewrites matching `lp_project_folders.path_prefix` values from the old notes root to the new notes root
+- rewrites matching `map_folder_project.path_prefix` values from the old notes root to the new notes root
+- rebuilds `map_project_folder`
+
+This moves project/sidebar filtering away from old mirror paths such as:
 
 ```text
-src/common/config.py
+E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes
 ```
 
-Check the configured app data folder and database:
+to the selected source, for example:
 
-```python
-user_folder = r"D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data"
-db_name = os.path.join(user_folder, 'lifepim.db')
-DB_FILE = db_name
+```text
+N:\duncan\LifePIM_Data\DATA\notes
 ```
+
+Links are ID-based. For notes, links point at `lp_notes.id`, so replacing the notes table creates new note IDs. Note links must be recreated after migration.
+
+## Folders
+
+Folders are how Notes connect markdown files to projects and the left-hand project/sidebar tabs.
+
+There are three related concepts:
+
+- `lp_notes.path`
+  - The real folder containing the markdown file.
+- `dim_folder`
+  - A normalized folder cache. Each imported note gets a `folder_id` pointing here.
+- `lp_project_folders`
+  - Project folder rules. These decide which folders belong to which project/sidebar tab.
+
+When a note is imported or created, LifePIM stores the actual selected notes path and assigns `folder_id`. For notes, the import keeps the selected source path. It does not rewrite `N:\...` back to `E:\BK_fangorn\...`.
+
+Project filtering works by matching a note folder against enabled `lp_project_folders.path_prefix` values. More specific folder prefixes should win over broad parent folders.
+
+Example:
+
+```text
+N:\duncan\LifePIM_Data\DATA\notes\10-Pers\13-Family
+```
+
+should map more specifically than:
+
+```text
+N:\duncan\LifePIM_Data\DATA\notes\10-Pers
+```
+
+The Folders section in Notes is a navigation aid. It shows subfolders for the current notes/project filter so you can drill into the markdown tree.
+
+If folder/project mapping looks wrong after changing source, run `Migrate notes source` rather than plain `Import Folder`, because migration rewrites the mapping prefixes from the old root to the new root.
+
+## Operational Notes
+
+Do not use `tests/LOAD_TESTING.py` as the normal Notes deployment/import path. It was a bulk test loader and should be phased out of deployment.
 
 The UI import and migration forms do not read `FOLDER_NOTES` from `tests/LOAD_TESTING.py`. The folder is supplied by the UI form.
 
-If project/sidebar mapping should work for the new NAS folder, check that project folder mappings include the NAS path prefixes. These mappings are managed through the folder/project mapping tables and CSVs, not by the notes import itself.
+If you later reload mapping CSVs from disk and those CSVs still contain old paths such as `E:\BK_fangorn`, the old paths can come back. Update the CSVs too if the NAS path is now the permanent source of truth.
 
-Relevant config values:
+## TODO
 
-```python
-etl_folders_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv"
-etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv"
-PATH_ALIASES = [
-    (r"N:\duncan", r"E:\BK_fangorn\user\duncan"),
-    (r"N:\\", r"E:\BK_fangorn\user"),
-]
-```
-
-If the mapping CSVs are still based on `E:\BK_fangorn` but imported notes are stored as `N:\...`, mapping may not match unless aliases/mapping rules account for both forms.
-
-The migration flow rewrites the currently loaded mapping rows in the SQLite database. If you later reload mapping CSVs from disk and those CSVs still contain `E:\BK_fangorn`, the old paths can come back. Update the CSVs too if the NAS path is now the permanent source of truth.
-
-Run folder mapping only if you changed project/folder mapping CSVs or need to refresh sidebar/project classification:
-
-```bat
-cd src
-ETL_MAP_FOLDERS.BAT
-```
-
-## What Is Not Needed For Notes Import
-
-For notes only, you do not need to run these after using the UI import or migration:
-
-- `tests/LOAD_TESTING.py`
-- `load_notes()` from `tests/LOAD_TESTING.py`
-- a full data reload
-- a separate folder-id backfill
-- a separate note-body import
-
-## Current Refactor Target
-
-`tests/LOAD_TESTING.py` should stop being part of deployment. The next cleanup should split database schema initialization from data loading so the deploy flow can be:
-
-1. Initialize schema.
-2. Start app.
-3. Import or migrate notes through the UI.
-4. Import other data sources through their own explicit import flows.
+- Add a refresh/sync job for notes. Current gap: if new `.md` files are added directly to the notes folder outside LifePIM, they are not automatically added to `lp_notes`. Today you must use `Import Folder`, but that is append-only and can create duplicates.
+- Replace `tests/LOAD_TESTING.py` with explicit import/sync flows for each data source.
+- Add idempotent note import keyed by full file path so repeated imports update existing rows instead of duplicating them.
