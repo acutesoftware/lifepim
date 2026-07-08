@@ -240,6 +240,7 @@ class TestMediaMigration(unittest.TestCase):
             self.assertEqual(row["artist"], "Artist")
             self.assertEqual(row["album"], "Album")
             self.assertEqual(row["song"], "Song")
+            self.assertEqual(row["duration"], "1.0")
         finally:
             conn.close()
             os.unlink(source_path)

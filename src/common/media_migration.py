@@ -24,7 +24,7 @@ VIDEO_SOURCE_SQL = (
 )
 AUDIO_SOURCE_TABLE = "fl_audio"
 AUDIO_SOURCE_SQL = (
-    "SELECT aud.filepath, aud.size, aud.basename, aud.path, aud.title, aud.artist, aud.album, aud.date, "
+    "SELECT aud.filepath, aud.size, aud.basename, aud.path, aud.title, aud.artist, aud.album, aud.date, aud.duration, "
     "fl.folder_name "
     "FROM fl_audio aud "
     "LEFT JOIN filelist_output fl ON fl.file_path = aud.filepath"
@@ -209,7 +209,7 @@ def migrate_audio_from_filelist(
     source = _source_conn(source_path)
     try:
         rows = source.execute(
-            "SELECT filepath, size, basename, path, title, artist, album, date, folder_name "
+            "SELECT filepath, size, basename, path, title, artist, album, date, duration, folder_name "
             f"FROM ({AUDIO_SOURCE_SQL}) audio_src {source_where}"
         )
         batch: List[tuple] = []
@@ -228,6 +228,7 @@ def migrate_audio_from_filelist(
                     _extension(filename or filepath),
                     str(_int_value(row["size"], 0)),
                     _date_value(row["date"]),
+                    _clean(row["duration"]),
                     _clean(row["artist"]),
                     _clean(row["album"]),
                     _clean(row["title"]) or os.path.splitext(filename)[0],
@@ -323,9 +324,10 @@ def _ensure_audio_table(conn: sqlite3.Connection) -> None:
         "CREATE TABLE IF NOT EXISTS lp_audio ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, "
         "file_name TEXT, path TEXT, folder_id TEXT, file_type TEXT, size TEXT, "
-        "date_modified TEXT, artist TEXT, album TEXT, song TEXT, project TEXT, "
+        "date_modified TEXT, duration TEXT, artist TEXT, album TEXT, song TEXT, project TEXT, "
         "user_name TEXT, rec_extract_date TEXT)"
     )
+    db.add_column_if_missing(conn, "lp_audio", "duration", "TEXT")
 
 
 def _ensure_folder_support(conn: sqlite3.Connection, table_name: str) -> None:
@@ -380,8 +382,8 @@ def _insert_audio_batch(conn: sqlite3.Connection, batch: Iterable[tuple]) -> int
         return 0
     cur = conn.executemany(
         "INSERT INTO lp_audio "
-        "(file_name, path, folder_id, file_type, size, date_modified, artist, album, song, project, user_name, rec_extract_date) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(file_name, path, folder_id, file_type, size, date_modified, duration, artist, album, song, project, user_name, rec_extract_date) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         batch,
     )
     return cur.rowcount if cur.rowcount != -1 else len(batch)

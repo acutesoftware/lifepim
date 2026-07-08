@@ -7,7 +7,7 @@ from datetime import date, datetime
 from flask import Flask, render_template, request, url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 
-from common.utils import get_tabs, get_side_tabs, get_table_def
+from common.utils import get_tabs, get_side_tabs, get_table_def, format_duration_friendly, format_duration_label
 import common.config as mod_cfg
 from common import data as db
 from common import search as search_mod
@@ -96,6 +96,8 @@ def _last_python_source_update():
 
 _dbg("Creating Flask app")
 app = Flask(__name__)
+app.jinja_env.filters["duration_friendly"] = format_duration_friendly
+app.jinja_env.filters["duration_label"] = format_duration_label
 projects_mod.ensure_projects_schema(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
 

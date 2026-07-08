@@ -10,6 +10,43 @@ def format_date(dt):
     return dt.strftime("%Y-%m-%d %H:%M")
 
 
+def _duration_parts(value):
+    raw = "" if value is None else str(value).strip()
+    if not raw:
+        return raw, ""
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        return raw, ""
+    if seconds <= 0:
+        return raw, ""
+    if seconds > 172800:
+        seconds = seconds / 1000.0
+    total_seconds = int(round(seconds))
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    secs = total_seconds % 60
+    parts = []
+    if hours:
+        parts.append(f"{hours} hour" + ("" if hours == 1 else "s"))
+    if hours or minutes:
+        parts.append(f"{minutes} min")
+    parts.append(f"{secs} sec")
+    return raw, " ".join(parts)
+
+
+def format_duration_friendly(value):
+    raw, friendly = _duration_parts(value)
+    if not friendly:
+        return raw
+    return f"{raw} ({friendly})"
+
+
+def format_duration_label(value):
+    raw, friendly = _duration_parts(value)
+    return friendly or raw
+
+
 def get_tabs():
     return mod_cfg.TABS
 

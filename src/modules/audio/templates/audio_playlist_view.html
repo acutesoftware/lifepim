@@ -23,6 +23,7 @@
           <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item.song or item.file_name }}</a>
           {% if item.artist %} - {{ item.artist }}{% endif %}
           {% if item.album %} ({{ item.album }}){% endif %}
+          {% if item.duration %} - {{ item.duration|duration_friendly }}{% endif %}
         </div>
         <form method="post" action="{{ url_for('audio.remove_playlist_item_route', playlist_id=playlist.playlist_id, audio_id=item.id, proj=project) }}">
           <button type="submit" onclick="return confirm('Remove this track from the playlist?');">Delete</button>

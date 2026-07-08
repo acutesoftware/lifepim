@@ -19,7 +19,7 @@
       <tbody>
         {% for item in items %}
         {% set is_focus = focus_item and focus_item.media_id == item.media_id %}
-        <tr class="media-row {% if is_focus %}focused{% endif %}">
+        <tr class="media-table-row {% if is_focus %}focused{% endif %}">
           <td>
             <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
           </td>
@@ -419,7 +419,7 @@
               <tr><th>Camera</th><td>{{ focus_item.camera_make }} {{ focus_item.camera_model }}</td></tr>
               <tr><th>Dims</th><td>{{ focus_item.width }} x {{ focus_item.height }}</td></tr>
             {% if focus_item.duration_sec %}
-              <tr><th>Duration</th><td>{{ focus_item.duration_sec }}</td></tr>
+              <tr><th>Duration</th><td>{{ focus_item.duration_sec|duration_friendly }}</td></tr>
             {% endif %}
             </tbody>
           </table>

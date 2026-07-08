@@ -29,6 +29,7 @@
             <input type="checkbox" name="item_id" value="{{ item.id }}">
             <div class="audio-list-info">
               <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item.file_name }}</a>{% if item.artist %} - {{ item.artist }}{% endif %}
+              {% if item.duration %}<span> - {{ item.duration|duration_label }}</span>{% endif %}
             </div>
             <div class="audio-list-item-actions">
               <a href="{{ url_for('audio.edit_audio_route', item_id=item.id, proj=project) }}">Edit</a> |

@@ -2857,6 +2857,10 @@ body.links-resizing {
   font-size: 11px;
 }
 
+.media-table-row.focused {
+  background: #eef2ff;
+}
+
 .media-group {
   margin-bottom: 8px;
 }

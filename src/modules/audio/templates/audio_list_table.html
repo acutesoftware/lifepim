@@ -42,6 +42,8 @@
             <td>
               {% if col == 'file_name' %}
               <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item[col] }}</a>
+              {% elif col == 'duration' %}
+              {{ item[col]|duration_friendly }}
               {% else %}
               {{ item[col] }}
               {% endif %}

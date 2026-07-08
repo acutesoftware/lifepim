@@ -51,6 +51,13 @@ ON lp_audio_playlist_items (audio_id);
 DEFAULT_PLAYLIST_NAME = "Recent 50"
 
 
+def _ensure_audio_table_schema(conn=None):
+    conn = db._get_conn() if conn is None else conn
+    db.add_column_if_missing(conn, "lp_audio", "duration", "TEXT")
+    conn.commit()
+    return conn
+
+
 def _utc_now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -177,6 +184,7 @@ def _ensure_default_playlist(conn):
 
 
 def _fetch_playlist_items(conn, playlist_id):
+    _ensure_audio_table_schema(conn)
     tbl = _get_tbl()
     if not tbl or not playlist_id:
         return []
@@ -199,6 +207,7 @@ def _get_tbl():
 
 
 def _fetch_audio(project=None, sort_col=None, sort_dir=None, limit=None, offset=None):
+    _ensure_audio_table_schema()
     tbl = _get_tbl()
     if not tbl:
         return []
@@ -209,6 +218,7 @@ def _fetch_audio(project=None, sort_col=None, sort_dir=None, limit=None, offset=
         "file_type": "t.file_type",
         "size": "t.size",
         "date_modified": "t.date_modified",
+        "duration": "t.duration",
         "artist": "t.artist",
         "album": "t.album",
         "song": "t.song",
@@ -483,6 +493,7 @@ def import_audio_route():
     project = request.args.get("proj") or ""
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = ""
+    _ensure_audio_table_schema()
     tbl = _get_tbl()
     imported = None
     error = ""
@@ -511,6 +522,7 @@ def import_audio_route():
                         "",
                         "",
                         "",
+                        "",
                         project,
                     ]
                     record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
@@ -533,6 +545,7 @@ def import_audio_route():
 @audio_bp.route("/view/<int:item_id>")
 def view_audio_route(item_id):
     project = request.args.get("proj")
+    _ensure_audio_table_schema()
     tbl = _get_tbl()
     item = None
     if tbl:
@@ -560,6 +573,7 @@ def view_audio_route(item_id):
 @audio_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
 def edit_audio_route(item_id):
     project = request.args.get("proj")
+    _ensure_audio_table_schema()
     tbl = _get_tbl()
     item = None
     if tbl:
@@ -594,6 +608,7 @@ def delete_audio_route(item_id):
 
 @audio_bp.route("/file/<int:item_id>")
 def audio_file_route(item_id):
+    _ensure_audio_table_schema()
     tbl = _get_tbl()
     if not tbl:
         abort(404)
