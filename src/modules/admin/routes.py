@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
 from common import config as cfg
+from common import media_migration
 from common import settings as settings_mod
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr
 
@@ -193,6 +194,40 @@ def settings_route():
                 message = "Some config settings were not saved: " + "; ".join(errors[:3])
             else:
                 message = f"Config settings saved ({saved_count} updated, {reset_count} reset)."
+        elif active_settings_tab == "media":
+            action = request.form.get("action", "")
+            try:
+                image_where = request.form.get("image_where", "")
+                audio_where = request.form.get("audio_where", "")
+                settings_mod.set_setting(
+                    cfg.CONFIG_SETTING_PREFIX + "FILELIST_IMAGE_WHERE",
+                    cfg.serialize_config_value(image_where),
+                    "Config",
+                    "FILELIST_IMAGE_WHERE",
+                    conn,
+                )
+                settings_mod.set_setting(
+                    cfg.CONFIG_SETTING_PREFIX + "FILELIST_AUDIO_WHERE",
+                    cfg.serialize_config_value(audio_where),
+                    "Config",
+                    "FILELIST_AUDIO_WHERE",
+                    conn,
+                )
+                cfg.refresh_config_overrides()
+                if action == "migrate_images":
+                    result = media_migration.migrate_images_from_filelist(where_clause=image_where, conn=conn)
+                    message = (
+                        f"Media migrated from {result['source_table']} and {result['video_source_table']}: "
+                        f"{result['total_inserted']} rows ({result['inserted']} images, "
+                        f"{result['video_inserted']} videos)."
+                    )
+                elif action == "migrate_audio":
+                    result = media_migration.migrate_audio_from_filelist(where_clause=audio_where, conn=conn)
+                    message = f"Audio migrated from {result['source_table']}: {result['inserted']} rows."
+                else:
+                    message = "Media migration filters saved."
+            except Exception as exc:
+                message = f"Media migration failed: {exc}"
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
@@ -212,6 +247,9 @@ def settings_route():
         general_settings=general_settings,
         config_settings=config_settings,
         all_settings=all_settings,
+        filelist_db=cfg.FILELIST_DB,
+        filelist_image_where=media_migration.default_image_where(),
+        filelist_audio_where=media_migration.default_audio_where(),
         now=datetime.now(),
     )
 

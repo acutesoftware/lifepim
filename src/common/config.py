@@ -28,6 +28,9 @@ folder_list_file =  os.path.join(user_folder, 'configuration', 'folders.lis')
 export_data_folder_base = os.path.join(user_folder, 'export_data')
 etl_folders_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv"
 etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv"
+FILELIST_DB = r"D:\TRANSFER_NAS\filelister\filelist_master.db"
+FILELIST_IMAGE_WHERE = r"WHERE folder_name IN ('Photos', 'Movies', 'TV Shows')"
+FILELIST_AUDIO_WHERE = r"WHERE folder_name = 'Music'"
 PATH_ALIASES = [
     (r"N:\duncan", r"E:\BK_fangorn\user\duncan"),
     (r"N:\\", r"E:\BK_fangorn\user"),
