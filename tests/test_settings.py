@@ -49,6 +49,31 @@ class TestSettingsSchema(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_calendar_thumbnail_settings_are_clamped_and_preserved(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            settings.save_calendar_view_settings(
+                {
+                    "events": True,
+                    "files": True,
+                    "usage": False,
+                    "thumbnail_size": "large",
+                    "thumbnail_limit": "30",
+                },
+                conn,
+            )
+            saved = settings.get_calendar_view_settings(conn)
+            self.assertEqual(saved["thumbnail_size"], "large")
+            self.assertEqual(saved["thumbnail_limit"], 20)
+
+            settings.save_calendar_view_settings({"events": False, "files": True, "usage": False}, conn)
+            saved = settings.get_calendar_view_settings(conn)
+            self.assertEqual(saved["thumbnail_size"], "large")
+            self.assertEqual(saved["thumbnail_limit"], 20)
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

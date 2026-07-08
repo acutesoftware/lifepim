@@ -43,6 +43,7 @@
       <a href="{{ url_for('calendar.list_view_route', proj=project, sort='project', dir=dir_project) }}">Project</a>
       {% if sort_col == 'project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
+    <th>Videos</th>
     <th>Actions</th>
   </tr>
   {% for ev in events %}
@@ -52,6 +53,11 @@
     <td>{{ ev.time }}</td>
     <td>{{ ev.title }}</td>
     <td>{{ ev.project }}</td>
+    <td>
+      {% for item in videos_by_date.get(ev.date, []) %}
+        <a href="{{ url_for('media.media_file_route', media_id=item.media_id) }}" title="{{ item.filename }}">{{ item.filename }}</a>{% if not loop.last %}<br>{% endif %}
+      {% endfor %}
+    </td>
     <td>
       <a href="{{ url_for('calendar.view_event_route', event_id=ev.id, proj=project) }}">View</a> |
       <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id, proj=project) }}">Edit</a> |

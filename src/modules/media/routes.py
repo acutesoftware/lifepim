@@ -811,7 +811,6 @@ def media_explorer_route():
     focus_args = dict(base_args_clean)
     focus_args.pop("focus_id", None)
     base_query = _query_string(base_args_clean)
-    focus_query = _query_string(focus_args)
     nav_query = _query_string(nav_args)
 
     skip_results = (
@@ -936,6 +935,12 @@ def media_explorer_route():
         pages = pagination["pages"]
         first_url = pagination["first_url"]
         last_url = pagination["last_url"]
+
+    if page > 1:
+        focus_args["page"] = page
+    else:
+        focus_args.pop("page", None)
+    focus_query = _query_string(focus_args)
 
     focus_item = None
     focus_tags = []

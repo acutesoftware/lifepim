@@ -13,6 +13,7 @@ if root_folder not in sys.path:
     sys.path.append(root_folder)
 
 from common import data
+from common.utils import format_duration_friendly, format_duration_label
 from common.media_schema import ensure_media_schema
 from modules.media import routes as media_routes
 
@@ -127,6 +128,8 @@ class TestMediaExplorerPagination(unittest.TestCase):
 
         template_folder = os.path.join(root_folder, "templates")
         self.app = Flask(__name__, template_folder=template_folder)
+        self.app.jinja_env.filters["duration_friendly"] = format_duration_friendly
+        self.app.jinja_env.filters["duration_label"] = format_duration_label
         self.app.register_blueprint(media_routes.media_bp)
         self.app.add_url_rule("/settings", endpoint="admin.settings_route", view_func=lambda: "")
         self.app.add_url_rule("/help", endpoint="help_route", view_func=lambda: "")
@@ -195,6 +198,28 @@ class TestMediaExplorerPagination(unittest.TestCase):
                 item_page_links.append(href)
 
         self.assertTrue(item_page_links)
+
+    def test_focus_link_preserves_current_item_page(self):
+        base = datetime(2026, 1, 1, 12, 0, 0)
+        for idx in range(55):
+            stamp = (base + timedelta(minutes=idx)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            self._insert_media(f"photo_{idx:03}.jpg", stamp)
+        self.conn.commit()
+
+        with self.app.test_client() as client:
+            response = client.get("/media/?view=all&view_mode=filmstrip&sort=taken_desc&group=month&page=2")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        focus_links = []
+        for part in html.split('href="')[1:]:
+            href = unescape(part.split('"', 1)[0])
+            query = parse_qs(urlparse(href).query)
+            if "focus_id" in query:
+                focus_links.append(query)
+
+        self.assertTrue(focus_links)
+        self.assertTrue(all(query.get("page") == ["2"] for query in focus_links))
 
     def test_filtered_event_does_not_show_sidebar_event_pagination_under_items(self):
         base = datetime(2026, 1, 1, 12, 0, 0)

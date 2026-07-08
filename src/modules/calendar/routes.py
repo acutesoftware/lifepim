@@ -135,7 +135,25 @@ def _source_hidden_fields(**values):
     return [{"name": key, "value": value} for key, value in values.items() if value not in (None, "")]
 
 
+def _calendar_media_settings(conn):
+    settings = settings_mod.get_calendar_view_settings(conn)
+    return {
+        "thumbnail_size": settings["thumbnail_size"],
+        "thumbnail_limit": settings["thumbnail_limit"],
+        "thumbnail_class": f"calendar-thumb-{settings['thumbnail_size']}",
+    }
+
+
+def _fetch_calendar_media(conn, start_day, end_day):
+    items = _fetch_media_rows(conn, start_day, end_day) + _fetch_audio_rows(conn, start_day, end_day)
+    return sorted(items, key=lambda item: ((item.get("display_date") or ""), (item.get("filename") or "").lower()))
+
+
 def _fetch_image_media(conn, start_day, end_day):
+    return _fetch_calendar_media(conn, start_day, end_day)
+
+
+def _fetch_media_rows(conn, start_day, end_day):
     cols = _table_columns(conn, "lp_media")
     if not {"media_id", "path", "filename", "media_type", "mtime_utc"}.issubset(cols):
         return []
@@ -149,7 +167,7 @@ def _fetch_image_media(conn, start_day, end_day):
             "COALESCE(meta.taken_utc, m.mtime_utc) AS display_date "
             "FROM lp_media m "
             "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
-            "WHERE m.media_type = 'image' "
+            "WHERE lower(m.media_type) IN ('image', 'video') "
             "AND substr(COALESCE(meta.taken_utc, m.mtime_utc), 1, 10) >= ? "
             "AND substr(COALESCE(meta.taken_utc, m.mtime_utc), 1, 10) < ? "
             "ORDER BY display_date, lower(m.filename)",
@@ -160,17 +178,113 @@ def _fetch_image_media(conn, start_day, end_day):
             "SELECT media_id, path, filename, ext, media_type, size_bytes, "
             "mtime_utc, NULL AS taken_utc, mtime_utc AS display_date "
             "FROM lp_media "
-            "WHERE media_type = 'image' "
+            "WHERE lower(media_type) IN ('image', 'video') "
             "AND substr(mtime_utc, 1, 10) >= ? "
             "AND substr(mtime_utc, 1, 10) < ? "
             "ORDER BY display_date, lower(filename)",
             (start_str, end_str),
         ).fetchall()
-    return [dict(row) for row in rows]
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["source_type"] = "media"
+        item["folder_key"] = _folder_key(item.get("path"))
+        items.append(item)
+    return items
+
+
+def _fetch_audio_rows(conn, start_day, end_day):
+    cols = _table_columns(conn, "lp_audio")
+    if not {"id", "file_name", "path", "date_modified"}.issubset(cols):
+        return []
+    start_str = start_day.strftime("%Y-%m-%d")
+    end_str = end_day.strftime("%Y-%m-%d")
+    select_cols = [
+        "id AS audio_id",
+        "file_name AS filename",
+        "path",
+        "file_type AS ext" if "file_type" in cols else "NULL AS ext",
+        "size AS size_bytes" if "size" in cols else "NULL AS size_bytes",
+        "date_modified AS mtime_utc",
+        "date_modified AS display_date",
+    ]
+    rows = conn.execute(
+        "SELECT "
+        + ", ".join(select_cols)
+        + " FROM lp_audio "
+        + "WHERE date_modified IS NOT NULL "
+        + "AND substr(date_modified, 1, 10) >= ? "
+        + "AND substr(date_modified, 1, 10) < ? "
+        + "ORDER BY display_date, lower(file_name)",
+        (start_str, end_str),
+    ).fetchall()
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["media_type"] = "audio"
+        item["source_type"] = "audio"
+        item["folder_key"] = _folder_key(item.get("path"))
+        items.append(item)
+    return items
+
+
+def _folder_key(path):
+    path = (path or "").strip()
+    if not path:
+        return ""
+    normalized = os.path.normpath(path)
+    if os.path.splitext(normalized)[1]:
+        normalized = os.path.dirname(normalized)
+    return normalized.lower()
+
+
+def _order_calendar_media_previews(items):
+    seen_folders = set()
+    first_by_folder = []
+    remaining = []
+    for item in items:
+        folder = item.get("folder_key") or _folder_key(item.get("path"))
+        if folder and folder not in seen_folders:
+            first_by_folder.append(item)
+            seen_folders.add(folder)
+        else:
+            remaining.append(item)
+    return first_by_folder + remaining
+
+
+def _order_grouped_calendar_media(grouped):
+    return {media_day: _order_calendar_media_previews(items) for media_day, items in grouped.items()}
 
 
 def _fetch_day_media(conn, day):
-    return _fetch_image_media(conn, day, day + timedelta(days=1))
+    return _order_calendar_media_previews(_fetch_calendar_media(conn, day, day + timedelta(days=1)))
+
+
+def _fetch_video_media_by_event_date(conn, events):
+    event_dates = set()
+    for event in events:
+        parsed = _parse_date_param(event.get("date"))
+        if parsed:
+            event_dates.add(parsed)
+    if not event_dates:
+        return {}
+    start_day = min(event_dates)
+    end_day = max(event_dates) + timedelta(days=1)
+    videos = [
+        item
+        for item in _fetch_media_rows(conn, start_day, end_day)
+        if (item.get("media_type") or "").lower() == "video"
+    ]
+    grouped = {}
+    for item in videos:
+        display_date = (item.get("display_date") or item.get("mtime_utc") or "")[:10]
+        try:
+            media_day = datetime.strptime(display_date, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+        if media_day in event_dates:
+            grouped.setdefault(media_day.strftime("%Y-%m-%d"), []).append(item)
+    return grouped
 
 
 def _group_media_by_date(items):
@@ -322,6 +436,7 @@ def month_view_route():
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
     day_sources, day_source_params = _parse_day_sources(request.args)
+    media_settings = _calendar_media_settings(data.conn)
 
     first_day = date(year, month, 1)
     next_month = month + 1
@@ -339,7 +454,7 @@ def month_view_route():
             continue
         events_by_day.setdefault(day, []).append(event)
     month_media = _fetch_image_media(data.conn, first_day, end_day) if day_sources["files"] else []
-    media_by_date = _group_media_by_date(month_media)
+    media_by_date = _order_grouped_calendar_media(_group_media_by_date(month_media))
     media_by_day = {}
     for media_day, items in media_by_date.items():
         media_by_day[media_day.day] = items
@@ -371,6 +486,8 @@ def month_view_route():
         project=project,
         day_sources=day_sources,
         day_source_params=day_source_params,
+        calendar_thumbnail_limit=media_settings["thumbnail_limit"],
+        calendar_thumbnail_class=media_settings["thumbnail_class"],
         source_action_url=url_for("calendar.month_view_route"),
         source_hidden_fields=_source_hidden_fields(year=year, month=month, proj=project),
         **_calendar_jump_context("month", first_day, project, day_source_params),
@@ -390,6 +507,7 @@ def week_view_route():
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
     day_sources, day_source_params = _parse_day_sources(request.args)
+    media_settings = _calendar_media_settings(data.conn)
     anchor = _parse_date_param(date_param) or today
     week_start = anchor - timedelta(days=anchor.weekday())
     week_end = week_start + timedelta(days=7)
@@ -402,7 +520,11 @@ def week_view_route():
             continue
         events_by_day.setdefault(day, []).append(event)
     week_days = [week_start + timedelta(days=offset) for offset in range(7)]
-    media_by_day = _group_media_by_date(_fetch_image_media(data.conn, week_start, week_end)) if day_sources["files"] else {}
+    media_by_day = (
+        _order_grouped_calendar_media(_group_media_by_date(_fetch_image_media(data.conn, week_start, week_end)))
+        if day_sources["files"]
+        else {}
+    )
     prev_week = week_start - timedelta(days=7)
     next_week = week_start + timedelta(days=7)
     timeslots = _build_timeslots()
@@ -438,6 +560,8 @@ def week_view_route():
         project=project,
         day_sources=day_sources,
         day_source_params=day_source_params,
+        calendar_thumbnail_limit=media_settings["thumbnail_limit"],
+        calendar_thumbnail_class=media_settings["thumbnail_class"],
         source_action_url=url_for("calendar.week_view_route"),
         source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
         **_calendar_jump_context("week", anchor, project, day_source_params),
@@ -462,6 +586,7 @@ def day_view_route():
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
     day_sources, day_source_params = _parse_day_sources(request.args)
+    media_settings = _calendar_media_settings(data.conn)
     anchor = _parse_date_param(date_param) or today
     next_day = anchor + timedelta(days=1)
     events = _fetch_events(project=project, start_date=anchor, end_date=next_day) if day_sources["events"] else []
@@ -510,6 +635,8 @@ def day_view_route():
         usage_items=usage_items,
         day_sources=day_sources,
         day_source_params=day_source_params,
+        calendar_thumbnail_limit=media_settings["thumbnail_limit"],
+        calendar_thumbnail_class=media_settings["thumbnail_class"],
         source_action_url=url_for("calendar.day_view_route"),
         source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
         **_calendar_jump_context("day", anchor, project, day_source_params),
@@ -613,6 +740,7 @@ def list_view_route():
     page = request.args.get("page", type=int) or 1
     page_data = paginate_items(events, page, cfg.RECS_PER_PAGE)
     events = page_data["items"]
+    videos_by_date = _fetch_video_media_by_event_date(data.conn, events)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
@@ -630,6 +758,7 @@ def list_view_route():
         content_title=f"Events ({project or 'All'})",
         content_html="",
         events=events,
+        videos_by_date=videos_by_date,
         project=project,
         sort_col=sort_col,
         sort_dir=sort_dir,

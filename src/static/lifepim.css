@@ -1273,7 +1273,7 @@ button.calendar-nav {
 
 .calendar-media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 128px));
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -1295,7 +1295,18 @@ button.calendar-nav {
   background: #111;
 }
 
-.calendar-inline-thumb img {
+.calendar-inline-thumb.calendar-thumb-medium {
+  width: 46px;
+  height: 38px;
+}
+
+.calendar-inline-thumb.calendar-thumb-large {
+  width: 64px;
+  height: 52px;
+}
+
+.calendar-inline-thumb img,
+.calendar-inline-thumb .calendar-audio-thumb {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1313,16 +1324,75 @@ button.calendar-nav {
   text-decoration: none;
   color: #333;
   font-size: 10px;
+  width: 110px;
   min-width: 0;
 }
 
+.calendar-media-thumb.calendar-thumb-medium {
+  width: 124px;
+}
+
+.calendar-media-thumb.calendar-thumb-large {
+  width: 128px;
+}
+
 .calendar-media-thumb img,
-.calendar-media-thumb video {
+.calendar-media-thumb .calendar-audio-card {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   background: #111;
   border-radius: 4px;
+}
+
+.calendar-media-thumb.calendar-thumb-large img,
+.calendar-media-thumb.calendar-thumb-large .calendar-audio-card {
+  width: 128px;
+  height: 128px;
+  aspect-ratio: 1 / 1;
+}
+
+.calendar-audio-thumb,
+.calendar-audio-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #333;
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.calendar-audio-card {
+  aspect-ratio: 4 / 3;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.calendar-video-link {
+  color: #0645ad;
+  text-decoration: underline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-video-link-inline {
+  display: inline-block;
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.calendar-video-link-card {
+  display: block;
+  max-width: 128px;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .calendar-media-thumb span,

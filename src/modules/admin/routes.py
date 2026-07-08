@@ -140,13 +140,26 @@ def settings_route():
 
     if request.method == "POST":
         if active_settings_tab == "calendar":
-            sources = {
-                "events": request.form.get("show_events") == "1",
-                "files": request.form.get("show_files") == "1",
-                "usage": request.form.get("show_usage") == "1",
-            }
-            settings_mod.save_calendar_view_settings(sources, conn)
-            message = "Calendar settings saved."
+            action = request.form.get("action", "")
+            if action == "rebuild_media_events":
+                try:
+                    from modules.media import routes as media_routes
+
+                    media_routes._ensure_schema()
+                    created = media_routes._rebuild_events(conn, gap_hours=2.0, split_on_day=True)
+                    message = f"Rebuilt {created} media events."
+                except Exception as exc:
+                    message = f"Media event rebuild failed: {exc}"
+            else:
+                sources = {
+                    "events": request.form.get("show_events") == "1",
+                    "files": request.form.get("show_files") == "1",
+                    "usage": request.form.get("show_usage") == "1",
+                    "thumbnail_size": request.form.get("thumbnail_size"),
+                    "thumbnail_limit": request.form.get("thumbnail_limit"),
+                }
+                settings_mod.save_calendar_view_settings(sources, conn)
+                message = "Calendar settings saved."
         elif active_settings_tab == "general":
             settings_mod.save_general_settings(
                 {

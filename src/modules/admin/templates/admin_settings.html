@@ -42,7 +42,30 @@
               Usage
             </label>
           </div>
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Media Thumbnails</div>
+            <label>
+              Thumbnail size
+              <select name="thumbnail_size">
+                <option value="small" {% if calendar_view.thumbnail_size == 'small' %}selected{% endif %}>Small (current)</option>
+                <option value="medium" {% if calendar_view.thumbnail_size == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="large" {% if calendar_view.thumbnail_size == 'large' %}selected{% endif %}>Large (128x128)</option>
+              </select>
+            </label>
+            <label>
+              Thumbnails per day
+              <input type="number" name="thumbnail_limit" min="1" max="20" value="{{ calendar_view.thumbnail_limit or 5 }}">
+            </label>
+          </div>
           <button type="submit">Save settings</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="calendar">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Events</div>
+            <p class="settings-empty">Rebuild calendar media events from imported images and videos.</p>
+          </div>
+          <button type="submit" name="action" value="rebuild_media_events">Rebuild from media</button>
         </form>
       {% elif active_settings_tab == 'media' %}
         <h4>Media</h4>

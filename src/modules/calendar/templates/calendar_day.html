@@ -48,19 +48,28 @@
     <h5>Files</h5>
     {% if day_media %}
       <div class="calendar-media-grid">
-        {% for item in day_media %}
-        <a class="calendar-media-thumb" href="{{ url_for('media.media_explorer_route', focus_id=item.media_id, view='all') }}" title="{{ item.filename }}">
-          {% if item.media_type == 'video' %}
-            <video muted preload="metadata">
-              <source src="{{ url_for('media.media_file_route', media_id=item.media_id) }}">
-            </video>
+        {% for item in day_media[:calendar_thumbnail_limit] %}
+        {% if item.media_type == 'video' %}
+        <a class="calendar-video-link calendar-video-link-card"
+           href="{{ url_for('media.media_file_route', media_id=item.media_id) }}"
+           title="{{ item.filename }}">{{ item.filename }}</a>
+        {% else %}
+        <a class="calendar-media-thumb {{ calendar_thumbnail_class }}"
+           href="{% if item.source_type == 'audio' %}{{ url_for('audio.view_audio_route', item_id=item.audio_id) }}{% else %}{{ url_for('media.media_explorer_route', focus_id=item.media_id, view='all') }}{% endif %}"
+           title="{{ item.filename }}">
+          {% if item.media_type == 'audio' %}
+            <span class="calendar-audio-card">Audio</span>
           {% else %}
             <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
           {% endif %}
           <span>{{ item.filename }}</span>
         </a>
+        {% endif %}
         {% endfor %}
       </div>
+      {% if day_media|length > calendar_thumbnail_limit %}
+        <p class="calendar-media-more">+{{ day_media|length - calendar_thumbnail_limit }} more media files for this day.</p>
+      {% endif %}
     {% endif %}
 
     {% if day_files %}

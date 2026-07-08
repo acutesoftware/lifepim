@@ -19,7 +19,13 @@ CALENDAR_VIEW_DEFAULTS = {
     "calendar.view.events": ("1", "Calendar", "Show events"),
     "calendar.view.files": ("0", "Calendar", "Show files/images"),
     "calendar.view.usage": ("0", "Calendar", "Show usage"),
+    "calendar.media.thumbnail_size": ("small", "Calendar", "Thumbnail size"),
+    "calendar.media.thumbnail_limit": ("5", "Calendar", "Thumbnails per day"),
 }
+
+CALENDAR_THUMBNAIL_SIZES = {"small", "medium", "large"}
+CALENDAR_THUMBNAIL_LIMIT_DEFAULT = 5
+CALENDAR_THUMBNAIL_LIMIT_MAX = 20
 
 
 GENERAL_DEFAULTS = {
@@ -107,6 +113,12 @@ def get_calendar_view_settings(conn=None):
         "events": _as_bool(get_setting("calendar.view.events", "1", conn)),
         "files": _as_bool(get_setting("calendar.view.files", "0", conn)),
         "usage": _as_bool(get_setting("calendar.view.usage", "0", conn)),
+        "thumbnail_size": normalize_calendar_thumbnail_size(
+            get_setting("calendar.media.thumbnail_size", "small", conn)
+        ),
+        "thumbnail_limit": normalize_calendar_thumbnail_limit(
+            get_setting("calendar.media.thumbnail_limit", str(CALENDAR_THUMBNAIL_LIMIT_DEFAULT), conn)
+        ),
     }
 
 
@@ -136,6 +148,18 @@ def save_calendar_view_settings(sources, conn=None):
         "calendar.view.files": ("1" if sources.get("files") else "0", "Calendar", "Show files/images"),
         "calendar.view.usage": ("1" if sources.get("usage") else "0", "Calendar", "Show usage"),
     }
+    if "thumbnail_size" in sources:
+        updates["calendar.media.thumbnail_size"] = (
+            normalize_calendar_thumbnail_size(sources.get("thumbnail_size")),
+            "Calendar",
+            "Thumbnail size",
+        )
+    if "thumbnail_limit" in sources:
+        updates["calendar.media.thumbnail_limit"] = (
+            str(normalize_calendar_thumbnail_limit(sources.get("thumbnail_limit"))),
+            "Calendar",
+            "Thumbnails per day",
+        )
     now = _utc_now()
     for key, (value, category, label) in updates.items():
         conn.execute(
@@ -169,6 +193,19 @@ def _row_value(row, key, index):
 
 def _as_bool(value):
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def normalize_calendar_thumbnail_size(value):
+    normalized = str(value or "small").strip().lower()
+    return normalized if normalized in CALENDAR_THUMBNAIL_SIZES else "small"
+
+
+def normalize_calendar_thumbnail_limit(value):
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        limit = CALENDAR_THUMBNAIL_LIMIT_DEFAULT
+    return max(1, min(CALENDAR_THUMBNAIL_LIMIT_MAX, limit))
 
 
 def _utc_now():
