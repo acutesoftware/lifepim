@@ -189,6 +189,7 @@ def _fetch_media_rows(conn, start_day, end_day):
         item = dict(row)
         item["source_type"] = "media"
         item["folder_key"] = _folder_key(item.get("path"))
+        item["folder_path"] = _folder_path(item.get("path"))
         items.append(item)
     return items
 
@@ -224,8 +225,19 @@ def _fetch_audio_rows(conn, start_day, end_day):
         item["media_type"] = "audio"
         item["source_type"] = "audio"
         item["folder_key"] = _folder_key(item.get("path"))
+        item["folder_path"] = _folder_path(item.get("path"))
         items.append(item)
     return items
+
+
+def _folder_path(path):
+    path = (path or "").strip()
+    if not path:
+        return ""
+    normalized = os.path.normpath(path)
+    if os.path.splitext(normalized)[1]:
+        normalized = os.path.dirname(normalized)
+    return normalized
 
 
 def _folder_key(path):

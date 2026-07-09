@@ -70,7 +70,7 @@
               {% for item in media_by_day.get(day, [])[:calendar_thumbnail_limit] %}
               {% if item.media_type == 'video' %}
               <a class="calendar-video-link calendar-video-link-inline"
-                 href="{{ url_for('media.media_file_route', media_id=item.media_id) }}"
+                 href="{{ url_for('media.media_explorer_route', view='all', view_mode='filmstrip', sort='taken_desc', group='month', focus_id=item.media_id, folder=item.folder_path) }}"
                  title="{{ item.filename }}">{{ item.filename }}</a>
               {% else %}
               <a class="calendar-inline-thumb {{ calendar_thumbnail_class }}"

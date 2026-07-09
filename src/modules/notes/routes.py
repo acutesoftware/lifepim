@@ -384,6 +384,16 @@ def _note_path_expr():
 def _derived_project_expr():
     folder_expr = _note_folder_match_expr()
     path_expr = _note_path_expr()
+    best_prefix_len_expr = (
+        "("
+        "SELECT MAX(LENGTH(pf_len.path_prefix)) "
+        "FROM lp_project_folders pf_len "
+        "WHERE pf_len.is_enabled = 1 "
+        "  AND pf_len.folder_role IN ('default','include','archive','output') "
+        f"  AND {folder_expr} IS NOT NULL "
+        f"  AND lower({folder_expr}) LIKE lower(pf_len.path_prefix) || '%'"
+        ")"
+    )
     named_child_expr = (
         "("
         "SELECT pf.project_id "
@@ -395,6 +405,7 @@ def _derived_project_expr():
         f"  AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%' "
         "  AND instr(pf.project_id, '/') > 0 "
         f"  AND lower({path_expr}) LIKE '%' || lower(COALESCE(p.project_name, '')) || '%' "
+        f"  AND LENGTH(pf.path_prefix) = {best_prefix_len_expr} "
         "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
         "  WHEN 'default' THEN 0 "
         "  WHEN 'include' THEN 1 "

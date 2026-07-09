@@ -90,6 +90,7 @@
         {% if album_id %}<input type="hidden" name="album_id" value="{{ album_id }}">{% endif %}
         {% if event_id %}<input type="hidden" name="event_id" value="{{ event_id }}">{% endif %}
         {% if smart_view_id %}<input type="hidden" name="smart_view_id" value="{{ smart_view_id }}">{% endif %}
+        {% if folder_filter %}<input type="hidden" name="folder" value="{{ folder_filter }}">{% endif %}
         <input type="text" name="q" value="{{ q }}" placeholder="Search media">
         <select name="media_type" title="Media type">
           <option value="">All types</option>
@@ -122,6 +123,12 @@
         {% endif %}
         <button type="submit">Apply</button>
       </form>
+      {% if folder_filter %}
+        <div class="media-folder-filter">
+          Folder: <span class="media-path">{{ folder_filter }}</span>
+          <a href="{{ url_for('media.media_explorer_route', view=view, view_mode=view_mode, sort=sort_key, group=group_by, media_type=media_type, q=q, focus_id=focus_item.media_id if focus_item else None) }}">Clear</a>
+        </div>
+      {% endif %}
 
       <form class="media-smart-save" method="post" action="{{ url_for('media.create_smart_view_route') }}">
         <input type="hidden" name="q" value="{{ q }}">
@@ -170,7 +177,7 @@
           <ul class="media-nav-list">
             {% for ev in nav_events %}
             <li>
-              <a class="media-nav-link {% if event and event.event_id == ev.event_id %}active{% endif %}" href="{{ media_url(nav_query, 'view=events&event_id=' ~ ev.event_id ~ ('&year=' ~ timeline_year if timeline_year else '')) }}">
+              <a class="media-nav-link {% if event and event.event_id == ev.event_id %}active{% endif %}" href="{{ media_url(event_nav_query, 'view=events&event_id=' ~ ev.event_id ~ ('&year=' ~ timeline_year if timeline_year else '')) }}">
                 <span>{{ ev.title }}</span>
                 <span class="media-count">{{ ev.item_count }}</span>
               </a>
@@ -243,7 +250,7 @@
           <ul class="media-event-list">
             {% for ev in events %}
             <li>
-              <a href="{{ media_url(nav_query, 'view=events&event_id=' ~ ev.event_id) }}">
+              <a href="{{ media_url(event_nav_query, 'view=events&event_id=' ~ ev.event_id) }}">
                 <div class="media-event-title">{{ ev.title }}</div>
                 <div class="media-event-sub">{{ ev.start_utc }} -> {{ ev.end_utc }} - {{ ev.item_count }} items</div>
               </a>

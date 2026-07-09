@@ -216,6 +216,7 @@ def _build_media_filters(
     base_terms,
     extra_terms,
     year_filter,
+    folder_filter=None,
 ):
     joins = []
     where = ["1=1"]
@@ -232,6 +233,13 @@ def _build_media_filters(
     if year_filter:
         where.append("substr(COALESCE(meta.taken_utc, m.mtime_utc), 1, 4) = ?")
         params.append(str(year_filter))
+    if folder_filter:
+        folder_value = os.path.normpath(folder_filter).rstrip("\\/")
+        where.append(
+            "(lower(replace(m.path, '/', '\\')) = lower(?) "
+            "OR lower(replace(m.path, '/', '\\')) LIKE lower(?))"
+        )
+        params.extend([folder_value, folder_value + "\\%"])
     _build_search_conditions(base_terms, where, params)
     _build_search_conditions(extra_terms, where, params)
     return joins, where, params
@@ -746,6 +754,7 @@ def media_explorer_route():
     media_type = raw_media_type
     q = (request.args.get("q") or "").strip()
     search_everywhere = _normalize_bool(request.args.get("search_everywhere"))
+    folder_filter = (request.args.get("folder") or "").strip()
 
     album_id = request.args.get("album_id", type=int)
     event_id = request.args.get("event_id", type=int)
@@ -786,6 +795,7 @@ def media_explorer_route():
         base_terms,
         extra_terms,
         year_filter,
+        folder_filter,
     )
 
     focus_id = request.args.get("focus_id", type=int)
@@ -797,6 +807,7 @@ def media_explorer_route():
         "year": year_filter or None,
         "media_type": media_type or None,
         "q": q or None,
+        "folder": folder_filter or None,
         "search_everywhere": "1" if search_everywhere else None,
         "album_id": album_id if album_id else None,
         "event_id": event_id if event_id else None,
@@ -808,10 +819,13 @@ def media_explorer_route():
     nav_args = dict(base_args_clean)
     for key in ("view", "year", "album_id", "event_id", "smart_view_id", "focus_id"):
         nav_args.pop(key, None)
+    event_nav_args = dict(nav_args)
+    event_nav_args.pop("folder", None)
     focus_args = dict(base_args_clean)
     focus_args.pop("focus_id", None)
     base_query = _query_string(base_args_clean)
     nav_query = _query_string(nav_args)
+    event_nav_query = _query_string(event_nav_args)
 
     skip_results = (
         (view == "albums" and not album)
@@ -841,6 +855,7 @@ def media_explorer_route():
         base_terms,
         extra_terms,
         year_filter,
+        None,
     )
     nav_event_total = _count_events_for_media_filters(conn, nav_event_where, nav_event_params)
     nav_event_page_data = paginate_total(nav_event_total, nav_event_page, per_page)
@@ -860,6 +875,7 @@ def media_explorer_route():
     )
     nav_event_base_args = dict(base_args_clean)
     nav_event_base_args.pop("nav_event_page", None)
+    nav_event_base_args.pop("folder", None)
     nav_event_pagination = _build_param_pagination(
         "media.media_explorer_route",
         nav_event_base_args,
@@ -905,6 +921,7 @@ def media_explorer_route():
             base_terms,
             extra_terms,
             None,
+            folder_filter,
         )
         timeline_years = _fetch_timeline_years(conn, year_joins, year_where, year_params)
 
@@ -972,6 +989,7 @@ def media_explorer_route():
         group_by=group_by,
         media_type=media_type,
         q=q,
+        folder_filter=folder_filter,
         total=total,
         search_everywhere=search_everywhere,
         album_id=album_id,
@@ -1018,6 +1036,7 @@ def media_explorer_route():
         base_query=base_query,
         focus_query=focus_query,
         nav_query=nav_query,
+        event_nav_query=event_nav_query,
     )
 
 
@@ -1168,7 +1187,7 @@ def media_player_route():
     conn = db._get_conn()
     sort_key = _normalize_sort(request.args.get("sort"))
     limit = request.args.get("limit", type=int) or 200
-    joins, where, params = _build_media_filters("all", None, None, False, "", [], [], None)
+    joins, where, params = _build_media_filters("all", None, None, False, "", [], [], None, None)
     _add_audio_media_filter(where, params)
     items = _fetch_media(conn, joins, where, params, sort_key, limit=limit, offset=0)
     playlist = []
@@ -1270,6 +1289,7 @@ def _redirect_args(form):
         "year",
         "media_type",
         "q",
+        "folder",
         "search_everywhere",
         "album_id",
         "event_id",
