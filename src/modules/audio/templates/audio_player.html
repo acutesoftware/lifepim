@@ -29,16 +29,16 @@
         <input type="range" id="progress" min="0" max="100" value="0">
         <span id="time-duration">0:00</span>
       </div>
-      <div class="display-eq">
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
-        <span class="eq-bar"></span>
+      <div class="display-visualizer" id="visualizer-panel" title="Click to change visualisation">
+        <canvas id="visualizer-canvas" width="640" height="160"></canvas>
+      </div>
+      <div class="display-visualizer-controls">
+        <label for="visualizer-select">Visual</label>
+        <select id="visualizer-select">
+          {% for value, label in visualizations.items() %}
+            <option value="{{ value }}" {% if visualization == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
     </section>
 
@@ -67,6 +67,8 @@
     const tracks = {{ tracks|tojson }};
     const startId = {{ start_id if start_id is not none else "null" }};
     const showFreqBar = {{ "true" if show_freq_bar else "false" }};
+    const initialVisualization = {{ visualization|tojson }};
+    const visualizations = {{ visualizations|tojson }};
     const audio = document.getElementById("player-audio");
     const player = document.getElementById("audio-player");
     const statusText = document.getElementById("status-text");
@@ -81,11 +83,6 @@
     const playlistEl = document.getElementById("playlist");
     let currentIndex = 0;
     let seekActive = false;
-    let audioCtx = null;
-    let analyser = null;
-    let freqData = null;
-    let eqRaf = null;
-    const eqBars = Array.from(document.querySelectorAll(".eq-bar"));
 
     function formatTime(seconds) {
       if (!Number.isFinite(seconds)) {
@@ -102,12 +99,16 @@
         player.classList.add("playing");
         statusDot.classList.add("live");
         setPlayToggle(true);
-        startEq();
+        if (window.LifePimAudioViz) {
+          window.LifePimAudioViz.start();
+        }
       } else {
         player.classList.remove("playing");
         statusDot.classList.remove("live");
         setPlayToggle(false);
-        stopEq();
+        if (window.LifePimAudioViz) {
+          window.LifePimAudioViz.stop();
+        }
       }
     }
 
@@ -217,66 +218,32 @@
       setTrack(startIndex >= 0 ? startIndex : 0, false);
     }
 
-    if (!showFreqBar) {
-      const eq = document.querySelector(".display-eq");
-      if (eq) {
-        eq.style.display = "none";
-      }
-    }
-
-    function initAnalyser() {
-      if (!showFreqBar || analyser) {
-        return;
-      }
-      try {
-        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioCtx.createMediaElementSource(audio);
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
-        freqData = new Uint8Array(analyser.frequencyBinCount);
-        source.connect(analyser);
-        analyser.connect(audioCtx.destination);
-        player.classList.add("live-eq");
-      } catch (_) {
-        analyser = null;
-      }
-    }
-
-    function startEq() {
-      if (!showFreqBar || !eqBars.length) {
-        return;
-      }
-      initAnalyser();
-      if (!analyser) {
-        return;
-      }
-      if (audioCtx && audioCtx.state === "suspended") {
-        audioCtx.resume();
-      }
-      if (eqRaf) {
-        cancelAnimationFrame(eqRaf);
-      }
-      const step = Math.max(1, Math.floor(freqData.length / eqBars.length));
-      const render = () => {
-        analyser.getByteFrequencyData(freqData);
-        eqBars.forEach((bar, idx) => {
-          const value = freqData[idx * step] || 0;
-          const height = Math.max(15, Math.round((value / 255) * 100));
-          bar.style.height = `${height}%`;
-        });
-        eqRaf = requestAnimationFrame(render);
-      };
-      render();
-    }
-
-    function stopEq() {
-      if (eqRaf) {
-        cancelAnimationFrame(eqRaf);
-        eqRaf = null;
-      }
-      eqBars.forEach((bar) => {
-        bar.style.height = "";
+  </script>
+  <script src="{{ url_for('static', filename='audio_visualizations/controller.js') }}"></script>
+  <script src="{{ url_for('static', filename='audio_visualizations/common.js') }}"></script>
+  {% for value in visualizations.keys() %}
+    <script src="{{ url_for('static', filename='audio_visualizations/' ~ value ~ '.js') }}"></script>
+  {% endfor %}
+  <script>
+    if (showFreqBar && window.LifePimAudioViz) {
+      window.LifePimAudioViz.init({
+        audio,
+        player,
+        canvas: document.getElementById("visualizer-canvas"),
+        panel: document.getElementById("visualizer-panel"),
+        select: document.getElementById("visualizer-select"),
+        initial: initialVisualization,
+        labels: visualizations
       });
+    } else {
+      const visualizer = document.getElementById("visualizer-panel");
+      const controls = document.querySelector(".display-visualizer-controls");
+      if (visualizer) {
+        visualizer.style.display = "none";
+      }
+      if (controls) {
+        controls.style.display = "none";
+      }
     }
   </script>
 </body>

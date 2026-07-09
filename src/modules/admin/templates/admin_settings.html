@@ -3,6 +3,7 @@
   {% set settings_tabs = [
     ('calendar', 'Calendar'),
     ('media', 'Media'),
+    ('audio', 'Audio'),
     ('files', 'Files'),
     ('notes', 'Notes'),
     ('config', 'Config'),
@@ -89,6 +90,24 @@
             </form>
           </div>
         </div>
+      {% elif active_settings_tab == 'audio' %}
+        <h4>Audio</h4>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="audio">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Player Visualisation</div>
+            <label>
+              Default visualisation
+              <select name="visualization">
+                {% for value, label in audio_settings.visualizations.items() %}
+                  <option value="{{ value }}" {% if audio_settings.visualization == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <p class="settings-empty">Click the visualisation area in the audio player to cycle through these displays while listening.</p>
+          </div>
+          <button type="submit">Save settings</button>
+        </form>
       {% elif active_settings_tab == 'files' %}
         <h4>Files</h4>
         <p class="settings-empty">No Files settings yet.</p>

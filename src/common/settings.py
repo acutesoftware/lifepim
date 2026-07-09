@@ -33,6 +33,46 @@ GENERAL_DEFAULTS = {
     "general.map_names_english": ("1", "General", "Map names English"),
 }
 
+AUDIO_VISUALIZATIONS = {
+    "bars": "Frequency bars",
+    "line": "Frequency line",
+    "scope": "Classic oscilloscope",
+    "circular_ring": "Circular spectrum ring",
+    "radial_flower": "Radial waveform flower",
+    "bass_pulse": "Bass pulse circle",
+    "vu_meter": "VU meter needles",
+    "led_equalizer": "Retro LED equaliser",
+    "tunnel": "90s Winamp tunnel",
+    "stars": "Starfield warp",
+    "particle_fountain": "Particle fountain",
+    "waterfall": "Spectrum waterfall",
+    "waveform_ribbon": "Waveform history ribbon",
+    "audio_terrain": "Audio terrain",
+    "lissajous": "Lissajous stereo scope",
+    "album_pulse": "Album-art colour pulse",
+    "kaleidoscope": "Beat reactive kaleidoscope",
+    "plasma": "Plasma blob background",
+    "orbiters": "Frequency orbiters",
+    "cassette": "Cassette reel animation",
+    "cyber_dashboard": "Cyberpunk data dashboard",
+    "falling_sand": "Falling sand spectrum",
+    "fire": "Fire visualizer",
+    "rain_glass": "Rain on glass",
+    "polygon": "Spinning polygon shape",
+    "city": "Frequency city skyline",
+    "vinyl": "Vinyl groove view",
+    "matrix": "Matrix rain audio mode",
+    "tree": "Fractal-ish tree",
+    "constellation": "Constellation network",
+    "glyphs": "Beat-triggered glyphs",
+    "robot": "Tiny dancing robot",
+    "ball": "Bouncing ball",
+}
+
+AUDIO_DEFAULTS = {
+    "audio.visualization": ("bars", "Audio", "Default visualisation"),
+}
+
 _SCHEMA_READY_CONN_IDS = set()
 
 
@@ -50,6 +90,7 @@ def ensure_settings_schema(conn=None):
     for key, (value, category, label) in {
         **CALENDAR_VIEW_DEFAULTS,
         **GENERAL_DEFAULTS,
+        **AUDIO_DEFAULTS,
     }.items():
         conn.execute(
             "INSERT OR IGNORE INTO sys_settings "
@@ -129,6 +170,27 @@ def get_general_settings(conn=None):
     }
 
 
+def get_audio_settings(conn=None):
+    return {
+        "visualization": normalize_audio_visualization(
+            get_setting("audio.visualization", "bars", conn)
+        ),
+        "visualizations": AUDIO_VISUALIZATIONS,
+    }
+
+
+def save_audio_settings(values, conn=None):
+    conn = db._get_conn() if conn is None else conn
+    ensure_settings_schema(conn)
+    set_setting(
+        "audio.visualization",
+        normalize_audio_visualization(values.get("visualization")),
+        "Audio",
+        "Default visualisation",
+        conn,
+    )
+
+
 def save_general_settings(values, conn=None):
     conn = db._get_conn() if conn is None else conn
     ensure_settings_schema(conn)
@@ -206,6 +268,11 @@ def normalize_calendar_thumbnail_limit(value):
     except (TypeError, ValueError):
         limit = CALENDAR_THUMBNAIL_LIMIT_DEFAULT
     return max(1, min(CALENDAR_THUMBNAIL_LIMIT_MAX, limit))
+
+
+def normalize_audio_visualization(value):
+    normalized = str(value or "bars").strip().lower()
+    return normalized if normalized in AUDIO_VISUALIZATIONS else "bars"
 
 
 def _utc_now():

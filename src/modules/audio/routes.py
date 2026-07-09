@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, request, url_for, send_file, abort
 from common import data as db
 from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
 from common import config as cfg
+from common import settings as settings_mod
 
 
 audio_bp = Blueprint(
@@ -359,6 +360,7 @@ def audio_player_route():
             items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
     else:
         items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
+    audio_settings = settings_mod.get_audio_settings(db._get_conn())
     tracks = []
     for item in items:
         audio_url = url_for("audio.audio_file_route", item_id=item.get("id"))
@@ -382,6 +384,8 @@ def audio_player_route():
         limit=limit,
         playlist_name=playlist_name,
         show_freq_bar=(getattr(cfg, "AUDIO_SHOW_FREQ_BAR", "Y") or "Y").upper() == "Y",
+        visualization=audio_settings["visualization"],
+        visualizations=audio_settings["visualizations"],
     )
 
 

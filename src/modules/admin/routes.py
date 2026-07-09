@@ -131,7 +131,7 @@ def admin_mapping_route():
 def settings_route():
     message = request.args.get("message", "")
     active_settings_tab = (request.args.get("tab") or request.form.get("tab") or "calendar").strip().lower()
-    if active_settings_tab not in {"calendar", "media", "files", "notes", "general", "config"}:
+    if active_settings_tab not in {"calendar", "media", "audio", "files", "notes", "general", "config"}:
         active_settings_tab = "calendar"
 
     conn = db.conn if db.conn is not None else None
@@ -169,6 +169,14 @@ def settings_route():
                 conn,
             )
             message = "General settings saved."
+        elif active_settings_tab == "audio":
+            settings_mod.save_audio_settings(
+                {
+                    "visualization": request.form.get("visualization"),
+                },
+                conn,
+            )
+            message = "Audio settings saved."
         elif active_settings_tab == "config":
             names = request.form.getlist("config_name")
             existing_override_names = {
@@ -243,6 +251,7 @@ def settings_route():
                 message = f"Media migration failed: {exc}"
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
+    audio_settings = settings_mod.get_audio_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
     config_settings = cfg.list_config_settings(conn)
     all_settings = settings_mod.list_settings(conn)
@@ -257,6 +266,7 @@ def settings_route():
         message=message,
         active_settings_tab=active_settings_tab,
         calendar_view=calendar_view,
+        audio_settings=audio_settings,
         general_settings=general_settings,
         config_settings=config_settings,
         all_settings=all_settings,
