@@ -1,8 +1,12 @@
 import os
 import re
 import hashlib
+import shutil
+import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
 
@@ -1069,6 +1073,8 @@ def view_note_route(note_id):
         file_exists=file_exists,
         note_path=note_path,
         note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_project),
+        active_projects=projects_mod.projects_list_sidebar(),
+        message=request.args.get("message", ""),
     )
 
 
@@ -1098,6 +1104,251 @@ def note_asset_route(note_id, asset_path):
     if not os.path.isfile(full_path):
         abort(404)
     return send_file(full_path)
+
+
+def _note_title_from_filename(file_name):
+    stem, _ = os.path.splitext((file_name or "").strip())
+    return stem or "Untitled"
+
+
+def _unique_file_path(folder_path, file_name):
+    candidate = os.path.join(folder_path, file_name)
+    if not os.path.exists(candidate):
+        return candidate
+    stem, ext = os.path.splitext(file_name)
+    idx = 2
+    while True:
+        candidate = os.path.join(folder_path, f"{stem}_{idx}{ext}")
+        if not os.path.exists(candidate):
+            return candidate
+        idx += 1
+
+
+def _safe_project_short_name(project_id):
+    raw = (project_id or "note").strip().split("/")[-1].split(".")[-1]
+    cleaned = INVALID_TITLE_CHARS.sub("", raw)
+    cleaned = WHITESPACE_RE.sub("_", cleaned).strip("._ ")
+    return cleaned or "note"
+
+
+def _update_note_title_content(note_path, old_title, new_title):
+    try:
+        text = _read_note_file(note_path)
+    except OSError:
+        return
+    if not text:
+        return
+    updated = text
+    escaped_title = (new_title or "").replace('"', '\\"')
+    if updated.startswith("---"):
+        updated = re.sub(
+            r'(?m)^title:\s*".*?"\s*$',
+            f'title: "{escaped_title}"',
+            updated,
+            count=1,
+        )
+    lines = updated.splitlines(keepends=True)
+    start_idx = 0
+    if lines and lines[0].strip() == "---":
+        for idx in range(1, len(lines)):
+            if lines[idx].strip() == "---":
+                start_idx = idx + 1
+                break
+    for idx, line in enumerate(lines[start_idx:], start=start_idx):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = re.match(r"^(#{1,6}\s+)(.+?)(\s*#*\s*)$", stripped)
+        if match:
+            current_title = match.group(2).strip()
+            if current_title.lower() in {old_title.lower(), old_title.lower() + ".md"}:
+                newline = "\n" if line.endswith("\n") else ""
+                lines[idx] = f"{match.group(1)}{new_title}{match.group(3)}{newline}"
+            updated = "".join(lines)
+        break
+    if updated != text:
+        _write_note_file_content(note_path, updated)
+
+
+def _update_note_file_metadata(note_id, note, file_name, folder_path, project=None):
+    tbl = get_table_def("notes")
+    if not tbl:
+        return False
+    note_path = os.path.join(folder_path, file_name)
+    try:
+        stat = os.stat(note_path)
+        size = str(stat.st_size)
+        date_modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+    except OSError:
+        size = note.get("size") or ""
+        date_modified = note.get("date_modified") or ""
+    values_map = {col: note.get(col, "") for col in tbl["col_list"]}
+    values_map.update(
+        {
+            "file_name": file_name,
+            "path": folder_path,
+            "size": size,
+            "date_modified": date_modified,
+        }
+    )
+    if project is not None:
+        values_map["project"] = project
+    values = [values_map.get(col, "") for col in tbl["col_list"]]
+    ok = data.update_record(data._get_conn(), tbl["name"], note_id, tbl["col_list"], values)
+    if ok:
+        _set_note_folder_id(data._get_conn(), tbl["name"], note_id, folder_path)
+    return ok
+
+
+def _rename_note(note_id, new_title):
+    note, _ = _get_note_record(note_id)
+    if not note:
+        raise ValueError("Note not found.")
+    note_path = _build_note_path(note)
+    if not note_path or not os.path.isfile(note_path):
+        raise ValueError("Note file not found.")
+    title = _validate_note_filename(new_title)
+    stem, ext = os.path.splitext(title)
+    file_name = title if ext else f"{title}.md"
+    if not file_name.lower().endswith(".md"):
+        file_name += ".md"
+    folder_path = _normalize_note_path(note.get("path"))
+    target_path = os.path.join(folder_path, file_name)
+    if os.path.exists(target_path) and os.path.abspath(target_path).lower() != os.path.abspath(note_path).lower():
+        raise ValueError("A note with that name already exists in this folder.")
+    old_title = _note_title_from_filename(note.get("file_name"))
+    new_stem = _note_title_from_filename(file_name)
+    if os.path.abspath(target_path).lower() != os.path.abspath(note_path).lower():
+        os.replace(note_path, target_path)
+    _update_note_title_content(target_path, old_title, new_stem)
+    _update_note_file_metadata(note_id, note, file_name, folder_path)
+    return file_name
+
+
+def _move_note_to_project(note_id, project_id):
+    note, _ = _get_note_record(note_id)
+    if not note:
+        raise ValueError("Note not found.")
+    note_path = _build_note_path(note)
+    if not note_path or not os.path.isfile(note_path):
+        raise ValueError("Note file not found.")
+    project_id = (project_id or "").strip()
+    if not project_id:
+        raise ValueError("Project is required.")
+    target_folder = projects_mod.project_default_folder_get(project_id)
+    if not target_folder:
+        raise ValueError("Selected project has no default folder.")
+    target_folder = _normalize_note_path(target_folder)
+    os.makedirs(target_folder, exist_ok=True)
+    file_name = note.get("file_name") or os.path.basename(note_path)
+    source_folder = _normalize_note_path(note.get("path")) or os.path.dirname(note_path)
+    if source_folder.lower() == target_folder.lower():
+        target_path = os.path.join(target_folder, file_name)
+    else:
+        target_path = _unique_file_path(target_folder, file_name)
+        shutil.move(note_path, target_path)
+    moved_name = os.path.basename(target_path)
+    _update_note_file_metadata(note_id, note, moved_name, target_folder, project=project_id)
+    return target_path
+
+
+def _derived_project_for_note_id(note_id):
+    tbl = get_table_def("notes")
+    if not tbl:
+        return ""
+    try:
+        row = data._get_conn().execute(
+            f"SELECT {_derived_project_expr()} AS derived_project "
+            f"FROM {tbl['name']} t "
+            "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+            "WHERE t.id = ?",
+            (note_id,),
+        ).fetchone()
+    except Exception:
+        return ""
+    return (row["derived_project"] or "") if row else ""
+
+
+def _archive_and_delete_note(note_id):
+    note, tbl = _get_note_record(note_id)
+    if not note or not tbl:
+        raise ValueError("Note not found.")
+    note_path = _build_note_path(note)
+    archived_path = ""
+    if note_path and os.path.isfile(note_path):
+        note_folder = _normalize_note_path(note.get("path")) or os.path.dirname(note_path)
+        notes_root = _notes_root_from_path(note_folder) or note_folder
+        deleted_folder = os.path.join(notes_root, "deleted")
+        os.makedirs(deleted_folder, exist_ok=True)
+        project_id = note.get("project") or _derived_project_for_note_id(note_id)
+        short_project = _safe_project_short_name(project_id)
+        stem = _note_title_from_filename(note.get("file_name"))
+        safe_stem = INVALID_TITLE_CHARS.sub("", stem)
+        safe_stem = WHITESPACE_RE.sub("_", safe_stem).strip("._ ") or "note"
+        stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        archive_name = f"{short_project}__{safe_stem}_{stamp}.md"
+        archived_path = _unique_file_path(deleted_folder, archive_name)
+        shutil.move(note_path, archived_path)
+    data.delete_record(data._get_conn(), tbl["name"], note_id)
+    return archived_path
+
+
+def _open_note_folder(note):
+    note_path = _build_note_path(note)
+    folder_path = os.path.dirname(note_path) if note_path else _normalize_note_path(note.get("path"))
+    if not folder_path or not os.path.isdir(folder_path):
+        raise ValueError("Folder not found.")
+    if sys.platform.startswith("win"):
+        if note_path and os.path.isfile(note_path):
+            subprocess.Popen(["explorer", f"/select,{note_path}"])
+        else:
+            os.startfile(folder_path)
+    elif sys.platform == "darwin":
+        if note_path and os.path.isfile(note_path):
+            subprocess.Popen(["open", "-R", note_path])
+        else:
+            subprocess.Popen(["open", folder_path])
+    else:
+        subprocess.Popen(["xdg-open", folder_path])
+
+
+@notes_bp.route('/rename/<int:note_id>', methods=["POST"])
+def rename_note_route(note_id):
+    try:
+        _rename_note(note_id, request.form.get("new_title", ""))
+    except Exception as exc:
+        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Rename failed: {exc}"))
+    return redirect(url_for("notes.view_note_route", note_id=note_id))
+
+
+@notes_bp.route('/move/<int:note_id>', methods=["POST"])
+def move_note_route(note_id):
+    try:
+        _move_note_to_project(note_id, request.form.get("project_id", ""))
+    except Exception as exc:
+        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Move failed: {exc}"))
+    return redirect(url_for("notes.view_note_route", note_id=note_id))
+
+
+@notes_bp.route('/archive-delete/<int:note_id>', methods=["POST"])
+def archive_delete_note_route(note_id):
+    try:
+        _archive_and_delete_note(note_id)
+    except Exception as exc:
+        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Delete failed: {exc}"))
+    return redirect(url_for("notes.list_notes_route"))
+
+
+@notes_bp.route('/open-folder/<int:note_id>', methods=["POST"])
+def open_note_folder_route(note_id):
+    note, _ = _get_note_record(note_id)
+    if not note:
+        abort(404)
+    try:
+        _open_note_folder(note)
+    except Exception as exc:
+        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Open folder failed: {exc}"))
+    return redirect(url_for("notes.view_note_route", note_id=note_id))
 
 
 @notes_bp.route('/api/new-note-options')
@@ -1328,9 +1579,10 @@ def save_note_route(note_id):
 
 @notes_bp.route('/delete/<int:note_id>')
 def delete_note_route(note_id):
-    tbl = get_table_def("notes")
-    if tbl:
-        data.delete_record(data.conn, tbl["name"], note_id)
+    try:
+        _archive_and_delete_note(note_id)
+    except Exception:
+        pass
     return redirect(url_for("notes.list_notes_route"))
 
 
@@ -1449,6 +1701,173 @@ def _insert_note_import_rows(tbl, rows):
             _set_note_folder_id(conn, tbl["name"], record_id, values_map.get("path", ""))
             count += 1
     return count
+
+
+def _note_full_path_key(folder_path, file_name):
+    folder_path = _normalize_note_path(folder_path)
+    file_name = (file_name or "").strip()
+    if not folder_path or not file_name:
+        return ""
+    return os.path.join(folder_path, file_name).replace("/", "\\").lower()
+
+
+def _note_folder_id_matches(conn, folder_id, folder_path):
+    if folder_id in (None, "", "0", 0):
+        return False
+    try:
+        row = conn.execute(
+            "SELECT folder_path FROM dim_folder WHERE folder_id = ?",
+            (folder_id,),
+        ).fetchone()
+    except Exception:
+        return False
+    if not row:
+        return False
+    return _normalize_note_path(row["folder_path"]).lower() == _normalize_note_path(folder_path).lower()
+
+
+def _sync_note_rows(folder_path):
+    folder_path = _normalize_note_path(folder_path)
+    tbl = get_table_def("notes")
+    if not tbl:
+        raise ValueError("Notes table not found.")
+    if not folder_path:
+        raise ValueError("No folder provided.")
+    if not os.path.isdir(folder_path):
+        raise ValueError("Folder not found.")
+
+    conn = data._get_conn()
+    root_lower = folder_path.rstrip("\\").lower()
+    existing = {}
+    duplicates = 0
+    rows = conn.execute(
+        f"SELECT id, {', '.join(tbl['col_list'])} FROM {tbl['name']} "
+        "WHERE COALESCE(path, '') != ''"
+    ).fetchall()
+    for row in rows:
+        row_dict = dict(row)
+        row_path = _normalize_note_path(row_dict.get("path"))
+        if not row_path:
+            continue
+        row_path_lower = row_path.lower()
+        if row_path_lower != root_lower and not row_path_lower.startswith(root_lower + "\\"):
+            continue
+        key = _note_full_path_key(row_path, row_dict.get("file_name"))
+        if not key:
+            continue
+        if key in existing:
+            duplicates += 1
+            continue
+        existing[key] = row_dict
+
+    scanned = inserted = updated = unchanged = 0
+    seen = set()
+    for root, _, files in os.walk(folder_path):
+        root_norm = _normalize_note_path(root)
+        for name in files:
+            if not name.lower().endswith(".md"):
+                continue
+            full_path = os.path.join(root_norm, name)
+            if not os.path.isfile(full_path):
+                continue
+            try:
+                stat = os.stat(full_path)
+            except OSError:
+                continue
+            scanned += 1
+            size = str(stat.st_size)
+            date_modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            key = _note_full_path_key(root_norm, name)
+            seen.add(key)
+            current = existing.get(key)
+            if current:
+                values_map = {col: current.get(col, "") for col in tbl["col_list"]}
+                values_map.update(
+                    {
+                        "file_name": name,
+                        "path": root_norm,
+                        "size": size,
+                        "date_modified": date_modified,
+                    }
+                )
+                needs_update = (
+                    (current.get("file_name") or "") != name
+                    or _normalize_note_path(current.get("path")).lower() != root_norm.lower()
+                    or str(current.get("size") or "") != size
+                    or str(current.get("date_modified") or "") != date_modified
+                    or not _note_folder_id_matches(conn, current.get("folder_id"), root_norm)
+                )
+                if needs_update:
+                    values = [values_map.get(col, "") for col in tbl["col_list"]]
+                    if data.update_record(conn, tbl["name"], current["id"], tbl["col_list"], values):
+                        _set_note_folder_id(conn, tbl["name"], current["id"], root_norm)
+                        updated += 1
+                    else:
+                        unchanged += 1
+                else:
+                    unchanged += 1
+            else:
+                values_map = {
+                    "file_name": name,
+                    "path": root_norm,
+                    "folder_id": "",
+                    "size": size,
+                    "date_modified": date_modified,
+                    "project": "",
+                }
+                values = [values_map.get(col, "") for col in tbl["col_list"]]
+                record_id = data.add_record(conn, tbl["name"], tbl["col_list"], values)
+                if record_id:
+                    _set_note_folder_id(conn, tbl["name"], record_id, root_norm)
+                    inserted += 1
+
+    missing = len([key for key in existing.keys() if key not in seen])
+    return {
+        "folder_path": folder_path,
+        "scanned": scanned,
+        "inserted": inserted,
+        "updated": updated,
+        "unchanged": unchanged,
+        "missing": missing,
+        "duplicates": duplicates,
+    }
+
+
+def _sync_notes_message(result):
+    return (
+        f"Synced notes folder {result['folder_path']}: scanned {result['scanned']}, "
+        f"inserted {result['inserted']}, updated {result['updated']}, "
+        f"unchanged {result['unchanged']}, missing on disk {result['missing']}, "
+        f"duplicate DB rows ignored {result['duplicates']}."
+    )
+
+
+@notes_bp.route('/sync', methods=["POST"])
+def sync_notes_route():
+    folder_path = request.form.get("notes_folder", "").strip()
+    if not folder_path:
+        folder_path = _notes_root_path() or ""
+    try:
+        result = _sync_note_rows(folder_path)
+        msg = _sync_notes_message(result)
+    except Exception as exc:
+        msg = f"Notes sync failed: {exc}"
+    return redirect(url_for("admin.settings_route", tab="notes", message=msg))
+
+
+@notes_bp.route('/sync-folder/<int:project_folder_id>', methods=["POST"])
+def sync_project_folder_route(project_folder_id):
+    folder = projects_mod.project_folder_get(project_folder_id)
+    if not folder:
+        abort(404)
+    try:
+        result = _sync_note_rows(folder.get("path_prefix") or "")
+        msg = _sync_notes_message(result)
+    except Exception as exc:
+        msg = f"Notes folder sync failed: {exc}"
+    next_url = request.form.get("next") or url_for("notes.list_notes_route", proj=folder.get("project_id"))
+    sep = "&" if "?" in next_url else "?"
+    return redirect(f"{next_url}{sep}{urlencode({'message': msg})}")
 
 
 def _upsert_note_dim_folder(conn, folder_path):

@@ -5,6 +5,9 @@
       <button type="button" class="project-folders-toggle" aria-expanded="true">[-]</button>
     </div>
     <div class="project-folders-body">
+    {% if request.args.get('message') %}
+      <div class="settings-message">{{ request.args.get('message') }}</div>
+    {% endif %}
     <form method="post" action="{{ url_for('projects.project_folder_add_route') }}" class="project-folder-form">
       <input type="hidden" name="project_id" value="{{ project_info.project_id }}">
       <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -42,6 +45,14 @@
             <td>{{ folder.path_prefix }}</td>
             <td>{% if folder.is_enabled %}Enabled{% else %}Disabled{% endif %}</td>
             <td>
+              <form method="post" action="{{ url_for('notes.sync_project_folder_route', project_folder_id=folder.project_folder_id) }}" style="display:inline;">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button type="submit">Sync</button>
+              </form>
+              <form method="post" action="{{ url_for('projects.project_folder_open_route', project_folder_id=folder.project_folder_id) }}" style="display:inline;">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button type="submit">Open</button>
+              </form>
               {% if folder.folder_role != 'default' %}
                 <form method="post" action="{{ url_for('projects.project_folder_set_default_route', project_folder_id=folder.project_folder_id) }}" style="display:inline;">
                   <input type="hidden" name="next" value="{{ request.full_path }}">

@@ -94,6 +94,16 @@
         <p class="settings-empty">No Files settings yet.</p>
       {% elif active_settings_tab == 'notes' %}
         <h4>Notes</h4>
+        <form method="post" action="{{ url_for('notes.sync_notes_route') }}" class="settings-form">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Sync notes from disk</div>
+            <label>
+              Notes root
+              <input type="text" name="notes_folder" value="{{ notes_sync_root }}" placeholder="N:\duncan\LifePIM_Data\DATA\notes">
+            </label>
+          </div>
+          <button type="submit">Sync notes</button>
+        </form>
         <form method="post" action="{{ url_for('notes.migrate_notes_source_route') }}" class="settings-form">
           <div class="settings-fieldset">
             <div class="settings-fieldset-title">Migrate notes to new source</div>

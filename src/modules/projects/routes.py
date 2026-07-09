@@ -1,4 +1,8 @@
-from flask import Blueprint, jsonify, redirect, request, url_for
+import os
+import subprocess
+import sys
+
+from flask import Blueprint, abort, jsonify, redirect, request, url_for
 
 from common import projects as projects_mod
 
@@ -84,6 +88,23 @@ def project_folder_set_default_route(project_folder_id):
         projects_mod.project_folder_set_default(folder["project_id"], project_folder_id)
         return redirect(_next_url(folder["project_id"]))
     return redirect(_next_url(""))
+
+
+@projects_bp.route("/folders/<int:project_folder_id>/open", methods=["POST"])
+def project_folder_open_route(project_folder_id):
+    folder = projects_mod.project_folder_get(project_folder_id)
+    if not folder:
+        abort(404)
+    folder_path = (folder.get("path_prefix") or "").strip()
+    if not folder_path or not os.path.isdir(folder_path):
+        abort(404)
+    if sys.platform.startswith("win"):
+        os.startfile(folder_path)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", folder_path])
+    else:
+        subprocess.Popen(["xdg-open", folder_path])
+    return redirect(_next_url(folder["project_id"]))
 
 
 @projects_bp.route("/folders/<int:project_folder_id>/toggle", methods=["POST"])

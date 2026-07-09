@@ -257,6 +257,115 @@ class TestNoteCreation(unittest.TestCase):
         self.assertNotIn(games_note_id, sport_ids)
         self.assertNotIn(travel_note_id, sport_ids)
 
+    def test_sync_note_rows_is_idempotent_and_counts_missing(self):
+        notes_dir = os.path.join(self.tmpdir.name, "sync_notes")
+        os.makedirs(notes_dir, exist_ok=True)
+        note_path = os.path.join(notes_dir, "external.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write("first")
+
+        result = notes_routes._sync_note_rows(notes_dir)
+        self.assertEqual(result["scanned"], 1)
+        self.assertEqual(result["inserted"], 1)
+        self.assertEqual(result["updated"], 0)
+
+        tbl = common_utils.get_table_def("notes")
+        rows = self.conn.execute(f"SELECT id, file_name, path, size FROM {tbl['name']}").fetchall()
+        self.assertEqual(len(rows), 1)
+        note_id = rows[0]["id"]
+        self.assertEqual(rows[0]["file_name"], "external.md")
+
+        result = notes_routes._sync_note_rows(notes_dir)
+        self.assertEqual(result["scanned"], 1)
+        self.assertEqual(result["inserted"], 0)
+        self.assertEqual(result["updated"], 0)
+        count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
+        self.assertEqual(count, 1)
+
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write("first plus more")
+        result = notes_routes._sync_note_rows(notes_dir)
+        self.assertEqual(result["updated"], 1)
+        row = self.conn.execute(f"SELECT size FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["size"], str(os.path.getsize(note_path)))
+
+        second_path = os.path.join(notes_dir, "second.md")
+        with open(second_path, "w", encoding="utf-8") as handle:
+            handle.write("second")
+        os.remove(note_path)
+        result = notes_routes._sync_note_rows(notes_dir)
+        self.assertEqual(result["scanned"], 1)
+        self.assertEqual(result["inserted"], 1)
+        self.assertEqual(result["missing"], 1)
+        count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
+        self.assertEqual(count, 2)
+
+    def test_rename_note_updates_file_and_metadata(self):
+        note_dir = os.path.join(self.tmpdir.name, "rename_note")
+        note_id, created = self._create_note_record("old title", note_dir, project="pers/health")
+
+        new_file_name = notes_routes._rename_note(note_id, "new title")
+        self.assertEqual(new_file_name, "new title.md")
+        self.assertFalse(os.path.exists(created["full_path"]))
+        new_path = os.path.join(note_dir, "new title.md")
+        self.assertTrue(os.path.exists(new_path))
+
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT file_name, path FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["file_name"], "new title.md")
+        self.assertEqual(row["path"], notes_routes._normalize_note_path(note_dir))
+        with open(new_path, "r", encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn('title: "new title"', text)
+        self.assertIn("# new title", text)
+
+    def test_move_note_updates_project_folder_and_metadata(self):
+        source_dir = os.path.join(self.tmpdir.name, "move_source")
+        target_dir = os.path.join(self.tmpdir.name, "move_target")
+        project_id = "fun/games"
+        projects_mod.project_upsert(
+            {
+                "project_id": project_id,
+                "tab": "FUN",
+                "group_name": "FUN",
+                "project_name": "Games",
+            },
+            conn=self.conn,
+        )
+        projects_mod.project_folder_add(
+            project_id,
+            target_dir,
+            folder_role="default",
+            is_write_enabled=1,
+            conn=self.conn,
+        )
+        note_id, created = self._create_note_record("move me", source_dir, project="")
+
+        moved_path = notes_routes._move_note_to_project(note_id, project_id)
+        self.assertFalse(os.path.exists(created["full_path"]))
+        self.assertTrue(os.path.exists(moved_path))
+        self.assertEqual(os.path.dirname(moved_path), notes_routes._normalize_note_path(target_dir))
+
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT file_name, path, project FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["file_name"], os.path.basename(moved_path))
+        self.assertEqual(row["path"], notes_routes._normalize_note_path(target_dir))
+        self.assertEqual(row["project"], project_id)
+
+    def test_archive_delete_moves_file_and_removes_db_row(self):
+        note_dir = os.path.join(self.tmpdir.name, "delete_note")
+        note_id, created = self._create_note_record("delete me", note_dir, project="fun/games")
+
+        archived_path = notes_routes._archive_and_delete_note(note_id)
+        self.assertFalse(os.path.exists(created["full_path"]))
+        self.assertTrue(os.path.exists(archived_path))
+        self.assertEqual(os.path.dirname(archived_path), os.path.join(notes_routes._normalize_note_path(note_dir), "deleted"))
+        self.assertTrue(os.path.basename(archived_path).startswith("games__delete_me_"))
+
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT id FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertIsNone(row)
+
     def test_delete_note_removes_from_unmapped(self):
         unmapped_dir = os.path.join(self.tmpdir.name, "unmapped_delete")
         note_id, _ = self._create_note_record("note_creation_test_delete", unmapped_dir, project="")

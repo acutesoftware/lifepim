@@ -263,8 +263,36 @@ def settings_route():
         filelist_db=cfg.FILELIST_DB,
         filelist_image_where=media_migration.default_image_where(),
         filelist_audio_where=media_migration.default_audio_where(),
+        notes_sync_root=_notes_live_root(conn),
         now=datetime.now(),
     )
+
+
+def _notes_live_root(conn):
+    try:
+        rows = conn.execute(
+            "SELECT path, COUNT(1) AS cnt FROM lp_notes "
+            "WHERE COALESCE(path, '') != '' "
+            "GROUP BY path ORDER BY cnt DESC"
+        ).fetchall()
+    except Exception:
+        return ""
+    root_counts = {}
+    root_display = {}
+    for row in rows:
+        path = (row["path"] or "").strip().replace("/", "\\")
+        parts = [part for part in path.split("\\") if part]
+        for idx in range(len(parts) - 1):
+            if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
+                root = "\\".join(parts[: idx + 2])
+                key = root.lower()
+                root_display.setdefault(key, root)
+                root_counts[key] = root_counts.get(key, 0) + int(row["cnt"] or 0)
+                break
+    if not root_counts:
+        return ""
+    best_key = max(root_counts, key=root_counts.get)
+    return root_display.get(best_key, "")
 
 
 def _load_json(value):

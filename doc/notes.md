@@ -59,6 +59,34 @@ Use this when adding another notes folder without deleting existing notes.
 
 Do not import the same folder twice unless duplicate rows are acceptable.
 
+## Sync Notes
+
+Use sync when markdown files were added or edited outside LifePIM and the database metadata needs to catch up.
+
+Full notes sync:
+
+```text
+Settings -> Notes -> Sync notes
+```
+
+Project/folder sync:
+
+```text
+Notes -> select project -> Folders panel -> Sync
+```
+
+Sync is idempotent:
+
+- scans `.md` files recursively
+- inserts new files into `lp_notes`
+- updates existing rows by full file path
+- refreshes `size`, `date_modified`, and `folder_id`
+- preserves existing `lp_notes.project`
+- counts missing-on-disk rows but does not delete them
+- ignores duplicate database rows after the first matching full path
+
+Use `Import Folder` only when append-only import behavior is acceptable. Use `Sync notes` for normal ongoing refresh.
+
 ## Migrate
 
 Use migration when changing the notes source to an existing notes folder, such as moving from a local mirror to the live NAS folder.
@@ -338,6 +366,5 @@ If you later reload mapping CSVs from disk and those CSVs still contain old path
 
 ## TODO
 
-- Add a refresh/sync job for notes. Current gap: if new `.md` files are added directly to the notes folder outside LifePIM, they are not automatically added to `lp_notes`. Today you must use `Import Folder`, but that is append-only and can create duplicates.
+- Consider adding a missing-file review screen for rows counted by sync as missing on disk.
 - Replace `tests/LOAD_TESTING.py` with explicit import/sync flows for each data source.
-- Add idempotent note import keyed by full file path so repeated imports update existing rows instead of duplicating them.
