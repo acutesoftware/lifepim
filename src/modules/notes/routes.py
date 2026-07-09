@@ -369,29 +369,116 @@ def _normalize_folder_filter(folder_path):
     return _normalize_note_path(folder_path) or folder_path
 
 
+def _note_folder_match_expr():
+    return "COALESCE(NULLIF(rtrim(replace(t.path, '/', '\\')), ''), df.folder_path)"
+
+
+def _note_path_expr():
+    return "rtrim(replace(t.path, '/', '\\'))"
+
+
+def _derived_project_expr():
+    folder_expr = _note_folder_match_expr()
+    path_expr = _note_path_expr()
+    named_child_expr = (
+        "("
+        "SELECT pf.project_id "
+        "FROM lp_project_folders pf "
+        "LEFT JOIN lp_projects p ON p.project_id = pf.project_id "
+        "WHERE pf.is_enabled = 1 "
+        "  AND pf.folder_role IN ('default','include','archive','output') "
+        f"  AND {folder_expr} IS NOT NULL "
+        f"  AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%' "
+        "  AND instr(pf.project_id, '/') > 0 "
+        f"  AND lower({path_expr}) LIKE '%' || lower(COALESCE(p.project_name, '')) || '%' "
+        "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
+        "  WHEN 'default' THEN 0 "
+        "  WHEN 'include' THEN 1 "
+        "  WHEN 'output' THEN 2 "
+        "  WHEN 'archive' THEN 3 "
+        "  ELSE 9 END, pf.sort_order, "
+        "  (LENGTH(pf.project_id) - LENGTH(REPLACE(pf.project_id, '/', ''))) ASC, "
+        "  LENGTH(pf.project_id) ASC, pf.project_id, pf.path_prefix "
+        "LIMIT 1"
+        ")"
+    )
+    normal_expr = (
+        "("
+        "SELECT pf.project_id "
+        "FROM lp_project_folders pf "
+        "WHERE pf.is_enabled = 1 "
+        "  AND pf.folder_role IN ('default','include','archive','output') "
+        f"  AND {folder_expr} IS NOT NULL "
+        f"  AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%' "
+        "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
+        "  WHEN 'default' THEN 0 "
+        "  WHEN 'include' THEN 1 "
+        "  WHEN 'output' THEN 2 "
+        "  WHEN 'archive' THEN 3 "
+        "  ELSE 9 END, pf.sort_order, "
+        "  (LENGTH(pf.project_id) - LENGTH(REPLACE(pf.project_id, '/', ''))) ASC, "
+        "  LENGTH(pf.project_id) ASC, pf.project_id, pf.path_prefix "
+        "LIMIT 1"
+        ")"
+    )
+    return f"COALESCE({named_child_expr}, {normal_expr})"
+
+
+def _project_scope_ids(project):
+    project = (project or "").strip()
+    if not project or project.lower() == "unmapped":
+        return []
+    conn = data._get_conn()
+    projects_mod.ensure_projects_schema(conn)
+    project_lower = project.lower()
+    ids = []
+
+    exact = projects_mod.project_get(project, conn=conn)
+    if exact:
+        rows = conn.execute(
+            "SELECT project_id FROM lp_projects "
+            "WHERE status = 'active' "
+            "AND (lower(project_id) = lower(?) OR lower(project_id) LIKE lower(?) || '/%') "
+            "ORDER BY LENGTH(project_id), project_id",
+            (project, project),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT project_id FROM lp_projects "
+            "WHERE status = 'active' "
+            "AND (lower(project_id) LIKE lower(?) || '/%' "
+            "     OR lower(tab) = ? "
+            "     OR lower(group_name) = ? "
+            "     OR lower(project_id) = ?) "
+            "ORDER BY LENGTH(project_id), project_id",
+            (project, project_lower, project_lower, f"{project_lower}.{project_lower}.{project_lower}"),
+        ).fetchall()
+
+    for row in rows:
+        project_id = (row["project_id"] or "").strip()
+        if project_id and project_id not in ids:
+            ids.append(project_id)
+    return ids or [project]
+
+
 def _notes_base_condition(project, folder_path=None):
     params = []
+    folder_expr = _note_folder_match_expr()
     if project and project.lower() == "unmapped":
         condition = (
             "NOT EXISTS ("
             "  SELECT 1 FROM lp_project_folders pf "
             "  WHERE pf.is_enabled = 1 "
             "    AND pf.folder_role IN ('default','include','archive','output') "
-            "    AND df.folder_path IS NOT NULL "
-            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
+            f"    AND {folder_expr} IS NOT NULL "
+            f"    AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%'"
             ")"
         )
     elif project:
-        condition = (
-            "EXISTS ("
-            "  SELECT 1 FROM lp_project_folders pf "
-            "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
-            "    AND pf.folder_role IN ('default','include','archive','output') "
-            "    AND df.folder_path IS NOT NULL "
-            "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
-            ")"
-        )
-        params.append(project)
+        scope_ids = _project_scope_ids(project)
+        placeholders = ", ".join(["?"] * len(scope_ids))
+        condition = f"{_derived_project_expr()} IN ({placeholders})"
+        params.extend(scope_ids)
     else:
         condition = "1=1"
     if folder_path:
@@ -570,23 +657,7 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
     order_by = f"{sort_key} {sort_dir}"
     select_cols = [f"t.{col}" for col in cols]
     select_cols.append("t.rec_extract_date as updated")
-    select_cols.append(
-        "("
-        "SELECT pf.project_id "
-        "FROM lp_project_folders pf "
-        "WHERE pf.is_enabled = 1 "
-        "  AND pf.folder_role IN ('default','include','archive','output') "
-        "  AND df.folder_path IS NOT NULL "
-        "  AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%' "
-        "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
-        "  WHEN 'default' THEN 0 "
-        "  WHEN 'include' THEN 1 "
-        "  WHEN 'output' THEN 2 "
-        "  WHEN 'archive' THEN 3 "
-        "  ELSE 9 END, pf.sort_order, pf.path_prefix "
-        "LIMIT 1"
-        ") as derived_project"
-    )
+    select_cols.append(f"{_derived_project_expr()} as derived_project")
     condition, params = _notes_base_condition(project, folder_path)
     sql = (
         f"SELECT {', '.join(select_cols)} "
@@ -952,23 +1023,7 @@ def view_note_route(note_id):
     if tbl:
         select_cols = [f"t.{col}" for col in (["id"] + tbl["col_list"])]
         select_cols.append("t.rec_extract_date as updated")
-        select_cols.append(
-            "("
-            "SELECT pf.project_id "
-            "FROM lp_project_folders pf "
-            "WHERE pf.is_enabled = 1 "
-            "  AND pf.folder_role IN ('default','include','archive','output') "
-            "  AND df.folder_path IS NOT NULL "
-            "  AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%' "
-        "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
-        "  WHEN 'default' THEN 0 "
-        "  WHEN 'include' THEN 1 "
-        "  WHEN 'output' THEN 2 "
-            "  WHEN 'archive' THEN 3 "
-            "  ELSE 9 END, pf.sort_order, pf.path_prefix "
-            "LIMIT 1"
-            ") as derived_project"
-        )
+        select_cols.append(f"{_derived_project_expr()} as derived_project")
         sql = (
             f"SELECT {', '.join(select_cols)} "
             f"FROM {tbl['name']} t "

@@ -125,6 +125,138 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn(note1.get("file_name"), note_titles)
         self.assertIn(note2.get("file_name"), note_titles)
 
+    def test_note_folder_id_preserves_live_note_path_alias_on_update(self):
+        project_id = "pers/health"
+        note_dir = r"N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health"
+        projects_mod.project_upsert(
+            {
+                "project_id": project_id,
+                "tab": "PERS",
+                "group_name": "PERS",
+                "project_name": "Health",
+            },
+            conn=self.conn,
+        )
+        projects_mod.project_folder_add(
+            project_id,
+            note_dir,
+            folder_role="default",
+            is_write_enabled=1,
+            conn=self.conn,
+        )
+
+        tbl = common_utils.get_table_def("notes")
+        values_map = {
+            "file_name": "new note in health.md",
+            "path": note_dir,
+            "folder_id": "",
+            "size": "160",
+            "date_modified": "2026-07-09 16:38:25",
+            "project": project_id,
+        }
+        values = [values_map.get(col, "") for col in tbl["col_list"]]
+        note_id = data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
+        self.assertTrue(note_id)
+
+        alias_dir = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health"
+        self.conn.execute("INSERT INTO dim_folder(folder_path) VALUES (?)", (alias_dir,))
+        alias_folder_id = self.conn.execute(
+            "SELECT folder_id FROM dim_folder WHERE folder_path = ?",
+            (alias_dir,),
+        ).fetchone()["folder_id"]
+        self.conn.execute("UPDATE lp_notes SET folder_id = ? WHERE id = ?", (alias_folder_id, note_id))
+        self.conn.commit()
+
+        stale_filtered_notes = notes_routes._fetch_notes(project_id)
+        stale_filtered_ids = {n.get("id") for n in stale_filtered_notes}
+        self.assertIn(note_id, stale_filtered_ids)
+        stale_derived = {n.get("id"): n.get("derived_project") for n in stale_filtered_notes}
+        self.assertEqual(stale_derived[note_id], project_id)
+
+        values_map["size"] = "161"
+        values = [values_map.get(col, "") for col in tbl["col_list"]]
+        self.assertTrue(data.update_record(self.conn, tbl["name"], note_id, tbl["col_list"], values))
+
+        row = self.conn.execute(
+            "SELECT t.folder_id, df.folder_path "
+            "FROM lp_notes t LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+            "WHERE t.id = ?",
+            (note_id,),
+        ).fetchone()
+        self.assertEqual(row["folder_path"], note_dir)
+
+        filtered_notes = notes_routes._fetch_notes(project_id)
+        filtered_ids = {n.get("id") for n in filtered_notes}
+        self.assertIn(note_id, filtered_ids)
+        derived = {n.get("id"): n.get("derived_project") for n in filtered_notes}
+        self.assertEqual(derived[note_id], project_id)
+
+    def test_parent_project_includes_children_without_broad_leaf_leakage(self):
+        root_dir = r"N:\duncan\LifePIM_Data\DATA\notes\50-Fun"
+        games_dir = root_dir + r"\51-Games"
+        travel_dir = root_dir + r"\56-Travel"
+        projects = [
+            ("fun.fun.fun", "FUN", "FUN", "Fun", root_dir),
+            ("fun/games", "FUN", "FUN", "Games", games_dir),
+            ("fun/sport", "FUN", "FUN", "Sport", root_dir),
+            ("fun/travel", "FUN", "FUN", "Travel", root_dir),
+        ]
+        for project_id, tab, group_name, project_name, folder_path in projects:
+            projects_mod.project_upsert(
+                {
+                    "project_id": project_id,
+                    "tab": tab,
+                    "group_name": group_name,
+                    "project_name": project_name,
+                },
+                conn=self.conn,
+            )
+            projects_mod.project_folder_add(
+                project_id,
+                folder_path,
+                folder_role="default",
+                is_write_enabled=1,
+                conn=self.conn,
+            )
+
+        tbl = common_utils.get_table_def("notes")
+
+        def add_note(file_name, folder_path):
+            values_map = {
+                "file_name": file_name,
+                "path": folder_path,
+                "folder_id": "",
+                "size": "1",
+                "date_modified": "2026-07-09 16:38:25",
+                "project": "",
+            }
+            values = [values_map.get(col, "") for col in tbl["col_list"]]
+            return data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
+
+        root_note_id = add_note("fun_root.md", root_dir)
+        games_note_id = add_note("games.md", games_dir)
+        travel_note_id = add_note("travel.md", travel_dir)
+
+        parent_ids = {n.get("id") for n in notes_routes._fetch_notes("fun")}
+        self.assertIn(root_note_id, parent_ids)
+        self.assertIn(games_note_id, parent_ids)
+        self.assertIn(travel_note_id, parent_ids)
+
+        games_ids = {n.get("id") for n in notes_routes._fetch_notes("fun/games")}
+        self.assertNotIn(root_note_id, games_ids)
+        self.assertIn(games_note_id, games_ids)
+        self.assertNotIn(travel_note_id, games_ids)
+
+        travel_ids = {n.get("id") for n in notes_routes._fetch_notes("fun/travel")}
+        self.assertNotIn(root_note_id, travel_ids)
+        self.assertNotIn(games_note_id, travel_ids)
+        self.assertIn(travel_note_id, travel_ids)
+
+        sport_ids = {n.get("id") for n in notes_routes._fetch_notes("fun/sport")}
+        self.assertNotIn(root_note_id, sport_ids)
+        self.assertNotIn(games_note_id, sport_ids)
+        self.assertNotIn(travel_note_id, sport_ids)
+
     def test_delete_note_removes_from_unmapped(self):
         unmapped_dir = os.path.join(self.tmpdir.name, "unmapped_delete")
         note_id, _ = self._create_note_record("note_creation_test_delete", unmapped_dir, project="")

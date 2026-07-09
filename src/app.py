@@ -57,11 +57,51 @@ def _help_paths():
         ("Source folder", src_folder),
         ("User data folder", getattr(mod_cfg, "user_folder", "")),
         ("Database file", getattr(mod_cfg, "DB_FILE", "")),
+        ("Notes folder", _notes_live_folder_path()),
         ("Data folder", getattr(mod_cfg, "data_folder", "")),
         ("Index folder", getattr(mod_cfg, "index_folder", "")),
         ("Calendar folder", getattr(mod_cfg, "calendar_folder", "")),
         ("Export data folder", getattr(mod_cfg, "export_data_folder_base", "")),
     ]
+
+
+def _notes_live_folder_path():
+    try:
+        notes_tbl = get_table_def("notes")
+        if not notes_tbl:
+            return ""
+        conn = db._get_conn()
+        rows = conn.execute(
+            f"SELECT path, COUNT(1) AS cnt FROM {notes_tbl['name']} "
+            "WHERE COALESCE(path, '') != '' "
+            "GROUP BY path "
+            "ORDER BY cnt DESC"
+        ).fetchall()
+    except Exception:
+        return ""
+
+    root_counts = {}
+    root_display = {}
+    for row in rows:
+        path = (row["path"] or "").strip().replace("/", "\\")
+        if not path:
+            continue
+        parts = [part for part in path.split("\\") if part]
+        root = ""
+        for idx in range(len(parts) - 1):
+            if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
+                root = "\\".join(parts[: idx + 2])
+                break
+        if not root:
+            continue
+        key = root.lower()
+        root_display.setdefault(key, root)
+        root_counts[key] = root_counts.get(key, 0) + int(row["cnt"] or 0)
+
+    if root_counts:
+        best_key = max(root_counts, key=root_counts.get)
+        return root_display.get(best_key, "")
+    return ""
 
 
 def _python_source_files():

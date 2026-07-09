@@ -126,8 +126,34 @@ def upsert_dim_folder(conn, folder_path):
     return row["folder_id"] if row else None
 
 
+def upsert_note_dim_folder(conn, folder_path):
+    conn = _get_conn() if conn is None else conn
+    fp = _normalize_note_folder_path(folder_path)
+    if not fp:
+        return None
+    conn.execute("INSERT OR IGNORE INTO dim_folder(folder_path) VALUES (?)", (fp,))
+    conn.execute(
+        "UPDATE dim_folder SET last_seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'), is_active=1 WHERE folder_path=?",
+        (fp,),
+    )
+    row = conn.execute("SELECT folder_id FROM dim_folder WHERE folder_path = ?", (fp,)).fetchone()
+    return row["folder_id"] if row else None
+
+
 def _normalize_folder_path(path_value):
     return folder_etl.norm_path(path_value)
+
+
+def _normalize_note_folder_path(path_value):
+    path_value = (path_value or "").strip().strip('"').strip()
+    if not path_value:
+        return ""
+    path_value = path_value.replace("/", "\\")
+    if len(path_value) >= 2 and path_value[1] == ":":
+        path_value = path_value[0].upper() + path_value[1:]
+    if len(path_value) > 3 and path_value.endswith("\\"):
+        path_value = path_value.rstrip("\\")
+    return path_value
 
 
 def _derive_folder_path(route_name, values_map):
@@ -163,10 +189,16 @@ def _derive_folder_path(route_name, values_map):
 def update_folder_id_for_record(conn, tbl_name, route_name, record_id, values_map):
     conn = _get_conn() if conn is None else conn
     folder_path = _derive_folder_path(route_name, values_map)
-    folder_path = _normalize_folder_path(folder_path)
+    if route_name == "notes":
+        folder_path = _normalize_note_folder_path(folder_path)
+    else:
+        folder_path = _normalize_folder_path(folder_path)
     if not folder_path:
         return
-    folder_id = upsert_dim_folder(conn, folder_path)
+    if route_name == "notes":
+        folder_id = upsert_note_dim_folder(conn, folder_path)
+    else:
+        folder_id = upsert_dim_folder(conn, folder_path)
     if not folder_id:
         return
     conn.execute(f"UPDATE {tbl_name} SET folder_id = ? WHERE id = ?", (folder_id, record_id))

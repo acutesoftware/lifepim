@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 
 from common import data as db
 from common import config as cfg
-from etl_folder_mapping import norm_path
 
 PROJECTS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS lp_projects (
@@ -75,12 +74,12 @@ def ensure_projects_schema(conn=None):
 
 
 def normalize_path_prefix(path_value):
-    raw = (path_value or "").strip()
-    if not raw:
-        return ""
-    normalized = norm_path(raw)
+    normalized = (path_value or "").strip().strip('"').strip()
     if not normalized:
         return ""
+    normalized = normalized.replace("/", "\\")
+    if len(normalized) >= 2 and normalized[1] == ":":
+        normalized = normalized[0].upper() + normalized[1:]
     if not os.path.isabs(normalized):
         raise ValueError("Path prefix must be an absolute path.")
     normalized = os.path.abspath(normalized)

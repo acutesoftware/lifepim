@@ -147,6 +147,187 @@ The Folders section in Notes is a navigation aid. It shows subfolders for the cu
 
 If folder/project mapping looks wrong after changing source, run `Migrate notes source` rather than plain `Import Folder`, because migration rewrites the mapping prefixes from the old root to the new root.
 
+## Projects
+
+Notes currently have two project concepts:
+
+- `lp_notes.project`
+  - A stored text column on the note row.
+  - It is set when a new note is created from a selected project, or when folder import is run with a selected `proj`.
+  - It is often blank for migrated/imported notes, because migration normally imports with `Project` blank and relies on folder mapping instead.
+  - It is displayed in the Notes table as `Project`.
+- derived project
+  - A runtime value calculated from the note folder.
+  - It is displayed in the Notes table and note view as `Derived` / `Derived Project`.
+  - It is the value that usually explains why sidebar filtering works even when `lp_notes.project` is empty.
+
+The derived project is calculated by joining:
+
+```text
+lp_notes.folder_id -> dim_folder.folder_id -> dim_folder.folder_path
+```
+
+then finding the enabled `lp_project_folders` row whose `path_prefix` is the best prefix match for that folder:
+
+```sql
+SELECT pf.project_id
+FROM lp_project_folders pf
+WHERE pf.is_enabled = 1
+  AND pf.folder_role IN ('default','include','archive','output')
+  AND lower(dim_folder.folder_path) LIKE lower(pf.path_prefix) || '%'
+ORDER BY
+  LENGTH(pf.path_prefix) DESC,
+  CASE pf.folder_role
+    WHEN 'default' THEN 0
+    WHEN 'include' THEN 1
+    WHEN 'output' THEN 2
+    WHEN 'archive' THEN 3
+    ELSE 9
+  END,
+  pf.sort_order,
+  pf.path_prefix
+LIMIT 1;
+```
+
+Example:
+
+```text
+lp_notes.path:
+N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
+
+dim_folder.folder_path:
+N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
+
+lp_project_folders:
+project_id        path_prefix
+proj/dev          N:\duncan\LifePIM_Data\DATA\notes\40-Dev
+proj/dev/lifepim  N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
+
+derived_project:
+proj/dev/lifepim
+```
+
+The more specific path wins because the query sorts by longest `path_prefix` first.
+
+### Sidebar Filtering
+
+The left sidebar is defined in `src/common/config.py` as `SIDE_TABS`. Each entry has an `id`, for example:
+
+```python
+{ 'id': 'proj/dev/lifepim', 'label': 'LifePIM' }
+```
+
+The layout turns the selected sidebar entry into a URL query parameter:
+
+```text
+/notes?proj=proj/dev/lifepim
+```
+
+For Notes, that `proj` value is used as a folder-scope filter. The Notes list does not primarily filter by `lp_notes.project`; it checks whether the note's `dim_folder.folder_path` matches an enabled `lp_project_folders.path_prefix` for that `project_id`.
+
+Parent sidebar entries such as `fun` expand to the active projects in that group, such as `fun/games` and `fun/food`. Leaf entries filter by each note's single derived project, so a broad placeholder folder on `fun/sport` does not make Sport show every note under the shared `50-Fun` root.
+
+`Unmapped` is special. It shows notes whose folder does not match any enabled project folder prefix.
+
+### Mapping Sources
+
+There are two related mapping layers.
+
+The current Notes list/create flow uses:
+
+- `lp_projects`
+  - Project metadata: `project_id`, `tab`, `group_name`, `project_name`, status, tags.
+- `lp_project_folders`
+  - The project-to-folder rules used by Notes filtering, derived project, and new-note default folders.
+  - These can be adjusted in the Notes UI when a selected sidebar project has an `lp_projects` row. The `Folders` panel can add, remove, enable/disable, and set default folders.
+
+The older folder-mapping ETL uses:
+
+- `map_folder_project`
+  - Raw mapping rules imported from the external CSV configured by `etl_rules_csv`.
+- `map_project_folder`
+  - Rebuilt cache that maps `dim_folder.folder_id` to the best matching raw mapping rule.
+
+The external CSV location is configured in `src/common/config.py`:
+
+```python
+etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv"
+```
+
+That CSV expects at least:
+
+```text
+path_prefix, tab, grp
+```
+
+and can also contain:
+
+```text
+project, tags, confidence, priority, is_primary, is_enabled, notes
+```
+
+Run this after changing the CSV:
+
+```bat
+cd src
+ETL_MAP_FOLDERS.BAT
+```
+
+or rebuild from scratch with:
+
+```bat
+cd src
+..\.venv\Scripts\python.exe init_database.py
+```
+
+`init_database.py` also imports project/folder rows into `lp_projects` and `lp_project_folders` from the configured rules CSV through `common.projects.import_project_mappings_csv()`.
+
+The Admin mapping page can display `map_folder_project`, `map_project_folder`, and `dim_folder`, and can rebuild the old mapping cache. It is not currently an editor for the CSV or for `lp_project_folders`.
+
+### Why the Project Column Can Be Empty
+
+The `Project` column in the Notes table is the stored `lp_notes.project` value. It is not the derived folder mapping. For imported or migrated notes this can be blank by design, because the import path usually leaves explicit project blank and lets folder mapping derive the project.
+
+Editing a note currently edits the markdown body and updates metadata such as size and modified time. It does not provide a project editor. Also, changing only `lp_notes.project` would not change sidebar filtering for Notes, because sidebar filtering is based on `lp_project_folders` and `dim_folder.folder_path`.
+
+### Best Way Forward
+
+Treat folder-derived project as the authoritative project for file-backed Notes.
+
+Recommended fix:
+
+1. Rename the Notes table columns so the UI is explicit:
+   - show derived/effective project as `Project`
+   - keep `lp_notes.project` visible as `Stored Project` because new-note creation populates it and it is useful diagnostic metadata
+2. Add an `effective_project` value in the Notes query:
+   - `COALESCE(NULLIF(t.project, ''), derived_project)` if stored project should act as an override
+   - or just `derived_project` if folder location must remain authoritative
+3. Update note view/edit to select and display `derived_project` consistently. The edit route currently fetches the note through `_get_note_record()`, which does not include the derived project query used by list/view.
+4. Add a project/folder editor, not just a text field:
+   - For changing a note's actual project, move the markdown file to the selected project's default folder, then update `lp_notes.path`, `folder_id`, and optionally `lp_notes.project`.
+   - For changing how a whole folder maps, edit `lp_project_folders` or the external `map_project_folder.csv` rule and rebuild/import mappings.
+5. Backfill existing rows only if the stored column is still useful:
+   - set `lp_notes.project = derived_project` for rows where it is blank
+   - keep this as a maintenance operation, because future folder mapping changes can make the stored value stale.
+
+Do not make the current `Project` cell a simple editable text box as the main fix. That would make the displayed stored value look correct while leaving sidebar filters, derived project, and new-note folder behavior unchanged.
+
+### Notes Path Aliases
+
+New notes can be created in the correct `N:\...` folder and have `lp_notes.project` populated, while still showing no derived project if the note's `folder_id` points at an alias path. One observed example:
+
+```text
+lp_notes.path:       N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health
+lp_notes.project:    pers/health
+dim_folder row:      E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health
+lp_project_folders:  N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health
+derived_project:     None
+```
+
+This happens when folder-id backfill applies `PATH_ALIASES` to Notes and stores the alias path in `dim_folder`, while the project folder rules use the live `N:\...` path. Derived-project matching then compares `E:\...` to `N:\...` and fails.
+
+For Notes, `folder_id` now preserves the same live path stored in `lp_notes.path`, and Notes project filtering/derived-project lookup prefers `lp_notes.path` before falling back to `dim_folder.folder_path`. This lets existing stale rows still match the correct project while future note updates stop rewriting the folder to the alias path.
+
 ## Operational Notes
 
 Do not use `tests/LOAD_TESTING.py` as the normal Notes deployment/import path. It was a bulk test loader and should be phased out of deployment.
