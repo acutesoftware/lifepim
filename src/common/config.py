@@ -14,7 +14,7 @@ import types
 # Folder Locations
 # 
 
-APP_VERSION = "3.1.003"
+APP_VERSION = "3.1.004"
 
 
 #user_folder = r'\\FANGORN\user\duncan\LifePIM_Data'

@@ -220,6 +220,12 @@ body.freeze-headers .content:has(.tabular-scroll) {
   overflow: hidden;
 }
 
+body.freeze-headers .content:has(.search-audio-layout),
+body.freeze-headers .content:has(.search-media-layout) {
+  display: block;
+  overflow: auto;
+}
+
 .tabular-scroll {
   min-width: 0;
 }
@@ -229,6 +235,37 @@ body.freeze-headers .tabular-scroll {
   min-height: 0;
   overflow: auto;
   padding-right: 4px;
+}
+
+body.freeze-headers .search-audio-layout,
+body.freeze-headers .search-media-layout {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+body.freeze-headers .search-audio-layout .audio-list-main,
+body.freeze-headers .search-audio-layout .audio-list-main > form,
+body.freeze-headers .search-media-layout .media-main,
+body.freeze-headers .search-media-layout .media-actions-form {
+  display: block;
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+body.freeze-headers .search-audio-layout .tabular-scroll {
+  height: auto;
+  overflow: visible;
+}
+
+.search-audio-layout .tabular-scroll {
+  height: auto;
+  overflow: visible;
+}
+
+body.freeze-headers .search-media-layout .tabular-scroll {
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
 }
 
 body.freeze-headers .audio-list-layout,
