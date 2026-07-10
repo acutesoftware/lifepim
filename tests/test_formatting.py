@@ -9,14 +9,14 @@ from common.utils import format_duration_friendly, format_duration_label
 
 
 class TestFormatting(unittest.TestCase):
-    def test_format_duration_keeps_raw_value(self):
-        self.assertEqual(format_duration_friendly("3665"), "3665 (1 hour 1 min 5 sec)")
+    def test_format_duration_uses_clock_value(self):
+        self.assertEqual(format_duration_friendly("3665"), "1:01:05")
 
     def test_format_short_duration(self):
-        self.assertEqual(format_duration_friendly("42"), "42 (42 sec)")
+        self.assertEqual(format_duration_friendly("42"), "0:00:42")
 
     def test_format_millisecond_like_large_duration(self):
-        self.assertEqual(format_duration_friendly("6458483"), "6458483 (1 hour 47 min 38 sec)")
+        self.assertEqual(format_duration_friendly("6458483"), "1:47:38")
 
     def test_format_duration_label_omits_raw_value(self):
         self.assertEqual(format_duration_label("289.2277551020408"), "4 min 49 sec")

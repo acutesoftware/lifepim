@@ -10,19 +10,25 @@ def format_date(dt):
     return dt.strftime("%Y-%m-%d %H:%M")
 
 
-def _duration_parts(value):
+def _duration_seconds(value):
     raw = "" if value is None else str(value).strip()
     if not raw:
-        return raw, ""
+        return raw, None
     try:
         seconds = float(raw)
     except (TypeError, ValueError):
-        return raw, ""
+        return raw, None
     if seconds <= 0:
-        return raw, ""
+        return raw, None
     if seconds > 172800:
         seconds = seconds / 1000.0
-    total_seconds = int(round(seconds))
+    return raw, int(round(seconds))
+
+
+def _duration_parts(value):
+    raw, total_seconds = _duration_seconds(value)
+    if total_seconds is None:
+        return raw, ""
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
     secs = total_seconds % 60
@@ -35,11 +41,18 @@ def _duration_parts(value):
     return raw, " ".join(parts)
 
 
-def format_duration_friendly(value):
-    raw, friendly = _duration_parts(value)
-    if not friendly:
+def _duration_clock(value):
+    raw, total_seconds = _duration_seconds(value)
+    if total_seconds is None:
         return raw
-    return f"{raw} ({friendly})"
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    secs = total_seconds % 60
+    return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
+def format_duration_friendly(value):
+    return _duration_clock(value)
 
 
 def format_duration_label(value):

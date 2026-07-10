@@ -23,20 +23,36 @@
         </div>
 
         <div class="tabular-scroll">
+        <audio id="audio-row-player" preload="none"></audio>
         <table border="1" cellpadding="5">
           <tr>
+            <th>Play</th>
+            <th>Beat</th>
             <th></th>
             {% for col in col_list %}
             {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
             <th>
-              <a href="{{ url_for('audio.list_audio_table_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+              <a href="{{ url_for('audio.list_audio_table_route', proj=project, sort=col, dir=next_dir) }}">{{ 'filename' if col == 'file_name' else col.replace('_', ' ') }}</a>
               {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
             </th>
             {% endfor %}
             <th>Actions</th>
           </tr>
           {% for item in items %}
-          <tr>
+          <tr class="audio-track-row">
+            <td>
+              <button
+                type="button"
+                class="audio-row-play"
+                data-audio-url="{{ url_for('audio.audio_file_route', item_id=item.id) }}"
+                data-audio-id="{{ item.id }}"
+              >Play</button>
+            </td>
+            <td class="audio-row-meter-cell">
+              <span class="audio-row-meter" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+              </span>
+            </td>
             <td><input type="checkbox" name="item_id" value="{{ item.id }}"></td>
             {% for col in col_list %}
             <td>
@@ -77,4 +93,70 @@
       </form>
     </aside>
   </div>
+  <script>
+    (function () {
+      const audio = document.getElementById("audio-row-player");
+      const buttons = Array.from(document.querySelectorAll(".audio-row-play"));
+      if (!audio || !buttons.length) {
+        return;
+      }
+      let activeButton = null;
+
+      function resetButtons() {
+        buttons.forEach((button) => {
+          button.textContent = "Play";
+          button.classList.remove("playing");
+          const row = button.closest(".audio-track-row");
+          if (row) {
+            row.classList.remove("playing");
+          }
+        });
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          if (activeButton === button && !audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+            activeButton = null;
+            resetButtons();
+            return;
+          }
+
+          resetButtons();
+          activeButton = button;
+          audio.src = button.dataset.audioUrl;
+          button.textContent = "Stop";
+          button.classList.add("playing");
+          const row = button.closest(".audio-track-row");
+          if (row) {
+            row.classList.add("playing");
+          }
+          const playPromise = audio.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {
+              activeButton = null;
+              resetButtons();
+            });
+          }
+        });
+      });
+
+      audio.addEventListener("ended", () => {
+        activeButton = null;
+        resetButtons();
+      });
+      audio.addEventListener("pause", () => {
+        if (!audio.ended && audio.currentTime > 0) {
+          return;
+        }
+        activeButton = null;
+        resetButtons();
+      });
+      audio.addEventListener("error", () => {
+        activeButton = null;
+        resetButtons();
+      });
+    })();
+  </script>
 {% endblock %}

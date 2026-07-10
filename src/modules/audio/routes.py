@@ -50,6 +50,7 @@ ON lp_audio_playlist_items (audio_id);
 """
 
 DEFAULT_PLAYLIST_NAME = "Recent 50"
+AUDIO_TABLE_COLUMNS = ["artist", "album", "song", "duration", "size", "date_modified", "file_name", "path"]
 
 
 def _ensure_audio_table_schema(conn=None):
@@ -273,7 +274,7 @@ def list_audio_table_route():
         total_pages,
     )
     tbl = _get_tbl()
-    col_list = tbl["col_list"] if tbl else []
+    col_list = [col for col in AUDIO_TABLE_COLUMNS if tbl and col in tbl["col_list"]]
     conn = _ensure_playlist_schema()
     _ensure_default_playlist(conn)
     playlists = _list_playlists(conn)
