@@ -15,6 +15,103 @@
   {% if not query %}
     <p>Enter a search term to see results.</p>
   {% else %}
+    {% if audio_search_items is not none %}
+      <div class="audio-list-layout search-audio-layout">
+        <div class="audio-list-main">
+          <div class="audio-list-nav">
+            <a href="{{ url_for('audio.list_audio_table_route', proj=project) }}">Table</a> |
+            <a href="{{ url_for('audio.list_audio_list_route', proj=project) }}">List</a> |
+            <a href="{{ url_for('audio.import_audio_route', proj=project) }}">Add Audio</a> |
+            <a href="{{ url_for('audio.audio_player_route', proj=project) }}" onclick="window.open(this.href, 'audio_player', 'width=420,height=640,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
+          </div>
+          <form method="post" action="{{ url_for('audio.add_playlist_items_route', proj=project) }}">
+            <div class="audio-list-actions">
+              <span>{{ audio_search_items|length }} audio result{% if audio_search_items|length != 1 %}s{% endif %} for "{{ query }}"</span>
+              <label>
+                Add selected to
+                <select name="playlist_id">
+                  {% for pl in audio_playlists %}
+                  <option value="{{ pl.playlist_id }}" {% if pl.is_default %}selected{% endif %}>{{ pl.name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button type="submit">Add</button>
+            </div>
+
+            <div class="tabular-scroll">
+              <audio id="audio-row-player" preload="none"></audio>
+              <table border="1" cellpadding="5">
+                <tr>
+                  <th>Play</th>
+                  <th>Beat</th>
+                  <th></th>
+                  {% for col in audio_search_col_list %}
+                  {% set next_dir = 'asc' if audio_sort_col != col or audio_sort_dir == 'desc' else 'desc' %}
+                  <th>
+                    <a href="{{ url_for('search_route', q=query, proj=project, route='audio', scope=request.args.get('scope', 'titles'), sort=col, dir=next_dir) }}">{{ 'filename' if col == 'file_name' else col.replace('_', ' ') }}</a>
+                    {% if audio_sort_col == col %} {{ '^' if audio_sort_dir == 'asc' else 'v' }}{% endif %}
+                  </th>
+                  {% endfor %}
+                  <th>Actions</th>
+                </tr>
+                {% for item in audio_search_items %}
+                <tr class="audio-track-row">
+                  <td>
+                    <button
+                      type="button"
+                      class="audio-row-play"
+                      data-audio-url="{{ url_for('audio.audio_file_route', item_id=item.id) }}"
+                      data-audio-id="{{ item.id }}"
+                    >Play</button>
+                  </td>
+                  <td class="audio-row-meter-cell">
+                    <span class="audio-row-meter" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span><span></span>
+                    </span>
+                  </td>
+                  <td><input type="checkbox" name="item_id" value="{{ item.id }}"></td>
+                  {% for col in audio_search_col_list %}
+                  <td>
+                    {% if col == 'file_name' %}
+                    <a href="{{ url_for('audio.view_audio_route', item_id=item.id, proj=project) }}">{{ item[col] }}</a>
+                    {% elif col == 'duration' %}
+                    {{ item[col]|duration_friendly }}
+                    {% else %}
+                    {{ item[col] }}
+                    {% endif %}
+                  </td>
+                  {% endfor %}
+                  <td>
+                    <a href="{{ url_for('audio.edit_audio_route', item_id=item.id, proj=project) }}">Edit</a> |
+                    <a href="{{ url_for('audio.delete_audio_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </table>
+            </div>
+          </form>
+        </div>
+
+        <aside class="audio-playlists-panel">
+          <div class="audio-playlists-header">Playlists</div>
+          <ul class="audio-playlists-list">
+            {% for pl in audio_playlists %}
+            <li class="audio-playlists-item">
+              <a href="{{ url_for('audio.view_playlist_route', playlist_id=pl.playlist_id, proj=project) }}">{{ pl.name }}</a>
+              <span class="audio-playlists-count">{{ pl.track_count }} tracks</span>
+            </li>
+            {% endfor %}
+          </ul>
+          <form class="audio-playlists-create" method="post" action="{{ url_for('audio.create_playlist_route', proj=project) }}">
+            <input type="text" name="playlist_name" placeholder="New playlist">
+            <button type="submit">Create</button>
+          </form>
+        </aside>
+      </div>
+      {% set results_primary = [] %}
+      {% set results_secondary = audio_other_results %}
+    {% endif %}
+
     {% if results_primary %}
       <h4>Matches in current context</h4>
       {% set audio_primary = results_primary|selectattr('route', 'equalto', 'audio')|list %}
@@ -181,6 +278,75 @@
 
     {% if query and not results_primary and not results_secondary %}
       <p>No matches found.</p>
+    {% endif %}
+
+    {% if audio_search_items is not none %}
+      <script>
+        (function () {
+          const audio = document.getElementById("audio-row-player");
+          const buttons = Array.from(document.querySelectorAll(".audio-row-play"));
+          if (!audio || !buttons.length) {
+            return;
+          }
+          let activeButton = null;
+
+          function resetButtons() {
+            buttons.forEach((button) => {
+              button.textContent = "Play";
+              button.classList.remove("playing");
+              const row = button.closest(".audio-track-row");
+              if (row) {
+                row.classList.remove("playing");
+              }
+            });
+          }
+
+          buttons.forEach((button) => {
+            button.addEventListener("click", () => {
+              if (activeButton === button && !audio.paused) {
+                audio.pause();
+                audio.currentTime = 0;
+                activeButton = null;
+                resetButtons();
+                return;
+              }
+
+              resetButtons();
+              activeButton = button;
+              audio.src = button.dataset.audioUrl;
+              button.textContent = "Stop";
+              button.classList.add("playing");
+              const row = button.closest(".audio-track-row");
+              if (row) {
+                row.classList.add("playing");
+              }
+              const playPromise = audio.play();
+              if (playPromise && typeof playPromise.catch === "function") {
+                playPromise.catch(() => {
+                  activeButton = null;
+                  resetButtons();
+                });
+              }
+            });
+          });
+
+          audio.addEventListener("ended", () => {
+            activeButton = null;
+            resetButtons();
+          });
+          audio.addEventListener("pause", () => {
+            if (!audio.ended && audio.currentTime > 0) {
+              return;
+            }
+            activeButton = null;
+            resetButtons();
+          });
+          audio.addEventListener("error", () => {
+            activeButton = null;
+            resetButtons();
+          });
+        })();
+      </script>
     {% endif %}
   {% endif %}
 {% endblock %}

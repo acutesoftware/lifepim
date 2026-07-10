@@ -241,6 +241,25 @@ def _fetch_audio(project=None, sort_col=None, sort_dir=None, limit=None, offset=
     return [dict(row) for row in rows]
 
 
+def _audio_item_matches_terms(item, terms):
+    if not terms:
+        return True
+    search_cols = ["file_name", "path", "artist", "album", "song"]
+    values = ["{}".format(item.get(col) or "").lower() for col in search_cols]
+    return all(any(term in value for value in values) for term in terms)
+
+
+def _fetch_audio_search(project=None, query=None, sort_col=None, sort_dir=None, limit=None, offset=None):
+    terms = [term.lower() for term in (query or "").strip().split() if term]
+    items = _fetch_audio(project, sort_col, sort_dir, limit=None, offset=None)
+    filtered = [item for item in items if _audio_item_matches_terms(item, terms)]
+    if offset:
+        filtered = filtered[int(offset):]
+    if limit is not None:
+        filtered = filtered[: int(limit)]
+    return filtered
+
+
 def _sort_items(items, sort_col, sort_dir):
     reverse = sort_dir == "desc"
     return sorted(items, key=lambda i: (i.get(sort_col) or ""), reverse=reverse)

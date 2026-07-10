@@ -281,6 +281,8 @@ def search_route():
     route = request.args.get("route") or "home"
     scope = (request.args.get("scope") or "titles").strip().lower()
     include_note_content = scope == "all"
+    sort_col = request.args.get("sort") or "file_name"
+    sort_dir = request.args.get("dir") or "asc"
     tab_ids = {t.get("id") for t in get_tabs()}
     active_tab = route if route in tab_ids else "home"
     results = search_mod.search_all(
@@ -295,14 +297,35 @@ def search_route():
             params["proj"] = project
         item["url"] = url_for(item["view_route"], **params)
     audio_playlists = []
+    audio_search_items = None
+    audio_search_col_list = []
+    audio_other_results = []
     has_audio = any(item.get("route") == "audio" for item in results["primary"] + results["secondary"])
-    if has_audio:
+    if has_audio or route == "audio":
         from modules.audio import routes as audio_routes
 
         conn = audio_routes._ensure_playlist_schema()
         audio_routes._ensure_default_playlist(conn)
         audio_playlists = audio_routes._list_playlists(conn)
+        if route == "audio" and query:
+            audio_search_items = audio_routes._fetch_audio_search(
+                project,
+                query,
+                sort_col=sort_col,
+                sort_dir=sort_dir,
+            )
+            tbl = audio_routes._get_tbl()
+            audio_search_col_list = [
+                col for col in audio_routes.AUDIO_TABLE_COLUMNS if tbl and col in tbl["col_list"]
+            ]
+            audio_other_results = [
+                item
+                for item in results["primary"] + results["secondary"]
+                if item.get("route") != "audio"
+            ]
     total_results = len(results["primary"]) + len(results["secondary"])
+    if audio_search_items is not None:
+        total_results = len(audio_search_items) + len(audio_other_results)
     search_all_areas_url = ""
     if query and route in tab_ids and route != "home":
         all_areas_args = {"q": query, "route": "home", "scope": scope}
@@ -324,6 +347,11 @@ def search_route():
         results_primary=results["primary"],
         results_secondary=results["secondary"],
         audio_playlists=audio_playlists,
+        audio_search_items=audio_search_items,
+        audio_search_col_list=audio_search_col_list,
+        audio_other_results=audio_other_results,
+        audio_sort_col=sort_col,
+        audio_sort_dir=sort_dir,
     )
 
 
