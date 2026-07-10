@@ -300,6 +300,17 @@ def search_route():
     audio_search_items = None
     audio_search_col_list = []
     audio_other_results = []
+    media_search = None
+    media_other_results = []
+    if route == "media" and query:
+        from modules.media import routes as media_routes
+
+        media_search = media_routes.build_media_search_context(query, request.args)
+        media_other_results = [
+            item
+            for item in results["primary"] + results["secondary"]
+            if item.get("route") != "media"
+        ]
     has_audio = any(item.get("route") == "audio" for item in results["primary"] + results["secondary"])
     if has_audio or route == "audio":
         from modules.audio import routes as audio_routes
@@ -326,6 +337,8 @@ def search_route():
     total_results = len(results["primary"]) + len(results["secondary"])
     if audio_search_items is not None:
         total_results = len(audio_search_items) + len(audio_other_results)
+    if media_search is not None:
+        total_results = media_search["total"] + len(media_other_results)
     search_all_areas_url = ""
     if query and route in tab_ids and route != "home":
         all_areas_args = {"q": query, "route": "home", "scope": scope}
@@ -352,6 +365,8 @@ def search_route():
         audio_other_results=audio_other_results,
         audio_sort_col=sort_col,
         audio_sort_dir=sort_dir,
+        media_search=media_search,
+        media_other_results=media_other_results,
     )
 
 

@@ -39,6 +39,12 @@
       <input type="text" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search">
       <input type="hidden" name="proj" value="{{ current_proj or '' }}">
       <input type="hidden" name="route" value="{{ active_tab }}">
+      {% if active_tab == 'media' %}
+        {% for key in ['view', 'view_mode', 'sort', 'group', 'media_type', 'folder', 'year', 'album_id', 'event_id', 'smart_view_id'] %}
+          {% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}
+        {% endfor %}
+        {% if request.args.get('search_everywhere') %}<input type="hidden" name="search_everywhere" value="{{ request.args.get('search_everywhere') }}">{% endif %}
+      {% endif %}
       <button type="submit">Search</button>
       <select name="scope" title="Search scope">
         <option value="titles" {% if search_scope != 'all' %}selected{% endif %}>Titles</option>

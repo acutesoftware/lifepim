@@ -326,6 +326,57 @@ def _fetch_media_by_id(conn, media_id):
     return items[0] if items else None
 
 
+def build_media_search_context(query, args=None):
+    _ensure_schema()
+    args = args or {}
+    conn = db._get_conn()
+    view_mode = _normalize_view_mode(args.get("view_mode"))
+    sort_key = _normalize_sort(args.get("sort"))
+    group_by = _normalize_group(args.get("group"))
+    media_type = (args.get("media_type") or "").strip().lower()
+    terms = parse_search_terms(query)
+    joins, where, params = _build_media_filters(
+        "all",
+        None,
+        None,
+        True,
+        media_type,
+        [],
+        terms,
+        None,
+        None,
+    )
+    total = _count_media(conn, joins, where, list(params))
+    items = _fetch_media(conn, joins, where, list(params), sort_key)
+    albums = _list_albums(conn)
+    focus_item = items[0] if items else None
+    if focus_item:
+        focus_item["folder_path"] = _build_media_folder_path(focus_item)
+    base_args = {
+        "view": "all",
+        "view_mode": view_mode,
+        "sort": sort_key,
+        "group": group_by,
+        "media_type": media_type or None,
+        "q": query or None,
+        "search_everywhere": "1",
+    }
+    base_args_clean = {k: v for k, v in base_args.items() if v not in (None, "", False)}
+    focus_query = _query_string(base_args_clean)
+    return {
+        "items": items,
+        "view_mode": view_mode,
+        "sort_key": sort_key,
+        "group_by": group_by,
+        "media_type": media_type,
+        "total": total,
+        "focus_item": focus_item,
+        "focus_query": focus_query,
+        "base_args": base_args_clean,
+        "albums": albums,
+    }
+
+
 def _count_media(conn, joins, where, params):
     sql = (
         "SELECT COUNT(1) AS cnt FROM lp_media m "

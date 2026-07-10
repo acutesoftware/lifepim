@@ -15,6 +15,144 @@
   {% if not query %}
     <p>Enter a search term to see results.</p>
   {% else %}
+    {% if media_search is not none %}
+      <div class="media-explorer search-media-layout">
+        <div class="media-toolbar">
+          <form class="media-toolbar-form" method="get" action="{{ url_for('search_route') }}">
+            <input type="hidden" name="route" value="media">
+            <input type="hidden" name="scope" value="{{ request.args.get('scope', 'titles') }}">
+            <input type="text" name="q" value="{{ query }}" placeholder="Search media">
+            <select name="media_type" title="Media type">
+              <option value="">All types</option>
+              <option value="image" {% if media_search.media_type == 'image' %}selected{% endif %}>Images</option>
+              <option value="video" {% if media_search.media_type == 'video' %}selected{% endif %}>Videos</option>
+            </select>
+            <select name="view_mode" title="View mode">
+              <option value="filmstrip" {% if media_search.view_mode == 'filmstrip' %}selected{% endif %}>Filmstrip</option>
+              <option value="grid" {% if media_search.view_mode == 'grid' %}selected{% endif %}>Grid</option>
+              <option value="table" {% if media_search.view_mode == 'table' %}selected{% endif %}>Table</option>
+            </select>
+            <select name="sort" title="Sort">
+              <option value="taken_desc" {% if media_search.sort_key == 'taken_desc' %}selected{% endif %}>Taken desc</option>
+              <option value="mtime_desc" {% if media_search.sort_key == 'mtime_desc' %}selected{% endif %}>Modified desc</option>
+              <option value="filename" {% if media_search.sort_key == 'filename' %}selected{% endif %}>Filename</option>
+            </select>
+            <span class="media-search-summary">{{ media_search.total }} media result{% if media_search.total != 1 %}s{% endif %} for "{{ query }}"</span>
+            <button type="submit">Apply</button>
+          </form>
+        </div>
+
+        <section class="media-main search-media-main">
+          <form class="media-actions-form" method="post" action="{{ url_for('media.media_actions_route') }}">
+            {% for key, value in media_search["base_args"].items() %}
+              <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+            <div class="media-actions-bar">
+              <label class="media-inline">
+                <input type="checkbox" class="media-select-all">
+                Select all
+              </label>
+              <span class="media-selected-count" data-empty="No selection">0 selected</span>
+              <select name="action" class="media-action-select">
+                <option value="">Actions</option>
+                <option value="add_to_album">Add to album</option>
+                <option value="tag">Tag</option>
+                <option value="copy_paths">Copy paths</option>
+              </select>
+              <select name="album_id" class="media-action-album">
+                <option value="">Choose album</option>
+                {% for alb in media_search.albums %}
+                  <option value="{{ alb.album_id }}">{{ alb.title }}</option>
+                {% endfor %}
+              </select>
+              <input type="text" name="tags" class="media-action-tags" placeholder="Tags">
+              <button type="submit" class="media-action-btn" disabled>Apply</button>
+            </div>
+
+            <div class="tabular-scroll">
+              {% if media_search["items"] %}
+                {% if media_search.view_mode == 'table' %}
+                  <table class="media-table">
+                    <thead>
+                      <tr>
+                        <th></th>
+                        <th>Filename</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Ext</th>
+                        <th>Size</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in media_search["items"] %}
+                      <tr class="media-table-row">
+                        <td><input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}"></td>
+                        <td>
+                          <a href="{{ url_for('media.media_explorer_route', view='all', view_mode=media_search.view_mode, sort=media_search.sort_key, media_type=media_search.media_type, q=query, search_everywhere='1', focus_id=item.media_id) }}">
+                            {{ item.filename }}
+                          </a>
+                        </td>
+                        <td>{{ item.media_type }}</td>
+                        <td>{{ item.taken_utc or item.mtime_utc }}</td>
+                        <td>{{ item.ext }}</td>
+                        <td>{{ item.size_bytes }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                {% elif media_search.view_mode == 'grid' %}
+                  <div class="media-grid">
+                    {% for item in media_search["items"] %}
+                    <div class="media-card">
+                      <label class="media-select">
+                        <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
+                      </label>
+                      <a class="media-thumb" href="{{ url_for('media.media_explorer_route', view='all', view_mode=media_search.view_mode, sort=media_search.sort_key, media_type=media_search.media_type, q=query, search_everywhere='1', focus_id=item.media_id) }}">
+                        {% if item.media_type == 'video' %}
+                          <span class="media-video-thumb" aria-label="Video">{{ item.ext|upper or 'VIDEO' }}</span>
+                        {% else %}
+                          <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
+                        {% endif %}
+                      </a>
+                      <div class="media-card-title">{{ item.filename }}</div>
+                      <div class="media-card-sub">{{ item.taken_utc or item.mtime_utc }}</div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <ul class="media-filmstrip">
+                    {% for item in media_search["items"] %}
+                    <li class="media-row">
+                      <label class="media-select">
+                        <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
+                      </label>
+                      <a class="media-thumb" href="{{ url_for('media.media_explorer_route', view='all', view_mode=media_search.view_mode, sort=media_search.sort_key, media_type=media_search.media_type, q=query, search_everywhere='1', focus_id=item.media_id) }}">
+                        {% if item.media_type == 'video' %}
+                          <span class="media-video-thumb" aria-label="Video">{{ item.ext|upper or 'VIDEO' }}</span>
+                        {% else %}
+                          <img src="{{ url_for('media.media_file_route', media_id=item.media_id) }}" alt="{{ item.filename }}" loading="lazy">
+                        {% endif %}
+                      </a>
+                      <div class="media-meta">
+                        <div class="media-title">{{ item.filename }}</div>
+                        <div class="media-sub">{{ item.taken_utc or item.mtime_utc }}</div>
+                        <div class="media-sub">{{ item.media_type }} - {{ item.ext }} - {{ item.size_bytes }}</div>
+                      </div>
+                    </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              {% else %}
+                <div class="media-empty">No media found.</div>
+              {% endif %}
+            </div>
+          </form>
+        </section>
+      </div>
+      {% set results_primary = [] %}
+      {% set results_secondary = media_other_results %}
+    {% endif %}
+
     {% if audio_search_items is not none %}
       <div class="audio-list-layout search-audio-layout">
         <div class="audio-list-main">
@@ -347,6 +485,9 @@
           });
         })();
       </script>
+    {% endif %}
+    {% if media_search is not none %}
+      <script src="{{ url_for('static', filename='media_explorer.js') }}"></script>
     {% endif %}
   {% endif %}
 {% endblock %}
