@@ -4,6 +4,7 @@
 from datetime import date, timedelta
 import os
 import random
+import sqlite3
 import string
 import sys
 import unittest
@@ -12,6 +13,7 @@ root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.se
 if root_folder not in sys.path:
     sys.path.append(root_folder)
 
+from common import config as cfg
 from common import data, utils
 from modules.contacts import dao as contacts_dao
 
@@ -53,7 +55,41 @@ def _fetch_ids(tbl, ids):
     return [dict(row) for row in rows]
 
 
+def _create_table(conn, tbl):
+    col_defs = []
+    for col in tbl["col_list"]:
+        col_type = "TEXT"
+        if "date" in col.lower():
+            col_type = "TEXT"
+        col_defs.append(f"{col} {col_type}")
+    col_defs.extend(["user_name TEXT", "rec_extract_date TEXT"])
+    conn.execute(
+        f"CREATE TABLE IF NOT EXISTS {tbl['name']} ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        f"{', '.join(col_defs)})"
+    )
+
+
+def _run_sql_script(conn, script_name):
+    script_path = os.path.join(root_folder, script_name)
+    with open(script_path, "r", encoding="utf-8") as handle:
+        conn.executescript(handle.read())
+
+
 class TestAddData(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:")
+        self.conn.row_factory = sqlite3.Row
+        self._old_conn = data.conn
+        data.conn = self.conn
+        for tbl in cfg.table_def:
+            _create_table(self.conn, tbl)
+        _run_sql_script(self.conn, "schema_contacts.sql")
+        _run_sql_script(self.conn, "schema_money.sql")
+
+    def tearDown(self):
+        data.conn = self._old_conn
+        self.conn.close()
 
     def test_01_notes(self):
         tbl = utils.get_table_def("notes")

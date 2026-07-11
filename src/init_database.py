@@ -12,7 +12,7 @@ from lifepim.importer.schema import ensure_import_schema
 from modules.calendar.services.calendar_index import run_calendar_migration
 def main():
     reset_database(cfg.DB_FILE)
-    _run_load_testing()
+    _run_load_testing_if_enabled()
     _run_folder_mapping()
     _run_projects_import()
     print(f"Initialized database at {cfg.DB_FILE}")
@@ -88,6 +88,13 @@ def _run_load_testing():
         return
     print("Running load testing script...")
     subprocess.check_call([sys.executable, script_path])
+
+
+def _run_load_testing_if_enabled():
+    if os.getenv("LIFEPIM_LOAD_SAMPLE_DATA", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        print("Skipping sample/load-test data. Set LIFEPIM_LOAD_SAMPLE_DATA=1 to enable it.")
+        return
+    _run_load_testing()
 
 
 def _run_folder_mapping():
