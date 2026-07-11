@@ -1678,6 +1678,35 @@ button.calendar-nav {
   max-width: 480px;
 }
 
+.calendar-summary-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.calendar-summary-panel {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px;
+}
+
+.calendar-summary-panel h4 {
+  margin: 0 0 6px;
+}
+
+.calendar-summary-panel h4:not(:first-child) {
+  margin-top: 12px;
+}
+
+.calendar-summary-panel .tabular-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .settings-message {
   margin-bottom: 8px;
   padding: 4px 6px;

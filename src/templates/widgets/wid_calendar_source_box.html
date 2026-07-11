@@ -2,12 +2,12 @@
   {% for field in source_hidden_fields %}
     <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
   {% endfor %}
-  <span class="calendar-source-caption">View:</span>
-  <input type="hidden" name="show_events" value="0">
-  <label><input type="checkbox" name="show_events" value="1" {% if day_sources.events %}checked{% endif %}> Events</label>
-  <input type="hidden" name="show_files" value="0">
-  <label><input type="checkbox" name="show_files" value="1" {% if day_sources.files %}checked{% endif %}> Files</label>
-  <input type="hidden" name="show_usage" value="0">
-  <label><input type="checkbox" name="show_usage" value="1" {% if day_sources.usage %}checked{% endif %}> Usage</label>
+  <span class="calendar-source-caption">Calendars / Sources:</span>
+  {% for source in day_sources.rows %}
+    <label>
+      <input type="checkbox" name="source" value="{{ source.source_key }}" {% if source.source_key in day_sources.selected %}checked{% endif %}>
+      {{ source.source_name }}
+    </label>
+  {% endfor %}
   <button type="submit">Apply</button>
 </form>

@@ -9,6 +9,7 @@ from common import projects as projects_mod
 from common.media_schema import ensure_media_schema
 from common.settings import ensure_settings_schema
 from lifepim.importer.schema import ensure_import_schema
+from modules.calendar.services.calendar_index import run_calendar_migration
 def main():
     reset_database(cfg.DB_FILE)
     _run_load_testing()
@@ -41,6 +42,7 @@ def reset_database(db_file):
     ensure_media_schema(db_conn)
     ensure_import_schema(db_conn)
     ensure_settings_schema(db_conn)
+    run_calendar_migration(db_conn)
     db_conn.commit()
     db_conn.close()
 

@@ -6,7 +6,9 @@
       <a href="{{ url_for('calendar.week_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
       <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
       <a href="{{ url_for('calendar.year_view_route', year=view_date.year, proj=project) }}">Yearly</a> |
-      <a href="{{ url_for('calendar.list_view_route', proj=project) }}">List</a>
+      <a href="{{ url_for('calendar.list_view_route', proj=project) }}">Agenda</a> |
+      <a href="{{ url_for('calendar.event_list_route', proj=project) }}">List</a> |
+      <a href="{{ url_for('calendar.summary_view_route', proj=project) }}">Summary</a>
     </div>
     <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Back</a>
     <a class="calendar-add-main" href="{{ url_for('calendar.edit_event_route', event_id=event.id, proj=project) }}">Edit</a>

@@ -6,13 +6,27 @@
     <a href="{{ url_for('calendar.week_view_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
     <a href="{{ url_for('calendar.day_view_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
     <a href="{{ url_for('calendar.year_view_route', year=now.year, proj=project) }}">Yearly</a> |
-    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">List</a>
+    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">Agenda</a> |
+    <a href="{{ url_for('calendar.event_list_route', proj=project) }}">List</a> |
+    <a href="{{ url_for('calendar.summary_view_route', proj=project) }}">Summary</a>
   </div>
   <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Today</a>
   {% include "widgets/wid_calendar_jump.html" %}
   <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Add Event</a>
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', proj=project) }}">Import Events</a>
 </div>
+
+<form method="get" action="{{ url_for('calendar.list_view_route') }}" class="calendar-source-box">
+  <input type="hidden" name="proj" value="{{ project or '' }}">
+  <label>From <input type="date" name="from" value="{{ request.args.get('from', '') }}"></label>
+  <label>To <input type="date" name="to" value="{{ request.args.get('to', '') }}"></label>
+  <label>Source <input type="text" name="source" value="{{ request.args.get('source', '') }}"></label>
+  <label>Type <input type="text" name="event_type" value="{{ request.args.get('event_type', '') }}"></label>
+  <label>Status <input type="text" name="status" value="{{ request.args.get('status', '') }}"></label>
+  <label>Search <input type="search" name="q" value="{{ request.args.get('q', '') }}"></label>
+  <label><input type="checkbox" name="recurring" value="1" {% if request.args.get('recurring') == '1' %}checked{% endif %}> Recurring</label>
+  <button type="submit">Filter</button>
+</form>
 
 {% set link_list_type = "event" %}
 {% set link_list_context_id = "calendar_list" %}
@@ -59,9 +73,11 @@
       {% endfor %}
     </td>
     <td>
+      {% if ev.can_edit is not defined or ev.can_edit %}
       <a href="{{ url_for('calendar.view_event_route', event_id=ev.id, proj=project) }}">View</a> |
       <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id, proj=project) }}">Edit</a> |
-      <a href="{{ url_for('calendar.delete_event_route', event_id=ev.id, proj=project) }}" onclick="return confirm('Delete event?');">Del</a>
+      <form method="post" action="{{ url_for('calendar.delete_event_route', event_id=ev.id, proj=project) }}" style="display:inline;" onsubmit="return confirm('Delete event?');"><button type="submit">Del</button></form>
+      {% endif %}
     </td>
   </tr>
   {% endfor %}

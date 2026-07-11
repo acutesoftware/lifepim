@@ -26,8 +26,9 @@
     <section class="settings-panel">
       {% if active_settings_tab == 'calendar' %}
         <h4>Calendar</h4>
-        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form settings-form-wide">
           <input type="hidden" name="tab" value="calendar">
+          <input type="hidden" name="action" value="save_calendar_sources">
           <div class="settings-fieldset">
             <div class="settings-fieldset-title">Default View Sources</div>
             <label>
@@ -44,7 +45,42 @@
             </label>
           </div>
           <div class="settings-fieldset">
-            <div class="settings-fieldset-title">Media Thumbnails</div>
+            <div class="settings-fieldset-title">Calendar Sources</div>
+            <div class="tabular-scroll">
+              <table class="settings-table">
+                <tr>
+                  <th>Source</th>
+                  <th>Enabled</th>
+                  <th>Default</th>
+                  <th>Colour</th>
+                  <th>Icon</th>
+                  <th>Priority</th>
+                  <th>Past</th>
+                  <th>Future</th>
+                  <th>Last Refresh</th>
+                  <th>Rows</th>
+                  <th>Status</th>
+                </tr>
+                {% for source in calendar_sources %}
+                <tr>
+                  <td>{{ source.source_name }}<br><small>{{ source.source_key }}</small></td>
+                  <td><input type="checkbox" name="enabled_{{ source.source_key }}" value="1" {% if source.enabled %}checked{% endif %}></td>
+                  <td><input type="checkbox" name="visible_{{ source.source_key }}" value="1" {% if source.visible_by_default %}checked{% endif %}></td>
+                  <td><input type="text" name="color_{{ source.source_key }}" value="{{ source.default_color or '' }}"></td>
+                  <td><input type="text" name="icon_{{ source.source_key }}" value="{{ source.default_icon or '' }}"></td>
+                  <td><input type="number" name="priority_{{ source.source_key }}" value="{{ source.default_priority }}"></td>
+                  <td><input type="number" name="past_{{ source.source_key }}" value="{{ source.horizon_past_days if source.horizon_past_days is not none else '' }}"></td>
+                  <td><input type="number" name="future_{{ source.source_key }}" value="{{ source.horizon_future_days if source.horizon_future_days is not none else '' }}"></td>
+                  <td>{{ source.last_refresh_at or 'Never' }}</td>
+                  <td>{{ source.last_refresh_count }}</td>
+                  <td>{{ source.last_refresh_status or '' }}</td>
+                </tr>
+                {% endfor %}
+              </table>
+            </div>
+          </div>
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Calendar Media Thumbnails</div>
             <label>
               Thumbnail size
               <select name="thumbnail_size">
@@ -63,10 +99,20 @@
         <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
           <input type="hidden" name="tab" value="calendar">
           <div class="settings-fieldset">
-            <div class="settings-fieldset-title">Events</div>
-            <p class="settings-empty">Rebuild calendar media events from imported images and videos.</p>
+            <div class="settings-fieldset-title">Rebuild</div>
+            <label>
+              Source
+              <select name="source_key">
+                {% for source in calendar_sources %}
+                <option value="{{ source.source_key }}">{{ source.source_name }}</option>
+                {% endfor %}
+              </select>
+            </label>
           </div>
-          <button type="submit" name="action" value="rebuild_media_events">Rebuild from media</button>
+          <button type="submit" name="action" value="rebuild_calendar_source">Rebuild source</button>
+          <button type="submit" name="action" value="rebuild_calendar_all">Rebuild all enabled</button>
+          <button type="submit" name="action" value="rebuild_calendar_item_days">Rebuild item days</button>
+          <button type="submit" name="action" value="rebuild_calendar_stats">Rebuild daily stats</button>
         </form>
       {% elif active_settings_tab == 'media' %}
         <h4>Media</h4>
@@ -87,6 +133,13 @@
               <button type="submit" name="action" value="save_media_filters">Save filters</button>
               <button type="submit" name="action" value="migrate_images">Migrate images/videos from filelist</button>
               <button type="submit" name="action" value="migrate_audio">Migrate audio from filelist</button>
+            </form>
+          </div>
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Media Events</div>
+            <form method="post" action="{{ url_for('admin.settings_route') }}">
+              <input type="hidden" name="tab" value="media">
+              <button type="submit" name="action" value="rebuild_media_events">Rebuild media events</button>
             </form>
           </div>
         </div>

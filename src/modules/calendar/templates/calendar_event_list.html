@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<div class="calendar-controls">
+  <div class="calendar-views">
+    <a href="{{ url_for('calendar.month_view_route', year=now.year, month=now.month, proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">Monthly</a> |
+    <a href="{{ url_for('calendar.week_view_route', date=now.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">Weekly</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=now.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">Daily</a> |
+    <a href="{{ url_for('calendar.year_view_route', year=now.year, proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">Yearly</a> |
+    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">Agenda</a> |
+    <a href="{{ url_for('calendar.event_list_route', proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">List</a> |
+    <a href="{{ url_for('calendar.summary_view_route', proj=project) }}">Summary</a>
+  </div>
+  <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=now.strftime('%Y-%m-%d'), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">Today</a>
+  {% include "widgets/wid_calendar_jump.html" %}
+  <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=now.strftime('%Y-%m-%d'), proj=project) }}">Add Event</a>
+  {% include "widgets/wid_calendar_source_box.html" %}
+</div>
+
+<form method="get" action="{{ url_for('calendar.event_list_route') }}" class="calendar-source-box">
+  <input type="hidden" name="proj" value="{{ project or '' }}">
+  <input type="hidden" name="show_events" value="{{ day_source_params.show_events }}">
+  <input type="hidden" name="show_files" value="{{ day_source_params.show_files }}">
+  <input type="hidden" name="show_usage" value="{{ day_source_params.show_usage }}">
+  <input type="hidden" name="sources" value="{{ day_source_params.sources }}">
+  <label>From <input type="date" name="from" value="{{ from_date.strftime('%Y-%m-%d') }}"></label>
+  <label>To <input type="date" name="to" value="{{ to_date.strftime('%Y-%m-%d') }}"></label>
+  <label>Type <input type="text" name="event_type" value="{{ request.args.get('event_type', '') }}"></label>
+  <label>Status <input type="text" name="status" value="{{ request.args.get('status', '') }}"></label>
+  <label>Search <input type="search" name="q" value="{{ request.args.get('q', '') }}"></label>
+  <label><input type="checkbox" name="recurring" value="1" {% if request.args.get('recurring') == '1' %}checked{% endif %}> Recurring</label>
+  <button type="submit">Filter</button>
+</form>
+
+<div class="tabular-scroll">
+<table class="settings-table">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Time</th>
+      <th>Title</th>
+      <th>Project</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ev in events %}
+    <tr>
+      <td>{{ ev.date }}</td>
+      <td>{{ ev.time }}</td>
+      <td>{{ ev.title }}</td>
+      <td>{{ ev.project }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% include "widgets/wid_pagination.html" %}
+</div>
+{% endblock %}

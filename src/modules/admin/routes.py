@@ -8,6 +8,7 @@ from common import config as cfg
 from common import media_migration
 from common import settings as settings_mod
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr
+from modules.calendar.services import calendar_index
 
 
 admin_bp = Blueprint(
@@ -137,19 +138,35 @@ def settings_route():
     conn = db.conn if db.conn is not None else None
     conn = db._get_conn() if conn is None else conn
     settings_mod.ensure_settings_schema(conn)
+    calendar_index.ensure_calendar_schema(conn)
 
     if request.method == "POST":
         if active_settings_tab == "calendar":
             action = request.form.get("action", "")
-            if action == "rebuild_media_events":
-                try:
-                    from modules.media import routes as media_routes
-
-                    media_routes._ensure_schema()
-                    created = media_routes._rebuild_events(conn, gap_hours=2.0, split_on_day=True)
-                    message = f"Rebuilt {created} media events."
-                except Exception as exc:
-                    message = f"Media event rebuild failed: {exc}"
+            if action == "save_calendar_sources":
+                calendar_index.save_calendar_sources(request.form, conn)
+                sources = {
+                    "events": request.form.get("show_events") == "1",
+                    "files": request.form.get("show_files") == "1",
+                    "usage": request.form.get("show_usage") == "1",
+                    "thumbnail_size": request.form.get("thumbnail_size"),
+                    "thumbnail_limit": request.form.get("thumbnail_limit"),
+                }
+                settings_mod.save_calendar_view_settings(sources, conn)
+                message = "Calendar source settings saved."
+            elif action == "rebuild_calendar_source":
+                source_key = request.form.get("source_key", "")
+                result = calendar_index.refresh_calendar_source(source_key, conn=conn, full_rebuild=True)
+                message = f"Rebuilt {source_key}: {result.status}, {result.rows_inserted} rows."
+            elif action == "rebuild_calendar_all":
+                results = calendar_index.refresh_all_calendar_sources(enabled_only=True, conn=conn)
+                message = f"Rebuilt {len(results)} enabled calendar sources."
+            elif action == "rebuild_calendar_item_days":
+                calendar_index.rebuild_calendar_item_days(conn=conn)
+                message = "Rebuilt calendar item-day index."
+            elif action == "rebuild_calendar_stats":
+                count = calendar_index.rebuild_calendar_day_stats(conn=conn)
+                message = f"Rebuilt calendar daily stats: {count} rows."
             else:
                 sources = {
                     "events": request.form.get("show_events") == "1",
@@ -217,40 +234,52 @@ def settings_route():
                 message = f"Config settings saved ({saved_count} updated, {reset_count} reset)."
         elif active_settings_tab == "media":
             action = request.form.get("action", "")
+            if action == "rebuild_media_events":
+                try:
+                    from modules.media import routes as media_routes
+
+                    media_routes._ensure_schema()
+                    created = media_routes._rebuild_events(conn, gap_hours=2.0, split_on_day=True)
+                    message = f"Rebuilt {created} media events."
+                except Exception as exc:
+                    message = f"Media event rebuild failed: {exc}"
+                action = ""
             try:
-                image_where = request.form.get("image_where", "")
-                audio_where = request.form.get("audio_where", "")
-                settings_mod.set_setting(
-                    cfg.CONFIG_SETTING_PREFIX + "FILELIST_IMAGE_WHERE",
-                    cfg.serialize_config_value(image_where),
-                    "Config",
-                    "FILELIST_IMAGE_WHERE",
-                    conn,
-                )
-                settings_mod.set_setting(
-                    cfg.CONFIG_SETTING_PREFIX + "FILELIST_AUDIO_WHERE",
-                    cfg.serialize_config_value(audio_where),
-                    "Config",
-                    "FILELIST_AUDIO_WHERE",
-                    conn,
-                )
-                cfg.refresh_config_overrides()
-                if action == "migrate_images":
-                    result = media_migration.migrate_images_from_filelist(where_clause=image_where, conn=conn)
-                    message = (
-                        f"Media migrated from {result['source_table']} and {result['video_source_table']}: "
-                        f"{result['total_inserted']} rows ({result['inserted']} images, "
-                        f"{result['video_inserted']} videos)."
+                if action:
+                    image_where = request.form.get("image_where", "")
+                    audio_where = request.form.get("audio_where", "")
+                    settings_mod.set_setting(
+                        cfg.CONFIG_SETTING_PREFIX + "FILELIST_IMAGE_WHERE",
+                        cfg.serialize_config_value(image_where),
+                        "Config",
+                        "FILELIST_IMAGE_WHERE",
+                        conn,
                     )
-                elif action == "migrate_audio":
-                    result = media_migration.migrate_audio_from_filelist(where_clause=audio_where, conn=conn)
-                    message = f"Audio migrated from {result['source_table']}: {result['inserted']} rows."
-                else:
-                    message = "Media migration filters saved."
+                    settings_mod.set_setting(
+                        cfg.CONFIG_SETTING_PREFIX + "FILELIST_AUDIO_WHERE",
+                        cfg.serialize_config_value(audio_where),
+                        "Config",
+                        "FILELIST_AUDIO_WHERE",
+                        conn,
+                    )
+                    cfg.refresh_config_overrides()
+                    if action == "migrate_images":
+                        result = media_migration.migrate_images_from_filelist(where_clause=image_where, conn=conn)
+                        message = (
+                            f"Media migrated from {result['source_table']} and {result['video_source_table']}: "
+                            f"{result['total_inserted']} rows ({result['inserted']} images, "
+                            f"{result['video_inserted']} videos)."
+                        )
+                    elif action == "migrate_audio":
+                        result = media_migration.migrate_audio_from_filelist(where_clause=audio_where, conn=conn)
+                        message = f"Audio migrated from {result['source_table']}: {result['inserted']} rows."
+                    else:
+                        message = "Media migration filters saved."
             except Exception as exc:
                 message = f"Media migration failed: {exc}"
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
+    calendar_sources = calendar_index.fetch_calendar_sources(conn)
     audio_settings = settings_mod.get_audio_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
     config_settings = cfg.list_config_settings(conn)
@@ -266,6 +295,7 @@ def settings_route():
         message=message,
         active_settings_tab=active_settings_tab,
         calendar_view=calendar_view,
+        calendar_sources=calendar_sources,
         audio_settings=audio_settings,
         general_settings=general_settings,
         config_settings=config_settings,

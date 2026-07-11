@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<div class="calendar-controls">
+  <div class="calendar-views">
+    <a href="{{ url_for('calendar.month_view_route', year=today.year, month=today.month, proj=project) }}">Monthly</a> |
+    <a href="{{ url_for('calendar.week_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
+    <a href="{{ url_for('calendar.year_view_route', year=today.year, proj=project) }}">Yearly</a> |
+    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">Agenda</a> |
+    <a href="{{ url_for('calendar.event_list_route', proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">List</a> |
+    <a href="{{ url_for('calendar.summary_view_route', proj=project) }}">Summary</a>
+  </div>
+  {% include "widgets/wid_calendar_jump.html" %}
+  {% include "widgets/wid_calendar_source_box.html" %}
+</div>
+
+<div class="calendar-summary-shell">
+  <section class="calendar-summary-panel">
+    <h4>Today</h4>
+    <ul>
+      {% for item in today_items %}
+      <li>{{ item.time }} {{ item.title }} {% if item.can_edit %}<a href="{{ url_for('calendar.view_event_route', event_id=item.id) }}">View</a>{% endif %}</li>
+      {% else %}
+      <li>No indexed items today.</li>
+      {% endfor %}
+    </ul>
+
+    <h4>Tomorrow</h4>
+    <ul>
+      {% for item in tomorrow_items %}
+      <li>{{ item.time }} {{ item.title }}</li>
+      {% else %}
+      <li>No indexed items tomorrow.</li>
+      {% endfor %}
+    </ul>
+
+    <h4>Next 7 Days</h4>
+    <p><a href="{{ url_for('calendar.list_view_route', proj=project, from=today.strftime('%Y-%m-%d')) }}">{{ next_7_items|length }} items</a></p>
+
+    <h4>Next 30 Days</h4>
+    <p>{{ next_30_items|length }} items</p>
+
+    <div class="tabular-scroll">
+      <table class="settings-table">
+        <tr><th>Group</th><th>Value</th><th>Count</th></tr>
+        {% for group_name, rows in grouped.items() %}
+          {% for row in rows %}
+          <tr>
+            <td>{{ group_name }}</td>
+            <td>{{ row.label or '(blank)' }}</td>
+            <td>{{ row.cnt }}</td>
+          </tr>
+          {% endfor %}
+        {% endfor %}
+      </table>
+    </div>
+
+    <h4>Daily Stats</h4>
+    <div class="tabular-scroll">
+      <table class="settings-table">
+        <tr><th>Date</th><th>Source</th><th>Metric</th><th>Count</th><th>Summary</th></tr>
+        {% for stat in stats %}
+        <tr>
+          <td>{{ stat.stat_date }}</td>
+          <td>{{ stat.source_key }}</td>
+          <td>{{ stat.metric_key }}</td>
+          <td>{{ stat.item_count }}</td>
+          <td>{{ stat.summary_text }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No daily stats in this range.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <h4>Source Refresh Status</h4>
+    <div class="tabular-scroll">
+      <table class="settings-table">
+        <tr><th>Source</th><th>Enabled</th><th>Last Refresh</th><th>Rows</th><th>Status</th><th>Message</th></tr>
+        {% for source in source_status %}
+        <tr>
+          <td>{{ source.source_name }}</td>
+          <td>{{ 'Yes' if source.enabled else 'No' }}</td>
+          <td>{{ source.last_refresh_at or 'Never' }}</td>
+          <td>{{ source.last_refresh_count }}</td>
+          <td>{{ source.last_refresh_status or '' }}</td>
+          <td>{{ source.last_refresh_message or '' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

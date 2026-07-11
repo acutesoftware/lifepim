@@ -1,19 +1,176 @@
 {% extends "layout.html" %}
 {% block module_content %}
-<form method="POST" class="calendar-form">
+{% set recurrence_rule = event.recurrence_rule if event else '' %}
+{% set initial_type = 'single' %}
+{% if recurrence_rule %}
+  {% if 'FREQ=WEEKLY' in recurrence_rule and 'INTERVAL=2' in recurrence_rule %}
+    {% set initial_type = 'fortnightly' %}
+  {% elif 'FREQ=WEEKLY' in recurrence_rule %}
+    {% set initial_type = 'weekly' %}
+  {% elif 'FREQ=MONTHLY' in recurrence_rule %}
+    {% set initial_type = 'monthly' %}
+  {% elif 'FREQ=YEARLY' in recurrence_rule %}
+    {% set initial_type = 'yearly_anniversary' %}
+  {% endif %}
+{% endif %}
+{% if event %}
+  {% set start_value = event.start_date or event.date %}
+  {% set end_value = event.end_date or event.date %}
+  {% set start_time_value = event.start_time or event.time %}
+  {% set end_time_value = event.end_time or event.time %}
+{% else %}
+  {% set start_value = default_date %}
+  {% set end_value = default_date %}
+  {% set start_time_value = '' %}
+  {% set end_time_value = '' %}
+{% endif %}
+{% set day_codes = [('MO', 'Monday'), ('TU', 'Tuesday'), ('WE', 'Wednesday'), ('TH', 'Thursday'), ('FR', 'Friday'), ('SA', 'Saturday'), ('SU', 'Sunday')] %}
+<form method="POST" class="calendar-form" id="calendar-event-form">
+  <label>Event kind:</label><br>
+  <select name="recurrence_type" id="recurrence_type">
+    <option value="single" {% if initial_type == 'single' %}selected{% endif %}>Add Event</option>
+    <option value="weekly" {% if initial_type == 'weekly' %}selected{% endif %}>Add Recurring Weekly Event</option>
+    <option value="fortnightly" {% if initial_type == 'fortnightly' %}selected{% endif %}>Add Fortnightly Recurring Event</option>
+    <option value="monthly" {% if initial_type == 'monthly' %}selected{% endif %}>Add Monthly Recurring Event</option>
+    <option value="yearly_anniversary" {% if initial_type == 'yearly_anniversary' %}selected{% endif %}>Add Recurring Yearly Anniversary</option>
+  </select><br>
+
   <label>Title:</label><br>
   <input type="text" name="title" value="{{ event.title if event else '' }}" required><br>
-  <label>Date:</label><br>
-  <input type="date" name="date" value="{{ event.date if event else default_date }}" required><br>
-  <label>Time:</label><br>
-  <input type="time" name="time" value="{{ event.time if event else '' }}"><br>
+
+  <div class="recurrence-fields" data-for="single fortnightly">
+    <label>Start date:</label><br>
+    <input type="date" name="start_date" id="start_date" value="{{ start_value }}"><br>
+  </div>
+
+  <div class="recurrence-fields" data-for="weekly">
+    <label>Day:</label><br>
+    <select name="weekly_day">
+      {% for code, label in day_codes %}
+        <option value="{{ code }}">{{ label }}</option>
+      {% endfor %}
+    </select><br>
+  </div>
+
+  <label>Start time:</label><br>
+  <input type="time" name="start_time" value="{{ start_time_value }}"><br>
+
+  <div class="recurrence-fields" data-for="single fortnightly">
+    <label>End date:</label><br>
+    <input type="date" name="end_date" id="end_date" value="{{ end_value }}"><br>
+  </div>
+  <label>End time:</label><br>
+  <input type="time" name="end_time" value="{{ end_time_value }}"><br>
+
+  <div class="recurrence-fields" data-for="monthly">
+    <label>Monthly repeat:</label><br>
+    <select name="monthly_mode" id="monthly_mode">
+      <option value="day">Day of month</option>
+      <option value="first_weekday">First weekday of month</option>
+    </select><br>
+    <div data-monthly-mode="day">
+      <label>Day of month:</label><br>
+      <input type="number" name="monthly_day" min="1" max="31" value="{{ start_value[8:10] if start_value else '' }}"><br>
+    </div>
+    <div data-monthly-mode="first_weekday">
+      <label>First:</label><br>
+      <select name="monthly_weekday">
+        {% for code, label in day_codes %}
+          <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+      </select><br>
+    </div>
+  </div>
+
+  <div class="recurrence-fields" data-for="yearly_anniversary">
+    <label>Anniversary MM/DD:</label><br>
+    <input type="number" name="anniversary_month" min="1" max="12" value="{{ start_value[5:7] if start_value else '' }}" style="width:70px;"> /
+    <input type="number" name="anniversary_day" min="1" max="31" value="{{ start_value[8:10] if start_value else '' }}" style="width:70px;"><br>
+  </div>
+
+  <label><input type="checkbox" name="all_day" value="1" {% if not event or event.all_day %}checked{% endif %}> All day</label><br>
+  <label><input type="checkbox" name="blocks_time" value="1" {% if event and event.blocks_time %}checked{% endif %}> Blocks time</label><br>
+  <label>Event type:</label><br>
+  <input type="text" name="event_type" value="{{ event.event_type if event else 'event' }}"><br>
+  <label>Category:</label><br>
+  <input type="text" name="category" value="{{ event.category if event else '' }}"><br>
+  <label>Status:</label><br>
+  <select name="status">
+    {% for status in ['active', 'completed', 'cancelled', 'tentative'] %}
+      <option value="{{ status }}" {% if event and event.status == status %}selected{% endif %}>{{ status }}</option>
+    {% endfor %}
+  </select><br>
+  {% set selected_project = event.project if event else default_project %}
   <label>Project:</label><br>
-  <input type="text" name="project" value="{{ event.project if event else default_project }}"><br>
+  <select name="project">
+    {% for option in project_options %}
+      <option value="{{ option.value }}" {% if option.value == selected_project %}selected{% endif %}>{{ option.label }}</option>
+    {% endfor %}
+  </select><br>
   <label>Details:</label><br>
   <textarea name="detail" rows="6" cols="60" class="mention-enabled"
             {% if event %}data-record-type="event" data-record-id="{{ event.id }}"{% endif %}>{{ event.detail if event else '' }}</textarea><br><br>
+  <label>Colour:</label><br>
+  <input type="text" name="color" value="{{ event.color if event else '' }}"><br>
+  <label>Icon:</label><br>
+  <input type="text" name="icon" value="{{ event.icon if event else '' }}"><br>
+  <label>Location:</label><br>
+  <input type="text" name="location" value="{{ event.location if event else '' }}"><br>
+  <input type="hidden" name="recurrence_rule" value="{{ recurrence_rule }}">
+  <label>Recurrence end date:</label><br>
+  <input type="date" name="recurrence_end_date" value="{{ event.recurrence_end_date if event else '' }}"><br>
+  <label>Recurrence count:</label><br>
+  <input type="number" name="recurrence_count" value="{{ event.recurrence_count if event else '' }}"><br>
+  <label>Reminder date:</label><br>
+  <input type="date" name="remind_date" value="{{ event.remind_date if event else '' }}"><br><br>
   <button type="submit">Save</button>
 </form>
+<script>
+  (function () {
+    const recurrenceType = document.getElementById("recurrence_type");
+    const monthlyMode = document.getElementById("monthly_mode");
+    const startDate = document.getElementById("start_date");
+    const endDate = document.getElementById("end_date");
+
+    function updateRecurrenceFields() {
+      const value = recurrenceType.value;
+      document.querySelectorAll(".recurrence-fields").forEach((section) => {
+        const allowed = (section.dataset.for || "").split(" ");
+        section.style.display = allowed.includes(value) ? "" : "none";
+      });
+      if (startDate) {
+        startDate.required = ["single", "fortnightly"].includes(value);
+      }
+      if (endDate && !endDate.value && startDate && startDate.value) {
+        endDate.value = startDate.value;
+      }
+    }
+
+    function updateMonthlyFields() {
+      const value = monthlyMode ? monthlyMode.value : "day";
+      document.querySelectorAll("[data-monthly-mode]").forEach((section) => {
+        section.style.display = section.dataset.monthlyMode === value ? "" : "none";
+      });
+    }
+
+    const startTime = document.querySelector("input[name='start_time']");
+    const allDay = document.querySelector("input[name='all_day']");
+    if (startTime && allDay) {
+      startTime.addEventListener("input", () => {
+        if (startTime.value) {
+          allDay.checked = false;
+        }
+      });
+    }
+
+    recurrenceType.addEventListener("change", updateRecurrenceFields);
+    if (monthlyMode) {
+      monthlyMode.addEventListener("change", updateMonthlyFields);
+    }
+    updateRecurrenceFields();
+    updateMonthlyFields();
+  })();
+</script>
 {% if event %}
   {% set link_record_type = "event" %}
   {% set link_record_id = event.id %}

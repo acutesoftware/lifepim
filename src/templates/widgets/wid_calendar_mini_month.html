@@ -27,7 +27,7 @@
       <td class="calendar-cell {% if day == 0 %}empty{% endif %}" {% if day != 0 %}style="background: {{ cell_bg }};"{% endif %}>
         {% if day != 0 %}
         {% if day_source_params is defined %}
-        <a href="{{ url_for('calendar.day_view_route', date='%04d-%02d-%02d'|format(year, month, day), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage) }}">
+        <a href="{{ url_for('calendar.day_view_route', date='%04d-%02d-%02d'|format(year, month, day), proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">
         {% else %}
         <a href="{{ url_for('calendar.day_view_route', date='%04d-%02d-%02d'|format(year, month, day), proj=project) }}">
         {% endif %}
