@@ -127,16 +127,4 @@ CREATE INDEX IF NOT EXISTS idx_lp_event_items_media ON lp_event_items (media_id)
 def ensure_media_schema(conn: sqlite3.Connection) -> None:
     """Ensure the Media Explorer tables exist."""
     conn.executescript(MEDIA_SCHEMA_SQL)
-    _ensure_media_fts(conn)
     conn.commit()
-
-
-def _ensure_media_fts(conn: sqlite3.Connection) -> None:
-    try:
-        conn.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS lp_media_fts USING fts5("
-            "media_id UNINDEXED, path, filename, ext, camera_make, camera_model, tags_text)"
-        )
-    except sqlite3.OperationalError:
-        # FTS5 may be unavailable in some SQLite builds.
-        pass

@@ -20,7 +20,7 @@
         <div class="media-toolbar">
           <form class="media-toolbar-form" method="get" action="{{ url_for('search_route') }}">
             <input type="hidden" name="route" value="media">
-            <input type="hidden" name="scope" value="{{ request.args.get('scope', 'titles') }}">
+            <input type="hidden" name="scope" value="{{ request.args.get('scope', 'metadata') }}">
             <input type="text" name="q" value="{{ query }}" placeholder="Search media">
             <select name="media_type" title="Media type">
               <option value="">All types</option>
@@ -186,7 +186,7 @@
                   {% for col in audio_search_col_list %}
                   {% set next_dir = 'asc' if audio_sort_col != col or audio_sort_dir == 'desc' else 'desc' %}
                   <th>
-                    <a href="{{ url_for('search_route', q=query, proj=project, route='audio', scope=request.args.get('scope', 'titles'), sort=col, dir=next_dir) }}">{{ 'filename' if col == 'file_name' else col.replace('_', ' ') }}</a>
+                    <a href="{{ url_for('search_route', q=query, proj=project, route='audio', scope=request.args.get('scope', 'metadata'), sort=col, dir=next_dir) }}">{{ 'filename' if col == 'file_name' else col.replace('_', ' ') }}</a>
                     {% if audio_sort_col == col %} {{ '^' if audio_sort_dir == 'asc' else 'v' }}{% endif %}
                   </th>
                   {% endfor %}
@@ -412,6 +412,17 @@
           {% endfor %}
         </table>
       {% endif %}
+    {% endif %}
+
+    {% if more_results_links %}
+      <h4>More matches</h4>
+      <div class="search-summary-line">
+        <div>
+          {% for item in more_results_links %}
+            <a href="{{ item.url }}">Show more {{ item.table }}</a>{% if not loop.last %}<span> | </span>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
     {% endif %}
 
     {% if query and not results_primary and not results_secondary %}

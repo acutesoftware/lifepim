@@ -34,7 +34,7 @@
         </a>
       {% endfor %}
     </div>
-    {% set search_scope = request.args.get('scope', 'titles') %}
+    {% set search_scope = request.args.get('scope', 'metadata') %}
     <form class="search-form" action="{{ url_for('search_route') }}" method="get">
       <input type="text" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search">
       <input type="hidden" name="proj" value="{{ current_proj or '' }}">
@@ -47,8 +47,8 @@
       {% endif %}
       <button type="submit">Search</button>
       <select name="scope" title="Search scope">
-        <option value="titles" {% if search_scope != 'all' %}selected{% endif %}>Titles</option>
-        <option value="all" {% if search_scope == 'all' %}selected{% endif %}>All</option>
+        <option value="metadata" {% if search_scope != 'note_content' %}selected{% endif %}>Metadata</option>
+        <option value="note_content" {% if search_scope == 'note_content' %}selected{% endif %}>Note Content</option>
       </select>
     </form>
   </div>

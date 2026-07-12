@@ -2084,7 +2084,7 @@ def migrate_notes_source_route():
                 f"{links_deleted} note links, updated {mappings_rewritten} folder mappings, "
                 f"then imported {imported} notes."
             )
-    return redirect(url_for("admin.settings_route", tab="notes", message=msg))
+    return redirect(url_for("admin.admin_mapping_route", tab="migration", message=msg))
 
 
 def _parse_datetime(value):

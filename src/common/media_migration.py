@@ -306,11 +306,6 @@ def _clear_media_tables(conn: sqlite3.Connection) -> None:
         "DELETE FROM lp_media",
     ):
         _execute_if_table_exists(conn, sql)
-    try:
-        conn.execute("DELETE FROM lp_media_fts")
-    except sqlite3.OperationalError:
-        pass
-
 
 def _execute_if_table_exists(conn: sqlite3.Connection, sql: str) -> None:
     try:

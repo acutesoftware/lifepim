@@ -140,31 +140,6 @@
               <button type="submit" name="action" value="save_media_display">Save media settings</button>
             </div>
           </form>
-          <button
-            type="button"
-            class="settings-disclosure-button"
-            data-settings-disclosure="filelister-migration"
-            data-show-label="FileLister Migration &gt;&gt;"
-            data-hide-label="Hide migration settings"
-          >FileLister Migration &gt;&gt;</button>
-          <div class="settings-fieldset settings-disclosure-panel" id="filelister-migration" hidden>
-            <div class="settings-fieldset-title">FileLister Migration</div>
-            <p class="settings-empty">Source database: {{ filelist_db }}</p>
-            <form method="post" action="{{ url_for('admin.settings_route') }}">
-              <input type="hidden" name="tab" value="media">
-              <label>
-                Image source WHERE clause
-                <textarea name="image_where" rows="3">{{ filelist_image_where }}</textarea>
-              </label>
-              <label>
-                Audio source WHERE clause
-                <textarea name="audio_where" rows="3">{{ filelist_audio_where }}</textarea>
-              </label>
-              <button type="submit" name="action" value="save_media_filters">Save filters</button>
-              <button type="submit" name="action" value="migrate_images">Migrate images/videos from filelist</button>
-              <button type="submit" name="action" value="migrate_audio">Migrate audio from filelist</button>
-            </form>
-          </div>
           <div class="settings-fieldset">
             <div class="settings-fieldset-title">Media Events</div>
             <form method="post" action="{{ url_for('admin.settings_route') }}">
@@ -172,18 +147,6 @@
               <button type="submit" name="action" value="rebuild_media_events">Rebuild media events</button>
             </form>
           </div>
-          <script>
-            document.querySelectorAll("[data-settings-disclosure]").forEach((button) => {
-              const panel = document.getElementById(button.dataset.settingsDisclosure);
-              if (!panel) return;
-              button.disabled = false;
-              button.textContent = panel.hidden ? button.dataset.showLabel : button.dataset.hideLabel;
-              button.addEventListener("click", () => {
-                panel.hidden = !panel.hidden;
-                button.textContent = panel.hidden ? button.dataset.showLabel : button.dataset.hideLabel;
-              });
-            });
-          </script>
         </div>
       {% elif active_settings_tab == 'audio' %}
         <h4>Audio</h4>
@@ -221,25 +184,15 @@
             <span class="settings-action-note">Refreshes metadata for all notes in this folder and adds new files.</span>
           </div>
         </form>
-        <form method="post" action="{{ url_for('notes.migrate_notes_source_route') }}" class="settings-form">
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="notes">
           <div class="settings-fieldset">
-            <div class="settings-fieldset-title">Migrate notes to new source</div>
-            <label>
-              Notes root
-              <input type="text" name="notes_folder" placeholder="N:\duncan\LifePIM_Data\DATA\notes">
-            </label>
-            <label>
-              Project
-              <input type="text" name="project" placeholder="Leave blank for derived project mapping">
-            </label>
-            <label>
-              <input type="checkbox" name="confirm_migrate" value="1">
-              Delete existing notes and note links before importing this folder
-            </label>
-          </div>
-          <div class="settings-action-row">
-            <button type="submit">Migrate notes source</button>
-            <span class="settings-action-note">WARNING: points notes to a different root folder and can replace existing note rows.</span>
+            <div class="settings-fieldset-title">Note Content Search</div>
+            <p class="settings-empty">Indexed note contents: {{ note_index_count }}</p>
+            <div class="settings-action-row">
+              <button type="submit" name="action" value="rebuild_note_search_index">Rebuild note search index</button>
+              <span class="settings-action-note">Reads markdown files once and stores cached content for the Note Content search scope.</span>
+            </div>
           </div>
         </form>
       {% elif active_settings_tab == 'config' %}

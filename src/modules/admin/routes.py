@@ -6,8 +6,9 @@ from flask import Blueprint, render_template, request, redirect, url_for
 from common import data as db
 from common import config as cfg
 from common import media_migration
+from common import note_search_index
 from common import settings as settings_mod
-from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr
+from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr, paginate_total, build_pagination
 from modules.calendar.services import calendar_index
 
 
@@ -58,34 +59,103 @@ JOIN map_folder_project r
 
 @admin_bp.route("/", methods=["GET", "POST"])
 def admin_mapping_route():
-    message = ""
+    message = request.args.get("message", "")
+    active_admin_tab = (request.args.get("tab") or request.form.get("tab") or "security").strip().lower()
+    if active_admin_tab not in {"security", "folder_mapping", "folders", "migration"}:
+        active_admin_tab = "security"
+
+    conn = db.conn if db.conn is not None else None
+    conn = db._get_conn() if conn is None else conn
+
     if request.method == "POST":
         action = request.form.get("action", "")
         if action == "rebuild":
-            conn = db.conn if db.conn is not None else None
-            conn = db._get_conn() if conn is None else conn
+            active_admin_tab = "folder_mapping"
             conn.executescript(_REBUILD_SQL)
             conn.commit()
             message = "Rebuilt folder cache."
+        elif active_admin_tab == "migration":
+            image_where = request.form.get("image_where", "")
+            audio_where = request.form.get("audio_where", "")
+            try:
+                settings_mod.set_setting(
+                    cfg.CONFIG_SETTING_PREFIX + "FILELIST_IMAGE_WHERE",
+                    cfg.serialize_config_value(image_where),
+                    "Config",
+                    "FILELIST_IMAGE_WHERE",
+                    conn,
+                )
+                settings_mod.set_setting(
+                    cfg.CONFIG_SETTING_PREFIX + "FILELIST_AUDIO_WHERE",
+                    cfg.serialize_config_value(audio_where),
+                    "Config",
+                    "FILELIST_AUDIO_WHERE",
+                    conn,
+                )
+                cfg.refresh_config_overrides()
+                if action == "migrate_images":
+                    result = media_migration.migrate_images_from_filelist(where_clause=image_where, conn=conn)
+                    message = (
+                        f"Media migrated from {result['source_table']} and {result['video_source_table']}: "
+                        f"{result['total_inserted']} rows ({result['inserted']} images, "
+                        f"{result['video_inserted']} videos)."
+                    )
+                elif action == "migrate_audio":
+                    result = media_migration.migrate_audio_from_filelist(where_clause=audio_where, conn=conn)
+                    message = f"Audio migrated from {result['source_table']}: {result['inserted']} rows."
+                elif action == "save_media_filters":
+                    message = "Media migration filters saved."
+            except Exception as exc:
+                message = f"Media migration failed: {exc}"
 
+    per_page = 200
+    page = request.args.get("page", type=int) or 1
     unmapped_only = request.args.get("unmapped") == "1"
     rules = []
     folders = []
     counts = {}
-    conn = db.conn if db.conn is not None else None
-    conn = db._get_conn() if conn is None else conn
+    rules_total = 0
+    folders_total = 0
+    page_data = paginate_total(0, 1, per_page)
+    pagination = build_pagination(url_for, "admin.admin_mapping_route", {"tab": active_admin_tab}, 1, 1)
     try:
         counts["map_folder_project"] = conn.execute("SELECT COUNT(1) FROM map_folder_project").fetchone()[0]
         counts["map_project_folder"] = conn.execute("SELECT COUNT(1) FROM map_project_folder").fetchone()[0]
         counts["dim_folder"] = conn.execute("SELECT COUNT(1) FROM dim_folder").fetchone()[0]
-        rules = conn.execute(
-            """
-            SELECT map_id, path_prefix, tab, grp, project, tags, confidence, priority, is_primary, is_enabled
-            FROM map_folder_project
-            ORDER BY tab, grp, path_prefix
-            """
-        ).fetchall()
-        if unmapped_only:
+        if active_admin_tab == "folder_mapping":
+            rules_total = counts["map_folder_project"]
+            page_data = paginate_total(rules_total, page, per_page)
+            offset = (page_data["page"] - 1) * per_page
+            rules = conn.execute(
+                """
+                SELECT map_id, path_prefix, tab, grp, project, tags, confidence, priority, is_primary, is_enabled
+                FROM map_folder_project
+                ORDER BY tab, grp, path_prefix
+                LIMIT ? OFFSET ?
+                """,
+                (per_page, offset),
+            ).fetchall()
+            pagination = build_pagination(
+                url_for,
+                "admin.admin_mapping_route",
+                {"tab": "folder_mapping"},
+                page_data["page"],
+                page_data["total_pages"],
+            )
+        if active_admin_tab == "folders" and unmapped_only:
+            folders_total = conn.execute(
+                """
+                SELECT COUNT(1)
+                FROM dim_folder f
+                LEFT JOIN map_project_folder mpf
+                  ON mpf.folder_id = f.folder_id
+                 AND mpf.is_primary = 1
+                 AND mpf.is_enabled = 1
+                WHERE mpf.folder_id IS NULL
+                """
+            ).fetchone()[0]
+            page_data = paginate_total(folders_total, page, per_page)
+            offset = (page_data["page"] - 1) * per_page
             folders = conn.execute(
                 """
                 SELECT f.folder_id, f.folder_path, f.is_active, f.last_seen_at
@@ -96,33 +166,71 @@ def admin_mapping_route():
                  AND mpf.is_enabled = 1
                 WHERE mpf.folder_id IS NULL
                 ORDER BY f.folder_path
-                """
+                LIMIT ? OFFSET ?
+                """,
+                (per_page, offset),
             ).fetchall()
-        else:
+            pagination = build_pagination(
+                url_for,
+                "admin.admin_mapping_route",
+                {"tab": "folders", "unmapped": 1},
+                page_data["page"],
+                page_data["total_pages"],
+            )
+        elif active_admin_tab == "folders":
+            folders_total = counts["dim_folder"]
+            page_data = paginate_total(folders_total, page, per_page)
+            offset = (page_data["page"] - 1) * per_page
             folders = conn.execute(
                 """
                 SELECT folder_id, folder_path, is_active, last_seen_at
                 FROM dim_folder
                 ORDER BY folder_path
-                """
+                LIMIT ? OFFSET ?
+                """,
+                (per_page, offset),
             ).fetchall()
+            pagination = build_pagination(
+                url_for,
+                "admin.admin_mapping_route",
+                {"tab": "folders"},
+                page_data["page"],
+                page_data["total_pages"],
+            )
     except Exception:
         rules = []
         folders = []
         counts = {}
+        rules_total = 0
+        folders_total = 0
+
+    filelist_image_where = media_migration.default_image_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_IMAGE_WHERE", "")
+    filelist_audio_where = media_migration.default_audio_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_AUDIO_WHERE", "")
 
     return render_template(
         "admin_mapping.html",
         active_tab="admin",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title="Admin - Folder Mapping",
+        content_title="Admin",
         content_html="",
+        active_admin_tab=active_admin_tab,
         message=message,
         rules=rules,
         folders=folders,
+        rules_total=rules_total,
+        folders_total=folders_total,
+        page=page_data["page"],
+        total_pages=page_data["total_pages"],
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
         counts=counts,
         db_file=cfg.DB_FILE,
+        filelist_db=cfg.FILELIST_DB,
+        filelist_image_where=filelist_image_where,
+        filelist_audio_where=filelist_audio_where,
+        notes_sync_root=_notes_live_root(conn),
         unmapped_only=unmapped_only,
         now=datetime.now(),
     )
@@ -194,6 +302,18 @@ def settings_route():
                 conn,
             )
             message = "Audio settings saved."
+        elif active_settings_tab == "notes":
+            action = request.form.get("action", "")
+            if action == "rebuild_note_search_index":
+                try:
+                    result = note_search_index.rebuild_index(conn)
+                    message = (
+                        "Rebuilt note search index: "
+                        f"{result['indexed']} indexed, {result['missing']} missing, "
+                        f"{result['skipped']} skipped."
+                    )
+                except Exception as exc:
+                    message = f"Note search index rebuild failed: {exc}"
         elif active_settings_tab == "config":
             names = request.form.getlist("config_name")
             existing_override_names = {
@@ -252,40 +372,6 @@ def settings_route():
                     message = f"Rebuilt {created} media events."
                 except Exception as exc:
                     message = f"Media event rebuild failed: {exc}"
-                action = ""
-            try:
-                if action:
-                    image_where = request.form.get("image_where", "")
-                    audio_where = request.form.get("audio_where", "")
-                    settings_mod.set_setting(
-                        cfg.CONFIG_SETTING_PREFIX + "FILELIST_IMAGE_WHERE",
-                        cfg.serialize_config_value(image_where),
-                        "Config",
-                        "FILELIST_IMAGE_WHERE",
-                        conn,
-                    )
-                    settings_mod.set_setting(
-                        cfg.CONFIG_SETTING_PREFIX + "FILELIST_AUDIO_WHERE",
-                        cfg.serialize_config_value(audio_where),
-                        "Config",
-                        "FILELIST_AUDIO_WHERE",
-                        conn,
-                    )
-                    cfg.refresh_config_overrides()
-                    if action == "migrate_images":
-                        result = media_migration.migrate_images_from_filelist(where_clause=image_where, conn=conn)
-                        message = (
-                            f"Media migrated from {result['source_table']} and {result['video_source_table']}: "
-                            f"{result['total_inserted']} rows ({result['inserted']} images, "
-                            f"{result['video_inserted']} videos)."
-                        )
-                    elif action == "migrate_audio":
-                        result = media_migration.migrate_audio_from_filelist(where_clause=audio_where, conn=conn)
-                        message = f"Audio migrated from {result['source_table']}: {result['inserted']} rows."
-                    else:
-                        message = "Media migration filters saved."
-            except Exception as exc:
-                message = f"Media migration failed: {exc}"
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
     calendar_sources = calendar_index.fetch_calendar_sources(conn)
@@ -294,8 +380,11 @@ def settings_route():
     general_settings = settings_mod.get_general_settings(conn)
     config_settings = cfg.list_config_settings(conn)
     all_settings = settings_mod.list_settings(conn)
-    filelist_image_where = media_migration.default_image_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_IMAGE_WHERE", "")
-    filelist_audio_where = media_migration.default_audio_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_AUDIO_WHERE", "")
+    try:
+        note_search_index.ensure_schema(conn)
+        note_index_count = conn.execute("SELECT COUNT(1) FROM lp_note_search_index").fetchone()[0]
+    except Exception:
+        note_index_count = 0
 
     return render_template(
         "admin_settings.html",
@@ -313,9 +402,7 @@ def settings_route():
         general_settings=general_settings,
         config_settings=config_settings,
         all_settings=all_settings,
-        filelist_db=cfg.FILELIST_DB,
-        filelist_image_where=filelist_image_where,
-        filelist_audio_where=filelist_audio_where,
+        note_index_count=note_index_count,
         notes_sync_root=_notes_live_root(conn),
         now=datetime.now(),
     )

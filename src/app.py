@@ -279,30 +279,42 @@ def search_route():
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
     route = request.args.get("route") or "home"
-    scope = (request.args.get("scope") or "titles").strip().lower()
-    include_note_content = scope == "all"
+    scope = (request.args.get("scope") or "metadata").strip().lower()
+    if scope in {"titles", "all"}:
+        scope = "metadata"
+    if scope not in {"metadata", "note_content"}:
+        scope = "metadata"
     sort_col = request.args.get("sort") or "file_name"
     sort_dir = request.args.get("dir") or "asc"
     tab_ids = {t.get("id") for t in get_tabs()}
     active_tab = route if route in tab_ids else "home"
-    results = search_mod.search_all(
-        query,
-        project=project,
-        route=route,
-        include_note_content=include_note_content,
-    )
+    if scope == "note_content":
+        results = search_mod.search_note_content(query, project=project, route=route)
+    else:
+        results = search_mod.search_all(query, project=project, route=route)
     for item in results["primary"] + results["secondary"]:
         params = {item["id_param"]: item["id"]}
         if project:
             params["proj"] = project
         item["url"] = url_for(item["view_route"], **params)
+    more_results_links = []
+    for item in results.get("more", []):
+        args = {"q": query, "route": item["route"], "scope": scope}
+        if project:
+            args["proj"] = project
+        more_results_links.append(
+            {
+                "table": item["table"],
+                "url": url_for("search_route", **args),
+            }
+        )
     audio_playlists = []
     audio_search_items = None
     audio_search_col_list = []
     audio_other_results = []
     media_search = None
     media_other_results = []
-    if route == "media" and query:
+    if route == "media" and query and scope != "note_content":
         from modules.media import routes as media_routes
 
         media_search = media_routes.build_media_search_context(query, request.args)
@@ -312,7 +324,7 @@ def search_route():
             if item.get("route") != "media"
         ]
     has_audio = any(item.get("route") == "audio" for item in results["primary"] + results["secondary"])
-    if has_audio or route == "audio":
+    if scope != "note_content" and (has_audio or route == "audio"):
         from modules.audio import routes as audio_routes
 
         conn = audio_routes._ensure_playlist_schema()
@@ -357,6 +369,7 @@ def search_route():
         route=route,
         total_results=total_results,
         search_all_areas_url=search_all_areas_url,
+        more_results_links=more_results_links,
         results_primary=results["primary"],
         results_secondary=results["secondary"],
         audio_playlists=audio_playlists,

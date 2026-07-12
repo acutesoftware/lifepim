@@ -230,6 +230,11 @@ body.freeze-headers .content:has(.search-media-layout) {
   min-width: 0;
 }
 
+.admin-list-scroll {
+  max-height: 65vh;
+  overflow: auto;
+}
+
 body.freeze-headers .tabular-scroll {
   flex: 1;
   min-height: 0;

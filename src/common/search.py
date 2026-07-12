@@ -1,7 +1,6 @@
-import os
-
 from common import config as cfg
 from common import data
+from common import note_search_index
 from common.utils import get_table_def
 
 ROUTE_RECORD_TYPE = {
@@ -23,6 +22,41 @@ ROUTE_TITLE_FIELD = {
     "contacts": "display_name",
     "places": "name",
 }
+
+SEARCH_SPECS = {
+    "notes": {
+        "columns": ["file_name", "path"],
+        "view_route": "notes.view_note_route",
+        "id_param": "note_id",
+    },
+    "data": {
+        "columns": ["name", "description", "tbl_name", "col_list"],
+        "view_route": "data.view_data_route",
+        "id_param": "item_id",
+    },
+    "audio": {
+        "columns": ["file_name", "path", "artist", "album", "song"],
+        "view_route": "audio.view_audio_route",
+        "id_param": "item_id",
+    },
+    "media": {
+        "columns": ["filename", "path", "ext", "media_type"],
+        "view_route": "media.view_media_route",
+        "id_param": "media_id",
+    },
+    "how": {
+        "columns": ["title", "description"],
+        "view_route": "how.view_how_route",
+        "id_param": "item_id",
+    },
+    "calendar": {
+        "columns": ["title", "content", "event_date"],
+        "view_route": "calendar.view_event_route",
+        "id_param": "event_id",
+    },
+}
+
+DEFAULT_SEARCH_ORDER = ["notes", "data", "audio", "media", "how", "calendar"]
 
 
 def parse_search_terms(query):
@@ -93,13 +127,13 @@ def _find_match_field(item, terms, columns):
     return ""
 
 
-def _search_table(route_name, terms, columns, view_route, id_param):
+def _search_table(route_name, terms, columns, view_route, id_param, limit=None):
     tbl = get_table_def(route_name)
     if not tbl:
-        return []
+        return [], False
     available_cols = [col for col in columns if col in tbl["col_list"]]
     if not available_cols or not terms:
-        return []
+        return [], False
     cols = ["id"] + tbl["col_list"]
     term_conditions = []
     params = []
@@ -109,7 +143,16 @@ def _search_table(route_name, terms, columns, view_route, id_param):
         term_conditions.append(f"({condition})")
         params.extend([like_value] * len(available_cols))
     where_clause = " AND ".join(term_conditions)
-    rows = data.get_data(data.conn, tbl["name"], cols, f"({where_clause})", params)
+    fetch_limit = int(limit) + 1 if limit else None
+    sql = f"SELECT {', '.join(cols)} FROM {tbl['name']} WHERE ({where_clause})"
+    if fetch_limit:
+        sql += " LIMIT ?"
+        params.append(fetch_limit)
+    conn = data._get_conn()
+    rows = conn.execute(sql, params).fetchall()
+    has_more = bool(fetch_limit and len(rows) > limit)
+    if has_more:
+        rows = rows[:limit]
     results = []
     for row in rows:
         item = dict(row)
@@ -130,15 +173,23 @@ def _search_table(route_name, terms, columns, view_route, id_param):
                 "title": item.get(ROUTE_TITLE_FIELD.get(route_name, "")) or "",
             }
         )
-    return results
+    return results, has_more
 
 
-def _search_media(terms):
+def _search_media(terms, limit=None):
     tbl = get_table_def("media")
     if not tbl:
-        return []
+        return [], False
     if not terms:
-        return []
+        return [], False
+    conn = data._get_conn()
+    try:
+        table_cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({tbl['name']})").fetchall()}
+    except Exception:
+        return [], False
+    required_cols = {"media_id", "filename", "path", "ext", "media_type"}
+    if not required_cols.issubset(table_cols):
+        return [], False
     search_cols = ["filename", "path", "ext", "media_type"]
     term_conditions = []
     params = []
@@ -148,11 +199,18 @@ def _search_media(terms):
         term_conditions.append(f"({condition})")
         params.extend([like_value] * len(search_cols))
     where_clause = " AND ".join(term_conditions)
+    fetch_limit = int(limit) + 1 if limit else None
     sql = (
         "SELECT media_id as id, filename, path, ext, media_type "
         f"FROM {tbl['name']} WHERE {where_clause}"
     )
-    rows = data._get_conn().execute(sql, params).fetchall()
+    if fetch_limit:
+        sql += " LIMIT ?"
+        params.append(fetch_limit)
+    rows = conn.execute(sql, params).fetchall()
+    has_more = bool(fetch_limit and len(rows) > limit)
+    if has_more:
+        rows = rows[:limit]
     results = []
     for row in rows:
         item = dict(row)
@@ -173,60 +231,43 @@ def _search_media(terms):
                 "title": item.get("filename") or "",
             }
         )
-    return results
+    return results, has_more
 
 
-def _build_note_path(note):
-    file_name = (note.get("file_name") or "").strip()
-    path = (note.get("path") or "").strip()
-    if path and file_name:
-        return os.path.join(path, file_name)
-    if file_name and os.path.isabs(file_name):
-        return file_name
-    return path or file_name
-
-
-def _read_note_file(note_path):
-    try:
-        with open(note_path, "r", encoding="utf-8", errors="replace") as handle:
-            return handle.read()
-    except OSError:
-        return ""
-
-
-def _search_note_content(terms, existing_ids=None):
-    tbl = get_table_def("notes")
-    if not tbl:
-        return []
-    cols = ["id"] + tbl["col_list"]
-    rows = data.get_data(data.conn, tbl["name"], cols)
+def _search_note_content_index(terms, project=None, route=None, limit=None):
+    note_search_index.ensure_schema()
+    fetch_limit = int(limit) + 1 if limit else None
+    term_conditions = []
+    params = []
+    for term in terms:
+        like_value = f"%{term}%"
+        term_conditions.append("lower(idx.content_text) LIKE ?")
+        params.append(like_value)
+    where_clause = " AND ".join(term_conditions) or "1=1"
+    sql = (
+        "SELECT idx.note_id, idx.title, idx.content_text, idx.file_path, n.project "
+        "FROM lp_note_search_index idx "
+        "LEFT JOIN lp_notes n ON n.id = idx.note_id "
+        f"WHERE {where_clause} "
+        "ORDER BY idx.title"
+    )
+    if fetch_limit:
+        sql += " LIMIT ?"
+        params.append(fetch_limit)
+    rows = data._get_conn().execute(sql, params).fetchall()
+    has_more = bool(fetch_limit and len(rows) > limit)
+    if has_more:
+        rows = rows[:limit]
     results = []
-    existing_ids = existing_ids or set()
     for row in rows:
         item = dict(row)
-        note_id = item.get("id")
-        if note_id in existing_ids:
-            continue
-        note_path = _build_note_path(item)
-        if not note_path:
-            continue
-        if not note_path.lower().endswith(".md"):
-            continue
-        if not os.path.isfile(note_path):
-            continue
-        note_text = _read_note_file(note_path)
-        if not note_text:
-            continue
-        note_text_lower = note_text.lower()
-        if not all(term in note_text_lower for term in terms):
-            continue
         snippet_len = getattr(cfg, "SEARCH_CONTENT_SNIPPET_LEN", 200)
-        snippet = _build_snippet(note_text, terms, max_len=snippet_len)
+        snippet = _build_snippet(item.get("content_text") or "", terms, max_len=snippet_len)
         results.append(
             {
-                "table": tbl.get("display_name") or "Notes",
-                "route": tbl.get("route") or "notes",
-                "id": note_id,
+                "table": "Notes",
+                "route": "notes",
+                "id": item.get("note_id"),
                 "project": item.get("project") or "",
                 "match_field": "content",
                 "match_value": snippet,
@@ -234,64 +275,84 @@ def _search_note_content(terms, existing_ids=None):
                 "view_route": "notes.view_note_route",
                 "id_param": "note_id",
                 "record_type": ROUTE_RECORD_TYPE.get("notes", ""),
-                "title": item.get("file_name") or "",
+                "title": item.get("title") or "",
             }
         )
-    return results
+    return results, has_more
 
 
-def search_all(query, project=None, route=None, include_note_content=False):
+def search_note_content(query, project=None, route=None, limit=100):
     terms = parse_search_terms(query)
     if not terms:
-        return {"primary": [], "secondary": []}
+        return {"primary": [], "secondary": [], "more": []}
     terms = [term.lower() for term in terms]
-    results = []
-    results += _search_table(
-        "notes",
-        terms,
-        ["file_name", "path"],
-        "notes.view_note_route",
-        "note_id",
-    )
-    results += _search_table(
-        "data",
-        terms,
-        ["name", "description", "tbl_name", "col_list"],
-        "data.view_data_route",
-        "item_id",
-    )
-    results += _search_table(
-        "audio",
-        terms,
-        ["file_name", "path", "artist", "album", "song"],
-        "audio.view_audio_route",
-        "item_id",
-    )
-    results += _search_media(terms)
-    results += _search_table(
-        "how",
-        terms,
-        ["title", "description"],
-        "how.view_how_route",
-        "item_id",
-    )
-    results += _search_table(
-        "calendar",
-        terms,
-        ["title", "content", "event_date"],
-        "calendar.view_event_route",
-        "event_id",
-    )
-    if include_note_content:
-        note_ids = {result.get("id") for result in results if result.get("route") == "notes" and result.get("id")}
-        results += _search_note_content(terms, existing_ids=note_ids)
+    results, has_more = _search_note_content_index(terms, project=project, route=route, limit=limit)
     primary = []
     secondary = []
     for result in results:
         matches_project = bool(project) and result.get("project") == project
-        matches_route = bool(route) and (result.get("route") == route)
+        matches_route = bool(route) and result.get("route") == route
         if matches_project or matches_route:
             primary.append(result)
         else:
             secondary.append(result)
-    return {"primary": primary, "secondary": secondary}
+    more = []
+    if has_more:
+        more.append({"route": "notes", "table": "Notes content"})
+    return {"primary": primary, "secondary": secondary, "more": more}
+
+
+def _search_route(route_name, terms, limit):
+    spec = SEARCH_SPECS.get(route_name)
+    if not spec:
+        return [], False
+    if route_name == "media":
+        return _search_media(terms, limit=limit)
+    return _search_table(
+        route_name,
+        terms,
+        spec["columns"],
+        spec["view_route"],
+        spec["id_param"],
+        limit=limit,
+    )
+
+
+def search_all(query, project=None, route=None, primary_limit=100, secondary_limit=20):
+    terms = parse_search_terms(query)
+    if not terms:
+        return {"primary": [], "secondary": [], "more": []}
+    terms = [term.lower() for term in terms]
+    primary = []
+    secondary = []
+    more = []
+    search_order = list(DEFAULT_SEARCH_ORDER)
+    current_route = route if route in SEARCH_SPECS else ""
+    if current_route:
+        search_order.remove(current_route)
+        search_order.insert(0, current_route)
+    for route_name in search_order:
+        limit = primary_limit if route_name == current_route else secondary_limit
+        route_results, has_more = _search_route(route_name, terms, limit)
+        if has_more:
+            spec = SEARCH_SPECS[route_name]
+            tbl = get_table_def(route_name)
+            more.append(
+                {
+                    "route": route_name,
+                    "table": (tbl.get("display_name") if tbl else None) or route_name.title(),
+                    "view_route": spec["view_route"],
+                }
+            )
+        for result in route_results:
+            matches_project = bool(project) and result.get("project") == project
+            matches_route = bool(route) and (result.get("route") == route)
+            if matches_project or matches_route:
+                primary.append(result)
+            else:
+                secondary.append(result)
+    return {
+        "primary": primary,
+        "secondary": secondary,
+        "more": more,
+    }

@@ -1,75 +1,165 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div style="margin-bottom:8px;">
-    <form method="post" style="display:inline;">
-      <input type="hidden" name="action" value="rebuild">
-      <button type="submit">Rebuild folder cache</button>
-    </form>
-    {% if message %}<span style="margin-left:8px;">{{ message }}</span>{% endif %}
-  </div>
-  <div style="margin-bottom:8px;">
-    <strong>DB:</strong> {{ db_file }}
-    {% if counts %}
-      <span style="margin-left:8px;">map_folder_project={{ counts.map_folder_project }}</span>
-      <span style="margin-left:8px;">map_project_folder={{ counts.map_project_folder }}</span>
-      <span style="margin-left:8px;">dim_folder={{ counts.dim_folder }}</span>
-    {% endif %}
-  </div>
+  {% set admin_tabs = [
+    ('security', 'Security'),
+    ('folder_mapping', 'Folder Mapping'),
+    ('folders', 'Folders (dim_folder)'),
+    ('migration', 'Migration')
+  ] %}
 
-  <div class="tabular-scroll">
-  <h4>Mapping rules (map_folder_project)</h4>
-  <table border="1" cellpadding="5">
-    <tr>
-      <th>map_id</th>
-      <th>path_prefix</th>
-      <th>tab</th>
-      <th>grp</th>
-      <th>project</th>
-      <th>tags</th>
-      <th>confidence</th>
-      <th>priority</th>
-      <th>primary</th>
-      <th>enabled</th>
-    </tr>
-    {% for row in rules %}
-    <tr>
-      <td>{{ row.map_id }}</td>
-      <td>{{ row.path_prefix }}</td>
-      <td>{{ row.tab }}</td>
-      <td>{{ row.grp }}</td>
-      <td>{{ row.project }}</td>
-      <td>{{ row.tags }}</td>
-      <td>{{ row.confidence }}</td>
-      <td>{{ row.priority }}</td>
-      <td>{{ row.is_primary }}</td>
-      <td>{{ row.is_enabled }}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  {% if message %}
+    <div class="settings-message">{{ message }}</div>
+  {% endif %}
 
-  <h4>Folders (dim_folder)</h4>
-  <div style="margin-bottom:6px;">
-    {% if unmapped_only %}
-      <a href="{{ url_for('admin.admin_mapping_route') }}">Show all folders</a>
-    {% else %}
-      <a href="{{ url_for('admin.admin_mapping_route', unmapped=1) }}">Show unmapped only</a>
-    {% endif %}
-  </div>
-  <table border="1" cellpadding="5">
-    <tr>
-      <th>folder_id</th>
-      <th>folder_path</th>
-      <th>is_active</th>
-      <th>last_seen_at</th>
-    </tr>
-    {% for row in folders %}
-    <tr>
-      <td>{{ row.folder_id }}</td>
-      <td>{{ row.folder_path }}</td>
-      <td>{{ row.is_active }}</td>
-      <td>{{ row.last_seen_at }}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="settings-shell">
+    <nav class="settings-tabs" aria-label="Admin sections">
+      {% for tab_id, tab_label in admin_tabs %}
+        <a class="{% if active_admin_tab == tab_id %}active{% endif %}" href="{{ url_for('admin.admin_mapping_route', tab=tab_id) }}">
+          {{ tab_label }}
+        </a>
+      {% endfor %}
+    </nav>
+
+    <section class="settings-panel">
+      <div style="margin-bottom:8px;">
+        <strong>DB:</strong> {{ db_file }}
+        {% if counts %}
+          <span style="margin-left:8px;">map_folder_project={{ counts.map_folder_project }}</span>
+          <span style="margin-left:8px;">map_project_folder={{ counts.map_project_folder }}</span>
+          <span style="margin-left:8px;">dim_folder={{ counts.dim_folder }}</span>
+        {% endif %}
+      </div>
+
+      {% if active_admin_tab == 'security' %}
+        <h4>Security</h4>
+        <form class="settings-form">
+          <div class="settings-fieldset">
+            <label>
+              Status
+              <input type="text" value="TODO - implement user security, logon screen using sessions" readonly>
+            </label>
+          </div>
+        </form>
+      {% elif active_admin_tab == 'folder_mapping' %}
+        <h4>Folder Mapping</h4>
+        <form method="post" class="settings-form" style="margin-bottom:10px;">
+          <input type="hidden" name="tab" value="folder_mapping">
+          <input type="hidden" name="action" value="rebuild">
+          <button type="submit">Rebuild mapping</button>
+        </form>
+        <p class="settings-empty">Total records: {{ rules_total }}</p>
+
+        <div class="tabular-scroll admin-list-scroll">
+          <h4>Mapping rules (map_folder_project)</h4>
+          <table border="1" cellpadding="5">
+            <tr>
+              <th>map_id</th>
+              <th>path_prefix</th>
+              <th>tab</th>
+              <th>grp</th>
+              <th>project</th>
+              <th>tags</th>
+              <th>confidence</th>
+              <th>priority</th>
+              <th>primary</th>
+              <th>enabled</th>
+            </tr>
+            {% for row in rules %}
+            <tr>
+              <td>{{ row.map_id }}</td>
+              <td>{{ row.path_prefix }}</td>
+              <td>{{ row.tab }}</td>
+              <td>{{ row.grp }}</td>
+              <td>{{ row.project }}</td>
+              <td>{{ row.tags }}</td>
+              <td>{{ row.confidence }}</td>
+              <td>{{ row.priority }}</td>
+              <td>{{ row.is_primary }}</td>
+              <td>{{ row.is_enabled }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+        {% include "widgets/wid_pagination.html" %}
+      {% else %}
+      {% if active_admin_tab == 'folders' %}
+        <h4>Folders (dim_folder)</h4>
+        <p class="settings-empty">
+          dim_folder stores the known folders used by LifePIM so records can be linked back to folder paths. The toggle switches this list between every folder and only folders without an enabled primary mapping.
+        </p>
+        <p class="settings-empty">Total records: {{ folders_total }}</p>
+        <div style="margin-bottom:6px;">
+          {% if unmapped_only %}
+            <a href="{{ url_for('admin.admin_mapping_route', tab='folders') }}">Show all folders</a>
+          {% else %}
+            <a href="{{ url_for('admin.admin_mapping_route', tab='folders', unmapped=1) }}">Show unmapped only</a>
+          {% endif %}
+        </div>
+        <div class="tabular-scroll admin-list-scroll">
+          <table border="1" cellpadding="5">
+            <tr>
+              <th>folder_id</th>
+              <th>folder_path</th>
+              <th>is_active</th>
+              <th>last_seen_at</th>
+            </tr>
+            {% for row in folders %}
+            <tr>
+              <td>{{ row.folder_id }}</td>
+              <td>{{ row.folder_path }}</td>
+              <td>{{ row.is_active }}</td>
+              <td>{{ row.last_seen_at }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+        {% include "widgets/wid_pagination.html" %}
+      {% else %}
+        <h4>Migration</h4>
+        <div class="settings-form">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Notes Migration</div>
+            <form method="post" action="{{ url_for('notes.migrate_notes_source_route') }}">
+              <label>
+                Notes root
+                <input type="text" name="notes_folder" placeholder="N:\duncan\LifePIM_Data\DATA\notes" value="{{ notes_sync_root }}">
+              </label>
+              <label>
+                Project
+                <input type="text" name="project" placeholder="Leave blank for derived project mapping">
+              </label>
+              <label>
+                <input type="checkbox" name="confirm_migrate" value="1">
+                Delete existing notes and note links before importing this folder
+              </label>
+              <div class="settings-action-row">
+                <button type="submit">Migrate notes source</button>
+                <span class="settings-action-note">WARNING: points notes to a different root folder and can replace existing note rows.</span>
+              </div>
+            </form>
+          </div>
+
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">FileLister Migration</div>
+            <p class="settings-empty">Source database: {{ filelist_db }}</p>
+            <form method="post" action="{{ url_for('admin.admin_mapping_route') }}">
+              <input type="hidden" name="tab" value="migration">
+              <label>
+                Image source WHERE clause
+                <textarea name="image_where" rows="3">{{ filelist_image_where }}</textarea>
+              </label>
+              <label>
+                Audio source WHERE clause
+                <textarea name="audio_where" rows="3">{{ filelist_audio_where }}</textarea>
+              </label>
+              <button type="submit" name="action" value="save_media_filters">Save filters</button>
+              <button type="submit" name="action" value="migrate_images">Migrate images/videos from FileLister</button>
+              <button type="submit" name="action" value="migrate_audio">Migrate audio from FileLister</button>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+      {% endif %}
+    </section>
   </div>
 {% endblock %}
