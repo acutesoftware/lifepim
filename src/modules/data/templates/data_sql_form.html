@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<form class="data-form" method="post">
+  <input type="hidden" name="_existing" value="{{ '1' if item else '0' }}">
+  <div class="data-form-grid">
+    <label>Name<input name="sql_name" required value="{{ item.sql_name if item else '' }}"></label>
+    <label>Target source
+      <select name="data_source_id">
+        <option value="">None</option>
+        {% for source in sources %}
+        <option value="{{ source.data_source_id }}" {% if item and item.data_source_id == source.data_source_id %}selected{% endif %}>{{ source.source_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Default database<input name="default_database" value="{{ item.default_database if item else '' }}"></label>
+    <label>Default schema<input name="default_schema" value="{{ item.default_schema if item else '' }}"></label>
+    <label>Output type<input name="output_type" value="{{ item.output_type if item else '' }}"></label>
+    <label>Linked file path<input name="linked_file_path" value="{{ item.linked_file_path if item else '' }}"></label>
+    <label>Authoritative location<input name="authoritative_location" value="{{ item.authoritative_location if item else 'DATABASE' }}"></label>
+    <label>Tags<input name="tags" value="{{ item.tags if item else '' }}"></label>
+  </div>
+  <label>SQL text<textarea class="data-sql-editor" name="sql_text" rows="14" required>{{ item.sql_text if item else '' }}</textarea></label>
+  <label>Purpose<textarea name="purpose" rows="3">{{ item.purpose if item else '' }}</textarea></label>
+  <label>Notes<textarea name="notes" rows="3">{{ item.notes if item else '' }}</textarea></label>
+  <label>Parameter definitions JSON<textarea name="parameter_json" rows="3">{{ item.parameter_json if item else '' }}</textarea></label>
+  <label>Related objects
+    <select name="related_objects" multiple size="8">
+      {% set selected = item.related_object_ids if item else [] %}
+      {% for obj in objects %}
+      <option value="{{ obj.data_object_id }}" {% if obj.data_object_id|string in selected %}selected{% endif %}>{{ obj.source_name }} / {{ obj.object_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <div class="data-checks">
+    <label><input type="checkbox" name="is_favourite" {% if item and item.is_favourite %}checked{% endif %}> Favourite</label>
+    <label><input type="checkbox" name="is_active" {% if (item and item.is_active) or not item %}checked{% endif %}> Active</label>
+  </div>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

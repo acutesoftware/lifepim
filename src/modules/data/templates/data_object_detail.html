@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-detail-actions">
+  {% if obj.source_type in ['SQLITE', 'CSV', 'EXCEL'] and obj.object_type in ['TABLE', 'VIEW', 'CSV_TABLE', 'EXCEL_SHEET'] %}
+  <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id) }}">View data</a>
+  {% endif %}
+  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='REGISTERED') }}"><button>Promote to Registered</button></form>
+  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='MANAGED') }}"><button>Promote to Managed</button></form>
+  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='DISCOVERED') }}"><button>Demote</button></form>
+  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='favourite') }}"><button>{{ 'Unfavourite' if obj.is_favourite else 'Favourite' }}</button></form>
+  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='hidden') }}"><button>{{ 'Unhide' if obj.is_hidden else 'Hide' }}</button></form>
+  <form method="post" action="{{ url_for('data.object_profile_route', object_id=obj.data_object_id) }}"><button>Profile now</button></form>
+</div>
+
+<div class="data-tabs-lite">
+  <a href="#overview">Overview</a><a href="#columns">Columns</a><a href="#profile">Profile</a><a href="#sql">SQL</a><a href="#activity">Activity</a>
+</div>
+
+<section id="overview" class="data-panel">
+  <h4>Overview</h4>
+  <form method="post" class="data-form">
+    <input type="hidden" name="_existing" value="1">
+    <div class="data-form-grid">
+      <label>Object name<input readonly value="{{ obj.object_name }}"></label>
+      <label>Display name<input name="display_name" value="{{ obj.display_name }}"></label>
+      <label>Full name/path<input readonly value="{{ obj.full_name or obj.full_path }}"></label>
+      <label>Object type<input readonly value="{{ obj.object_type }}"></label>
+      <label>Source<input readonly value="{{ obj.source_name }}"></label>
+      <label>Schema or folder<input readonly value="{{ obj.schema_name or obj.parent_path }}"></label>
+      <label>Catalogue level
+        <select name="catalogue_level">
+          {% for level in levels %}
+          <option value="{{ level }}" {% if obj.catalogue_level == level %}selected{% endif %}>{{ level }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Tags<input name="tags" value="{{ obj.tags }}"></label>
+      <label>Profile mode<input name="profile_mode" value="{{ obj.profile_mode }}"></label>
+      <label>Content index mode<input name="content_index_mode" value="{{ obj.content_index_mode }}"></label>
+      <label>Refresh policy<input name="refresh_policy" value="{{ obj.refresh_policy }}"></label>
+    </div>
+    <div class="data-checks">
+      {% for name, label in [('is_favourite','Favourite'),('is_canonical','Canonical'),('is_sensitive','Sensitive'),('is_hidden','Hidden'),('is_active','Active')] %}
+      <label><input type="checkbox" name="{{ name }}" {% if obj[name] %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+    <label>Description<textarea name="description" rows="3">{{ obj.description }}</textarea></label>
+    <label>Purpose<textarea name="purpose" rows="3">{{ obj.purpose }}</textarea></label>
+    <label>Notes<textarea name="notes" rows="4">{{ obj.notes }}</textarea></label>
+    <button type="submit">Save metadata</button>
+  </form>
+  <table>
+    <tr><th>Row count</th><td>{{ obj.row_count }}</td><th>Size</th><td>{{ obj.size_bytes }}</td></tr>
+    <tr><th>Last seen</th><td>{{ obj.last_seen_at }}</td><th>Last scanned</th><td>{{ obj.last_scanned_at }}</td></tr>
+    <tr><th>Last profiled</th><td>{{ obj.last_profiled_at }}</td><th>Source modified</th><td>{{ obj.source_modified_at }}</td></tr>
+  </table>
+</section>
+
+<section id="columns" class="data-panel">
+  <h4>Columns</h4>
+  <table>
+    <tr><th>Position</th><th>Name</th><th>Data type</th><th>Nullable</th><th>PK</th><th>Description</th><th>Profile</th></tr>
+    {% for col in columns %}
+    <tr><td>{{ col.ordinal_position }}</td><td>{{ col.column_name }}</td><td>{{ col.data_type }}</td><td>{{ col.is_nullable }}</td><td>{{ col.is_primary_key }}</td><td>{{ col.description }}</td><td>{{ col.profile_status }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section id="profile" class="data-panel">
+  <h4>Profile</h4>
+  <table>
+    <tr><th>Status</th><td>{{ obj.profile_status or 'Not collected' }}</td></tr>
+    <tr><th>Quality</th><td>{{ obj.quality_status or 'Not collected' }}</td></tr>
+    <tr><th>Metadata</th><td><pre>{{ obj.metadata_json }}</pre></td></tr>
+  </table>
+</section>
+
+<section id="sql" class="data-panel">
+  <h4>Saved SQL</h4>
+  <table>
+    <tr><th>Name</th><th>Purpose</th><th>Last run</th></tr>
+    {% for item in related_sql %}
+    <tr><td><a href="{{ url_for('data.sql_detail_route', sql_id=item.saved_sql_id) }}">{{ item.sql_name }}</a></td><td>{{ item.purpose }}</td><td>{{ item.last_run_at }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section id="activity" class="data-panel">
+  <h4>Activity</h4>
+  <p>Discovery and metadata timestamps are shown in the overview panel. Detailed history will build from task records as scanners expand.</p>
+</section>
+{% endblock %}

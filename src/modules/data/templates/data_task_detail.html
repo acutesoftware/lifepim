@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<table>
+  <tr><th>Task</th><td>{{ task.task_name }}</td></tr>
+  <tr><th>Type</th><td>{{ task.task_type }}</td></tr>
+  <tr><th>Source/object/sql</th><td>{{ task.source_name or task.object_name or task.sql_name }}</td></tr>
+  <tr><th>Status</th><td>{{ task.status }}</td></tr>
+  <tr><th>Progress</th><td>{{ task.progress }}%</td></tr>
+  <tr><th>Started</th><td>{{ task.started_at }}</td></tr>
+  <tr><th>Finished</th><td>{{ task.finished_at }}</td></tr>
+  <tr><th>Parameters</th><td><pre>{{ task.parameters_json }}</pre></td></tr>
+  <tr><th>Result</th><td>{{ task.result_summary }}</td></tr>
+  <tr><th>Error</th><td>{{ task.error_message }}</td></tr>
+  <tr><th>Log</th><td><pre>{{ task.log_output }}</pre></td></tr>
+</table>
+{% endblock %}

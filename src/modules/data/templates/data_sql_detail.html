@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-detail-actions">
+  <a href="{{ url_for('data.sql_edit_route', sql_id=item.saved_sql_id) }}">Edit</a>
+  <a href="{{ url_for('data.sql_download_route', sql_id=item.saved_sql_id) }}">Download .sql</a>
+  <button type="button" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('sqlText').innerText)">Copy SQL</button>
+  <form method="post" action="{{ url_for('data.sql_run_route', sql_id=item.saved_sql_id) }}"><button>Submit as runner task</button></form>
+  <form method="post" action="{{ url_for('data.sql_delete_route', sql_id=item.saved_sql_id) }}" onsubmit="return confirm('Delete this saved SQL?');"><button>Delete</button></form>
+</div>
+
+<div class="data-panels">
+  <section><h4>Summary</h4>
+    <table>
+      <tr><th>Name</th><td>{{ item.sql_name }}</td></tr>
+      <tr><th>Target</th><td>{{ item.source_name }} {{ item.environment }}</td></tr>
+      <tr><th>Purpose</th><td>{{ item.purpose }}</td></tr>
+      <tr><th>Notes</th><td>{{ item.notes }}</td></tr>
+      <tr><th>Tags</th><td>{{ item.tags }}</td></tr>
+      <tr><th>Last run</th><td>{{ item.last_run_at }} {{ item.last_run_status }}</td></tr>
+    </table>
+  </section>
+  <section><h4>Related Objects</h4>
+    <table>
+      <tr><th>Object</th><th>Type</th><th>Relationship</th></tr>
+      {% for obj in related_objects %}
+      <tr><td><a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ obj.object_name }}</a></td><td>{{ obj.object_type }}</td><td>{{ obj.relationship_type }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+</div>
+<h4>SQL</h4>
+<pre id="sqlText" class="data-sql-code">{{ item.sql_text }}</pre>
+{% endblock %}

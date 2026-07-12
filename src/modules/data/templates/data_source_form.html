@@ -1,0 +1,259 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+{% if kind == 'DATABASE' %}
+<form class="data-form data-db-wizard" method="post" enctype="multipart/form-data" data-initial-type="{{ source.source_type if source else '' }}">
+  <input type="hidden" name="_existing" value="{{ '1' if source else '0' }}">
+  {% if error %}
+  <div class="data-form-error">{{ error }}</div>
+  {% endif %}
+
+  <section class="data-wizard-step">
+    <h4>1. Choose database type</h4>
+    <div class="data-connector-grid">
+      {% for source_type in source_types %}
+      <label class="data-connector-card">
+        <input type="radio" name="source_type" value="{{ source_type }}" {% if (submitted and submitted.source_type == source_type) or (source and source.source_type == source_type) %}checked{% endif %}>
+        <span>{{ source_type.replace('_', ' ') }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="data-wizard-step data-db-details" hidden>
+    <h4>2. Connection details</h4>
+    <div class="data-form-grid">
+      <label>Connection name
+        <input name="source_name" value="{{ submitted.source_name if submitted else (source.source_name if source else '') }}" placeholder="Optional; derived when possible">
+      </label>
+      <label>Environment
+        <input name="environment" value="{{ submitted.environment if submitted else (source.environment if source else '') }}" placeholder="dev, personal, prod">
+      </label>
+      <label>Tags
+        <input name="tags" value="{{ submitted.tags if submitted else (source.tags if source else '') }}" placeholder="finance, warehouse">
+      </label>
+    </div>
+
+    <div class="data-connector-panel" data-types="SQLITE CSV EXCEL DUCKDB">
+      <h4 class="data-panel-subtitle">Local data file</h4>
+      <div class="data-form-grid">
+        <label>File path
+          <input name="local_database_path" class="data-local-db-path" value="{{ submitted.local_database_path if submitted else (source.root_path if source and source.source_type in ['SQLITE', 'CSV', 'EXCEL', 'DUCKDB'] else '') }}" placeholder="Browse to select a data file">
+        </label>
+        <div class="data-browse-row">
+          <button type="button" class="data-server-file-picker">Browse...</button>
+          <span class="data-browse-status"></span>
+        </div>
+      </div>
+      <p class="data-field-note" data-file-note="SQLITE">For SQLite, selecting the file is enough. LifePIM saves the source, opens it read-only, scans tables and columns, and stores the metadata.</p>
+      <p class="data-field-note" data-file-note="CSV" hidden>For CSV, selecting the file is enough. LifePIM scans the header and stores it as one data object with columns.</p>
+      <p class="data-field-note" data-file-note="EXCEL" hidden>For Excel, selecting the workbook is enough. LifePIM scans each worksheet as a separate data object.</p>
+    </div>
+
+    <div class="data-connector-panel" data-types="FABRIC_SQL">
+      <h4 class="data-panel-subtitle">Fabric SQL endpoint</h4>
+      <label>Database connection string
+        <textarea name="db_connection_string" rows="5" placeholder="Server=...;Database=...;Authentication=...">{{ source.connection_options_json if source and source.source_type == 'FABRIC_SQL' else '' }}</textarea>
+      </label>
+      <p class="data-field-note">Do not paste plaintext passwords here. Use credential aliases, environment variables, or integrated authentication where possible.</p>
+    </div>
+
+    <div class="data-connector-panel" data-types="SQL_SERVER ORACLE">
+      <h4 class="data-panel-subtitle">Server database</h4>
+      <div class="data-form-grid">
+        <label>Host
+          <input name="host_name" value="{{ source.host_name if source else '' }}" placeholder="server or host name">
+        </label>
+        <label>Port
+          <input name="port" type="number" value="{{ source.port if source else '' }}">
+        </label>
+        <label>Database or service name
+          <input name="database_name" value="{{ source.database_name if source else '' }}">
+        </label>
+        <label>Default schema
+          <input name="default_schema" value="{{ source.default_schema if source else '' }}">
+        </label>
+        <label>Credential reference
+          <input name="credential_reference" value="{{ source.credential_reference if source else '' }}" placeholder="ENV:DB_USER, Windows credential key, alias">
+        </label>
+      </div>
+    </div>
+
+    <div class="data-connector-panel" data-types="ODBC">
+      <h4 class="data-panel-subtitle">ODBC connection</h4>
+      <div class="data-form-grid">
+        <label>DSN, driver, or host
+          <input name="odbc_host_name" value="{{ source.host_name if source and source.source_type == 'ODBC' else '' }}" placeholder="MyDsn or Driver={...}">
+        </label>
+        <label>Database
+          <input name="odbc_database_name" value="{{ source.database_name if source and source.source_type == 'ODBC' else '' }}">
+        </label>
+      </div>
+      <label>ODBC connection string
+        <textarea name="odbc_connection_string" rows="4" placeholder="DSN=...;Database=...">{{ source.connection_options_json if source and source.source_type == 'ODBC' else '' }}</textarea>
+      </label>
+    </div>
+
+    <button type="button" class="data-advanced-toggle" aria-expanded="false">Advanced &gt;&gt;</button>
+
+    <div class="data-advanced-panel" hidden>
+      <h4>Advanced connection and scan fields</h4>
+      <div class="data-form-grid">
+        <label>Host or device<input name="host_name" value="{{ source.host_name if source and source.source_type != 'ODBC' else '' }}"></label>
+        <label>Port<input name="port" type="number" value="{{ source.port if source else '' }}"></label>
+        <label>Database name<input name="database_name" value="{{ source.database_name if source and source.source_type != 'ODBC' else '' }}"></label>
+        <label>Default schema<input name="default_schema" value="{{ source.default_schema if source else '' }}"></label>
+        <label>Root path or local DB path<input name="root_path" value="{{ source.root_path if source else '' }}"></label>
+        <label>Credential reference<input name="credential_reference" value="{{ source.credential_reference if source else '' }}"></label>
+      </div>
+      <div class="data-form-grid data-form-wide">
+        <label>Include patterns<textarea name="include_patterns" rows="4">{{ source.include_patterns if source else '' }}</textarea></label>
+        <label>Exclude patterns<textarea name="exclude_patterns" rows="4">{{ source.exclude_patterns if source else '' }}</textarea></label>
+        <label>Archive rules<textarea name="archive_rules" rows="3">{{ source.archive_rules if source else '' }}</textarea></label>
+        <label>Ignore rules<textarea name="ignore_rules" rows="3">{{ source.ignore_rules if source else '' }}</textarea></label>
+        <label>Connection options JSON<textarea name="connection_options_json" rows="3">{{ source.connection_options_json if source else '' }}</textarea></label>
+        <label>Notes<textarea name="notes" rows="3">{{ source.notes if source else '' }}</textarea></label>
+      </div>
+      <div class="data-checks">
+        {% for name, label, default in [
+          ('is_active', 'Active', True),
+          ('recursive_scan', 'Recursive scan', True),
+          ('scan_views', 'Scan views', True),
+          ('scan_columns', 'Scan columns', True),
+          ('collect_row_counts', 'Collect row counts', False),
+          ('infer_schemas', 'Infer schemas', True),
+          ('extract_text_metadata', 'Extract text metadata', False),
+          ('collect_hashes', 'Collect file hashes', False)
+        ] %}
+          <label><input type="checkbox" name="{{ name }}" {% if (source and source[name]) or (not source and default) %}checked{% endif %}> {{ label }}</label>
+        {% endfor %}
+      </div>
+      <label>Row-count mode<input name="row_count_mode" value="{{ source.row_count_mode if source else '' }}"></label>
+    </div>
+
+    <div class="data-form-actions">
+      <button type="submit">Save and scan</button>
+      <a href="{{ url_for('data.database_sources_route') }}">Cancel</a>
+    </div>
+  </section>
+</form>
+
+<script>
+  (function () {
+    const form = document.querySelector(".data-db-wizard");
+    if (!form) return;
+    const details = form.querySelector(".data-db-details");
+    const panels = Array.from(form.querySelectorAll(".data-connector-panel"));
+    const advancedToggle = form.querySelector(".data-advanced-toggle");
+    const advancedPanel = form.querySelector(".data-advanced-panel");
+    const picker = form.querySelector(".data-server-file-picker");
+    const browseStatus = form.querySelector(".data-browse-status");
+    const localPath = form.querySelector("input[name='local_database_path']");
+    const fileNotes = Array.from(form.querySelectorAll("[data-file-note]"));
+
+    function selectedType() {
+      const checked = form.querySelector("input[name='source_type']:checked");
+      return checked ? checked.value : "";
+    }
+
+    function syncPanels() {
+      const type = selectedType();
+      details.hidden = !type;
+      panels.forEach((panel) => {
+        const types = (panel.dataset.types || "").split(/\s+/);
+        panel.hidden = !types.includes(type);
+      });
+      fileNotes.forEach((note) => {
+        note.hidden = note.dataset.fileNote !== type;
+      });
+    }
+
+    form.addEventListener("change", (event) => {
+      if (event.target.name === "source_type") syncPanels();
+    });
+
+    if (advancedToggle && advancedPanel) {
+      advancedToggle.addEventListener("click", () => {
+        const open = advancedPanel.hidden;
+        advancedPanel.hidden = !open;
+        advancedToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        advancedToggle.textContent = open ? "Advanced <<" : "Advanced >>";
+      });
+    }
+
+    if (picker && localPath) {
+      picker.addEventListener("click", async () => {
+        if (browseStatus) browseStatus.textContent = "Opening file picker...";
+        try {
+          const response = await fetch("{{ url_for('data.database_source_browse_sqlite_route') }}?type=" + encodeURIComponent(selectedType()));
+          const payload = await response.json();
+          if (!response.ok || payload.error) {
+            throw new Error(payload.error || "Browse failed");
+          }
+          if (payload.path) {
+            localPath.value = payload.path;
+            if (browseStatus) browseStatus.textContent = "Selected";
+          } else if (browseStatus) {
+            browseStatus.textContent = "No file selected";
+          }
+        } catch (error) {
+          if (browseStatus) browseStatus.textContent = error.message;
+        }
+      });
+    }
+
+    syncPanels();
+  })();
+</script>
+
+{% else %}
+<form class="data-form" method="post">
+  <input type="hidden" name="_existing" value="{{ '1' if source else '0' }}">
+  <div class="data-form-grid">
+    <label>Source name<input name="source_name" required value="{{ source.source_name if source else '' }}"></label>
+    <label>Source type
+      <select name="source_type">
+        {% for source_type in source_types %}
+        <option value="{{ source_type }}" {% if source and source.source_type == source_type %}selected{% endif %}>{{ source_type }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Environment<input name="environment" value="{{ source.environment if source else '' }}"></label>
+    <label>Host or device<input name="host_name" value="{{ source.host_name if source else '' }}"></label>
+    <label>Root path<input name="root_path" value="{{ source.root_path if source else '' }}"></label>
+    <label>Tags<input name="tags" value="{{ source.tags if source else '' }}" placeholder="finance, warehouse"></label>
+  </div>
+
+  <div class="data-form-grid data-form-wide">
+    <label>Include patterns<textarea name="include_patterns" rows="4">{{ source.include_patterns if source else '' }}</textarea></label>
+    <label>Exclude patterns<textarea name="exclude_patterns" rows="4">{{ source.exclude_patterns if source else '' }}</textarea></label>
+    <label>Archive rules<textarea name="archive_rules" rows="3">{{ source.archive_rules if source else '' }}</textarea></label>
+    <label>Ignore rules<textarea name="ignore_rules" rows="3">{{ source.ignore_rules if source else '**/.git/**&#10;**/temp/**&#10;**/backup/**&#10;*.tmp&#10;~$*' }}</textarea></label>
+    <label>Connection options JSON<textarea name="connection_options_json" rows="3">{{ source.connection_options_json if source else '' }}</textarea></label>
+    <label>Notes<textarea name="notes" rows="3">{{ source.notes if source else '' }}</textarea></label>
+  </div>
+
+  <div class="data-checks">
+    {% for name, label, default in [
+      ('is_active', 'Active', True),
+      ('recursive_scan', 'Recursive scan', True),
+      ('scan_views', 'Scan views', True),
+      ('scan_columns', 'Scan columns', True),
+      ('collect_row_counts', 'Collect row counts', False),
+      ('infer_schemas', 'Infer schemas', True),
+      ('extract_text_metadata', 'Extract text metadata', False),
+      ('collect_hashes', 'Collect file hashes', False)
+    ] %}
+      <label><input type="checkbox" name="{{ name }}" {% if (source and source[name]) or (not source and default) %}checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+  </div>
+
+  <label>Row-count mode<input name="row_count_mode" value="{{ source.row_count_mode if source else '' }}"></label>
+  <div class="data-form-actions">
+    <button type="submit">Save</button>
+    <a href="{{ url_for('data.file_sources_route') }}">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

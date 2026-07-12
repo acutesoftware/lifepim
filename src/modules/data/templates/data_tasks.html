@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<table>
+  <tr><th>Task</th><th>Type</th><th>Source/object</th><th>Status</th><th>Progress</th><th>Started</th><th>Finished</th><th>Result</th><th>Error</th></tr>
+  {% for task in tasks %}
+  <tr>
+    <td><a href="{{ url_for('data.task_detail_route', task_id=task.data_task_id) }}">{{ task.task_name }}</a></td>
+    <td>{{ task.task_type }}</td>
+    <td>{{ task.source_name or task.object_name or task.sql_name }}</td>
+    <td>{{ task.status }}</td>
+    <td>{{ task.progress }}%</td>
+    <td>{{ task.started_at }}</td>
+    <td>{{ task.finished_at }}</td>
+    <td>{{ task.result_summary }}</td>
+    <td>{{ task.error_message }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

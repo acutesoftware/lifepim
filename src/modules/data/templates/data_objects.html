@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-shell">
+  <aside class="data-filter-panel">
+    <form method="get" class="data-filter-form">
+      <label>Search<input name="q" value="{{ filters.q }}"></label>
+      <label>Source
+        <select name="source_id">
+          <option value="">Any</option>
+          {% for source in sources %}
+          <option value="{{ source.data_source_id }}" {% if filters.source_id == source.data_source_id|string %}selected{% endif %}>{{ source.source_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Object type
+        <select name="object_type">
+          <option value="">Any</option>
+          {% for item in object_types %}
+          <option value="{{ item }}" {% if filters.object_type == item %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Catalogue level
+        <select name="catalogue_level">
+          <option value="">Any</option>
+          {% for item in catalogue_levels %}
+          <option value="{{ item }}" {% if filters.catalogue_level == item %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Environment
+        <select name="environment">
+          <option value="">Any</option>
+          {% for item in environments %}
+          <option value="{{ item }}" {% if filters.environment == item %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Favourite
+        <select name="favourite"><option value="">Any</option><option value="1" {% if filters.favourite == '1' %}selected{% endif %}>Yes</option><option value="0" {% if filters.favourite == '0' %}selected{% endif %}>No</option></select>
+      </label>
+      <label>Hidden
+        <select name="hidden"><option value="">Any</option><option value="0" {% if filters.hidden == '0' %}selected{% endif %}>Visible</option><option value="1" {% if filters.hidden == '1' %}selected{% endif %}>Hidden</option></select>
+      </label>
+      <button type="submit">Apply</button>
+      <a href="{{ url_for('data.objects_route') }}">Reset</a>
+    </form>
+  </aside>
+
+  <section class="data-main-panel">
+    <table>
+      <tr>
+        <th>Fav</th><th>Object name</th><th>Type</th><th>Source</th><th>Schema/folder</th><th>Level</th><th>Rows</th><th>Cols</th><th>Size</th><th>Last seen</th><th>Profile</th><th>Quality</th><th>Tags</th><th>Actions</th>
+      </tr>
+      {% for obj in objects %}
+      {% set is_previewable = obj.source_type in ['SQLITE', 'CSV', 'EXCEL'] and obj.object_type in ['TABLE', 'VIEW', 'CSV_TABLE', 'EXCEL_SHEET'] %}
+      <tr>
+        <td>{{ '*' if obj.is_favourite else '' }}</td>
+        <td>
+          <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id) if is_previewable else url_for('data.object_detail_route', object_id=obj.data_object_id) }}">
+            {{ obj.display_name or obj.object_name }}
+          </a>
+        </td>
+        <td>{{ obj.object_type }}</td>
+        <td>{{ obj.source_name }}</td>
+        <td>{{ obj.schema_name or obj.parent_path }}</td>
+        <td>{{ obj.catalogue_level }}</td>
+        <td>{{ obj.row_count }}</td>
+        <td>{{ obj.column_count }}</td>
+        <td>{{ obj.size_bytes }}</td>
+        <td>{{ obj.last_seen_at }}</td>
+        <td>{{ obj.profile_status }}</td>
+        <td>{{ obj.quality_status }}</td>
+        <td>{{ obj.tags }}</td>
+        <td class="data-actions-cell">
+          <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ 'Metadata' if is_previewable else 'View' }}</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+</div>
+{% endblock %}

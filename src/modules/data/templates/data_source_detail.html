@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-detail-actions">
+  {% if source.source_kind == 'DATABASE' %}
+    <a href="{{ url_for('data.database_source_edit_route', source_id=source.data_source_id) }}">Edit source</a>
+  {% else %}
+    <a href="{{ url_for('data.file_source_edit_route', source_id=source.data_source_id) }}">Edit source</a>
+  {% endif %}
+  <form method="post" action="{{ url_for('data.source_scan_route', source_id=source.data_source_id) }}"><button>Scan now</button></form>
+  {% if source.source_kind == 'DATABASE' %}
+  <form method="post" action="{{ url_for('data.source_test_route', source_id=source.data_source_id) }}"><button>Test connection</button></form>
+  {% endif %}
+  <form method="post" action="{{ url_for('data.source_delete_route', source_id=source.data_source_id) }}" onsubmit="return confirm('Delete this source?');"><button>Delete</button></form>
+</div>
+
+<div class="data-panels">
+  <section><h4>Summary</h4>
+    <table>
+      <tr><th>Name</th><td>{{ source.source_name }}</td></tr>
+      <tr><th>Type</th><td>{{ source.source_kind }} / {{ source.source_type }}</td></tr>
+      <tr><th>Host/path</th><td>{{ source.host_name or source.root_path }}</td></tr>
+      <tr><th>Environment</th><td>{{ source.environment }}</td></tr>
+      <tr><th>Active</th><td>{{ 'Yes' if source.is_active else 'No' }}</td></tr>
+      <tr><th>Tags</th><td>{{ source.tags }}</td></tr>
+      <tr><th>Last scan</th><td>{{ source.last_scan_completed_at }} {{ source.last_scan_status }}</td></tr>
+      <tr><th>Notes</th><td>{{ source.notes }}</td></tr>
+    </table>
+  </section>
+  <section><h4>Scan Configuration</h4>
+    <table>
+      <tr><th>Include</th><td><pre>{{ source.include_patterns }}</pre></td></tr>
+      <tr><th>Exclude</th><td><pre>{{ source.exclude_patterns }}</pre></td></tr>
+      <tr><th>Ignore</th><td><pre>{{ source.ignore_rules }}</pre></td></tr>
+      <tr><th>Columns / views</th><td>Columns: {{ source.scan_columns }} Views: {{ source.scan_views }}</td></tr>
+    </table>
+  </section>
+</div>
+
+<h4>Objects</h4>
+<table>
+  <tr><th>Name</th><th>Type</th><th>Level</th><th>Rows</th><th>Columns</th><th>Last seen</th><th>Actions</th></tr>
+  {% for obj in objects %}
+  {% set is_previewable = obj.source_type in ['SQLITE', 'CSV', 'EXCEL'] and obj.object_type in ['TABLE', 'VIEW', 'CSV_TABLE', 'EXCEL_SHEET'] %}
+  <tr>
+    <td>
+      <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id) if is_previewable else url_for('data.object_detail_route', object_id=obj.data_object_id) }}">
+        {{ obj.object_name }}
+      </a>
+    </td>
+    <td>{{ obj.object_type }}</td><td>{{ obj.catalogue_level }}</td><td>{{ obj.row_count }}</td><td>{{ obj.column_count }}</td><td>{{ obj.last_seen_at }}</td>
+    <td class="data-actions-cell">
+      <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ 'Metadata' if is_previewable else 'View' }}</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h4>Activity</h4>
+<table>
+  <tr><th>Task</th><th>Status</th><th>Started</th><th>Result</th></tr>
+  {% for task in tasks %}
+  <tr><td><a href="{{ url_for('data.task_detail_route', task_id=task.data_task_id) }}">{{ task.task_name }}</a></td><td>{{ task.status }}</td><td>{{ task.started_at }}</td><td>{{ task.result_summary }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-detail-actions">
+  <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">View metadata</a>
+  <a href="{{ url_for('data.objects_route', source_id=obj.data_source_id) }}">Back to objects</a>
+</div>
+
+<section class="data-panel">
+  <h4>{{ obj.source_name }} / {{ obj.object_name }}</h4>
+  <table>
+    <tr><th>Source type</th><td>{{ obj.source_type }}</td><th>Object type</th><td>{{ obj.object_type }}</td></tr>
+    <tr><th>Full name/path</th><td colspan="3">{{ obj.full_name or obj.full_path }}</td></tr>
+  </table>
+</section>
+
+{% if error %}
+<div class="data-form-error">{{ error }}</div>
+{% else %}
+<div class="data-preview-summary">Showing top {{ preview.rows|length }} rows, maximum 200.</div>
+<div class="tabular-scroll data-preview-grid">
+  <table>
+    <tr>
+      {% for col in preview.columns %}
+      <th>{{ col }}</th>
+      {% endfor %}
+    </tr>
+    {% for row in preview.rows %}
+    <tr>
+      {% for value in row %}
+      <td>{{ value }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}
