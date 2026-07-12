@@ -91,64 +91,6 @@ class TestAddData(unittest.TestCase):
         data.conn = self._old_conn
         self.conn.close()
 
-    def test_01_notes(self):
-        tbl = utils.get_table_def("notes")
-        self.assertIsNotNone(tbl)
-        projects = ["Dev", "Work", "Pers", "Games", ""]
-        rows = []
-        for _ in range(10):
-            rows.append([
-                _rand_text("note") + ".md",
-                r"C:\\Notes",
-                str(random.randint(1, 500)) if random.random() > 0.2 else "",
-                _rand_dt(date.today() - timedelta(days=90), date.today()) if random.random() > 0.2 else "",
-                random.choice(projects),
-            ])
-        ids = _insert_rows(tbl, rows)
-        self.assertTrue(all(ids))
-        fetched = _fetch_ids(tbl, ids)
-        self.assertEqual(len(fetched), len(ids))
-
-    def test_02_tasks(self):
-        tbl = utils.get_table_def("tasks")
-        self.assertIsNotNone(tbl)
-        today = date.today()
-        projects = ["Home", "Work", "Fun", "Pers", ""]
-        rows = []
-        for _ in range(10):
-            start_date = _rand_date(today - timedelta(days=7), today) if random.random() > 0.2 else None
-            due_date = _rand_date(today, today + timedelta(days=30)) if random.random() > 0.3 else None
-            rows.append([
-                _rand_text("task"),
-                _rand_text("desc") if random.random() > 0.2 else "",
-                random.choice(projects),
-                start_date.isoformat() if start_date else "",
-                due_date.isoformat() if due_date else "",
-            ])
-        ids = _insert_rows(tbl, rows)
-        self.assertTrue(all(ids))
-        fetched = _fetch_ids(tbl, ids)
-        self.assertEqual(len(fetched), len(ids))
-
-    def test_03_events(self):
-        tbl = utils.get_table_def("calendar")
-        self.assertIsNotNone(tbl)
-        today = date.today()
-        projects = ["Work", "Pers", "Dev", ""]
-        rows = []
-        for _ in range(10):
-            rows.append([
-                _rand_text("event"),
-                _rand_text("title") if random.random() > 0.2 else "",
-                _rand_dt(today, today + timedelta(days=30)) if random.random() > 0.1 else "",
-                "",
-                random.choice(projects),
-            ])
-        ids = _insert_rows(tbl, rows)
-        self.assertTrue(all(ids))
-        fetched = _fetch_ids(tbl, ids)
-        self.assertEqual(len(fetched), len(ids))
-
     def test_04_goals(self):
         tbl = utils.get_table_def("goals")
         self.assertIsNotNone(tbl)

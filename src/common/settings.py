@@ -73,6 +73,14 @@ AUDIO_DEFAULTS = {
     "audio.visualization": ("bars", "Audio", "Default visualisation"),
 }
 
+MEDIA_THUMBNAIL_SIZES = {"tiny", "small", "medium", "large"}
+MEDIA_PADDING_SIZES = {"none", "thin", "wide"}
+
+MEDIA_DEFAULTS = {
+    "media.display.thumbnail_size": ("small", "Media", "Thumbnail size"),
+    "media.display.padding_size": ("thin", "Media", "Padding size"),
+}
+
 _SCHEMA_READY_CONN_IDS = set()
 
 
@@ -91,6 +99,7 @@ def ensure_settings_schema(conn=None):
         **CALENDAR_VIEW_DEFAULTS,
         **GENERAL_DEFAULTS,
         **AUDIO_DEFAULTS,
+        **MEDIA_DEFAULTS,
     }.items():
         conn.execute(
             "INSERT OR IGNORE INTO sys_settings "
@@ -177,6 +186,47 @@ def get_audio_settings(conn=None):
         ),
         "visualizations": AUDIO_VISUALIZATIONS,
     }
+
+
+def get_media_settings(conn=None):
+    return {
+        "thumbnail_size": normalize_media_thumbnail_size(
+            get_setting("media.display.thumbnail_size", "small", conn)
+        ),
+        "padding_size": normalize_media_padding_size(
+            get_setting("media.display.padding_size", "thin", conn)
+        ),
+        "thumbnail_sizes": {
+            "tiny": "Tiny",
+            "small": "Small",
+            "medium": "Medium",
+            "large": "Large",
+        },
+        "padding_sizes": {
+            "none": "None",
+            "thin": "Thin",
+            "wide": "Wide",
+        },
+    }
+
+
+def save_media_settings(values, conn=None):
+    conn = db._get_conn() if conn is None else conn
+    ensure_settings_schema(conn)
+    set_setting(
+        "media.display.thumbnail_size",
+        normalize_media_thumbnail_size(values.get("thumbnail_size")),
+        "Media",
+        "Thumbnail size",
+        conn,
+    )
+    set_setting(
+        "media.display.padding_size",
+        normalize_media_padding_size(values.get("padding_size")),
+        "Media",
+        "Padding size",
+        conn,
+    )
 
 
 def save_audio_settings(values, conn=None):
@@ -273,6 +323,18 @@ def normalize_calendar_thumbnail_limit(value):
 def normalize_audio_visualization(value):
     normalized = str(value or "bars").strip().lower()
     return normalized if normalized in AUDIO_VISUALIZATIONS else "bars"
+
+
+def normalize_media_thumbnail_size(value):
+    normalized = str(value or "small").strip().lower()
+    if normalized == "med":
+        normalized = "medium"
+    return normalized if normalized in MEDIA_THUMBNAIL_SIZES else "small"
+
+
+def normalize_media_padding_size(value):
+    normalized = str(value or "thin").strip().lower()
+    return normalized if normalized in MEDIA_PADDING_SIZES else "thin"
 
 
 def _utc_now():

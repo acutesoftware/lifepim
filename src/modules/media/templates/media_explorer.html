@@ -83,7 +83,7 @@
 {% endmacro %}
 
 {% block module_content %}
-  <div class="media-explorer">
+  <div class="media-explorer media-thumb-{{ media_settings.thumbnail_size }} media-padding-{{ media_settings.padding_size }}">
     <div class="media-toolbar">
       <form class="media-toolbar-form" method="get" action="{{ url_for('media.media_explorer_route') }}">
         <input type="hidden" name="view" value="{{ view }}">
@@ -475,6 +475,7 @@
             {% if focus_item.folder_path %}
               <a href="{{ url_for('media.open_media_folder_route', media_id=focus_item.media_id) }}">Open folder</a>
             {% endif %}
+            <a href="{{ url_for('media.launch_media_file_route', media_id=focus_item.media_id) }}">Launch</a>
           </div>
         {% else %}
           <div class="media-empty">Select a media item to inspect.</div>

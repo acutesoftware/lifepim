@@ -16,6 +16,7 @@ from common.media_schema import ensure_media_schema
 
 
 PROJECT_LOAD_TEST = "LoadTest"
+LOAD_CORE_RECORDS_ENV = "LIFEPIM_LOAD_CORE_RECORDS"
 
 test_type = 'FULL'
 #test_type = 'Light'
@@ -336,6 +337,10 @@ def load_apps(folder_path=FOLDER_APPS, project=PROJECT_LOAD_TEST):
     return count
 
 
+def _load_core_records_enabled():
+    return os.getenv(LOAD_CORE_RECORDS_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def main():
 
     print('Run order ')
@@ -343,9 +348,12 @@ def main():
     print(' 2. Load sample data.  python LOAD_TESTING.py')
     print(' 3. Run ETL_MAP_FOLDERS.BAT (now also backfills folder_id).')
 
-    load_notes()
-    load_tasks()
-    load_events()
+    if _load_core_records_enabled():
+        load_notes()
+        load_tasks()
+        load_events()
+    else:
+        print(f"Skipping notes, tasks, and calendar events. Set {LOAD_CORE_RECORDS_ENV}=1 to load them.")
     load_goals()
     load_how()
     load_data()

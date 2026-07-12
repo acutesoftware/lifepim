@@ -234,7 +234,16 @@ def settings_route():
                 message = f"Config settings saved ({saved_count} updated, {reset_count} reset)."
         elif active_settings_tab == "media":
             action = request.form.get("action", "")
-            if action == "rebuild_media_events":
+            if action == "save_media_display":
+                settings_mod.save_media_settings(
+                    {
+                        "thumbnail_size": request.form.get("thumbnail_size"),
+                        "padding_size": request.form.get("padding_size"),
+                    },
+                    conn,
+                )
+                message = "Media display settings saved."
+            elif action == "rebuild_media_events":
                 try:
                     from modules.media import routes as media_routes
 
@@ -280,10 +289,13 @@ def settings_route():
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
     calendar_sources = calendar_index.fetch_calendar_sources(conn)
+    media_settings = settings_mod.get_media_settings(conn)
     audio_settings = settings_mod.get_audio_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
     config_settings = cfg.list_config_settings(conn)
     all_settings = settings_mod.list_settings(conn)
+    filelist_image_where = media_migration.default_image_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_IMAGE_WHERE", "")
+    filelist_audio_where = media_migration.default_audio_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_AUDIO_WHERE", "")
 
     return render_template(
         "admin_settings.html",
@@ -296,13 +308,14 @@ def settings_route():
         active_settings_tab=active_settings_tab,
         calendar_view=calendar_view,
         calendar_sources=calendar_sources,
+        media_settings=media_settings,
         audio_settings=audio_settings,
         general_settings=general_settings,
         config_settings=config_settings,
         all_settings=all_settings,
         filelist_db=cfg.FILELIST_DB,
-        filelist_image_where=media_migration.default_image_where(),
-        filelist_audio_where=media_migration.default_audio_where(),
+        filelist_image_where=filelist_image_where,
+        filelist_audio_where=filelist_audio_where,
         notes_sync_root=_notes_live_root(conn),
         now=datetime.now(),
     )

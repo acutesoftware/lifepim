@@ -117,8 +117,38 @@
       {% elif active_settings_tab == 'media' %}
         <h4>Media</h4>
         <div class="settings-form">
-          <div class="settings-fieldset">
-            <div class="settings-fieldset-title">Filelister Migration</div>
+          <form method="post" action="{{ url_for('admin.settings_route') }}">
+            <input type="hidden" name="tab" value="media">
+            <div class="settings-fieldset">
+              <div class="settings-fieldset-title">Media Settings</div>
+              <label>
+                Thumbnail size
+                <select name="thumbnail_size">
+                  {% for value, label in media_settings.thumbnail_sizes.items() %}
+                    <option value="{{ value }}" {% if media_settings.thumbnail_size == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                Padding size
+                <select name="padding_size">
+                  {% for value, label in media_settings.padding_sizes.items() %}
+                    <option value="{{ value }}" {% if media_settings.padding_size == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button type="submit" name="action" value="save_media_display">Save media settings</button>
+            </div>
+          </form>
+          <button
+            type="button"
+            class="settings-disclosure-button"
+            data-settings-disclosure="filelister-migration"
+            data-show-label="FileLister Migration &gt;&gt;"
+            data-hide-label="Hide migration settings"
+          >FileLister Migration &gt;&gt;</button>
+          <div class="settings-fieldset settings-disclosure-panel" id="filelister-migration" hidden>
+            <div class="settings-fieldset-title">FileLister Migration</div>
             <p class="settings-empty">Source database: {{ filelist_db }}</p>
             <form method="post" action="{{ url_for('admin.settings_route') }}">
               <input type="hidden" name="tab" value="media">
@@ -142,6 +172,18 @@
               <button type="submit" name="action" value="rebuild_media_events">Rebuild media events</button>
             </form>
           </div>
+          <script>
+            document.querySelectorAll("[data-settings-disclosure]").forEach((button) => {
+              const panel = document.getElementById(button.dataset.settingsDisclosure);
+              if (!panel) return;
+              button.disabled = false;
+              button.textContent = panel.hidden ? button.dataset.showLabel : button.dataset.hideLabel;
+              button.addEventListener("click", () => {
+                panel.hidden = !panel.hidden;
+                button.textContent = panel.hidden ? button.dataset.showLabel : button.dataset.hideLabel;
+              });
+            });
+          </script>
         </div>
       {% elif active_settings_tab == 'audio' %}
         <h4>Audio</h4>
@@ -174,7 +216,10 @@
               <input type="text" name="notes_folder" value="{{ notes_sync_root }}" placeholder="N:\duncan\LifePIM_Data\DATA\notes">
             </label>
           </div>
-          <button type="submit">Sync notes</button>
+          <div class="settings-action-row">
+            <button type="submit">Sync notes</button>
+            <span class="settings-action-note">Refreshes metadata for all notes in this folder and adds new files.</span>
+          </div>
         </form>
         <form method="post" action="{{ url_for('notes.migrate_notes_source_route') }}" class="settings-form">
           <div class="settings-fieldset">
@@ -192,7 +237,10 @@
               Delete existing notes and note links before importing this folder
             </label>
           </div>
-          <button type="submit">Migrate notes source</button>
+          <div class="settings-action-row">
+            <button type="submit">Migrate notes source</button>
+            <span class="settings-action-note">WARNING: points notes to a different root folder and can replace existing note rows.</span>
+          </div>
         </form>
       {% elif active_settings_tab == 'config' %}
         <h4>Config</h4>

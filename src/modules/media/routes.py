@@ -10,6 +10,7 @@ from flask import Blueprint, render_template, request, url_for, send_file, abort
 
 from common import data as db
 from common import config as cfg
+from common import settings as settings_mod
 from common.media_schema import ensure_media_schema
 from common.search import parse_search_terms
 from common.utils import get_side_tabs, get_tabs, paginate_total, build_pagination
@@ -1026,6 +1027,7 @@ def media_explorer_route():
         focus_albums = _fetch_album_memberships(conn, focus_item["media_id"])
         focus_events = _fetch_event_memberships(conn, focus_item["media_id"])
         focus_item["folder_path"] = _build_media_folder_path(focus_item)
+    media_settings = settings_mod.get_media_settings(conn)
 
     return render_template(
         "media_explorer.html",
@@ -1088,6 +1090,7 @@ def media_explorer_route():
         focus_query=focus_query,
         nav_query=nav_query,
         event_nav_query=event_nav_query,
+        media_settings=media_settings,
     )
 
 
@@ -1328,6 +1331,25 @@ def open_media_folder_route(media_id):
         subprocess.Popen(["open", folder_path])
     else:
         subprocess.Popen(["xdg-open", folder_path])
+    return redirect(request.referrer or url_for("media.media_explorer_route", focus_id=media_id))
+
+
+@media_bp.route("/launch/<int:media_id>")
+def launch_media_file_route(media_id):
+    _ensure_schema()
+    conn = db._get_conn()
+    item = _fetch_media_by_id(conn, media_id)
+    if not item:
+        abort(404)
+    full_path = _build_media_path(item)
+    if not full_path or not os.path.isfile(full_path):
+        abort(404)
+    if sys.platform.startswith("win"):
+        os.startfile(full_path)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", full_path])
+    else:
+        subprocess.Popen(["xdg-open", full_path])
     return redirect(request.referrer or url_for("media.media_explorer_route", focus_id=media_id))
 
 
