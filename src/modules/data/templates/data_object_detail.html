@@ -4,14 +4,14 @@
 
 <div class="data-detail-actions">
   {% if obj.source_type in ['SQLITE', 'CSV', 'EXCEL'] and obj.object_type in ['TABLE', 'VIEW', 'CSV_TABLE', 'EXCEL_SHEET'] %}
-  <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id) }}">View data</a>
+  <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id, proj=current_proj) if current_proj else url_for('data.object_data_route', object_id=obj.data_object_id) }}">View data</a>
   {% endif %}
-  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='REGISTERED') }}"><button>Promote to Registered</button></form>
-  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='MANAGED') }}"><button>Promote to Managed</button></form>
-  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='DISCOVERED') }}"><button>Demote</button></form>
-  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='favourite') }}"><button>{{ 'Unfavourite' if obj.is_favourite else 'Favourite' }}</button></form>
-  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='hidden') }}"><button>{{ 'Unhide' if obj.is_hidden else 'Hide' }}</button></form>
-  <form method="post" action="{{ url_for('data.object_profile_route', object_id=obj.data_object_id) }}"><button>Profile now</button></form>
+  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='REGISTERED', proj=current_proj) if current_proj else url_for('data.object_level_route', object_id=obj.data_object_id, level='REGISTERED') }}"><button>Promote to Registered</button></form>
+  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='MANAGED', proj=current_proj) if current_proj else url_for('data.object_level_route', object_id=obj.data_object_id, level='MANAGED') }}"><button>Promote to Managed</button></form>
+  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='DISCOVERED', proj=current_proj) if current_proj else url_for('data.object_level_route', object_id=obj.data_object_id, level='DISCOVERED') }}"><button>Demote</button></form>
+  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='favourite', proj=current_proj) if current_proj else url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='favourite') }}"><button>{{ 'Unfavourite' if obj.is_favourite else 'Favourite' }}</button></form>
+  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='hidden', proj=current_proj) if current_proj else url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='hidden') }}"><button>{{ 'Unhide' if obj.is_hidden else 'Hide' }}</button></form>
+  <form method="post" action="{{ url_for('data.object_profile_route', object_id=obj.data_object_id, proj=current_proj) if current_proj else url_for('data.object_profile_route', object_id=obj.data_object_id) }}"><button>Profile now</button></form>
 </div>
 
 <div class="data-tabs-lite">
@@ -29,6 +29,14 @@
       <label>Object type<input readonly value="{{ obj.object_type }}"></label>
       <label>Source<input readonly value="{{ obj.source_name }}"></label>
       <label>Schema or folder<input readonly value="{{ obj.schema_name or obj.parent_path }}"></label>
+      <label>Project
+        <select name="project">
+          <option value="">None</option>
+          {% for option in project_options %}
+          <option value="{{ option.id }}" {% if obj.project == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
+          {% endfor %}
+        </select>
+      </label>
       <label>Catalogue level
         <select name="catalogue_level">
           {% for level in levels %}
@@ -82,7 +90,7 @@
   <table>
     <tr><th>Name</th><th>Purpose</th><th>Last run</th></tr>
     {% for item in related_sql %}
-    <tr><td><a href="{{ url_for('data.sql_detail_route', sql_id=item.saved_sql_id) }}">{{ item.sql_name }}</a></td><td>{{ item.purpose }}</td><td>{{ item.last_run_at }}</td></tr>
+    <tr><td><a href="{{ url_for('data.sql_detail_route', sql_id=item.saved_sql_id, proj=current_proj) if current_proj else url_for('data.sql_detail_route', sql_id=item.saved_sql_id) }}">{{ item.sql_name }}</a></td><td>{{ item.purpose }}</td><td>{{ item.last_run_at }}</td></tr>
     {% endfor %}
   </table>
 </section>

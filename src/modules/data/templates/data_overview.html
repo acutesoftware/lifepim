@@ -5,21 +5,21 @@
 <div class="data-shell">
   <aside class="data-filter-panel">
     <h4>Quick Actions</h4>
-    <a class="data-action" href="{{ url_for('data.database_source_new_route') }}">Add database source</a>
-    <a class="data-action" href="{{ url_for('data.file_source_new_route') }}">Add file source</a>
-    <a class="data-action" href="{{ url_for('data.objects_route') }}">Search objects</a>
-    <a class="data-action" href="{{ url_for('data.sql_new_route') }}">Add saved SQL</a>
+    <a class="data-action" href="{{ url_for('data.database_source_new_route', proj=current_proj) if current_proj else url_for('data.database_source_new_route') }}">Add database source</a>
+    <a class="data-action" href="{{ url_for('data.file_source_new_route', proj=current_proj) if current_proj else url_for('data.file_source_new_route') }}">Add file source</a>
+    <a class="data-action" href="{{ url_for('data.objects_route', proj=current_proj) if current_proj else url_for('data.objects_route') }}">Search objects</a>
+    <a class="data-action" href="{{ url_for('data.sql_new_route', proj=current_proj) if current_proj else url_for('data.sql_new_route') }}">Add saved SQL</a>
   </aside>
 
   <section class="data-main-panel">
     <div class="data-card-grid">
-      <a class="data-summary-card" href="{{ url_for('data.database_sources_route') }}"><span>Database sources</span><strong>{{ counts.database_sources }}</strong></a>
-      <a class="data-summary-card" href="{{ url_for('data.file_sources_route') }}"><span>File sources</span><strong>{{ counts.file_sources }}</strong></a>
-      <a class="data-summary-card" href="{{ url_for('data.objects_route', catalogue_level='DISCOVERED') }}"><span>Discovered objects</span><strong>{{ counts.discovered_objects }}</strong></a>
-      <a class="data-summary-card" href="{{ url_for('data.objects_route', catalogue_level='REGISTERED') }}"><span>Registered objects</span><strong>{{ counts.registered_objects }}</strong></a>
-      <a class="data-summary-card" href="{{ url_for('data.objects_route', catalogue_level='MANAGED') }}"><span>Managed objects</span><strong>{{ counts.managed_objects }}</strong></a>
-      <a class="data-summary-card" href="{{ url_for('data.sql_route') }}"><span>Saved SQL</span><strong>{{ counts.saved_sql }}</strong></a>
-      <a class="data-summary-card" href="{{ url_for('data.tasks_route') }}"><span>Open or failed tasks</span><strong>{{ counts.problem_tasks }}</strong></a>
+      <a class="data-summary-card" href="{{ url_for('data.database_sources_route', proj=current_proj) if current_proj else url_for('data.database_sources_route') }}"><span>Database sources</span><strong>{{ counts.database_sources }}</strong></a>
+      <a class="data-summary-card" href="{{ url_for('data.file_sources_route', proj=current_proj) if current_proj else url_for('data.file_sources_route') }}"><span>File sources</span><strong>{{ counts.file_sources }}</strong></a>
+      <a class="data-summary-card" href="{{ url_for('data.objects_route', catalogue_level='DISCOVERED', proj=current_proj) if current_proj else url_for('data.objects_route', catalogue_level='DISCOVERED') }}"><span>Discovered objects</span><strong>{{ counts.discovered_objects }}</strong></a>
+      <a class="data-summary-card" href="{{ url_for('data.objects_route', catalogue_level='REGISTERED', proj=current_proj) if current_proj else url_for('data.objects_route', catalogue_level='REGISTERED') }}"><span>Registered objects</span><strong>{{ counts.registered_objects }}</strong></a>
+      <a class="data-summary-card" href="{{ url_for('data.objects_route', catalogue_level='MANAGED', proj=current_proj) if current_proj else url_for('data.objects_route', catalogue_level='MANAGED') }}"><span>Managed objects</span><strong>{{ counts.managed_objects }}</strong></a>
+      <a class="data-summary-card" href="{{ url_for('data.sql_route', proj=current_proj) if current_proj else url_for('data.sql_route') }}"><span>Saved SQL</span><strong>{{ counts.saved_sql }}</strong></a>
+      <a class="data-summary-card" href="{{ url_for('data.tasks_route', proj=current_proj) if current_proj else url_for('data.tasks_route') }}"><span>Open or failed tasks</span><strong>{{ counts.problem_tasks }}</strong></a>
       <span class="data-summary-card"><span>Sources not scanned recently</span><strong>{{ counts.stale_sources }}</strong></span>
     </div>
 

@@ -3,8 +3,8 @@
 {% include "data_nav.html" %}
 
 <div class="data-detail-actions">
-  <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">View metadata</a>
-  <a href="{{ url_for('data.objects_route', source_id=obj.data_source_id) }}">Back to objects</a>
+  <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id, proj=current_proj) if current_proj else url_for('data.object_detail_route', object_id=obj.data_object_id) }}">View metadata</a>
+  <a href="{{ url_for('data.objects_route', source_id=obj.data_source_id, proj=current_proj) if current_proj else url_for('data.objects_route', source_id=obj.data_source_id) }}">Back to objects</a>
 </div>
 
 <section class="data-panel">

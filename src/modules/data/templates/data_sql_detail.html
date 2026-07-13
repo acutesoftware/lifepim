@@ -3,7 +3,7 @@
 {% include "data_nav.html" %}
 
 <div class="data-detail-actions">
-  <a href="{{ url_for('data.sql_edit_route', sql_id=item.saved_sql_id) }}">Edit</a>
+  <a href="{{ url_for('data.sql_edit_route', sql_id=item.saved_sql_id, proj=current_proj) if current_proj else url_for('data.sql_edit_route', sql_id=item.saved_sql_id) }}">Edit</a>
   <a href="{{ url_for('data.sql_download_route', sql_id=item.saved_sql_id) }}">Download .sql</a>
   <button type="button" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('sqlText').innerText)">Copy SQL</button>
   <form method="post" action="{{ url_for('data.sql_run_route', sql_id=item.saved_sql_id) }}"><button>Submit as runner task</button></form>
@@ -14,6 +14,7 @@
   <section><h4>Summary</h4>
     <table>
       <tr><th>Name</th><td>{{ item.sql_name }}</td></tr>
+      <tr><th>Project</th><td>{{ item.project }}</td></tr>
       <tr><th>Target</th><td>{{ item.source_name }} {{ item.environment }}</td></tr>
       <tr><th>Purpose</th><td>{{ item.purpose }}</td></tr>
       <tr><th>Notes</th><td>{{ item.notes }}</td></tr>
@@ -23,9 +24,18 @@
   </section>
   <section><h4>Related Objects</h4>
     <table>
-      <tr><th>Object</th><th>Type</th><th>Relationship</th></tr>
+      <tr><th>Object</th><th>Type</th><th>Schema/folder</th><th>Project</th><th>Rows</th><th>Last seen</th><th>Level</th><th>Relationship</th></tr>
       {% for obj in related_objects %}
-      <tr><td><a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ obj.object_name }}</a></td><td>{{ obj.object_type }}</td><td>{{ obj.relationship_type }}</td></tr>
+      <tr>
+        <td><a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ obj.object_name }}</a></td>
+        <td>{{ obj.object_type }}</td>
+        <td>{{ obj.schema_name or obj.parent_path }}</td>
+        <td>{{ obj.project }}</td>
+        <td>{{ obj.row_count if obj.row_count is not none else '' }}</td>
+        <td>{{ obj.last_seen_at }}</td>
+        <td>{{ obj.catalogue_level }}</td>
+        <td>{{ obj.relationship_type }}</td>
+      </tr>
       {% endfor %}
     </table>
   </section>

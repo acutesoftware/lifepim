@@ -35,6 +35,7 @@ TASK_TYPES = [
     "PROFILE_OBJECT",
     "RUN_SAVED_SQL",
 ]
+CSV_ENCODINGS = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
 
 
 def conn():
@@ -61,6 +62,7 @@ def ensure_schema(connection=None):
             default_schema TEXT,
             root_path TEXT,
             environment TEXT,
+            project TEXT,
             credential_reference TEXT,
             connection_options_json TEXT,
             recursive_scan INTEGER NOT NULL DEFAULT 1,
@@ -94,6 +96,7 @@ def ensure_schema(connection=None):
             database_name TEXT,
             schema_name TEXT,
             parent_path TEXT,
+            project TEXT,
             full_name TEXT,
             full_path TEXT,
             catalogue_level TEXT NOT NULL DEFAULT 'DISCOVERED',
@@ -157,6 +160,7 @@ def ensure_schema(connection=None):
             saved_sql_id INTEGER PRIMARY KEY,
             sql_name TEXT NOT NULL,
             data_source_id INTEGER,
+            project TEXT,
             default_database TEXT,
             default_schema TEXT,
             sql_text TEXT NOT NULL,
@@ -258,7 +262,35 @@ def ensure_schema(connection=None):
         CREATE INDEX IF NOT EXISTS idx_data_task_status ON d_data_task(status);
         """
     )
+    _ensure_column(c, "d_data_source", "project", "TEXT")
+    _ensure_column(c, "d_data_object", "project", "TEXT")
+    _ensure_column(c, "d_data_saved_sql", "project", "TEXT")
+    c.execute(
+        """
+        UPDATE d_data_saved_sql
+        SET project = (
+            SELECT s.project FROM d_data_source s
+            WHERE s.data_source_id = d_data_saved_sql.data_source_id
+        )
+        WHERE COALESCE(project, '') = ''
+          AND data_source_id IS NOT NULL
+          AND EXISTS (
+              SELECT 1 FROM d_data_source s
+              WHERE s.data_source_id = d_data_saved_sql.data_source_id
+                AND COALESCE(s.project, '') != ''
+          )
+        """
+    )
     c.commit()
+
+
+def _ensure_column(connection, table_name, column_name, column_type):
+    existing = {
+        row["name"]
+        for row in connection.execute(f"PRAGMA table_info({_quote_ident(table_name)})").fetchall()
+    }
+    if column_name not in existing:
+        connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
 
 
 def scalar(sql, params=()):
@@ -316,12 +348,17 @@ def set_tags(entity_type, entity_id, tag_text):
     c.commit()
 
 
-def source_list(kind=None):
+def source_list(kind=None, filters=None):
+    filters = filters or {}
     params = []
-    where = "1=1"
+    clauses = []
     if kind:
-        where = "s.source_kind = ?"
+        clauses.append("s.source_kind = ?")
         params.append(kind)
+    if filters.get("project"):
+        clauses.append("s.project = ?")
+        params.append(filters["project"])
+    where = " AND ".join(clauses) if clauses else "1=1"
     items = rows(
         f"""
         SELECT s.*,
@@ -385,6 +422,7 @@ def _source_values(form, kind):
         "default_schema": form.get("default_schema", "").strip(),
         "root_path": form.get("root_path", "").strip(),
         "environment": form.get("environment", "").strip(),
+        "project": form.get("project", "").strip(),
         "credential_reference": form.get("credential_reference", "").strip(),
         "connection_options_json": form.get("connection_options_json", "").strip(),
         "recursive_scan": _checked(form, "recursive_scan", default=True),
@@ -445,6 +483,7 @@ def object_list(filters):
         ("object_type", "o.object_type"),
         ("catalogue_level", "o.catalogue_level"),
         ("environment", "s.environment"),
+        ("project", "o.project"),
         ("profile_status", "o.profile_status"),
         ("quality_status", "o.quality_status"),
     ]:
@@ -460,7 +499,7 @@ def object_list(filters):
     where = " AND ".join(clauses) if clauses else "1=1"
     return rows(
         f"""
-        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment,
+        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment, s.project AS source_project,
                GROUP_CONCAT(DISTINCT t.tag_name) AS tags
         FROM d_data_object o
         JOIN d_data_source s ON s.data_source_id = o.data_source_id
@@ -480,7 +519,7 @@ def object_list(filters):
 def object_get(object_id):
     item = row(
         """
-        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment
+        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment, s.project AS source_project
         FROM d_data_object o
         JOIN d_data_source s ON s.data_source_id = o.data_source_id
         WHERE o.data_object_id = ?
@@ -502,6 +541,7 @@ def save_object_metadata(object_id, form):
         """
         UPDATE d_data_object
         SET display_name = ?, catalogue_level = ?, description = ?, purpose = ?, notes = ?,
+            project = ?,
             is_favourite = ?, is_canonical = ?, is_sensitive = ?, is_hidden = ?, is_active = ?,
             profile_mode = ?, content_index_mode = ?, refresh_policy = ?, updated_at = ?
         WHERE data_object_id = ?
@@ -512,6 +552,7 @@ def save_object_metadata(object_id, form):
             form.get("description", "").strip(),
             form.get("purpose", "").strip(),
             form.get("notes", "").strip(),
+            form.get("project", "").strip(),
             _checked(form, "is_favourite"),
             _checked(form, "is_canonical"),
             _checked(form, "is_sensitive"),
@@ -557,13 +598,16 @@ def sql_list(filters=None):
     if filters.get("source_id"):
         clauses.append("ss.data_source_id = ?")
         params.append(filters["source_id"])
+    if filters.get("project"):
+        clauses.append("ss.project = ?")
+        params.append(filters["project"])
     if filters.get("favourite") in ("0", "1"):
         clauses.append("ss.is_favourite = ?")
         params.append(int(filters["favourite"]))
     where = " AND ".join(clauses) if clauses else "1=1"
     return rows(
         f"""
-        SELECT ss.*, s.source_name, s.source_type, s.environment,
+        SELECT ss.*, s.source_name, s.source_type, s.environment, s.project AS source_project,
                GROUP_CONCAT(DISTINCT t.tag_name) AS tags
         FROM d_data_saved_sql ss
         LEFT JOIN d_data_source s ON s.data_source_id = ss.data_source_id
@@ -580,7 +624,7 @@ def sql_list(filters=None):
 def sql_get(sql_id):
     item = row(
         """
-        SELECT ss.*, s.source_name, s.source_type, s.environment
+        SELECT ss.*, s.source_name, s.source_type, s.environment, s.project AS source_project
         FROM d_data_saved_sql ss
         LEFT JOIN d_data_source s ON s.data_source_id = ss.data_source_id
         WHERE ss.saved_sql_id = ?
@@ -602,6 +646,7 @@ def save_sql(sql_id, form):
     values = {
         "sql_name": form.get("sql_name", "").strip(),
         "data_source_id": _int_or_none(form.get("data_source_id")),
+        "project": form.get("project", "").strip(),
         "default_database": form.get("default_database", "").strip(),
         "default_schema": form.get("default_schema", "").strip(),
         "sql_text": form.get("sql_text", "").strip(),
@@ -614,6 +659,9 @@ def save_sql(sql_id, form):
         "is_favourite": _checked(form, "is_favourite"),
         "is_active": _checked(form, "is_active", default=True),
     }
+    if not values["project"] and values["data_source_id"]:
+        source = source_get(values["data_source_id"])
+        values["project"] = source.get("project", "") if source else ""
     if sql_id:
         set_clause = ", ".join([f"{key} = ?" for key in values])
         c.execute(
@@ -631,7 +679,10 @@ def save_sql(sql_id, form):
         )
         new_id = c.execute("SELECT last_insert_rowid()").fetchone()[0]
     c.execute("DELETE FROM d_data_object_sql WHERE saved_sql_id = ?", (new_id,))
-    for object_id in form.getlist("related_objects"):
+    related_objects = form.getlist("related_objects") if hasattr(form, "getlist") else form.get("related_objects", [])
+    if isinstance(related_objects, str):
+        related_objects = [related_objects]
+    for object_id in related_objects:
         object_id = _int_or_none(object_id)
         if object_id:
             c.execute(
@@ -665,19 +716,31 @@ def sql_related_objects(sql_id):
     )
 
 
-def tasks(limit=None):
+def tasks(limit=None, filters=None):
+    filters = filters or {}
+    clauses = []
+    params = []
+    if filters.get("project"):
+        clauses.append(
+            "(s.project = ? OR o.project = ? OR ss.project = ?)"
+        )
+        params.extend([filters["project"]] * 3)
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
     sql = """
-        SELECT t.*, s.source_name, o.object_name, ss.sql_name
+        SELECT t.*, s.source_name, s.project AS source_project,
+               o.object_name, o.project AS object_project,
+               ss.sql_name, ss.project AS sql_project
         FROM d_data_task t
         LEFT JOIN d_data_source s ON s.data_source_id = t.data_source_id
         LEFT JOIN d_data_object o ON o.data_object_id = t.data_object_id
         LEFT JOIN d_data_saved_sql ss ON ss.saved_sql_id = t.saved_sql_id
+        {where}
         ORDER BY COALESCE(t.started_at, t.created_at) DESC
-    """
+    """.format(where=where)
     if limit:
         sql += " LIMIT ?"
-        return rows(sql, (limit,))
-    return rows(sql)
+        return rows(sql, params + [limit])
+    return rows(sql, params)
 
 
 def task_get(task_id):
@@ -797,7 +860,7 @@ def scan_sqlite_source(source_id):
             object_type = "VIEW" if table["type"] == "view" else "TABLE"
             columns = source_conn.execute(f"PRAGMA table_info({_quote_ident(table_name)})").fetchall()
             row_count = None
-            if object_type == "TABLE" and int(source.get("collect_row_counts") or 0):
+            if object_type == "TABLE":
                 try:
                     row_count = source_conn.execute(f"SELECT COUNT(1) AS cnt FROM {_quote_ident(table_name)}").fetchone()["cnt"]
                 except sqlite3.Error:
@@ -808,6 +871,7 @@ def scan_sqlite_source(source_id):
                 object_type=object_type,
                 database_name=source.get("database_name") or os.path.basename(path),
                 schema_name=source.get("default_schema") or "",
+                project=source.get("project") or "",
                 full_name=table_name,
                 full_path="",
                 row_count=row_count,
@@ -899,7 +963,8 @@ def scan_tabular_file_source(source_id):
 
 
 def _scan_csv_source(source_id, source, path, stat):
-    frame = pd.read_csv(path, nrows=200)
+    frame, encoding = _read_csv_frame(path, nrows=200)
+    row_count = _csv_row_count(path)
     object_id = upsert_object(
         source_id,
         object_name=os.path.basename(path),
@@ -907,14 +972,15 @@ def _scan_csv_source(source_id, source, path, stat):
         database_name=source.get("database_name") or os.path.basename(path),
         schema_name="",
         parent_path=os.path.dirname(path),
+        project=source.get("project") or "",
         full_name=os.path.basename(path),
         full_path=os.path.abspath(path),
-        row_count=None,
+        row_count=row_count,
         column_count=len(frame.columns),
         size_bytes=stat.st_size,
         source_modified_at=datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
         source_created_at=datetime.fromtimestamp(stat.st_ctime).strftime("%Y-%m-%d %H:%M:%S"),
-        metadata={"file_type": "csv", "sampled_rows_for_schema": len(frame.index)},
+        metadata={"file_type": "csv", "encoding": encoding, "sampled_rows_for_schema": len(frame.index)},
     )
     _replace_dataframe_columns(object_id, frame)
     return 1
@@ -932,9 +998,10 @@ def _scan_excel_source(source_id, source, path, stat):
             database_name=source.get("database_name") or os.path.basename(path),
             schema_name="",
             parent_path=os.path.dirname(path),
+            project=source.get("project") or "",
             full_name=f"{os.path.basename(path)}::{sheet_name}",
             full_path=os.path.abspath(path),
-            row_count=None,
+            row_count=len(frame.index),
             column_count=len(frame.columns),
             size_bytes=stat.st_size,
             source_modified_at=datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
@@ -973,6 +1040,29 @@ def _replace_dataframe_columns(object_id, frame):
     c.commit()
 
 
+def _csv_row_count(path):
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as handle:
+            line_count = sum(1 for _ in handle)
+        return max(0, line_count - 1)
+    except OSError:
+        return None
+
+
+def _read_csv_frame(path, nrows=None):
+    last_error = None
+    for encoding in CSV_ENCODINGS:
+        try:
+            frame = pd.read_csv(path, nrows=nrows, encoding=encoding)
+            return frame, encoding
+        except UnicodeDecodeError as exc:
+            last_error = exc
+    if last_error:
+        raise last_error
+    frame = pd.read_csv(path, nrows=nrows)
+    return frame, ""
+
+
 def object_can_preview(obj):
     return obj and obj.get("source_type") in {"SQLITE", "CSV", "EXCEL"} and obj.get("object_type") in {"TABLE", "VIEW", "CSV_TABLE", "EXCEL_SHEET"}
 
@@ -989,7 +1079,7 @@ def preview_object_rows(object_id, limit=200):
     if source["source_type"] == "SQLITE":
         return preview_sqlite_rows(path, obj["object_name"], limit)
     if source["source_type"] == "CSV":
-        frame = pd.read_csv(path, nrows=limit)
+        frame, _encoding = _read_csv_frame(path, nrows=limit)
         return dataframe_preview(frame)
     if source["source_type"] == "EXCEL":
         frame = pd.read_excel(path, sheet_name=obj["object_name"], nrows=limit)
@@ -1061,6 +1151,7 @@ def scan_file_source(source_id):
                     database_name="",
                     schema_name="",
                     parent_path=dirpath,
+                    project=source.get("project") or "",
                     full_name=rel_norm,
                     full_path=os.path.abspath(full_path),
                     row_count=None,
@@ -1099,7 +1190,7 @@ def scan_file_source(source_id):
     return task_id
 
 
-def upsert_object(source_id, object_name, object_type, database_name="", schema_name="", parent_path="", full_name="", full_path="", row_count=None, column_count=None, size_bytes=None, source_modified_at=None, source_created_at=None, metadata=None):
+def upsert_object(source_id, object_name, object_type, database_name="", schema_name="", parent_path="", project="", full_name="", full_path="", row_count=None, column_count=None, size_bytes=None, source_modified_at=None, source_created_at=None, metadata=None):
     c = conn()
     ts = now()
     if full_path and object_type == "EXCEL_SHEET":
@@ -1133,6 +1224,7 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
             """
             UPDATE d_data_object
             SET database_name = ?, schema_name = ?, parent_path = ?, full_name = ?, full_path = ?,
+                project = CASE WHEN COALESCE(project, '') = '' THEN ? ELSE project END,
                 row_count = ?, column_count = ?, size_bytes = ?, last_seen_at = ?,
                 last_scanned_at = ?, source_modified_at = ?, source_created_at = ?,
                 metadata_json = ?, updated_at = ?
@@ -1144,6 +1236,7 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
                 parent_path,
                 full_name,
                 os.path.abspath(full_path) if full_path else "",
+                project,
                 row_count,
                 column_count,
                 size_bytes,
@@ -1161,10 +1254,10 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
             """
             INSERT INTO d_data_object(
                 data_source_id, object_name, display_name, object_type, database_name, schema_name,
-                parent_path, full_name, full_path, row_count, column_count, size_bytes,
+                parent_path, project, full_name, full_path, row_count, column_count, size_bytes,
                 first_seen_at, last_seen_at, last_scanned_at, source_modified_at,
                 source_created_at, metadata_json, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 source_id,
@@ -1174,6 +1267,7 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
                 database_name,
                 schema_name,
                 parent_path,
+                project,
                 full_name,
                 os.path.abspath(full_path) if full_path else "",
                 row_count,
@@ -1219,22 +1313,41 @@ def upsert_column(object_id, col):
     c.commit()
 
 
-def overview_counts():
+def overview_counts(project=None):
+    source_project = " AND project = ?" if project else ""
+    object_project = " AND project = ?" if project else ""
+    sql_project = " AND project = ?" if project else ""
+    source_params = (project,) if project else ()
+    object_params = (project,) if project else ()
+    sql_params = (project,) if project else ()
     return {
-        "database_sources": scalar("SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'DATABASE'"),
-        "file_sources": scalar("SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'FILE_SOURCE'"),
-        "discovered_objects": scalar("SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'DISCOVERED'"),
-        "registered_objects": scalar("SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'REGISTERED'"),
-        "managed_objects": scalar("SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'MANAGED'"),
-        "saved_sql": scalar("SELECT COUNT(1) FROM d_data_saved_sql WHERE is_active = 1"),
-        "problem_tasks": scalar("SELECT COUNT(1) FROM d_data_task WHERE status IN ('FAILED', 'RUNNING', 'QUEUED')"),
-        "stale_sources": scalar(
+        "database_sources": scalar(f"SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'DATABASE'{source_project}", source_params),
+        "file_sources": scalar(f"SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'FILE_SOURCE'{source_project}", source_params),
+        "discovered_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'DISCOVERED'{object_project}", object_params),
+        "registered_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'REGISTERED'{object_project}", object_params),
+        "managed_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'MANAGED'{object_project}", object_params),
+        "saved_sql": scalar(f"SELECT COUNT(1) FROM d_data_saved_sql WHERE is_active = 1{sql_project}", sql_params),
+        "problem_tasks": scalar(
             """
+            SELECT COUNT(1)
+            FROM d_data_task t
+            LEFT JOIN d_data_source s ON s.data_source_id = t.data_source_id
+            LEFT JOIN d_data_object o ON o.data_object_id = t.data_object_id
+            LEFT JOIN d_data_saved_sql ss ON ss.saved_sql_id = t.saved_sql_id
+            WHERE t.status IN ('FAILED', 'RUNNING', 'QUEUED')
+            """
+            + (" AND (s.project = ? OR o.project = ? OR ss.project = ?)" if project else ""),
+            ([project, project, project] if project else []),
+        ),
+        "stale_sources": scalar(
+            f"""
             SELECT COUNT(1)
             FROM d_data_source
             WHERE is_active = 1
               AND (last_scan_completed_at IS NULL OR last_scan_completed_at < datetime('now', '-30 days'))
-            """
+              {source_project}
+            """,
+            source_params,
         ),
     }
 
@@ -1259,12 +1372,15 @@ def attention_items():
     }
 
 
-def recent_activity():
+def recent_activity(project=None):
+    source_filter = {"project": project} if project else None
+    object_filter = {"project": project} if project else {}
+    sql_filter = {"project": project} if project else {}
     return {
-        "sources": rows("SELECT * FROM d_data_source ORDER BY updated_at DESC LIMIT 8"),
-        "objects": rows("SELECT * FROM d_data_object ORDER BY updated_at DESC LIMIT 8"),
-        "sql": rows("SELECT * FROM d_data_saved_sql ORDER BY updated_at DESC LIMIT 8"),
-        "tasks": tasks(limit=8),
+        "sources": source_list(None, source_filter)[:8],
+        "objects": object_list(object_filter)[:8],
+        "sql": sql_list(sql_filter)[:8],
+        "tasks": tasks(limit=8, filters={"project": project} if project else None),
     }
 
 

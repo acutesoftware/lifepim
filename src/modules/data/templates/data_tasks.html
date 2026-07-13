@@ -3,11 +3,12 @@
 {% include "data_nav.html" %}
 
 <table>
-  <tr><th>Task</th><th>Type</th><th>Source/object</th><th>Status</th><th>Progress</th><th>Started</th><th>Finished</th><th>Result</th><th>Error</th></tr>
+  <tr><th>Task</th><th>Type</th><th>Project</th><th>Source/object</th><th>Status</th><th>Progress</th><th>Started</th><th>Finished</th><th>Result</th><th>Error</th></tr>
   {% for task in tasks %}
   <tr>
     <td><a href="{{ url_for('data.task_detail_route', task_id=task.data_task_id) }}">{{ task.task_name }}</a></td>
     <td>{{ task.task_type }}</td>
+    <td>{{ task.source_project or task.object_project or task.sql_project }}</td>
     <td>{{ task.source_name or task.object_name or task.sql_name }}</td>
     <td>{{ task.status }}</td>
     <td>{{ task.progress }}%</td>

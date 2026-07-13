@@ -30,6 +30,15 @@
       <label>Environment
         <input name="environment" value="{{ submitted.environment if submitted else (source.environment if source else '') }}" placeholder="dev, personal, prod">
       </label>
+      <label>Project
+        {% set selected_project = submitted.project if submitted else (source.project if source else '') %}
+        <select name="project">
+          <option value="">None</option>
+          {% for option in project_options %}
+          <option value="{{ option.id }}" {% if selected_project == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
+          {% endfor %}
+        </select>
+      </label>
       <label>Tags
         <input name="tags" value="{{ submitted.tags if submitted else (source.tags if source else '') }}" placeholder="finance, warehouse">
       </label>
@@ -134,7 +143,7 @@
 
     <div class="data-form-actions">
       <button type="submit">Save and scan</button>
-      <a href="{{ url_for('data.database_sources_route') }}">Cancel</a>
+      <a href="{{ url_for('data.database_sources_route', proj=current_proj) if current_proj else url_for('data.database_sources_route') }}">Cancel</a>
     </div>
   </section>
 </form>
@@ -220,6 +229,15 @@
       </select>
     </label>
     <label>Environment<input name="environment" value="{{ source.environment if source else '' }}"></label>
+    <label>Project
+      {% set selected_project = submitted.project if submitted else (source.project if source else '') %}
+      <select name="project">
+        <option value="">None</option>
+        {% for option in project_options %}
+        <option value="{{ option.id }}" {% if selected_project == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>Host or device<input name="host_name" value="{{ source.host_name if source else '' }}"></label>
     <label>Root path<input name="root_path" value="{{ source.root_path if source else '' }}"></label>
     <label>Tags<input name="tags" value="{{ source.tags if source else '' }}" placeholder="finance, warehouse"></label>
@@ -252,7 +270,7 @@
   <label>Row-count mode<input name="row_count_mode" value="{{ source.row_count_mode if source else '' }}"></label>
   <div class="data-form-actions">
     <button type="submit">Save</button>
-    <a href="{{ url_for('data.file_sources_route') }}">Cancel</a>
+    <a href="{{ url_for('data.file_sources_route', proj=current_proj) if current_proj else url_for('data.file_sources_route') }}">Cancel</a>
   </div>
 </form>
 {% endif %}

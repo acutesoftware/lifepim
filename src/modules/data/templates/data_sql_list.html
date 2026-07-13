@@ -5,7 +5,16 @@
 <div class="data-shell">
   <aside class="data-filter-panel">
     <form method="get" class="data-filter-form">
+      {% if current_proj %}<input type="hidden" name="proj" value="{{ current_proj }}">{% endif %}
       <label>Search<input name="q" value="{{ filters.q }}"></label>
+      <label>Project
+        <select name="project">
+          <option value="">Any</option>
+          {% for option in project_options %}
+          <option value="{{ option.id }}" {% if filters.project == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
+          {% endfor %}
+        </select>
+      </label>
       <label>Target source
         <select name="source_id">
           <option value="">Any</option>
@@ -18,15 +27,16 @@
         <select name="favourite"><option value="">Any</option><option value="1" {% if filters.favourite == '1' %}selected{% endif %}>Yes</option><option value="0" {% if filters.favourite == '0' %}selected{% endif %}>No</option></select>
       </label>
       <button type="submit">Apply</button>
-      <a class="data-action" href="{{ url_for('data.sql_new_route') }}">Add saved SQL</a>
+      <a class="data-action" href="{{ url_for('data.sql_new_route', proj=current_proj) if current_proj else url_for('data.sql_new_route') }}">Add saved SQL</a>
     </form>
   </aside>
   <section class="data-main-panel">
     <table>
-      <tr><th>Name</th><th>Target source</th><th>Database/schema</th><th>Purpose</th><th>Tags</th><th>Fav</th><th>Last updated</th><th>Last run</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Name</th><th>Project</th><th>Target source</th><th>Database/schema</th><th>Purpose</th><th>Tags</th><th>Fav</th><th>Last updated</th><th>Last run</th><th>Status</th><th>Actions</th></tr>
       {% for item in sql_items %}
       <tr>
-        <td><a href="{{ url_for('data.sql_detail_route', sql_id=item.saved_sql_id) }}">{{ item.sql_name }}</a></td>
+        <td><a href="{{ url_for('data.sql_detail_route', sql_id=item.saved_sql_id, proj=current_proj) if current_proj else url_for('data.sql_detail_route', sql_id=item.saved_sql_id) }}">{{ item.sql_name }}</a></td>
+        <td>{{ item.project }}</td>
         <td>{{ item.source_name }}</td>
         <td>{{ item.default_database }} {{ item.default_schema }}</td>
         <td>{{ item.purpose }}</td>
@@ -35,7 +45,7 @@
         <td>{{ item.updated_at }}</td>
         <td>{{ item.last_run_at }}</td>
         <td>{{ item.last_run_status }}</td>
-        <td><a href="{{ url_for('data.sql_edit_route', sql_id=item.saved_sql_id) }}">Edit</a></td>
+        <td><a href="{{ url_for('data.sql_edit_route', sql_id=item.saved_sql_id, proj=current_proj) if current_proj else url_for('data.sql_edit_route', sql_id=item.saved_sql_id) }}">Edit</a></td>
       </tr>
       {% endfor %}
     </table>

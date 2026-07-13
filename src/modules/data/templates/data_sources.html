@@ -5,33 +5,34 @@
 <div class="data-shell">
   <aside class="data-filter-panel">
     <h4>Sources</h4>
-    <a class="{% if section == 'databases' %}active{% endif %}" href="{{ url_for('data.database_sources_route') }}">Databases</a>
-    <a class="{% if section == 'files' %}active{% endif %}" href="{{ url_for('data.file_sources_route') }}">File Sources</a>
+    <a class="{% if section == 'databases' %}active{% endif %}" href="{{ url_for('data.database_sources_route', proj=current_proj) if current_proj else url_for('data.database_sources_route') }}">Databases</a>
+    <a class="{% if section == 'files' %}active{% endif %}" href="{{ url_for('data.file_sources_route', proj=current_proj) if current_proj else url_for('data.file_sources_route') }}">File Sources</a>
     {% if section == 'databases' %}
-      <a class="data-action" href="{{ url_for('data.database_source_new_route') }}">Add database</a>
-      <a class="data-action" href="{{ url_for('data.import_data_db_route') }}">Import SQLite DBs</a>
+      <a class="data-action" href="{{ url_for('data.database_source_new_route', proj=current_proj) if current_proj else url_for('data.database_source_new_route') }}">Add database</a>
+      <a class="data-action" href="{{ url_for('data.import_data_db_route', proj=current_proj) if current_proj else url_for('data.import_data_db_route') }}">Import SQLite DBs</a>
     {% else %}
-      <a class="data-action" href="{{ url_for('data.file_source_new_route') }}">Add file source</a>
+      <a class="data-action" href="{{ url_for('data.file_source_new_route', proj=current_proj) if current_proj else url_for('data.file_source_new_route') }}">Add file source</a>
     {% endif %}
   </aside>
 
   <section class="data-main-panel">
     <table>
       <tr>
-        <th>Name</th><th>Type</th><th>Host or path</th><th>Database</th><th>Environment</th><th>Objects</th><th>Last scanned</th><th>Status</th><th>Tags</th><th>Actions</th>
+        <th>Name</th><th>Type</th><th>Host or path</th><th>Database</th><th>Project</th><th>Environment</th><th>Objects</th><th>Last scanned</th><th>Status</th><th>Tags</th><th>Actions</th>
       </tr>
       {% for source in sources %}
       <tr>
         <td>
           {% if source.source_kind == 'DATABASE' %}
-            <a href="{{ url_for('data.database_source_detail_route', source_id=source.data_source_id) }}">{{ source.source_name }}</a>
+            <a href="{{ url_for('data.database_source_detail_route', source_id=source.data_source_id, proj=current_proj) if current_proj else url_for('data.database_source_detail_route', source_id=source.data_source_id) }}">{{ source.source_name }}</a>
           {% else %}
-            <a href="{{ url_for('data.file_source_detail_route', source_id=source.data_source_id) }}">{{ source.source_name }}</a>
+            <a href="{{ url_for('data.file_source_detail_route', source_id=source.data_source_id, proj=current_proj) if current_proj else url_for('data.file_source_detail_route', source_id=source.data_source_id) }}">{{ source.source_name }}</a>
           {% endif %}
         </td>
         <td>{{ source.source_type }}</td>
         <td>{{ source.host_name or source.root_path }}</td>
         <td>{{ source.database_name }}</td>
+        <td>{{ source.project }}</td>
         <td>{{ source.environment }}</td>
         <td>{{ source.object_count }}</td>
         <td>{{ source.last_scan_completed_at }}</td>
@@ -39,11 +40,11 @@
         <td>{{ source.tags }}</td>
         <td class="data-actions-cell">
           {% if source.source_kind == 'DATABASE' %}
-            <a href="{{ url_for('data.database_source_edit_route', source_id=source.data_source_id) }}">Edit</a>
+            <a href="{{ url_for('data.database_source_edit_route', source_id=source.data_source_id, proj=current_proj) if current_proj else url_for('data.database_source_edit_route', source_id=source.data_source_id) }}">Edit</a>
           {% else %}
-            <a href="{{ url_for('data.file_source_edit_route', source_id=source.data_source_id) }}">Edit</a>
+            <a href="{{ url_for('data.file_source_edit_route', source_id=source.data_source_id, proj=current_proj) if current_proj else url_for('data.file_source_edit_route', source_id=source.data_source_id) }}">Edit</a>
           {% endif %}
-          <form method="post" action="{{ url_for('data.source_scan_route', source_id=source.data_source_id) }}"><button>Scan</button></form>
+          <form method="post" action="{{ url_for('data.source_scan_route', source_id=source.data_source_id, proj=current_proj) if current_proj else url_for('data.source_scan_route', source_id=source.data_source_id) }}"><button>Scan</button></form>
         </td>
       </tr>
       {% endfor %}

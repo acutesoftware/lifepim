@@ -5,6 +5,7 @@
 <div class="data-shell">
   <aside class="data-filter-panel">
     <form method="get" class="data-filter-form">
+      {% if current_proj %}<input type="hidden" name="proj" value="{{ current_proj }}">{% endif %}
       <label>Search<input name="q" value="{{ filters.q }}"></label>
       <label>Source
         <select name="source_id">
@@ -38,6 +39,14 @@
           {% endfor %}
         </select>
       </label>
+      <label>Project
+        <select name="project">
+          <option value="">Any</option>
+          {% for option in project_options %}
+          <option value="{{ option.id }}" {% if filters.project == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
+          {% endfor %}
+        </select>
+      </label>
       <label>Favourite
         <select name="favourite"><option value="">Any</option><option value="1" {% if filters.favourite == '1' %}selected{% endif %}>Yes</option><option value="0" {% if filters.favourite == '0' %}selected{% endif %}>No</option></select>
       </label>
@@ -45,37 +54,38 @@
         <select name="hidden"><option value="">Any</option><option value="0" {% if filters.hidden == '0' %}selected{% endif %}>Visible</option><option value="1" {% if filters.hidden == '1' %}selected{% endif %}>Hidden</option></select>
       </label>
       <button type="submit">Apply</button>
-      <a href="{{ url_for('data.objects_route') }}">Reset</a>
+      <a href="{{ url_for('data.objects_route', proj=current_proj) if current_proj else url_for('data.objects_route') }}">Reset</a>
     </form>
   </aside>
 
   <section class="data-main-panel">
     <table>
       <tr>
-        <th>Fav</th><th>Object name</th><th>Type</th><th>Source</th><th>Schema/folder</th><th>Level</th><th>Rows</th><th>Cols</th><th>Size</th><th>Last seen</th><th>Profile</th><th>Quality</th><th>Tags</th><th>Actions</th>
+        <th>Fav</th><th>Object name</th><th>Type</th><th>Source</th><th>Schema/folder</th><th>Project</th><th>Rows</th><th>Cols</th><th>Size</th><th>Last seen</th><th>Level</th><th>Profile</th><th>Quality</th><th>Tags</th><th>Actions</th>
       </tr>
       {% for obj in objects %}
       {% set is_previewable = obj.source_type in ['SQLITE', 'CSV', 'EXCEL'] and obj.object_type in ['TABLE', 'VIEW', 'CSV_TABLE', 'EXCEL_SHEET'] %}
       <tr>
         <td>{{ '*' if obj.is_favourite else '' }}</td>
         <td>
-          <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id) if is_previewable else url_for('data.object_detail_route', object_id=obj.data_object_id) }}">
+          <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id, proj=current_proj) if is_previewable and current_proj else (url_for('data.object_data_route', object_id=obj.data_object_id) if is_previewable else (url_for('data.object_detail_route', object_id=obj.data_object_id, proj=current_proj) if current_proj else url_for('data.object_detail_route', object_id=obj.data_object_id))) }}">
             {{ obj.display_name or obj.object_name }}
           </a>
         </td>
         <td>{{ obj.object_type }}</td>
         <td>{{ obj.source_name }}</td>
         <td>{{ obj.schema_name or obj.parent_path }}</td>
-        <td>{{ obj.catalogue_level }}</td>
-        <td>{{ obj.row_count }}</td>
-        <td>{{ obj.column_count }}</td>
-        <td>{{ obj.size_bytes }}</td>
+        <td>{{ obj.project }}</td>
+        <td>{{ obj.row_count if obj.row_count is not none else '' }}</td>
+        <td>{{ obj.column_count if obj.column_count is not none else '' }}</td>
+        <td>{{ obj.size_bytes if obj.size_bytes is not none else '' }}</td>
         <td>{{ obj.last_seen_at }}</td>
+        <td>{{ obj.catalogue_level }}</td>
         <td>{{ obj.profile_status }}</td>
         <td>{{ obj.quality_status }}</td>
         <td>{{ obj.tags }}</td>
         <td class="data-actions-cell">
-          <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ 'Metadata' if is_previewable else 'View' }}</a>
+          <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id, proj=current_proj) if current_proj else url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ 'Metadata' if is_previewable else 'View' }}</a>
         </td>
       </tr>
       {% endfor %}

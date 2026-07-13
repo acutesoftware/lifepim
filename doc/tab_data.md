@@ -1,177 +1,126 @@
 # Data Tab
 
-This document records how the Data tab works today. It is a baseline for future changes, not a proposed design.
+The Data tab is the catalogue for database sources, file-backed data sources, discovered data objects, saved SQL, and scan tasks.
 
-## Purpose
+## Main Areas
 
-The Data tab is a simple registry of data sources. At present it mainly supports manually entered records and SQLite `.db` files. When a registered record points to a valid SQLite database file, the detail page can list that database's tables and preview the first 10 rows from a selected table.
+- Overview: counts, quick actions, recent activity, and failed/stale items.
+- Databases: registered database-like sources such as SQLite, CSV, Excel, DuckDB, SQL Server, Oracle, Fabric SQL, and ODBC.
+- File Sources: registered folders or file collections for data files.
+- Objects: discovered tables, views, sheets, CSV tables, and files.
+- Saved SQL: reusable SQL text and object relationships.
+- Tasks: connection tests, scans, and profiling/run placeholders.
 
-## Storage
+The old generic `lp_data` legacy tab has been removed from the Data navigation and route code. Data catalogue records now live in the `d_data_*` tables managed by `src/modules/data/catalogue.py`.
 
-The tab is backed by the generic table definition in `src/common/config.py`:
+## Projects
 
-```python
-{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'project']}
-```
+Data sources and data objects both have a `project` metadata field.
 
-`lp_data` records use these fields:
+Project values are selected from the same project/sidebar list used by the left-hand main menu. The stored value is the project id, such as `health`, `fun/games`, or `proj/dev/lifepim`.
 
-- `name`: display name for the data source.
-- `description`: free text description.
-- `tbl_name`: currently used as either a table/source identifier or a SQLite database file path.
-- `col_list`: free text column-list metadata.
-- `project`: project/category value used for project filtering.
+Project selection is available on:
 
-Like the other generic LifePIM tables, rows also have standard metadata columns added by database initialization, including `id`, `user_name`, and `rec_extract_date`.
+- Add/edit database source.
+- Add/edit file source.
+- SQLite database import.
+- Object metadata.
+- Object search/filter.
+- Saved SQL add/edit.
+- Saved SQL search/filter.
 
-## Main List
+The left-hand project sidebar filters the current Data subtab instead of resetting to the Data overview. For example, if the current page is Saved SQL and `family` is selected from the sidebar, the URL remains on Saved SQL and adds `?proj=family`.
 
-Route: `/data/`
+Project filtering applies to:
 
-Handler: `list_data_route()` in `src/modules/data/routes.py`
+- database source lists.
+- file source lists.
+- object lists.
+- saved SQL lists.
+- task lists where a task is linked to a source, object, or saved SQL with that project.
+- overview counts and recent activity.
 
-The list page:
+When a source is scanned, new objects inherit the source project. Existing objects keep their manually selected project; if an existing object has no project, a later scan can fill it from the source.
 
-- Loads the `lp_data` table definition through `get_table_def("data")`.
-- Displays all configured columns from `col_list`.
-- Supports project filtering when `proj` is present and the table has a `project` column.
-- Treats `any`, `All`, `all`, `ALL`, and `spacer` as no project filter.
-- Sorts in memory after loading rows from SQLite.
-- Defaults to sorting by `name` ascending.
-- Allows column-header sorting with `sort` and `dir` query parameters.
-- Paginates with `cfg.RECS_PER_PAGE`.
+## Source Lists
 
-Template: `src/modules/data/templates/data_list.html`
+Database and file source lists show:
 
-The page provides links for:
+- Name
+- Type
+- Host or path
+- Database
+- Project
+- Environment
+- Object count
+- Last scanned
+- Status
+- Tags
+- Actions
 
-- Add Data
-- Import Databases
-- View
-- Edit
-- Delete
+Source detail pages also show Project in the summary.
 
-## Add and Edit
+## Object Lists
 
-Routes:
+Object lists show Project immediately after Schema/folder. Level is shown after Last seen.
 
-- `/data/add`
-- `/data/edit/<item_id>`
+The standard object list columns are:
 
-Handlers:
+- Favourite
+- Object name
+- Type
+- Source
+- Schema/folder
+- Project
+- Rows
+- Columns
+- Size
+- Last seen
+- Level
+- Profile
+- Quality
+- Tags
+- Actions
 
-- `add_data_route()`
-- `edit_data_route()`
+The same ordering is used for source-detail object lists and Saved SQL related-object lists where those fields are available.
 
-The add/edit form is generated from the configured `lp_data` column list using `build_form_fields()`.
+## Saved SQL
 
-Current form behavior:
+Saved SQL records have a `project` metadata field stored on `d_data_saved_sql`.
 
-- Fields containing `date` use an HTML date input.
-- `description`, `content`, `col_list`, and `path` are rendered as textareas.
-- Other fields are rendered as text inputs.
-- On add, `project` defaults to the current `proj` query value, or `General`.
-- On edit, all configured field values are read from the submitted form and written back to `lp_data`.
+When a Saved SQL row is linked to a source and no project is selected, the source project is used as the default. Otherwise, choose the project explicitly from the Saved SQL form.
 
-Template: `src/modules/data/templates/data_edit.html`
+The Saved SQL list shows Project immediately after Name so SQL snippets can be scanned by project before target source, purpose, tags, and run status.
 
-## Delete
+## Row Counts
 
-Route: `/data/delete/<item_id>`
+SQLite scans now collect row counts for tables automatically. Views still show a blank row count because counting arbitrary views can be expensive or fail.
 
-Handler: `delete_data_route()`
+CSV scans count data rows by counting file lines minus the header row. Excel scans currently store the number of sampled rows read for schema discovery, capped by the scanner sample size.
 
-Delete calls the shared `db.delete_record()` helper for the `lp_data` row, then redirects back to the list page.
+Unknown counts are displayed as blank in the UI instead of `None`.
 
-The delete link uses a browser confirmation prompt.
+## Object Preview
 
-## Detail View
+Preview is available for:
 
-Route: `/data/view/<item_id>`
+- SQLite tables/views
+- CSV table objects
+- Excel sheet objects
 
-Handler: `view_data_route()`
+The preview route is:
 
-The detail page shows all configured `lp_data` columns in a simple table.
+- `/data/object/<object_id>/data`
 
-If the row's `tbl_name` value is a path to an existing SQLite database, the page also shows a SQLite browser area:
+Preview is read-only and shows up to 200 rows.
 
-- The left column lists SQLite tables from `sqlite_master`.
-- Selecting a table reloads the same view route with `?table=<name>`.
-- The right column previews the selected table.
-- The preview uses `SELECT * FROM "<table>" LIMIT 10`.
+## Scanning
 
-Template: `src/modules/data/templates/data_view.html`
+Source scan behavior:
 
-SQLite detection is intentionally simple:
+- SQLite: reads tables/views from `sqlite_master`, columns from `PRAGMA table_info`, and table row counts with `COUNT(1)`.
+- CSV: reads a sample for schema inference and stores one `CSV_TABLE` object.
+- Excel: reads worksheets and stores one `EXCEL_SHEET` object per sheet.
+- File Source: recursively scans matching files unless recursive scan is disabled.
 
-- The file path must exist.
-- `sqlite3.connect(path)` must succeed.
-- `SELECT name FROM sqlite_master LIMIT 1` must succeed.
-
-## Database Import
-
-Routes:
-
-- `/data/import-db`
-- `/data/import-db-folder`
-
-Handlers:
-
-- `import_data_db_route()`
-- `import_data_db_folder_route()`
-
-Template: `src/modules/data/templates/data_import_db.html`
-
-The import page supports two paths:
-
-1. Paste one SQLite database path per line.
-2. Provide a folder path and recursively scan for `.db` files.
-
-For each imported `.db` file, the code creates one `lp_data` record:
-
-- `name`: filename without extension.
-- `description`: `SQLite database`.
-- `tbl_name`: full file path.
-- `col_list`: blank.
-- `project`: current project value, or blank.
-
-The importer only checks the file extension. It does not validate that each imported path is a readable SQLite database at import time. Validation happens later on the detail page.
-
-## Search Integration
-
-Global search includes `lp_data` via `common.search.search_all()`.
-
-Searchable columns are:
-
-- `name`
-- `description`
-- `tbl_name`
-- `col_list`
-
-Search results link to `data.view_data_route`.
-
-Unlike Audio and Media, the Data tab does not currently have a specialized search-results layout. Data search matches are shown in the generic search results table.
-
-## Project Behavior
-
-The Data tab uses the `project` text column directly. It does not use folder mapping or `dim_folder`.
-
-On the list page, if a project is selected, rows are filtered with:
-
-```sql
-lower(project) = lower(?)
-```
-
-On add/import, the current project is stored into the new record when available.
-
-## Current Limitations
-
-- The tab is a registry, not a general-purpose data explorer.
-- `tbl_name` is overloaded: it can describe a table/source name, but for SQLite imports it stores a database file path.
-- SQLite previews are read-only.
-- SQLite preview always shows only the first 10 rows.
-- SQLite preview has no filtering, sorting, schema detail beyond column names, or export.
-- Imported `.db` paths are not validated during import.
-- List sorting is done in Python after loading all matching rows, then pagination is applied.
-- There is no deduplication when importing the same database path multiple times.
-- There is no specialized Data search page yet.
+Scan activity is stored in `d_data_task`, and source scan status fields are updated on completion or failure.

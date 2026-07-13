@@ -59,7 +59,8 @@
         {% set tab_proj = (s.proj if s.proj is defined and s.proj else s.id) %}
         {% set is_all = tab_proj in ['any', 'All', 'all', 'ALL'] %}
         {% set is_active = (current_proj and tab_proj and tab_proj|lower == current_proj|lower) or (not current_proj and is_all) %}
-        <a class="side {% if is_active %}active{% endif %}" href="/{{active_tab}}{% if tab_proj not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{tab_proj}}{% endif %}">
+        {% set side_base_path = request.path if active_tab == 'data' else '/' ~ active_tab %}
+        <a class="side {% if is_active %}active{% endif %}" href="{{ side_base_path }}{% if tab_proj not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{tab_proj}}{% endif %}">
           <span class="ic">{{s.icon}}</span>
           <span class="lab">{{s.label}}</span>
         </a>

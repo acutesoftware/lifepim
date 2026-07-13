@@ -6,6 +6,15 @@
   <input type="hidden" name="_existing" value="{{ '1' if item else '0' }}">
   <div class="data-form-grid">
     <label>Name<input name="sql_name" required value="{{ item.sql_name if item else '' }}"></label>
+    <label>Project
+      {% set selected_project = submitted.project if submitted else (item.project if item else '') %}
+      <select name="project">
+        <option value="">None</option>
+        {% for option in project_options %}
+        <option value="{{ option.id }}" {% if selected_project == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>Target source
       <select name="data_source_id">
         <option value="">None</option>

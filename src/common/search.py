@@ -29,11 +29,6 @@ SEARCH_SPECS = {
         "view_route": "notes.view_note_route",
         "id_param": "note_id",
     },
-    "data": {
-        "columns": ["name", "description", "tbl_name", "col_list"],
-        "view_route": "data.view_data_route",
-        "id_param": "item_id",
-    },
     "audio": {
         "columns": ["file_name", "path", "artist", "album", "song"],
         "view_route": "audio.view_audio_route",
@@ -56,7 +51,7 @@ SEARCH_SPECS = {
     },
 }
 
-DEFAULT_SEARCH_ORDER = ["notes", "data", "audio", "media", "how", "calendar"]
+DEFAULT_SEARCH_ORDER = ["notes", "audio", "media", "how", "calendar"]
 
 
 def parse_search_terms(query):
