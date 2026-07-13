@@ -123,7 +123,12 @@ def _tab_leaf(value, group_tokens):
 
 
 def get_side_tabs():
-    return list(mod_cfg.SIDE_TABS)
+    try:
+        from common import projects
+
+        return projects.projects_side_tabs()
+    except Exception:
+        return list(mod_cfg.SIDE_TABS)
 
 def get_table_def(route_id):
     for tbl in mod_cfg.table_def:

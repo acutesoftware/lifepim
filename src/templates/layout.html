@@ -21,7 +21,7 @@
       <div class="dropdown-menu" id="menuDropdown">
         <a href="#" id="showSidebar">Show project list</a>
         <a href="#" id="hideSidebar">Hide project list</a>
-        <a href="#">Edit projects</a>
+        <a href="{{ url_for('projects.edit_projects_route') }}">Edit projects</a>
         <div class="menu-spacer"></div>
         <a href="{{ url_for('admin.settings_route') }}">Settings</a>
         <a href="{{ url_for('help_route') }}">Help</a>

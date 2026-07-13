@@ -6,6 +6,7 @@
     ('audio', 'Audio'),
     ('files', 'Files'),
     ('notes', 'Notes'),
+    ('projects', 'Edit Projects'),
     ('config', 'Config'),
     ('general', 'General')
   ] %}
@@ -17,9 +18,13 @@
   <div class="settings-shell">
     <nav class="settings-tabs" aria-label="Settings sections">
       {% for tab_id, tab_label in settings_tabs %}
+        {% if tab_id == 'projects' %}
+        <a href="{{ url_for('projects.edit_projects_route') }}">{{ tab_label }}</a>
+        {% else %}
         <a class="{% if active_settings_tab == tab_id %}active{% endif %}" href="{{ url_for('admin.settings_route', tab=tab_id) }}">
           {{ tab_label }}
         </a>
+        {% endif %}
       {% endfor %}
     </nav>
 

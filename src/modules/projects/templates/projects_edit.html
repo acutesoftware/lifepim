@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% if message %}
+    <div class="settings-message">{{ message }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="settings-message settings-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="settings-shell">
+    <section class="settings-panel">
+      <h4>Projects</h4>
+      <form method="post" action="{{ url_for('projects.edit_projects_route') }}" class="settings-form settings-form-wide">
+        <div class="tabular-scroll">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Group</th>
+                <th>Project ID</th>
+                <th>Label</th>
+                <th>Icon</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in project_rows %}
+              <tr>
+                <td>
+                  <select name="row_type" {% if row.is_system %}disabled{% endif %}>
+                    <option value="project" {% if not row.is_header %}selected{% endif %}>Project</option>
+                    <option value="header" {% if row.is_header %}selected{% endif %}>Header</option>
+                  </select>
+                  <input type="hidden" name="row_type" value="{{ 'header' if row.is_header else 'project' }}" {% if not row.is_system %}disabled{% endif %}>
+                  <input type="hidden" name="is_system" value="{{ row.is_system or 0 }}">
+                </td>
+                <td><input type="text" name="group_name" value="{{ row.group_name or row.label }}"></td>
+                <td><input type="text" name="project_id" value="{{ row.id }}" {% if row.is_system %}readonly{% endif %}></td>
+                <td><input type="text" name="project_name" value="{{ row.label }}"></td>
+                <td><input type="text" name="icon" value="{{ row.icon }}"></td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <td>
+                  <select name="new_row_type">
+                    <option value="project">Project</option>
+                    <option value="header">Header</option>
+                  </select>
+                </td>
+                <td><input type="text" name="new_group_name" placeholder="WORK"></td>
+                <td><input type="text" name="new_project_id" placeholder="work/job"></td>
+                <td><input type="text" name="new_project_name" placeholder="Job"></td>
+                <td><input type="text" name="new_icon" placeholder="*"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="settings-action-row">
+          <button type="submit" name="action" value="save">Save projects</button>
+          <button type="submit" name="action" value="reset" onclick="return confirm('Reset your project list to the default?');">Reset to default</button>
+        </div>
+      </form>
+    </section>
+  </div>
+{% endblock %}

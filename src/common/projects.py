@@ -7,24 +7,29 @@ from common import config as cfg
 
 PROJECTS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS lp_projects (
-    project_id      TEXT PRIMARY KEY,
+    owner_user_id   INTEGER,
+    project_id      TEXT NOT NULL,
+    icon            TEXT,
     tab             TEXT NOT NULL,
     group_name      TEXT NOT NULL,
     project_name    TEXT NOT NULL,
+    is_header       INTEGER NOT NULL DEFAULT 0,
+    is_system       INTEGER NOT NULL DEFAULT 0,
     status          TEXT NOT NULL DEFAULT 'active',
     tags            TEXT,
     sort_order      INTEGER NOT NULL DEFAULT 100,
     pinned          INTEGER NOT NULL DEFAULT 0,
     notes           TEXT,
     created_utc     TEXT NOT NULL,
-    updated_utc     TEXT NOT NULL
+    updated_utc     TEXT NOT NULL,
+    UNIQUE (owner_user_id, project_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_lp_projects_tab_group
-ON lp_projects (tab, group_name, sort_order, project_name);
+ON lp_projects (owner_user_id, tab, group_name, sort_order, project_name);
 
 CREATE INDEX IF NOT EXISTS idx_lp_projects_status
-ON lp_projects (status);
+ON lp_projects (owner_user_id, status);
 
 CREATE TABLE IF NOT EXISTS lp_project_folders (
     project_folder_id    INTEGER PRIMARY KEY,
@@ -69,8 +74,89 @@ def _get_conn(conn=None):
 
 def ensure_projects_schema(conn=None):
     conn = _get_conn(conn)
+    _migrate_projects_schema(conn)
     conn.executescript(PROJECTS_SCHEMA)
     conn.commit()
+
+
+def _table_columns(conn, table_name):
+    try:
+        return [dict(row) for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()]
+    except Exception:
+        return []
+
+
+def _migrate_projects_schema(conn):
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lp_projects'"
+    ).fetchone()
+    if not exists:
+        return
+    columns = _table_columns(conn, "lp_projects")
+    column_names = {row["name"] for row in columns}
+    project_id_is_pk = any(row["name"] == "project_id" and int(row.get("pk") or 0) for row in columns)
+    required = {"owner_user_id", "icon", "is_header", "is_system"}
+    if required.issubset(column_names) and not project_id_is_pk:
+        return
+    conn.execute("ALTER TABLE lp_projects RENAME TO lp_projects_legacy")
+    conn.executescript(PROJECTS_SCHEMA)
+    legacy_cols = {row["name"] for row in _table_columns(conn, "lp_projects_legacy")}
+    select_expr = {
+        "owner_user_id": "owner_user_id" if "owner_user_id" in legacy_cols else "NULL",
+        "project_id": "project_id",
+        "icon": "icon" if "icon" in legacy_cols else "''",
+        "tab": "tab",
+        "group_name": "group_name",
+        "project_name": "project_name",
+        "is_header": "is_header" if "is_header" in legacy_cols else "0",
+        "is_system": "is_system" if "is_system" in legacy_cols else "0",
+        "status": "status",
+        "tags": "tags",
+        "sort_order": "sort_order",
+        "pinned": "pinned",
+        "notes": "notes",
+        "created_utc": "created_utc",
+        "updated_utc": "updated_utc",
+    }
+    insert_cols = ", ".join(select_expr.keys())
+    select_cols = ", ".join(select_expr.values())
+    conn.execute(
+        f"INSERT OR IGNORE INTO lp_projects ({insert_cols}) SELECT {select_cols} FROM lp_projects_legacy"
+    )
+    conn.execute("DROP TABLE lp_projects_legacy")
+    conn.commit()
+
+
+def _current_owner_user_id():
+    try:
+        from flask_login import current_user
+
+        if getattr(current_user, "is_authenticated", False):
+            return getattr(current_user, "user_id", None)
+    except Exception:
+        return None
+    return None
+
+
+def _current_username():
+    try:
+        from flask_login import current_user
+
+        if getattr(current_user, "is_authenticated", False):
+            return (getattr(current_user, "username", "") or "").strip()
+    except Exception:
+        return ""
+    return ""
+
+
+def _owner_user_id(owner_user_id=None):
+    return _current_owner_user_id() if owner_user_id is None else owner_user_id
+
+
+def _int_value(value, default=0):
+    if value is None or value == "":
+        return default
+    return int(value)
 
 
 def normalize_path_prefix(path_value):
@@ -88,16 +174,17 @@ def normalize_path_prefix(path_value):
     return normalized
 
 
-def projects_list_sidebar(status="active", conn=None):
+def projects_list_sidebar(status="active", conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
-    params = []
-    condition = "1=1"
+    params = [_owner_user_id(owner_user_id)]
+    condition = "owner_user_id IS ? AND is_header = 0 AND is_system = 0"
     if status:
-        condition = "status = ?"
+        condition += " AND status = ?"
         params.append(status)
     sql = (
-        "SELECT project_id, tab, group_name, project_name, status, tags, "
+        "SELECT owner_user_id, project_id, icon, tab, group_name, project_name, "
+        "is_header, is_system, status, tags, "
         "sort_order, pinned, notes, created_utc, updated_utc "
         "FROM lp_projects "
         f"WHERE {condition} "
@@ -107,8 +194,8 @@ def projects_list_sidebar(status="active", conn=None):
     return [dict(row) for row in rows]
 
 
-def projects_sidebar_tree(status="active", conn=None):
-    rows = projects_list_sidebar(status=status, conn=conn)
+def projects_sidebar_tree(status="active", conn=None, owner_user_id=None):
+    rows = projects_list_sidebar(status=status, conn=conn, owner_user_id=owner_user_id)
     tabs = {}
     for row in rows:
         tab = row.get("tab") or ""
@@ -134,25 +221,209 @@ def projects_sidebar_tree(status="active", conn=None):
     return ordered
 
 
-def project_get(project_id, conn=None):
+def _default_sidebar_rows(owner_user_id=None):
+    rows = []
+    current_group = "Projects"
+    for idx, entry in enumerate(cfg.SIDE_TABS):
+        entry_id = (entry.get("id") or "").strip()
+        label = (entry.get("label") or entry_id).strip()
+        icon = entry.get("icon") or ""
+        if not entry_id:
+            continue
+        lower_id = entry_id.lower()
+        is_system = 1 if lower_id in {"all", "any", "unmapped"} else 0
+        is_header = 1 if lower_id == "spacer" or (not icon and label and label.upper() == label) else 0
+        if is_header:
+            current_group = label
+            project_id = entry_id if lower_id != "spacer" else f"header-{idx}"
+            tab = label
+            project_name = label
+        else:
+            project_id = entry_id
+            tab = current_group
+            project_name = label
+        rows.append(
+            {
+                "owner_user_id": owner_user_id,
+                "project_id": project_id,
+                "icon": icon,
+                "tab": tab,
+                "group_name": current_group,
+                "project_name": project_name,
+                "is_header": is_header,
+                "is_system": is_system,
+                "status": "active",
+                "sort_order": idx * 10,
+            }
+        )
+    return rows
+
+
+def _sidebar_looks_like_flat_legacy(conn, owner_user_id):
+    row = conn.execute(
+        """
+        SELECT COUNT(1) AS cnt,
+               SUM(CASE WHEN COALESCE(icon, '') != '' THEN 1 ELSE 0 END) AS icon_count,
+               SUM(CASE WHEN COALESCE(is_header, 0) = 1 THEN 1 ELSE 0 END) AS header_count,
+               SUM(CASE WHEN COALESCE(is_system, 0) = 1 THEN 1 ELSE 0 END) AS system_count,
+               COUNT(DISTINCT sort_order) AS sort_count
+        FROM lp_projects
+        WHERE owner_user_id IS ?
+        """,
+        (owner_user_id,),
+    ).fetchone()
+    if not row or int(row["cnt"] or 0) == 0:
+        return False
+    return (
+        int(row["icon_count"] or 0) == 0
+        and int(row["header_count"] or 0) == 0
+        and int(row["system_count"] or 0) == 0
+        and int(row["sort_count"] or 0) <= 1
+    )
+
+
+def seed_default_projects_for_user(owner_user_id=None, conn=None, replace=False):
+    conn = _get_conn(conn)
+    ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    existing = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_projects WHERE owner_user_id IS ?",
+        (owner_user_id,),
+    ).fetchone()
+    if existing and int(existing["cnt"] or 0) and not replace:
+        if _sidebar_looks_like_flat_legacy(conn, owner_user_id):
+            replace = True
+        else:
+            return 0
+    legacy = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_projects WHERE owner_user_id IS NULL"
+    ).fetchone()
+    if (
+        not replace
+        and owner_user_id is not None
+        and legacy
+        and int(legacy["cnt"] or 0)
+        and _current_username().lower() == "duncan"
+    ):
+        if _sidebar_looks_like_flat_legacy(conn, None):
+            conn.execute("DELETE FROM lp_projects WHERE owner_user_id IS NULL")
+            conn.commit()
+            replace = True
+        else:
+            conn.execute("UPDATE lp_projects SET owner_user_id = ? WHERE owner_user_id IS NULL", (owner_user_id,))
+            conn.commit()
+            return int(legacy["cnt"] or 0)
+    if existing and int(existing["cnt"] or 0) and not replace:
+        return 0
+    if replace:
+        conn.execute("DELETE FROM lp_projects WHERE owner_user_id IS ?", (owner_user_id,))
+        conn.commit()
+    count = 0
+    for row in _default_sidebar_rows(owner_user_id):
+        project_upsert(row, conn=conn, owner_user_id=owner_user_id)
+        count += 1
+    return count
+
+
+def projects_side_tabs(owner_user_id=None, conn=None, seed=True):
+    conn = _get_conn(conn)
+    ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    if owner_user_id is None:
+        return list(cfg.SIDE_TABS)
+    if seed:
+        seed_default_projects_for_user(owner_user_id, conn=conn, replace=False)
+    rows = conn.execute(
+        "SELECT project_id, icon, group_name, project_name, is_header, is_system, status, sort_order "
+        "FROM lp_projects WHERE owner_user_id IS ? AND status = 'active' "
+        "ORDER BY sort_order, project_name",
+        (owner_user_id,),
+    ).fetchall()
+    side_tabs = []
+    for row in rows:
+        side_tabs.append(
+            {
+                "icon": row["icon"] or "",
+                "id": row["project_id"],
+                "proj": "" if str(row["project_id"]).startswith("header-") else row["project_id"],
+                "label": row["project_name"],
+                "group_name": row["group_name"],
+                "is_header": int(row["is_header"] or 0),
+                "is_system": int(row["is_system"] or 0),
+            }
+        )
+    return side_tabs or list(cfg.SIDE_TABS)
+
+
+def save_user_sidebar_rows(rows, owner_user_id=None, conn=None):
+    conn = _get_conn(conn)
+    ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    if owner_user_id is None:
+        raise ValueError("A logged-in user is required.")
+    now = _utc_now()
+    conn.execute("DELETE FROM lp_projects WHERE owner_user_id IS ?", (owner_user_id,))
+    for idx, row in enumerate(rows):
+        project_id = (row.get("project_id") or "").strip()
+        project_name = (row.get("project_name") or "").strip()
+        if not project_id or not project_name:
+            continue
+        is_header = int(row.get("is_header") or 0)
+        is_system = int(row.get("is_system") or 0)
+        group_name = (row.get("group_name") or "").strip()
+        if is_header:
+            group_name = project_name
+        if not group_name:
+            group_name = "Projects"
+        tab = group_name
+        conn.execute(
+            "INSERT INTO lp_projects "
+            "(owner_user_id, project_id, icon, tab, group_name, project_name, is_header, is_system, "
+            "status, tags, sort_order, pinned, notes, created_utc, updated_utc) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                owner_user_id,
+                project_id,
+                row.get("icon") or "",
+                tab,
+                group_name,
+                project_name,
+                is_header,
+                is_system,
+                row.get("status") or "active",
+                row.get("tags"),
+                _int_value(row.get("sort_order"), idx * 10),
+                _int_value(row.get("pinned"), 0),
+                row.get("notes"),
+                now,
+                now,
+            ),
+        )
+    conn.commit()
+
+
+def project_get(project_id, conn=None, owner_user_id=None):
     if not project_id:
         return None
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     row = conn.execute(
-        "SELECT project_id, tab, group_name, project_name, status, tags, "
+        "SELECT owner_user_id, project_id, icon, tab, group_name, project_name, "
+        "is_header, is_system, status, tags, "
         "sort_order, pinned, notes, created_utc, updated_utc "
-        "FROM lp_projects WHERE project_id = ?",
-        (project_id,),
+        "FROM lp_projects WHERE project_id = ? AND owner_user_id IS ?",
+        (project_id, owner_user_id),
     ).fetchone()
     return dict(row) if row else None
 
 
-def project_upsert(project, conn=None):
+def project_upsert(project, conn=None, owner_user_id=None):
     if not project:
         raise ValueError("Missing project data.")
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(project.get("owner_user_id", owner_user_id))
     project_id = (project.get("project_id") or "").strip()
     if not project_id:
         raise ValueError("project_id is required.")
@@ -161,22 +432,28 @@ def project_upsert(project, conn=None):
     project_name = (project.get("project_name") or "").strip()
     if not tab or not group_name or not project_name:
         raise ValueError("tab, group_name, and project_name are required.")
+    icon = project.get("icon") or ""
+    is_header = int(project.get("is_header") or 0)
+    is_system = int(project.get("is_system") or 0)
     status = (project.get("status") or "active").strip()
     tags = project.get("tags")
-    sort_order = int(project.get("sort_order") or 100)
-    pinned = int(project.get("pinned") or 0)
+    sort_order = _int_value(project.get("sort_order"), 100)
+    pinned = _int_value(project.get("pinned"), 0)
     notes = project.get("notes")
     now = _utc_now()
-    existing = project_get(project_id, conn=conn)
+    existing = project_get(project_id, conn=conn, owner_user_id=owner_user_id)
     if existing:
         conn.execute(
-            "UPDATE lp_projects SET tab = ?, group_name = ?, project_name = ?, "
-            "status = ?, tags = ?, sort_order = ?, pinned = ?, notes = ?, "
-            "updated_utc = ? WHERE project_id = ?",
+            "UPDATE lp_projects SET icon = ?, tab = ?, group_name = ?, project_name = ?, "
+            "is_header = ?, is_system = ?, status = ?, tags = ?, sort_order = ?, pinned = ?, notes = ?, "
+            "updated_utc = ? WHERE project_id = ? AND owner_user_id IS ?",
             (
+                icon,
                 tab,
                 group_name,
                 project_name,
+                is_header,
+                is_system,
                 status,
                 tags,
                 sort_order,
@@ -184,19 +461,24 @@ def project_upsert(project, conn=None):
                 notes,
                 now,
                 project_id,
+                owner_user_id,
             ),
         )
     else:
         conn.execute(
             "INSERT INTO lp_projects "
-            "(project_id, tab, group_name, project_name, status, tags, sort_order, "
+            "(owner_user_id, project_id, icon, tab, group_name, project_name, is_header, is_system, status, tags, sort_order, "
             "pinned, notes, created_utc, updated_utc) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
+                owner_user_id,
                 project_id,
+                icon,
                 tab,
                 group_name,
                 project_name,
+                is_header,
+                is_system,
                 status,
                 tags,
                 sort_order,
@@ -210,12 +492,13 @@ def project_upsert(project, conn=None):
     return project_id
 
 
-def project_set_status(project_id, status, conn=None):
+def project_set_status(project_id, status, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     conn.execute(
-        "UPDATE lp_projects SET status = ?, updated_utc = ? WHERE project_id = ?",
-        ((status or "active").strip(), _utc_now(), project_id),
+        "UPDATE lp_projects SET status = ?, updated_utc = ? WHERE project_id = ? AND owner_user_id IS ?",
+        ((status or "active").strip(), _utc_now(), project_id, owner_user_id),
     )
     conn.commit()
 

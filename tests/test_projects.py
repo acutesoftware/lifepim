@@ -21,10 +21,14 @@ class TestProjects(unittest.TestCase):
     def test_schema_columns(self):
         cols = [row[1] for row in self.conn.execute("PRAGMA table_info(lp_projects)").fetchall()]
         expected = [
+            "owner_user_id",
             "project_id",
+            "icon",
             "tab",
             "group_name",
             "project_name",
+            "is_header",
+            "is_system",
             "status",
             "tags",
             "sort_order",
@@ -136,6 +140,60 @@ class TestProjects(unittest.TestCase):
         id2 = projects.project_folder_add("proj.two", path, conn=self.conn)
         self.assertTrue(id1)
         self.assertTrue(id2)
+
+    def test_user_sidebar_can_be_saved_and_reset(self):
+        projects.seed_default_projects_for_user(1, conn=self.conn)
+        default_rows = projects.projects_side_tabs(owner_user_id=1, conn=self.conn, seed=False)
+        self.assertGreater(len(default_rows), 1)
+
+        projects.save_user_sidebar_rows(
+            [
+                {
+                    "project_id": "All",
+                    "project_name": "All Projects",
+                    "icon": "*",
+                    "group_name": "Projects",
+                    "is_system": 1,
+                },
+                {
+                    "project_id": "work/client",
+                    "project_name": "Client",
+                    "icon": "W",
+                    "group_name": "WORK",
+                },
+            ],
+            owner_user_id=1,
+            conn=self.conn,
+        )
+        rows = projects.projects_side_tabs(owner_user_id=1, conn=self.conn, seed=False)
+        self.assertEqual([row["id"] for row in rows], ["All", "work/client"])
+
+        projects.seed_default_projects_for_user(1, conn=self.conn, replace=True)
+        reset_rows = projects.projects_side_tabs(owner_user_id=1, conn=self.conn, seed=False)
+        self.assertEqual(len(reset_rows), len(default_rows))
+
+    def test_flat_legacy_sidebar_is_restored_to_default_structure(self):
+        for project_id, name in [("work/job", "Job"), ("make/design", "Design")]:
+            projects.project_upsert(
+                {
+                    "project_id": project_id,
+                    "tab": "LEGACY",
+                    "group_name": "Legacy",
+                    "project_name": name,
+                    "sort_order": 100,
+                },
+                owner_user_id=1,
+                conn=self.conn,
+            )
+
+        count = projects.seed_default_projects_for_user(1, conn=self.conn)
+        rows = projects.projects_side_tabs(owner_user_id=1, conn=self.conn, seed=False)
+
+        self.assertGreater(count, 2)
+        self.assertEqual(rows[0]["id"], "All")
+        self.assertTrue(any(row["is_header"] for row in rows))
+        self.assertTrue(any(row["icon"] for row in rows))
+        self.assertIn("All", [row["id"] for row in rows])
 
 
 if __name__ == "__main__":
