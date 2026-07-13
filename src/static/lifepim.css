@@ -438,6 +438,22 @@ body.freeze-headers {
   padding: 2px 4px;
 }
 
+.top-user-link {
+  color: #1f3f6d;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 4px 6px;
+  border: 1px solid #c8d3e3;
+  border-radius: 4px;
+  background: #f7f9fc;
+  white-space: nowrap;
+}
+
+.top-user-link:hover {
+  background: #e7edf7;
+}
+
 .search-summary-line {
   display: flex;
   justify-content: space-between;
@@ -2189,6 +2205,72 @@ button.calendar-nav {
 .settings-form button {
   align-self: flex-start;
   padding: 3px 8px;
+}
+
+.user-profile {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.user-profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid #d8dde5;
+  border-radius: 6px;
+  background: #fff;
+  padding: 16px;
+}
+
+.user-profile-kicker,
+.user-profile-sub,
+.user-profile-stat span {
+  color: #5c6675;
+  font-size: 12px;
+}
+
+.user-profile h2 {
+  margin: 2px 0;
+  font-size: 24px;
+}
+
+.user-profile-action {
+  color: #1f3f6d;
+  text-decoration: none;
+  border: 1px solid #c8d3e3;
+  border-radius: 4px;
+  background: #f7f9fc;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.user-profile-action:hover,
+.user-profile-stat:hover {
+  background: #f7f9fc;
+}
+
+.user-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.user-profile-stat {
+  border: 1px solid #d8dde5;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  text-decoration: none;
+  padding: 14px;
+}
+
+.user-profile-stat strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 28px;
 }
 
 .settings-action-row {

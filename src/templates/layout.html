@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8"/>
   <title>LifePIM - {{ active_tab }}</title>
+  {% if csrf_token is defined %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css') }}">
 </head>
 {% set current_proj = request.args.get('proj') %}
@@ -23,6 +26,18 @@
         <a href="{{ url_for('admin.settings_route') }}">Settings</a>
         <a href="{{ url_for('help_route') }}">Help</a>
         <a href="{{ url_for('admin.user_history_route') }}">User history</a>
+        {% if security_current_user is defined and security_current_user.is_authenticated %}
+        {% if security_current_user.role == 'admin' %}
+        <a href="{{ url_for('admin.users_route') }}">Users</a>
+        <a href="{{ url_for('admin.trusted_devices_route') }}">Trusted devices</a>
+        {% endif %}
+        <a href="{{ url_for('auth.change_password') }}">Change password</a>
+        <form method="post" action="{{ url_for('auth.logout') }}" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="forget_device" value="1">
+          <button type="submit" style="width:100%; text-align:left;">Log out</button>
+        </form>
+        {% endif %}
       </div>
     </div>
 
@@ -50,6 +65,9 @@
         <option value="metadata" {% if search_scope != 'note_content' %}selected{% endif %}>Metadata</option>
         <option value="note_content" {% if search_scope == 'note_content' %}selected{% endif %}>Note Content</option>
       </select>
+      {% if security_current_user is defined and security_current_user.is_authenticated %}
+        <a class="top-user-link" href="{{ url_for('auth.user_profile') }}">{{ security_current_user.username }}</a>
+      {% endif %}
     </form>
   </div>
 
@@ -80,6 +98,33 @@
   {% include "widgets/note_overlay.html" %}
 
   <script>
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+    if (csrfToken) {
+      document.querySelectorAll('form[method="post"], form[method="POST"]').forEach((form) => {
+        if (!form.querySelector('input[name="csrf_token"]')) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'csrf_token';
+          input.value = csrfToken;
+          form.appendChild(input);
+        }
+      });
+      const originalFetch = window.fetch;
+      window.fetch = function(resource, options) {
+        options = options || {};
+        const method = (options.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+          const headers = new Headers(options.headers || {});
+          if (!headers.has('X-CSRFToken')) {
+            headers.set('X-CSRFToken', csrfToken);
+          }
+          options.headers = headers;
+        }
+        return originalFetch(resource, options);
+      };
+    }
+
     const menuToggle = document.getElementById('menuToggle');
     const menuDropdown = document.getElementById('menuDropdown');
     const sidebar = document.getElementById('sidebar');

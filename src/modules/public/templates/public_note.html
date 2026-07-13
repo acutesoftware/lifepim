@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ note.file_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css') }}">
+</head>
+<body>
+  <main class="main">
+    <h1>{{ note.file_name }}</h1>
+    <article>{{ content_html|safe }}</article>
+  </main>
+</body>
+</html>

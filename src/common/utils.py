@@ -4,6 +4,20 @@ import math
 import common.config as mod_cfg
 from common import data as db
 
+
+NORMAL_USER_HIDDEN_TABS = {
+    "admin",
+    "agent",
+    "files",
+    "data",
+    "how",
+    "tasks",
+    "goals",
+    "contacts",
+    "places",
+    "apps",
+}
+
 def format_date(dt):
     if isinstance(dt, str):
         return dt
@@ -61,7 +75,14 @@ def format_duration_label(value):
 
 
 def get_tabs():
-    return mod_cfg.TABS
+    try:
+        from flask_login import current_user
+
+        if getattr(current_user, "is_authenticated", False) and getattr(current_user, "role", "") == "admin":
+            return mod_cfg.TABS
+    except Exception:
+        pass
+    return [tab for tab in mod_cfg.TABS if tab.get("id") not in NORMAL_USER_HIDDEN_TABS]
 
 
 def _fetch_mapping_tabs():

@@ -1,7 +1,7 @@
 from datetime import datetime
 import json
 
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, abort, render_template, request, redirect, url_for
 
 from common import data as db
 from common import config as cfg
@@ -10,6 +10,7 @@ from common import note_search_index
 from common import settings as settings_mod
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr, paginate_total, build_pagination
 from modules.calendar.services import calendar_index
+from core import security
 
 
 admin_bp = Blueprint(
@@ -59,6 +60,7 @@ JOIN map_folder_project r
 
 @admin_bp.route("/", methods=["GET", "POST"])
 def admin_mapping_route():
+    security.require_role("admin")
     message = request.args.get("message", "")
     active_admin_tab = (request.args.get("tab") or request.form.get("tab") or "security").strip().lower()
     if active_admin_tab not in {"security", "folder_mapping", "folders", "migration"}:
@@ -238,6 +240,7 @@ def admin_mapping_route():
 
 @admin_bp.route("/settings", methods=["GET", "POST"])
 def settings_route():
+    security.require_role("admin")
     message = request.args.get("message", "")
     active_settings_tab = (request.args.get("tab") or request.form.get("tab") or "calendar").strip().lower()
     if active_settings_tab not in {"calendar", "media", "audio", "files", "notes", "general", "config"}:
@@ -578,6 +581,7 @@ def _undo_log_entry(conn, entry):
 
 @admin_bp.route("/user-history", methods=["GET", "POST"])
 def user_history_route():
+    security.require_role("admin")
     message = ""
     conn = db.conn if db.conn is not None else None
     conn = db._get_conn() if conn is None else conn
@@ -638,4 +642,131 @@ def user_history_route():
         sort_col=sort_col,
         sort_dir=sort_dir,
         now=datetime.now(),
+    )
+
+
+@admin_bp.route("/users")
+def users_route():
+    security.require_role("admin")
+    return render_template(
+        "admin_users.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Users",
+        content_html="",
+        users=security.list_users(),
+        message=request.args.get("message", ""),
+    )
+
+
+@admin_bp.route("/users/new", methods=["GET", "POST"])
+def new_user_route():
+    security.require_role("admin")
+    error = ""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        display_name = request.form.get("display_name", "").strip()
+        password = request.form.get("password", "")
+        role = request.form.get("role", "user")
+        if not username or not display_name or not password:
+            error = "Username, display name, and password are required."
+        else:
+            try:
+                user_id = security.create_user(username, display_name, password, role=role, is_active=True)
+                return redirect(url_for("admin.users_route", message=f"Created user {username}."))
+            except Exception as exc:
+                error = f"User creation failed: {exc}"
+    return render_template(
+        "admin_user_form.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="New User",
+        content_html="",
+        user=None,
+        error=error,
+    )
+
+
+@admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
+def edit_user_route(user_id):
+    security.require_role("admin")
+    row = security.get_user_by_id(user_id)
+    if not row:
+        abort(404)
+    error = ""
+    if request.method == "POST":
+        try:
+            security.update_user(
+                user_id,
+                request.form.get("username", ""),
+                request.form.get("display_name", ""),
+                request.form.get("role", "user"),
+                request.form.get("is_active") == "1",
+            )
+            return redirect(url_for("admin.users_route", message="User updated."))
+        except Exception as exc:
+            error = f"User update failed: {exc}"
+    return render_template(
+        "admin_user_form.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Edit User",
+        content_html="",
+        user=dict(row),
+        error=error,
+    )
+
+
+@admin_bp.route("/users/<int:user_id>/reset-password", methods=["GET", "POST"])
+def reset_password_route(user_id):
+    security.require_role("admin")
+    row = security.get_user_by_id(user_id)
+    if not row:
+        abort(404)
+    error = ""
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+        if not password or password != confirm:
+            error = "Passwords do not match."
+        else:
+            security.reset_user_password(user_id, password, revoke_devices=True)
+            return redirect(url_for("admin.users_route", message="Password reset and trusted devices revoked."))
+    return render_template(
+        "admin_reset_password.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Reset Password",
+        content_html="",
+        user=dict(row),
+        error=error,
+    )
+
+
+@admin_bp.route("/trusted-devices", methods=["GET", "POST"])
+def trusted_devices_route():
+    security.require_role("admin")
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        if action == "revoke":
+            security.revoke_trusted_device(request.form.get("trusted_device_id"))
+        elif action == "revoke_user":
+            security.logout_all_devices(request.form.get("user_id"))
+        return redirect(url_for("admin.trusted_devices_route", message="Trusted device settings updated."))
+    raw_token = request.cookies.get(security.TRUSTED_DEVICE_COOKIE)
+    current_token_hash = security._hash_trusted_token(raw_token) if raw_token else ""
+    return render_template(
+        "admin_trusted_devices.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Trusted Devices",
+        content_html="",
+        devices=security.get_trusted_devices(),
+        current_token_hash=current_token_hash,
+        message=request.args.get("message", ""),
     )

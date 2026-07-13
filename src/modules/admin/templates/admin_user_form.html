@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+<form method="post" class="settings-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Username
+    <input type="text" name="username" value="{{ user.username if user else '' }}" required>
+  </label>
+  <label>Display name
+    <input type="text" name="display_name" value="{{ user.display_name if user else '' }}" required>
+  </label>
+  <label>Role
+    {% set role = user.role if user else 'user' %}
+    <select name="role">
+      <option value="admin" {% if role == 'admin' %}selected{% endif %}>Admin</option>
+      <option value="user" {% if role == 'user' %}selected{% endif %}>User</option>
+      <option value="guest" {% if role == 'guest' %}selected{% endif %}>Guest</option>
+    </select>
+  </label>
+  {% if user %}
+    <label>
+      <input type="checkbox" name="is_active" value="1" {% if user.is_active %}checked{% endif %}>
+      Active
+    </label>
+  {% else %}
+    <label>Password
+      <input type="password" name="password" autocomplete="new-password" required>
+    </label>
+  {% endif %}
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

@@ -1,62 +1,66 @@
 @echo off
 setlocal
 
-REM ============================================================
-REM LifePIM Desktop Launcher
-REM Works when this BAT is located in:
-REM   <LifePIM root>\src\RUN_DESKTOP.BAT
-REM and the venv is located at:
-REM   <LifePIM root>\.venv\
-REM ============================================================
+REM LifePIM production launcher.
+REM Works from either:
+REM   C:\apps\LifePIM_Prod\RUN_DESKTOP.BAT
+REM   C:\apps\LifePIM_Prod\src\RUN_DESKTOP.BAT
 
-REM note - to run this manually from a command line, use the line below
-REM D:\DATA_LLM\dev\lifepim-desktop\.venv\Scripts\python.exe app.py
-REM from the D:\DATA_LLM\dev\lifepim-desktop\src folder
+set "SCRIPT_DIR=%~dp0"
 
-
-REM Move to the LifePIM root folder, one level above /src
-cd /d "%~dp0\.."
-
-echo ============================================================
-echo Starting LifePIM
-echo Root folder: %CD%
-echo ============================================================
-
-set LIFEPIM_HOST=127.0.0.1
-set LIFEPIM_PORT=9741
-set LIFEPIM_DEBUG=false
-
-if exist "%CD%\config\lifepim.local.toml" (
-    set LIFEPIM_CONFIG=%CD%\config\lifepim.local.toml
-    echo Using config: %LIFEPIM_CONFIG%
+if exist "%SCRIPT_DIR%app.py" (
+    set "APP_DIR=%SCRIPT_DIR%"
+    for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
+) else if exist "%SCRIPT_DIR%src\app.py" (
+    set "ROOT_DIR=%SCRIPT_DIR:~0,-1%"
+    set "APP_DIR=%SCRIPT_DIR%src"
 ) else (
-    echo No local config found at %CD%\config\lifepim.local.toml
-)
-
-if not exist "%CD%\.venv\Scripts\python.exe" (
-    echo.
-    echo ERROR: Python venv not found:
-    echo   %CD%\.venv\Scripts\python.exe
-    echo.
-    pause
+    echo ERROR: Could not find app.py next to this file or in .\src.
     exit /b 1
 )
 
-echo Python:
-"%CD%\.venv\Scripts\python.exe" --version
+set "PYTHON_EXE=%ROOT_DIR%\.venv\Scripts\python.exe"
 
-echo.
-echo Launching LifePIM server:
-echo   http://%LIFEPIM_HOST%:%LIFEPIM_PORT%
-echo.
+if not exist "%PYTHON_EXE%" (
+    echo ERROR: Python virtual environment not found:
+    echo   %PYTHON_EXE%
+    exit /b 1
+)
 
-REM Start Flask in a new command window
-start "LifePIM Server" "%CD%\.venv\Scripts\python.exe" "%CD%\src\app.py"
+if not defined LIFEPIM_ENV set "LIFEPIM_ENV=production"
+if not defined LIFEPIM_HOST set "LIFEPIM_HOST=127.0.0.1"
+if not defined LIFEPIM_PORT set "LIFEPIM_PORT=9741"
 
-REM Give Flask a few seconds to start
-timeout /t 4 /nobreak > nul
+if /I "%LIFEPIM_ENV%"=="production" if not defined LIFEPIM_SECRET_KEY (
+    echo ERROR: LIFEPIM_SECRET_KEY is not set.
+    echo Set a persistent secret before starting production, for example:
+    echo   setx LIFEPIM_SECRET_KEY "replace-with-a-long-random-secret"
+    exit /b 1
+)
 
-REM Open browser
-start "" "http://127.0.0.1:9741"
+set "CADDY_DIR=C:\apps\caddy"
+set "CADDY_EXE=%CADDY_DIR%\caddy_windows_amd64.exe"
 
-exit /b 0
+if exist "%CADDY_EXE%" (
+    tasklist /FI "IMAGENAME eq caddy_windows_amd64.exe" 2>NUL | find /I "caddy_windows_amd64.exe" >NUL
+    if errorlevel 1 (
+        echo Starting Caddy reverse proxy.
+        pushd "%CADDY_DIR%"
+        "%CADDY_EXE%" start
+        if errorlevel 1 (
+            popd
+            echo WARNING: Caddy did not start cleanly. LifePIM will still start on Waitress.
+        ) else (
+            popd
+        )
+    ) else (
+        echo Caddy reverse proxy is already running.
+    )
+) else (
+    echo WARNING: Caddy was not found at %CADDY_EXE%.
+    echo LifePIM will still start on Waitress without HTTPS reverse proxy startup.
+)
+
+cd /d "%APP_DIR%"
+echo Starting LifePIM with Waitress on http://%LIFEPIM_HOST%:%LIFEPIM_PORT%
+"%PYTHON_EXE%" run_waitress.py

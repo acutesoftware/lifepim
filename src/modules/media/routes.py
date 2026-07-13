@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, render_template, request, url_for, send_file, abort, redirect
+from flask_login import current_user
 
 from common import data as db
 from common import config as cfg
@@ -14,6 +15,7 @@ from common import settings as settings_mod
 from common.media_schema import ensure_media_schema
 from common.search import parse_search_terms
 from common.utils import get_side_tabs, get_tabs, paginate_total, build_pagination
+from core import security
 
 
 media_bp = Blueprint(
@@ -228,6 +230,9 @@ def _build_media_filters(
     if scope == "event" and event_id and not search_everywhere:
         joins.append("JOIN lp_event_items ei ON ei.media_id = m.media_id AND ei.event_id = ?")
         params.append(event_id)
+    visibility_condition, visibility_params = security.visible_record_condition("m", current_user)
+    where.append(visibility_condition)
+    params.extend(visibility_params)
     if media_type:
         where.append("m.media_type = ?")
         params.append(media_type)
@@ -795,6 +800,7 @@ def _rebuild_events(conn, gap_hours=2.0, split_on_day=True):
 def media_explorer_route():
     _ensure_schema()
     conn = db._get_conn()
+    settings_mod.ensure_settings_schema(conn)
 
     view = _normalize_view(request.args.get("view"))
     view_mode = _normalize_view_mode(request.args.get("view_mode"))
@@ -1096,6 +1102,9 @@ def media_explorer_route():
 
 @media_bp.route("/actions", methods=["POST"])
 def media_actions_route():
+    for media_id in _coerce_int_list(request.form.getlist("media_id")):
+        if not security.can_edit_media(media_id, current_user):
+            abort(403)
     _ensure_schema()
     conn = db._get_conn()
     action = (request.form.get("action") or "").strip().lower()
@@ -1270,6 +1279,8 @@ def media_player_route():
 
 @media_bp.route("/view/<int:media_id>")
 def view_media_route(media_id):
+    if not security.can_view_media(media_id, current_user):
+        abort(404)
     _ensure_schema()
     conn = db._get_conn()
     item = _fetch_media_by_id(conn, media_id)
@@ -1299,6 +1310,8 @@ def view_media_route(media_id):
 
 @media_bp.route("/file/<int:media_id>")
 def media_file_route(media_id):
+    if not security.can_view_media(media_id, current_user):
+        abort(404)
     _ensure_schema()
     conn = db._get_conn()
     row = conn.execute(
@@ -1317,6 +1330,8 @@ def media_file_route(media_id):
 
 @media_bp.route("/folder/<int:media_id>")
 def open_media_folder_route(media_id):
+    if not security.can_view_media(media_id, current_user):
+        abort(403)
     _ensure_schema()
     conn = db._get_conn()
     item = _fetch_media_by_id(conn, media_id)
@@ -1336,6 +1351,8 @@ def open_media_folder_route(media_id):
 
 @media_bp.route("/launch/<int:media_id>")
 def launch_media_file_route(media_id):
+    if not security.can_view_media(media_id, current_user):
+        abort(403)
     _ensure_schema()
     conn = db._get_conn()
     item = _fetch_media_by_id(conn, media_id)

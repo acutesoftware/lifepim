@@ -1,339 +1,253 @@
-# LifePIM Desktop Deploy Notes
+# LifePIM Production Deployment
 
-Concise operator notes for deploying LifePIM Desktop and refreshing local data.
+These notes describe how to run the secured Flask/SQLite version of LifePIM from:
 
-## Current Deployment Shape
+```text
+C:\apps\LifePIM_Prod
+```
 
-- App entry point: `src/app.py`
-- Windows launcher: `src/RUN_DESKTOP.BAT`
-- Local SQLite DB path: `DB_FILE` / `db_name` in `src/common/config.py`
-- Default sample DB path currently points at:
-  - `D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim.db`
-- App URL:
-  - `http://127.0.0.1:9741`
-- Python environment expected by launcher:
-  - repo root `.venv\Scripts\python.exe`
+## What Runs Where
+
+- Flask app entry point: `src\app.py`
+- Production WSGI entry point: `src\run_waitress.py`
+- Production launcher: `src\RUN_DESKTOP.BAT`
+- Expected virtual environment: `.venv\Scripts\python.exe` under the LifePIM root.
+
+`RUN_DESKTOP.BAT` works from either:
+
+```text
+C:\apps\LifePIM_Prod\RUN_DESKTOP.BAT
+C:\apps\LifePIM_Prod\src\RUN_DESKTOP.BAT
+```
+
+It starts Waitress, not Flask's development server.
+
+## One-Time Setup
+
+Install dependencies in the production virtual environment:
+
+```bat
+cd /d C:\apps\LifePIM_Prod
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Set a persistent secret key:
+
+```bat
+setx LIFEPIM_SECRET_KEY "replace-this-with-a-long-random-secret"
+```
+
+Close and reopen the command prompt after `setx`, then confirm:
+
+```bat
+echo %LIFEPIM_SECRET_KEY%
+```
+
+The secret key is required because Flask signs login sessions and CSRF tokens with it. If it changes, existing browser sessions and trusted-device logins stop working. Do not commit it to source control.
+
+## First Administrator
+
+Create the admin username and a password 
+
+```bat
+cd /d C:\apps\LifePIM_Prod
+.venv\Scripts\python.exe scripts\create_admin.py
+```
+
+That creates the first admin user and assigns existing unowned notes/media to that user.
+
+## Starting LifePIM
 
 Run:
 
 ```bat
+C:\apps\LifePIM_Prod\src\RUN_DESKTOP.BAT
+```
+
+Default listener:
+
+```text
+http://127.0.0.1:9741
+```
+
+The launcher sets:
+
+```text
+LIFEPIM_ENV=production
+LIFEPIM_HOST=127.0.0.1
+LIFEPIM_PORT=9741
+```
+
+You can override host/port before starting:
+
+```bat
+set LIFEPIM_HOST=127.0.0.1
+set LIFEPIM_PORT=9741
 src\RUN_DESKTOP.BAT
 ```
 
-Manual run from repo root:
+Keep Waitress bound to `127.0.0.1` when using an HTTPS reverse proxy on the same machine.
 
-```bat
-.\.venv\Scripts\python.exe src\app.py
+## User and Device Administration
+
+Log in as the admin user, then open:
+
+```text
+/admin
+/admin/users
+/admin/trusted-devices
 ```
 
-## Bootstrap Order
+In the UI:
 
-Full bootstrap is destructive. It deletes and recreates the configured SQLite DB.
+```text
+Top-left menu -> Users
+Top-left menu -> Trusted devices
+Admin -> Security -> Manage users
+Admin -> Security -> Manage trusted devices
+```
+
+Available actions:
+
+- Create users: `/admin/users/new`
+- Edit/disable users: `/admin/users/<id>/edit`
+- Reset passwords: `/admin/users/<id>/reset-password`
+- Revoke one trusted device: `/admin/trusted-devices`
+- Revoke all devices for a user: `/admin/trusted-devices`
+
+## Using https instead of HTTP
+
+Set the machine you are running LifePIM desktop on to a fixed IP address
+
+```text
+192.168.1.99
+```
+
+Download Caddy from https://caddyserver.com/download
+
+copy the download to C:\apps\caddy
+
+create "Caddyfile" with content below
+
+```text
+https://192.168.1.99 {
+    reverse_proxy 127.0.0.1:9741
+}
+```
+
+Start the caddy service (also put this line into the startup BAT file)
+
+```text
+C:\apps\caddy> .\caddy_windows_amd64.exe start
+```
+
+
+Then browse from any PC on network or mobile on Wifi
+
+```text
+https://192.168.1.99
+```
+
+Note that you still get a warning about untrusted certificates, because the browser cant prove where certificate came from
+
+
+## Secure Cookies and Local HTTP
+
+In production, LifePIM uses secure cookies. Secure cookies are only sent over HTTPS by browsers.
+
+That means:
+
+- `python app.py` is acceptable for local development checks.
+- `http://127.0.0.1:9741` may work for local testing.
+- Normal family/LAN use should be through HTTPS.
+- If you run production over plain HTTP from another device, login/trusted-device behavior may fail or be unsafe.
+
+For temporary local development only:
+
+```bat
+set LIFEPIM_ENV=development
+set LIFEPIM_ALLOW_INSECURE_COOKIES=1
+python app.py
+```
+
+Do not use that mode for the normal LAN deployment.
+
+## Database and Migration Notes
+
+The app creates/updates the security schema at startup:
+
+- `users`
+- `auth_trusted_devices`
+- `auth_login_attempts`
+- note visibility fields on `lp_notes`
+- media visibility fields on `lp_media`
+
+The visibility fields are:
+
+```text
+owner_user_id
+visibility
+show_in_blog
+is_public
+```
+
+SQLite settings used by the app:
+
+```text
+PRAGMA foreign_keys = ON
+PRAGMA busy_timeout = 5000
+PRAGMA journal_mode = WAL
+```
+
+## Public Routes
+
+Public unauthenticated content is only under:
+
+```text
+/public
+/public/blog
+/public/notes/<id>
+/public/media/<id>
+```
+
+Only records with `is_public = 1` are exposed there. `show_in_blog = 1` alone does not make a record public.
+
+## Do Not Rebuild Production DB Accidentally
+
+This command is destructive:
 
 ```bat
 cd src
 ..\.venv\Scripts\python.exe init_database.py
 ```
 
-`src/init_database.py` currently does this:
+It deletes and recreates the configured SQLite database. Do not run it against production data unless you intend to rebuild the DB.
 
-1. Deletes existing `cfg.DB_FILE` if present.
-2. Recreates base tables from `config.table_def`.
-3. Creates folder mapping schema.
-4. Creates projects schema.
-5. Runs SQL schemas:
-   - `schema_contacts.sql`
-   - `schema_links.sql`
-   - `schema_money.sql`
-6. Ensures Media schema.
-7. Ensures importer schema.
-8. Ensures settings schema.
-9. Runs `tests/LOAD_TESTING.py`.
-10. Runs folder mapping ETL.
-11. Imports project mappings and assigns default folders.
-
-Do not run this against a DB you want to preserve.
-
-## Data Roots and Config
-
-Primary config file:
-
-```text
-src/common/config.py
-```
-
-Important values:
-
-- `user_folder`
-- `DB_FILE`
-- `PATH_ALIASES`
-- `etl_folders_csv`
-- `etl_rules_csv`
-- `RECS_PER_PAGE`
-- `IMAGES_PER_PAGE`
-
-Current deployment is still mostly config-file driven. `RUN_DESKTOP.BAT` sets some environment variables, but the app currently reads host/port and DB settings from `common.config`.
-
-## External Data Sources Refreshed So Far
-
-These are loaded by `tests/LOAD_TESTING.py` during bootstrap.
-
-| Source | Loader | Destination |
-| --- | --- | --- |
-| Markdown notes | `load_notes()` | `lp_notes` |
-| Task files | `load_tasks()` | `lp_tasks` |
-| Calendar/event files | `load_events()` | `lp_calendar_events` |
-| Goal files | `load_goals()` | `lp_goals` |
-| How-to files | `load_how()` | `lp_how` |
-| SQLite DB files | `load_data()` | `lp_data` |
-| Folder tree/filelist roots | `load_files()` | `lp_files` |
-| Images/videos | `load_media()` | `lp_media` |
-| Audio files | `load_audio()` | `lp_audio` |
-| Blender files | `load_3d()` | `lp_3d` |
-| Executables/apps | `load_apps()` | `lp_apps` |
-
-Important current source paths in `LOAD_TESTING.py` include:
-
-- Notes: `E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes`
-- Tasks: `E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes\00-META\02-Tasks`
-- Calendar files: `N:\duncan\LifePIM_Data\calendar`
-- Media: `E:\BK_fangorn\photo`
-- Audio: `E:\BK_fangorn\music\Music`
-- Files root: `E:\BK_fangorn\user\duncan\LifePIM_Data`
-- Apps: `C:\apps`
-
-Change these paths before bootstrapping a different machine/profile.
-
-## Refreshing Data
-
-### Full Refresh
-
-Use only when rebuilding the local DB from scratch:
-
-```bat
-cd src
-..\.venv\Scripts\python.exe init_database.py
-```
-
-This reruns all bootstrap loading and mapping.
-
-### Refresh Folder Mapping Only
-
-Use when folder/project mapping CSVs changed.
-
-```bat
-cd src
-ETL_MAP_FOLDERS.BAT
-```
-
-Or directly:
-
-```bat
-cd src
-..\.venv\Scripts\python.exe etl_folder_mapping.py ^
-  --db D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim.db ^
-  --folders_csv E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv ^
-  --rules_csv E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv
-```
-
-This updates:
-
-- `dim_folder`
-- `map_folder_project`
-- `map_project_folder`
-- `folder_id` values on file-backed tables where possible
-
-### Refresh Sample/Test Loaded Data Only
-
-Current loader is not a safe incremental sync for most tables. It mostly appends via `data.add_record()` and can create duplicates if rerun without clearing the DB.
-
-Preferred current approach:
-
-```bat
-cd src
-..\.venv\Scripts\python.exe init_database.py
-```
-
-Future improvement: split `LOAD_TESTING.py` into idempotent import jobs per source.
-
-## Media Import Notes
-
-Media bootstrap:
-
-```python
-load_media(folder_path=FOLDER_MEDIA)
-```
-
-Behavior:
-
-- Recurses the configured media root.
-- Accepts image extensions: `jpg`, `jpeg`, `png`, `gif`, `bmp`, `webp`, `tif`, `tiff`, `heic`, `heif`.
-- Accepts video extensions: `mp4`, `mov`, `avi`, `mkv`, `webm`, `mpg`, `mpeg`, `wmv`.
-- Inserts into `lp_media` using `INSERT OR IGNORE`.
-- Stores the real file path in `lp_media.path`.
-- Does not create thumbnail files.
-- Does not store thumbnail blobs in SQLite.
-- Thumbnails in the UI are generated by the browser reading `/media/file/<media_id>`, which streams the real file.
-
-After loading media, Media tab event clusters can be rebuilt in the UI:
-
-```text
-Media tab -> Rebuild events
-```
-
-This writes:
-
-- `lp_events`
-- `lp_event_items`
-
-It does not write to `lp_calendar_events`.
-
-## Notes Import Notes
-
-Notes bootstrap:
-
-```python
-load_notes(folder_path=FOLDER_NOTES)
-```
-
-Behavior:
-
-- Recurses configured notes folder.
-- Loads `.md` files only.
-- Inserts metadata into `lp_notes`.
-- Stores:
-  - `file_name`
-  - containing `path`
-  - file `size`
-  - filesystem modified time as `date_modified`
-  - project currently set to `LoadTest`
-
-The note body remains in the markdown file on disk.
-
-## Filelist / Folder Data Notes
-
-There are two different concepts:
-
-1. `lp_files`
-   - Loaded by `load_files()`.
-   - Current bootstrap stores folder records from a recursive directory walk.
-   - Used by Files tab and Calendar file overlays.
-
-2. Folder mapping cache
-   - Loaded from CSV files by `etl_folder_mapping.py`.
-   - Used to map folders to tabs/projects and backfill `folder_id`.
-
-External folder mapping CSVs:
-
-- `all_folders.csv`
-  - Must include `folder_path`.
-- `map_project_folder.csv`
-  - Must include `path_prefix`, `tab`, and `grp` or `group`.
-  - Optional: `project`, `tags`, `confidence`, `priority`, `is_primary`, `is_enabled`, `notes`.
-
-## Importer v1
-
-Importer framework lives under:
-
-```text
-src/lifepim/importer/
-src/lifepim/targets/
-```
-
-Tracked import runs:
-
-- `lp_import_runs`
-
-Importer-backed targets:
-
-- `contacts`
-- `files`
-- `media`
-
-Modes:
-
-- `snapshot`: marks prior rows for that source as deleted, then upserts current rows.
-- `authoritative`: can tombstone rows missing from current feed.
-- `merge`: updates provided fields only.
-
-Use dry-run first for new feeds.
-
-Example shape:
-
-```python
-from lifepim.importer import run_import, csv_source
-
-with run_import("contacts_refresh") as run:
-    run.load(
-        target="contacts",
-        source=csv_source("contacts.csv"),
-        mapping={
-            "source_uid": "ContactID",
-            "display_name": "Name",
-            "email": "Email",
-        },
-        key="source_uid",
-        mode="snapshot",
-        source_system="contacts_csv",
-        dry_run=True,
-    )
-```
-
-## Initial Bootstrapping Already Done
-
-The current sample/local DB has been bootstrapped using:
-
-- Base schema from `config.table_def`.
-- Contacts, links, money SQL schemas.
-- Media schema from `common/media_schema.py`.
-- Importer schema from `lifepim/importer/schema.py`.
-- Settings schema from `common/settings.py`.
-- Sample/load data from `tests/LOAD_TESTING.py`.
-- Folder mapping from:
-  - `all_folders.csv`
-  - `map_project_folder.csv`
-- Project/default-folder import from the folder mapping rules CSV.
-
-Expected rough full-load counts from the current `LOAD_TESTING.py` comments:
-
-- Notes: about 2066
-- Tasks: about 283
-- Events: about 214
-- How entries: about 97
-- Data entries: about 20
-- File lists: about 511
-- Media: about 9943
-- Audio: about 17563
-- Apps: about 747
-
-Counts depend on the source folders and current files on disk.
-
-## Common Operational Checks
-
-Check configured DB:
-
-```bat
-cd src
-..\.venv\Scripts\python.exe -c "from common import config; print(config.DB_FILE)"
-```
+## Operational Checks
 
 Check app imports:
 
 ```bat
-..\.venv\Scripts\python.exe -m py_compile src\app.py
+cd /d C:\apps\LifePIM_Prod
+.venv\Scripts\python.exe -m py_compile src\app.py
 ```
 
-Check DB file exists:
+Check configured DB:
 
 ```bat
-dir D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim.db
+cd /d C:\apps\LifePIM_Prod\src
+..\.venv\Scripts\python.exe -c "from common import config; print(config.DB_FILE)"
 ```
 
-## Known Gaps
+Check users:
 
-- `init_database.py` is destructive.
-- `LOAD_TESTING.py` is the current bootstrap loader, not a production incremental sync.
-- Source paths are hardcoded and machine-specific.
-- `RUN_DESKTOP.BAT` sets environment variables, but config is still mostly read from `common.config`.
-- Need proper migrations instead of schema creation spread across scripts/modules.
-- Need idempotent refresh jobs for notes, media, audio, files, and calendar sources.
+```bat
+cd /d C:\apps\LifePIM_Prod\src
+..\.venv\Scripts\python.exe -c "from common import data; print(data._get_conn().execute('select username, role, is_active from users').fetchall())"
+```
+
+## Current Gaps
+
+- Notes and media have central permission checks, but not every other content type has ownership/visibility enforcement yet.
+- Visibility controls are not yet fully exposed on all edit screens.
+- HTTPS is not built into the Flask app; it must be provided by a reverse proxy.

@@ -90,7 +90,15 @@ def ensure_settings_schema(conn=None):
         raise TypeError("settings schema requires a sqlite3.Connection")
     conn_id = id(conn)
     if conn_id in _SCHEMA_READY_CONN_IDS:
-        return
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sys_settings'"
+            ).fetchone()
+            if row:
+                return
+        except Exception:
+            pass
+        _SCHEMA_READY_CONN_IDS.discard(conn_id)
 
     conn.executescript(SETTINGS_SCHEMA_SQL)
     _ensure_settings_columns(conn)

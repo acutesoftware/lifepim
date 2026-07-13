@@ -41,6 +41,12 @@ def _get_conn():
         _dbg(f"Opening sqlite connection to {DB_FILE}")
         conn = sqlite3.connect(DB_FILE, check_same_thread=False)
         _set_row_factory(conn)
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+        except Exception:
+            pass
         _dbg("SQLite connection ready")
     return conn
 
@@ -366,17 +372,30 @@ def add_record(conn, tbl_name, col_list, value_list):
     """
     cols = list(col_list)
     vals = list(value_list)
+    conn = _get_conn() if conn is None else conn
+    try:
+        table_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()}
+        if "owner_user_id" in table_cols and "owner_user_id" not in cols:
+            from flask_login import current_user
+
+            if getattr(current_user, "is_authenticated", False):
+                cols.append("owner_user_id")
+                vals.append(current_user.user_id)
+    except Exception:
+        pass
     cols.extend(["user_name", "rec_extract_date"])
     vals.extend([_current_user(), _now_str()])
     placeholders = ", ".join(["?"] * len(cols))
     sql = f"INSERT INTO {tbl_name} ({', '.join(cols)}) VALUES ({placeholders})"
     try:
-        conn = _get_conn() if conn is None else conn
         #_dbg(f"INSERT {tbl_name} cols={cols}")
         cur = conn.execute(sql, vals)
         conn.commit()
         record_id = cur.lastrowid
-        _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id)
+        try:
+            _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id)
+        except Exception as exc:
+            _log_error(conn, f"folder maintenance after add_record failed: {exc}")
         _log_user_change(conn, "add", tbl_name, record_id, before=None, after=_fetch_row_by_id(conn, tbl_name, record_id))
         return record_id
     except Exception as exc:

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
+from flask_login import current_user
 
 from common import data
 from utils import importer
@@ -18,6 +19,7 @@ from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total,
 from common import config as cfg
 import etl_folder_mapping as folder_etl
 from common import projects as projects_mod
+from core import security
 
 notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
                      template_folder='templates', static_folder='static')
@@ -499,6 +501,9 @@ def _notes_base_condition(project, folder_path=None):
     if folder_path:
         condition = f"({condition}) AND lower(rtrim(replace(t.path, '/', '\\'))) = lower(?)"
         params.append(folder_path)
+    visibility_condition, visibility_params = security.visible_record_condition("t", current_user)
+    condition = f"({condition}) AND {visibility_condition}"
+    params.extend(visibility_params)
     return condition, params
 
 
@@ -1031,6 +1036,8 @@ def list_notes_cards_route():
 
 @notes_bp.route('/view/<int:note_id>')
 def view_note_route(note_id):
+    if not security.can_view_note(note_id, current_user):
+        abort(404)
     render_mode = request.args.get("format") or "markdown"
     tbl = get_table_def("notes")
     note = None
@@ -1091,6 +1098,8 @@ def view_note_route(note_id):
 
 @notes_bp.route('/asset/<int:note_id>/<path:asset_path>')
 def note_asset_route(note_id, asset_path):
+    if not security.can_view_note(note_id, current_user):
+        abort(404)
     tbl = get_table_def("notes")
     if not tbl:
         abort(404)
@@ -1325,6 +1334,8 @@ def _open_note_folder(note):
 
 @notes_bp.route('/rename/<int:note_id>', methods=["POST"])
 def rename_note_route(note_id):
+    if not security.can_edit_note(note_id, current_user):
+        abort(403)
     try:
         _rename_note(note_id, request.form.get("new_title", ""))
     except Exception as exc:
@@ -1334,6 +1345,8 @@ def rename_note_route(note_id):
 
 @notes_bp.route('/move/<int:note_id>', methods=["POST"])
 def move_note_route(note_id):
+    if not security.can_edit_note(note_id, current_user):
+        abort(403)
     try:
         _move_note_to_project(note_id, request.form.get("project_id", ""))
     except Exception as exc:
@@ -1343,6 +1356,8 @@ def move_note_route(note_id):
 
 @notes_bp.route('/archive-delete/<int:note_id>', methods=["POST"])
 def archive_delete_note_route(note_id):
+    if not security.can_delete_note(note_id, current_user):
+        abort(403)
     try:
         _archive_and_delete_note(note_id)
     except Exception as exc:
@@ -1352,6 +1367,8 @@ def archive_delete_note_route(note_id):
 
 @notes_bp.route('/open-folder/<int:note_id>', methods=["POST"])
 def open_note_folder_route(note_id):
+    if not security.can_view_note(note_id, current_user):
+        abort(403)
     note, _ = _get_note_record(note_id)
     if not note:
         abort(404)
@@ -1491,6 +1508,8 @@ def add_note_route():
 
 @notes_bp.route('/edit/<int:note_id>', methods=["GET", "POST"])
 def edit_note_route(note_id):
+    if not security.can_edit_note(note_id, current_user):
+        abort(403)
     note, tbl = _get_note_record(note_id)
     if request.method == "POST":
         content = request.form.get("content")
@@ -1530,6 +1549,8 @@ def edit_note_route(note_id):
 
 @notes_bp.route('/api/save/<int:note_id>', methods=["POST"])
 def save_note_route(note_id):
+    if not security.can_edit_note(note_id, current_user):
+        abort(403)
     payload = request.get_json(silent=True) or {}
     content = payload.get("content")
     if content is None:
@@ -1590,6 +1611,8 @@ def save_note_route(note_id):
 
 @notes_bp.route('/delete/<int:note_id>')
 def delete_note_route(note_id):
+    if not security.can_delete_note(note_id, current_user):
+        abort(403)
     try:
         _archive_and_delete_note(note_id)
     except Exception:

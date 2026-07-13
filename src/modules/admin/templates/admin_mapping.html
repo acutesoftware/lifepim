@@ -32,14 +32,13 @@
 
       {% if active_admin_tab == 'security' %}
         <h4>Security</h4>
-        <form class="settings-form">
+        <div class="settings-form">
           <div class="settings-fieldset">
-            <label>
-              Status
-              <input type="text" value="TODO - implement user security, logon screen using sessions" readonly>
-            </label>
+            <p><a href="{{ url_for('admin.users_route') }}">Manage users</a></p>
+            <p><a href="{{ url_for('admin.trusted_devices_route') }}">Manage trusted devices</a></p>
+            <p><a href="{{ url_for('auth.change_password') }}">Change your password</a></p>
           </div>
-        </form>
+        </div>
       {% elif active_admin_tab == 'folder_mapping' %}
         <h4>Folder Mapping</h4>
         <form method="post" class="settings-form" style="margin-bottom:10px;">

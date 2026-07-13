@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% if message %}<p class="form-message">{{ message }}</p>{% endif %}
+<p><a href="{{ url_for('admin.users_route') }}">Users</a></p>
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Device</th>
+      <th>User</th>
+      <th>Created</th>
+      <th>Last used</th>
+      <th>Created IP</th>
+      <th>Last IP</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for device in devices %}
+      <tr>
+        <td>
+          {{ device.device_name or 'Trusted device' }}
+          {% if device.token_hash == current_token_hash %}<strong>This device</strong>{% endif %}
+          <br><small>{{ device.user_agent or '' }}</small>
+        </td>
+        <td>{{ device.display_name }} ({{ device.username }})</td>
+        <td>{{ device.created_at }}</td>
+        <td>{{ device.last_used_at }}</td>
+        <td>{{ device.created_ip or '' }}</td>
+        <td>{{ device.last_ip or '' }}</td>
+        <td>{{ 'Revoked' if device.revoked_at else 'Active' }}</td>
+        <td>
+          {% if not device.revoked_at %}
+            <form method="post" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="revoke">
+              <input type="hidden" name="trusted_device_id" value="{{ device.trusted_device_id }}">
+              <button type="submit">Revoke</button>
+            </form>
+            <form method="post" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="revoke_user">
+              <input type="hidden" name="user_id" value="{{ device.user_id }}">
+              <button type="submit">Revoke all for user</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

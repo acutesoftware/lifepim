@@ -13,6 +13,7 @@ from common import data as db
 from common import search as search_mod
 from common import projects as projects_mod
 from common import settings as settings_mod
+from core.security import configure_security
 
 
 APP_NAME = "LifePIM"
@@ -143,6 +144,8 @@ settings_mod.ensure_settings_schema(db._get_conn())
 
 # Register blueprints
 _dbg("Importing blueprints")
+from modules.auth.routes import auth_bp
+from modules.public.routes import public_bp
 from modules.calendar.routes import calendar_bp
 from modules.data.routes import data_bp
 from modules.files.routes import files_bp
@@ -162,6 +165,8 @@ from modules.links.routes import links_bp
 from modules.projects.routes import projects_bp
 
 _dbg("Registering blueprints")
+app.register_blueprint(auth_bp)
+app.register_blueprint(public_bp)
 app.register_blueprint(calendar_bp, url_prefix="/calendar")
 app.register_blueprint(data_bp, url_prefix="/data")
 app.register_blueprint(files_bp, url_prefix="/files")
@@ -179,6 +184,7 @@ app.register_blueprint(tasks_bp, url_prefix="/tasks")
 app.register_blueprint(admin_bp, url_prefix="/admin")
 app.register_blueprint(links_bp, url_prefix="/links")
 app.register_blueprint(projects_bp, url_prefix="/projects")
+configure_security(app)
 _dbg("Blueprints registered")
 
 
@@ -288,6 +294,8 @@ def search_route():
     sort_dir = request.args.get("dir") or "asc"
     tab_ids = {t.get("id") for t in get_tabs()}
     active_tab = route if route in tab_ids else "home"
+    if route not in tab_ids:
+        route = "home"
     if scope == "note_content":
         results = search_mod.search_note_content(query, project=project, route=route)
     else:

@@ -1,7 +1,56 @@
 from common import config as cfg
 from common import data
 from common import note_search_index
-from common.utils import get_table_def
+from common.utils import get_table_def, get_tabs
+
+
+def _table_columns(conn, table_name):
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    except Exception:
+        return set()
+    cols = set()
+    for row in rows:
+        try:
+            cols.add(row["name"])
+        except (TypeError, KeyError, IndexError):
+            cols.add(row[1])
+    return cols
+
+
+def _current_search_user():
+    try:
+        from flask_login import current_user
+
+        if getattr(current_user, "is_authenticated", False):
+            return current_user
+    except Exception:
+        return None
+    return None
+
+
+def _visible_table_condition(conn, table_name, alias):
+    columns = _table_columns(conn, table_name)
+    prefix = f"{alias}." if alias else ""
+    user = _current_search_user()
+    if table_name == "lp_media":
+        if user is not None:
+            return "1=1", []
+        if "is_public" in columns:
+            return f"{prefix}is_public = 1", []
+        return "1=0", []
+    if not {"owner_user_id", "visibility", "is_public"}.issubset(columns):
+        return "1=1", []
+    if user is not None:
+        return f"({prefix}owner_user_id = ? OR {prefix}visibility = 'family' OR {prefix}is_public = 1)", [user.user_id]
+    return f"{prefix}is_public = 1", []
+
+
+def _visible_search_routes():
+    try:
+        return {tab.get("id") for tab in get_tabs()}
+    except Exception:
+        return set()
 
 ROUTE_RECORD_TYPE = {
     "notes": "note",
@@ -126,24 +175,29 @@ def _search_table(route_name, terms, columns, view_route, id_param, limit=None):
     tbl = get_table_def(route_name)
     if not tbl:
         return [], False
-    available_cols = [col for col in columns if col in tbl["col_list"]]
+    conn = data._get_conn()
+    table_cols = _table_columns(conn, tbl["name"])
+    if not table_cols:
+        return [], False
+    available_cols = [col for col in columns if col in tbl["col_list"] and col in table_cols]
     if not available_cols or not terms:
         return [], False
-    cols = ["id"] + tbl["col_list"]
+    cols = [col for col in ["id"] + tbl["col_list"] if col in table_cols]
     term_conditions = []
     params = []
     for term in terms:
         like_value = f"%{term}%"
-        condition = " OR ".join([f"lower({col}) LIKE ?" for col in available_cols])
+        condition = " OR ".join([f"lower(r.{col}) LIKE ?" for col in available_cols])
         term_conditions.append(f"({condition})")
         params.extend([like_value] * len(available_cols))
     where_clause = " AND ".join(term_conditions)
+    visibility_clause, visibility_params = _visible_table_condition(conn, tbl["name"], "r")
+    params.extend(visibility_params)
     fetch_limit = int(limit) + 1 if limit else None
-    sql = f"SELECT {', '.join(cols)} FROM {tbl['name']} WHERE ({where_clause})"
+    sql = f"SELECT {', '.join(cols)} FROM {tbl['name']} r WHERE ({where_clause}) AND ({visibility_clause})"
     if fetch_limit:
         sql += " LIMIT ?"
         params.append(fetch_limit)
-    conn = data._get_conn()
     rows = conn.execute(sql, params).fetchall()
     has_more = bool(fetch_limit and len(rows) > limit)
     if has_more:
@@ -190,14 +244,16 @@ def _search_media(terms, limit=None):
     params = []
     for term in terms:
         like_value = f"%{term}%"
-        condition = " OR ".join([f"lower({col}) LIKE ?" for col in search_cols])
+        condition = " OR ".join([f"lower(m.{col}) LIKE ?" for col in search_cols])
         term_conditions.append(f"({condition})")
         params.extend([like_value] * len(search_cols))
     where_clause = " AND ".join(term_conditions)
+    visibility_clause, visibility_params = _visible_table_condition(conn, tbl["name"], "m")
+    params.extend(visibility_params)
     fetch_limit = int(limit) + 1 if limit else None
     sql = (
         "SELECT media_id as id, filename, path, ext, media_type "
-        f"FROM {tbl['name']} WHERE {where_clause}"
+        f"FROM {tbl['name']} m WHERE ({where_clause}) AND ({visibility_clause})"
     )
     if fetch_limit:
         sql += " LIMIT ?"
@@ -231,6 +287,7 @@ def _search_media(terms, limit=None):
 
 def _search_note_content_index(terms, project=None, route=None, limit=None):
     note_search_index.ensure_schema()
+    conn = data._get_conn()
     fetch_limit = int(limit) + 1 if limit else None
     term_conditions = []
     params = []
@@ -239,17 +296,19 @@ def _search_note_content_index(terms, project=None, route=None, limit=None):
         term_conditions.append("lower(idx.content_text) LIKE ?")
         params.append(like_value)
     where_clause = " AND ".join(term_conditions) or "1=1"
+    visibility_clause, visibility_params = _visible_table_condition(conn, "lp_notes", "n")
+    params.extend(visibility_params)
     sql = (
         "SELECT idx.note_id, idx.title, idx.content_text, idx.file_path, n.project "
         "FROM lp_note_search_index idx "
         "LEFT JOIN lp_notes n ON n.id = idx.note_id "
-        f"WHERE {where_clause} "
+        f"WHERE ({where_clause}) AND ({visibility_clause}) "
         "ORDER BY idx.title"
     )
     if fetch_limit:
         sql += " LIMIT ?"
         params.append(fetch_limit)
-    rows = data._get_conn().execute(sql, params).fetchall()
+    rows = conn.execute(sql, params).fetchall()
     has_more = bool(fetch_limit and len(rows) > limit)
     if has_more:
         rows = rows[:limit]
@@ -321,11 +380,14 @@ def search_all(query, project=None, route=None, primary_limit=100, secondary_lim
     primary = []
     secondary = []
     more = []
-    search_order = list(DEFAULT_SEARCH_ORDER)
+    visible_routes = _visible_search_routes()
+    search_order = [route_name for route_name in DEFAULT_SEARCH_ORDER if not visible_routes or route_name in visible_routes]
     current_route = route if route in SEARCH_SPECS else ""
-    if current_route:
+    if current_route and current_route in search_order:
         search_order.remove(current_route)
         search_order.insert(0, current_route)
+    elif current_route:
+        current_route = ""
     for route_name in search_order:
         limit = primary_limit if route_name == current_route else secondary_limit
         route_results, has_more = _search_route(route_name, terms, limit)

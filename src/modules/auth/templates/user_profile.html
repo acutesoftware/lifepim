@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block module_content %}
+<section class="user-profile">
+  <div class="user-profile-header">
+    <div>
+      <div class="user-profile-kicker">Signed in as</div>
+      <h2>{{ security_current_user.display_name or security_current_user.username }}</h2>
+      <div class="user-profile-sub">@{{ security_current_user.username }}{% if security_current_user.role %} · {{ security_current_user.role }}{% endif %}</div>
+    </div>
+    <a class="user-profile-action" href="{{ url_for('auth.change_password') }}">Reset password</a>
+  </div>
+
+  <div class="user-profile-stats">
+    <a class="user-profile-stat" href="{{ url_for('notes.list_notes_route') }}">
+      <span>Notes</span>
+      <strong>{{ note_count }}</strong>
+    </a>
+    <a class="user-profile-stat" href="{{ url_for('media.media_explorer_route') }}">
+      <span>Media visible</span>
+      <strong>{{ media_count }}</strong>
+    </a>
+  </div>
+</section>
+{% endblock %}
