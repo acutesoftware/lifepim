@@ -7,6 +7,232 @@
   --media-max-height: 72vh;
 }
 
+.how-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border: 1px solid #d8dde5;
+  background: #f7f8fa;
+  border-radius: 6px;
+}
+
+.how-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.how-subtabs a,
+.how-all-projects,
+.how-toolbar a {
+  color: #223;
+  text-decoration: none;
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.how-subtabs a.active {
+  background: #e7edf7;
+  border-color: #c8d3e3;
+  font-weight: bold;
+}
+
+.how-toolbar,
+.how-editor-actions,
+.how-catalog-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.how-blueprint-meta {
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) minmax(220px, 320px) minmax(260px, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: 1px solid #d8dde5;
+  border-radius: 6px;
+  background: #f7f8fa;
+}
+
+.how-name-field,
+.how-project-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.how-name-field span,
+.how-project-field span {
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+.how-name-field input,
+.how-project-field select {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  padding: 3px 5px;
+}
+
+.how-file-ext {
+  font-family: Consolas, "Courier New", monospace;
+  color: #444;
+}
+
+.how-save-folder {
+  min-width: 0;
+  color: #555;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.how-inline-form {
+  display: inline-flex;
+  margin-left: 6px;
+  gap: 4px;
+}
+
+.how-blueprint-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.how-blueprint-panel,
+.how-preview-panel {
+  min-width: 0;
+}
+
+.how-blueprint-panel h4,
+.how-preview-panel h4 {
+  margin: 4px 0 6px;
+}
+
+.how-blueprint-editor {
+  width: 100%;
+  min-height: 70vh;
+  box-sizing: border-box;
+  resize: vertical;
+  background: #0b3a78;
+  color: #f5f9ff;
+  border: 1px solid #06254e;
+  border-radius: 6px;
+  padding: 10px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  tab-size: 2;
+}
+
+.how-preview-panel {
+  border: 1px solid #d8dde5;
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px;
+  overflow: auto;
+}
+
+.how-muted {
+  color: #666;
+}
+
+.how-preview-status,
+.how-diagnostic {
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.how-diagnostic.warning,
+.how-status-warning {
+  background: #fff7db;
+  color: #6e5300;
+}
+
+.how-diagnostic.error,
+.how-status-error {
+  background: #ffecec;
+  color: #8a1f1f;
+}
+
+.how-status-ok {
+  background: #e9f7ea;
+  color: #245c28;
+}
+
+.how-status-not_parsed {
+  background: #f1f1f1;
+  color: #555;
+}
+
+.how-step-tree {
+  list-style: none;
+  padding-left: 0;
+}
+
+.how-step-tree .how-step-tree {
+  padding-left: 18px;
+  border-left: 2px solid #e1e6ef;
+  margin-left: 6px;
+}
+
+.how-step-tree li {
+  margin: 5px 0;
+}
+
+.how-step-number {
+  display: inline-block;
+  min-width: 36px;
+  font-weight: bold;
+  color: #354b6f;
+}
+
+.how-step-meta,
+.how-step-warning,
+.how-linked {
+  margin-left: 40px;
+  color: #555;
+  font-size: 11px;
+}
+
+.how-step-warning,
+.how-linked.missing {
+  color: #8a4b00;
+}
+
+.how-text-block {
+  white-space: pre-wrap;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+@media (max-width: 900px) {
+  .how-blueprint-meta,
+  .how-blueprint-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .how-save-folder {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 .data-header {
   display: flex;
   align-items: center;

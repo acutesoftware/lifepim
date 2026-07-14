@@ -1,0 +1,10 @@
+<div class="how-header">
+  <strong>HOW</strong>
+  <nav class="how-subtabs">
+    <a href="{{ url_for('how.list_how_route', proj=project) }}" class="{{ 'active' if subtab == 'howtos' else '' }}">How-tos</a>
+    <a href="{{ url_for('how.catalog_route', kind='tools', proj=project) }}" class="{{ 'active' if subtab == 'tools' else '' }}">Tools</a>
+    <a href="{{ url_for('how.catalog_route', kind='parts', proj=project) }}" class="{{ 'active' if subtab == 'parts' else '' }}">Parts</a>
+    <a href="{{ url_for('how.catalog_route', kind='steps', proj=project) }}" class="{{ 'active' if subtab == 'steps' else '' }}">Steps</a>
+  </nav>
+  <a class="how-all-projects" href="{{ url_for('how.list_how_route') if subtab == 'howtos' else url_for('how.catalog_route', kind=subtab) }}">All Projects</a>
+</div>

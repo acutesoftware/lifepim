@@ -1,18 +1,84 @@
 {% extends "layout.html" %}
+{% macro render_tree(node) %}
+  {% if node.cycle %}
+    <div class="how-diagnostic error">Circular How-to reference detected: {{ node.cycle_path|join(" -> ") }}</div>
+  {% else %}
+    <ol class="how-step-tree">
+      {% for entry in node.steps %}
+        {% set step = entry.step %}
+        <li>
+          <span class="how-step-number">{{ entry.number }}</span>
+          <span>{{ step.instruction }}</span>
+          {% if step.expected_result %}<div class="how-step-meta">Expected: {{ step.expected_result }}</div>{% endif %}
+          {% if step.warning %}<div class="how-step-warning">Warning: {{ step.warning }}</div>{% endif %}
+          {% if entry.unresolved_child %}
+            <div class="how-linked missing">
+              Linked How-to not yet created: {{ entry.unresolved_child }}
+              <form method="post" action="{{ url_for('how.create_child_route', item_id=howto.howto_id, proj=project) }}" class="how-inline-form">
+                <input type="hidden" name="child_key" value="{{ entry.unresolved_child }}">
+                <button type="submit">Create Linked How-to</button>
+              </form>
+            </div>
+          {% endif %}
+          {% if entry.child %}
+            <details class="how-linked">
+              <summary>Linked How-to: {{ entry.child.howto.title }} · {{ entry.child.howto.status }}</summary>
+              {{ render_tree(entry.child) }}
+            </details>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  {% endif %}
+{% endmacro %}
 {% block module_content %}
-  <div>
-    <a href="{{ url_for('how.list_how_route', proj=project) }}">Back to list</a>
+  {% include "how_nav.html" %}
+  {% set howto = detail.howto %}
+  <div class="data-detail-actions">
+    <a href="{{ url_for('how.list_how_route', proj=project) }}">Back</a>
+    <a href="{{ url_for('how.edit_how_route', item_id=howto.howto_id, proj=project) }}">Edit Blueprint</a>
   </div>
-  <table border="1" cellpadding="5">
-    {% for col in col_list %}
-    <tr>
-      <th>{{ col.replace('_', ' ') }}</th>
-      <td>{{ item[col] }}</td>
-    </tr>
-    {% endfor %}
+  <h3>{{ howto.title }}</h3>
+  <table>
+    <tr><th>Key</th><td>{{ howto.howto_key }}</td></tr>
+    <tr><th>Project</th><td>{{ howto.project_id }}</td></tr>
+    <tr><th>Status</th><td>{{ howto.status }}</td></tr>
+    <tr><th>Parse</th><td class="how-status-{{ howto.parse_status|lower }}">{{ howto.parse_status }} · {{ howto.parse_message }}</td></tr>
+    <tr><th>Source</th><td>{{ howto.source_filepath }}</td></tr>
+    <tr><th>Last Verified</th><td>{{ howto.last_verified }}</td></tr>
   </table>
-  <p>
-    <a href="{{ url_for('how.edit_how_route', item_id=item.id, proj=project) }}">Edit</a> |
-    <a href="{{ url_for('how.delete_how_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
-  </p>
+  {% if howto.summary %}<h4>Summary</h4><p>{{ howto.summary }}</p>{% endif %}
+  {% if howto.outcome %}<h4>Outcome</h4><p>{{ howto.outcome }}</p>{% endif %}
+  <div class="data-two-col">
+    <section>
+      <h4>Parts</h4>
+      <table>
+        <tr><th>Name</th><th>Quantity</th><th>Unit</th><th>Optional</th><th>Notes</th></tr>
+        {% for part in detail.parts %}
+          <tr><td>{{ part.part_name }}</td><td>{{ part.quantity }}</td><td>{{ part.unit }}</td><td>{{ part.optional }}</td><td>{{ part.notes }}</td></tr>
+        {% endfor %}
+      </table>
+    </section>
+    <section>
+      <h4>Tools</h4>
+      <table>
+        <tr><th>Name</th><th>Optional</th><th>Notes</th></tr>
+        {% for tool in detail.tools %}
+          <tr><td>{{ tool.tool_name }}</td><td>{{ tool.optional }}</td><td>{{ tool.notes }}</td></tr>
+        {% endfor %}
+      </table>
+    </section>
+  </div>
+  <h4>Steps</h4>
+  {{ render_tree(tree) }}
+  {% if howto.check_content %}<h4>Check</h4><pre class="how-text-block">{{ howto.check_content }}</pre>{% endif %}
+  {% if howto.notes_content %}<h4>Notes</h4><pre class="how-text-block">{{ howto.notes_content }}</pre>{% endif %}
+  <h4>Used By</h4>
+  <ul>
+    {% for parent in detail.parents %}
+      <li><a href="{{ url_for('how.view_how_route', item_id=parent.howto_id, proj=project) }}">{{ parent.title }}</a></li>
+    {% else %}
+      <li>Not used by another How-to.</li>
+    {% endfor %}
+  </ul>
 {% endblock %}

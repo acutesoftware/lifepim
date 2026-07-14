@@ -89,7 +89,7 @@ SEARCH_SPECS = {
         "id_param": "media_id",
     },
     "how": {
-        "columns": ["title", "description"],
+        "columns": ["title", "summary", "outcome", "markdown_full_content", "tags"],
         "view_route": "how.view_how_route",
         "id_param": "item_id",
     },
@@ -357,6 +357,8 @@ def search_note_content(query, project=None, route=None, limit=100):
 
 
 def _search_route(route_name, terms, limit):
+    if route_name == "how":
+        return _search_how(terms, limit=limit)
     spec = SEARCH_SPECS.get(route_name)
     if not spec:
         return [], False
@@ -370,6 +372,59 @@ def _search_route(route_name, terms, limit):
         spec["id_param"],
         limit=limit,
     )
+
+
+def _search_how(terms, limit=None):
+    if not terms:
+        return [], False
+    conn = data._get_conn()
+    try:
+        from modules.how.schema import ensure_how_schema
+
+        ensure_how_schema(conn)
+    except Exception:
+        return [], False
+    search_cols = ["title", "summary", "outcome", "markdown_full_content", "tags"]
+    term_conditions = []
+    params = []
+    for term in terms:
+        like_value = f"%{term}%"
+        term_conditions.append("(" + " OR ".join([f"lower(h.{col}) LIKE ?" for col in search_cols]) + ")")
+        params.extend([like_value] * len(search_cols))
+    fetch_limit = int(limit) + 1 if limit else None
+    sql = (
+        "SELECT h.howto_id AS id, h.title, h.project_id AS project, h.summary, h.outcome, "
+        "h.markdown_full_content, h.tags FROM lp_howto h "
+        f"WHERE {' AND '.join(term_conditions)}"
+    )
+    if fetch_limit:
+        sql += " LIMIT ?"
+        params.append(fetch_limit)
+    rows = conn.execute(sql, params).fetchall()
+    has_more = bool(fetch_limit and len(rows) > limit)
+    if has_more:
+        rows = rows[:limit]
+    results = []
+    for row in rows:
+        item = dict(row)
+        match_field = _find_match_field(item, terms, search_cols)
+        match_value = item.get(match_field) or ""
+        results.append(
+            {
+                "table": "How",
+                "route": "how",
+                "id": item.get("id"),
+                "project": item.get("project") or "",
+                "match_field": match_field,
+                "match_value": match_value,
+                "match_snippet": _build_snippet(match_value, terms),
+                "view_route": "how.view_how_route",
+                "id_param": "item_id",
+                "record_type": "howto",
+                "title": item.get("title") or "",
+            }
+        )
+    return results, has_more
 
 
 def search_all(query, project=None, route=None, primary_limit=100, secondary_limit=20):

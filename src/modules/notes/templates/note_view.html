@@ -44,6 +44,9 @@
       <form method="post" action="{{ url_for('notes.archive_delete_note_route', note_id=note.id) }}" style="display:inline;" onsubmit="return confirm('Move this note to deleted and remove it from LifePIM?');">
         <button type="submit">Delete</button>
       </form>
+      <form method="post" action="{{ url_for('notes.convert_note_to_howto_route', note_id=note.id) }}" style="display:inline;" onsubmit="return confirm('Convert this note to a HOWTO and remove it from Notes?');">
+        <button type="submit">Convert to HOWTO</button>
+      </form>
     </div>
 
     <div class="tabular-scroll">

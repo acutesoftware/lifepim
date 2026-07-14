@@ -20,6 +20,7 @@ from common import config as cfg
 import etl_folder_mapping as folder_etl
 from common import projects as projects_mod
 from core import security
+from modules.how import service as how_service
 
 notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
                      template_folder='templates', static_folder='static')
@@ -1363,6 +1364,37 @@ def archive_delete_note_route(note_id):
     except Exception as exc:
         return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Delete failed: {exc}"))
     return redirect(url_for("notes.list_notes_route"))
+
+
+@notes_bp.route('/convert-to-howto/<int:note_id>', methods=["POST"])
+def convert_note_to_howto_route(note_id):
+    if not security.can_delete_note(note_id, current_user):
+        abort(403)
+    note, tbl = _get_note_record(note_id)
+    if not note or not tbl:
+        return redirect(url_for("notes.list_notes_route"))
+    note_path = _build_note_path(note)
+    markdown = _read_note_file(note_path) if note_path else ""
+    if not markdown:
+        markdown = ""
+    title = os.path.splitext(note.get("file_name") or "")[0] or "Converted Note"
+    project_id = note.get("project") or ""
+    conn = data._get_conn()
+    try:
+        conn.execute("BEGIN")
+        howto_id = how_service.create_howto_from_markdown(
+            title,
+            markdown,
+            project_id=project_id,
+            source_filepath=note_path,
+            conn=conn,
+        )
+        conn.execute(f"DELETE FROM {tbl['name']} WHERE id = ?", (note_id,))
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Convert to HOWTO failed: {exc}"))
+    return redirect(url_for("how.view_how_route", item_id=howto_id, proj=project_id))
 
 
 @notes_bp.route('/open-folder/<int:note_id>', methods=["POST"])

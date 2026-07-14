@@ -1,14 +1,106 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <form method="POST">
-    {% for field in fields %}
-    <label>{{ field.label }}:</label><br>
-    {% if field.is_textarea %}
-    <textarea name="{{ field.name }}" rows="6" cols="60">{{ item[field.name] if item else (project if field.name == 'project' else '') }}</textarea><br><br>
-    {% else %}
-    <input type="{{ field.input_type }}" name="{{ field.name }}" value="{{ item[field.name] if item else (project if field.name == 'project' else '') }}"><br><br>
-    {% endif %}
-    {% endfor %}
-    <button type="submit">Save</button>
+  {% include "how_nav.html" %}
+  <form method="post" class="how-editor-form">
+    <input type="hidden" name="proj" value="{{ project }}">
+    <input type="hidden" name="howto_id" value="{{ item.howto_id if item else '' }}">
+    <input type="hidden" name="source_filepath" value="{{ item.source_filepath if item else '' }}">
+    <div class="how-blueprint-meta">
+      <label class="how-name-field">
+        <span>Name :</span>
+        <input type="text" name="blueprint_name" value="{{ blueprint_name }}" required>
+        <span class="how-file-ext">.md</span>
+      </label>
+      <label class="how-project-field">
+        <span>Project :</span>
+        <select name="project_id" id="how-project-select">
+          {% for opt in project_options %}
+            <option value="{{ opt.project_id }}" data-folder="{{ opt.folder }}" {% if opt.selected %}selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <span class="how-save-folder" id="how-save-folder">{{ save_folder }}</span>
+    </div>
+    <div class="how-editor-actions">
+      <button type="submit" formaction="{{ url_for('how.preview_how_route') }}">Preview</button>
+      <button type="submit" formaction="{{ url_for('how.save_how_route') }}">Save and Apply</button>
+      <a href="{{ url_for('how.list_how_route', proj=project) }}">Cancel</a>
+      {% if item and item.source_filepath %}<span>{{ item.source_filepath }}</span>{% endif %}
+    </div>
+    <div class="how-blueprint-grid">
+      <section class="how-blueprint-panel">
+        <textarea name="markdown" class="how-blueprint-editor" spellcheck="false">{{ markdown }}</textarea>
+      </section>
+      <section class="how-preview-panel">
+        <h4>PARSED PREVIEW</h4>
+        {% if not preview %}
+          <p class="how-muted">Click Preview to parse the current Markdown without writing to the database.</p>
+        {% else %}
+          {% if preview.save_error %}
+            <div class="how-diagnostic error">{{ preview.save_error }}</div>
+          {% endif %}
+          <div class="how-preview-status how-status-{{ preview.status|lower }}">{{ preview.status }}</div>
+          {% set parsed = preview.parsed %}
+          <div class="how-diagnostics">
+            {% for diag in parsed.diagnostics %}
+              <div class="how-diagnostic {{ diag.severity|lower }}">
+                {% if diag.source_line %}Line {{ diag.source_line }}: {% endif %}{{ diag.message }}
+              </div>
+            {% endfor %}
+          </div>
+          <table>
+            <tr><th>Field</th><th>Value</th></tr>
+            <tr><td>Key</td><td>{{ parsed.metadata.key }}</td></tr>
+            <tr><td>Title</td><td>{{ parsed.title }}</td></tr>
+            <tr><td>Project</td><td>{{ parsed.metadata.resolved_project_id }}</td></tr>
+            <tr><td>Status</td><td>{{ parsed.metadata.status or "draft" }}</td></tr>
+            <tr><td>Summary</td><td>{{ parsed.summary }}</td></tr>
+            <tr><td>Outcome</td><td>{{ parsed.outcome }}</td></tr>
+          </table>
+          <h4>Parts</h4>
+          <table>
+            <tr><th>Line</th><th>Name</th><th>Qty</th><th>Unit</th><th>Optional</th><th>Resolution</th></tr>
+            {% for part in parsed.parts %}
+              <tr><td>{{ part.source_line }}</td><td>{{ part.name }}</td><td>{{ part.quantity }}</td><td>{{ part.unit }}</td><td>{{ part.optional }}</td><td>{{ part.resolution }}</td></tr>
+            {% endfor %}
+          </table>
+          <h4>Tools</h4>
+          <table>
+            <tr><th>Line</th><th>Name</th><th>Optional</th><th>Notes</th><th>Resolution</th></tr>
+            {% for tool in parsed.tools %}
+              <tr><td>{{ tool.source_line }}</td><td>{{ tool.name }}</td><td>{{ tool.optional }}</td><td>{{ tool.notes }}</td><td>{{ tool.resolution }}</td></tr>
+            {% endfor %}
+          </table>
+          <h4>Steps</h4>
+          <table>
+            <tr><th>Line</th><th>Order</th><th>Instruction</th><th>Expected</th><th>Warning</th><th>Child How-to</th><th>Resolution</th></tr>
+            {% for step in parsed.steps %}
+              <tr>
+                <td>{{ step.source_line }}</td>
+                <td>{{ step.order }}</td>
+                <td>{{ step.instruction }}</td>
+                <td>{{ step.expected_result }}</td>
+                <td>{{ step.warning }}</td>
+                <td>{{ step.child_howto_ref }} {{ step.child_resolution }}</td>
+                <td>{{ step.resolution }}</td>
+              </tr>
+            {% endfor %}
+          </table>
+        {% endif %}
+      </section>
+    </div>
   </form>
+  <script>
+    (function () {
+      var select = document.getElementById("how-project-select");
+      var folder = document.getElementById("how-save-folder");
+      if (!select || !folder) return;
+      function updateFolder() {
+        var option = select.options[select.selectedIndex];
+        folder.textContent = option ? option.getAttribute("data-folder") || "" : "";
+      }
+      select.addEventListener("change", updateFolder);
+      updateFolder();
+    }());
+  </script>
 {% endblock %}

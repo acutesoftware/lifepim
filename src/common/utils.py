@@ -10,7 +10,6 @@ NORMAL_USER_HIDDEN_TABS = {
     "agent",
     "files",
     "data",
-    "how",
     "tasks",
     "goals",
     "contacts",

@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% include "how_nav.html" %}
+  <form method="post" action="{{ url_for('how.catalog_add_route', kind=kind, proj=project) }}" class="how-catalog-form">
+    <input type="hidden" name="project_id" value="{{ project }}">
+    {% if kind == "tools" %}
+      <input name="tool_key" placeholder="tool-key">
+      <input name="tool_name" placeholder="Tool name" required>
+      <input name="description" placeholder="Description">
+      <input name="notes" placeholder="Notes">
+    {% elif kind == "parts" %}
+      <input name="part_key" placeholder="part-key">
+      <input name="part_name" placeholder="Part name" required>
+      <input name="default_unit" placeholder="Unit">
+      <input name="description" placeholder="Description">
+      <input name="notes" placeholder="Notes">
+    {% else %}
+      <input name="step_key" placeholder="step-key">
+      <select name="step_type"><option value="instruction">instruction</option><option value="howto">howto</option></select>
+      <input name="step_title" placeholder="Step title">
+      <input name="instruction" placeholder="Instruction" required>
+      <input name="expected_result" placeholder="Expected result">
+      <input name="warning" placeholder="Warning">
+      <input name="child_howto_ref" placeholder="Child How-to key">
+      <select name="child_mode"><option value="linked">linked</option><option value="reference">reference</option></select>
+      <input name="notes" placeholder="Notes">
+      <input type="hidden" name="default_optional" value="0">
+    {% endif %}
+    <button type="submit">Add {{ kind[:-1]|title }}</button>
+  </form>
+  <div class="tabular-scroll">
+    <table>
+      {% if kind == "tools" %}
+        <tr><th>Name</th><th>Key</th><th>Project</th><th>Description</th><th>Used By</th><th>Updated</th></tr>
+        {% for item in items %}
+          <tr><td>{{ item.tool_name }}</td><td>{{ item.tool_key }}</td><td>{{ item.project_id }}</td><td>{{ item.description }}</td><td>{{ item.used_by_count }}</td><td>{{ item.updated_at }}</td></tr>
+        {% endfor %}
+      {% elif kind == "parts" %}
+        <tr><th>Name</th><th>Key</th><th>Project</th><th>Unit</th><th>Description</th><th>Used By</th><th>Updated</th></tr>
+        {% for item in items %}
+          <tr><td>{{ item.part_name }}</td><td>{{ item.part_key }}</td><td>{{ item.project_id }}</td><td>{{ item.default_unit }}</td><td>{{ item.description }}</td><td>{{ item.used_by_count }}</td><td>{{ item.updated_at }}</td></tr>
+        {% endfor %}
+      {% else %}
+        <tr><th>Title</th><th>Type</th><th>Instruction</th><th>Linked How-to</th><th>Expected</th><th>Warning</th><th>Used By</th><th>Updated</th></tr>
+        {% for item in items %}
+          <tr><td>{{ item.step_title }}</td><td>{{ item.step_type }}</td><td>{{ item.instruction }}</td><td>{{ item.child_howto_ref }}</td><td>{{ item.expected_result }}</td><td>{{ item.warning }}</td><td>{{ item.used_by_count }}</td><td>{{ item.updated_at }}</td></tr>
+        {% endfor %}
+      {% endif %}
+    </table>
+  </div>
+{% endblock %}

@@ -14,6 +14,7 @@ from common import search as search_mod
 from common import projects as projects_mod
 from common import settings as settings_mod
 from core.security import configure_security
+from modules.how.schema import ensure_how_schema
 
 
 APP_NAME = "LifePIM"
@@ -141,6 +142,7 @@ app.jinja_env.filters["duration_friendly"] = format_duration_friendly
 app.jinja_env.filters["duration_label"] = format_duration_label
 projects_mod.ensure_projects_schema(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
+ensure_how_schema(db._get_conn())
 
 # Register blueprints
 _dbg("Importing blueprints")

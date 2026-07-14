@@ -1,28 +1,51 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <a href="{{ url_for('how.add_how_route', proj=project) }}">Add How</a>
-
-<div class="tabular-scroll">
-<table border="1" cellpadding="5">
-  <tr>
-    {% for col in col_list %}
-    <th>{{ col.replace('_', ' ') }}</th>
-    {% endfor %}
-    <th>Actions</th>
-  </tr>
-  {% for item in items %}
-  <tr>
-    {% for col in col_list %}
-    <td>{{ item[col] }}</td>
-    {% endfor %}
-    <td>
-      <a href="{{ url_for('how.view_how_route', item_id=item.id, proj=project) }}">View</a> |
-      <a href="{{ url_for('how.edit_how_route', item_id=item.id, proj=project) }}">Edit</a> |
-      <a href="{{ url_for('how.delete_how_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
-    </td>
-  </tr>
-  {% endfor %}
-</table>
-{% include "widgets/wid_pagination.html" %}
-</div>
+  {% include "how_nav.html" %}
+  <div class="how-toolbar">
+    <a class="data-action" href="{{ url_for('how.add_how_route', proj=project) }}">Add How-to</a>
+    <span>{{ project or "All Projects" }}</span>
+  </div>
+  <div class="tabular-scroll">
+    <table>
+      <tr>
+        <th>Title</th>
+        <th>Project</th>
+        <th>Status</th>
+        <th>Difficulty</th>
+        <th>Estimated</th>
+        <th>Steps</th>
+        <th>Nested How-tos</th>
+        <th>Last Verified</th>
+        <th>Parse Status</th>
+        <th>Updated</th>
+        <th>Source</th>
+        <th>Actions</th>
+      </tr>
+      {% for item in items %}
+      <tr>
+        <td><a href="{{ url_for('how.view_how_route', item_id=item.howto_id, proj=project) }}">{{ item.title }}</a></td>
+        <td>{{ item.project_id }}</td>
+        <td>{{ item.status }}</td>
+        <td>{{ item.difficulty }}</td>
+        <td>{{ item.estimated_minutes }}</td>
+        <td>{{ item.step_count }}</td>
+        <td>{{ item.child_count }}</td>
+        <td>{{ item.last_verified }}</td>
+        <td class="how-status-{{ item.parse_status|lower }}">{{ item.parse_status }}</td>
+        <td>{{ item.updated_at }}</td>
+        <td>{{ item.source_filepath or "Manual" }}</td>
+        <td class="data-actions-cell">
+          <a href="{{ url_for('how.view_how_route', item_id=item.howto_id, proj=project) }}">Open</a>
+          <a href="{{ url_for('how.edit_how_route', item_id=item.howto_id, proj=project) }}">Edit Blueprint</a>
+          <form method="post" action="{{ url_for('how.convert_howto_to_note_route', item_id=item.howto_id, proj=project) }}" onsubmit="return confirm('Convert this HOWTO back to a Note and remove it from HOW?');">
+            <button type="submit">Convert to Note</button>
+          </form>
+          <form method="post" action="{{ url_for('how.delete_how_route', item_id=item.howto_id, proj=project) }}" onsubmit="return confirm('Delete How-to?');">
+            <button type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
 {% endblock %}
