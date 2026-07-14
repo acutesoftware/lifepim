@@ -241,6 +241,39 @@ def _fetch_audio(project=None, sort_col=None, sort_dir=None, limit=None, offset=
     return [dict(row) for row in rows]
 
 
+def _parse_audio_ids(raw_ids):
+    ids = []
+    seen = set()
+    for value in (raw_ids or "").replace("|", ",").split(","):
+        value = value.strip()
+        if not value:
+            continue
+        try:
+            audio_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if audio_id in seen:
+            continue
+        ids.append(audio_id)
+        seen.add(audio_id)
+    return ids
+
+
+def _fetch_audio_by_ids(audio_ids):
+    _ensure_audio_table_schema()
+    tbl = _get_tbl()
+    if not tbl or not audio_ids:
+        return []
+    cols = ["id"] + tbl["col_list"]
+    placeholders = ", ".join(["?"] * len(audio_ids))
+    rows = db._get_conn().execute(
+        f"SELECT {', '.join(cols)} FROM {tbl['name']} WHERE id IN ({placeholders})",
+        audio_ids,
+    ).fetchall()
+    by_id = {row["id"]: dict(row) for row in rows}
+    return [by_id[audio_id] for audio_id in audio_ids if audio_id in by_id]
+
+
 def _audio_item_matches_terms(item, terms):
     if not terms:
         return True
@@ -359,18 +392,22 @@ def list_audio_list_route():
     )
 
 
-@audio_bp.route("/player")
+@audio_bp.route("/player", methods=["GET", "POST"])
 def audio_player_route():
-    project = request.args.get("proj")
+    project = request.values.get("proj")
     if project in ("any", "All", "all", "ALL", "spacer"):
         project = None
-    sort_col = request.args.get("sort") or "file_name"
-    sort_dir = request.args.get("dir") or "asc"
-    limit = request.args.get("limit", type=int) or 200
-    start_id = request.args.get("id", type=int)
-    playlist_id = request.args.get("playlist_id", type=int)
+    sort_col = request.values.get("sort") or "file_name"
+    sort_dir = request.values.get("dir") or "asc"
+    limit = request.values.get("limit", type=int) or 200
+    start_id = request.values.get("id", type=int)
+    playlist_id = request.values.get("playlist_id", type=int)
+    audio_ids = _parse_audio_ids(request.values.get("ids"))
     playlist_name = None
-    if playlist_id:
+    if audio_ids:
+        items = _fetch_audio_by_ids(audio_ids)
+        playlist_name = "Current list"
+    elif playlist_id:
         conn = _ensure_playlist_schema()
         playlist = _get_playlist(conn, playlist_id)
         if playlist:

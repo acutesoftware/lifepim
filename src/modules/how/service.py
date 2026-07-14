@@ -523,7 +523,21 @@ def convert_howto_to_note(howto_id, conn=None):
         "date_modified": __import__("datetime").datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
         "project": project_id,
     }
-    cols = [col for col in tbl["col_list"] if col in values]
+    table_cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({tbl['name']})").fetchall()}
+    try:
+        from flask_login import current_user
+
+        if getattr(current_user, "is_authenticated", False):
+            values["owner_user_id"] = current_user.user_id
+    except Exception:
+        pass
+    if "visibility" in table_cols:
+        values["visibility"] = "private"
+    if "is_public" in table_cols:
+        values["is_public"] = 0
+    if "show_in_blog" in table_cols:
+        values["show_in_blog"] = 0
+    cols = [col for col in list(tbl["col_list"]) + ["owner_user_id", "visibility", "is_public", "show_in_blog"] if col in values and col in table_cols]
     placeholders = ", ".join(["?"] * (len(cols) + 2))
     cur = conn.execute(
         f"INSERT INTO {tbl['name']} ({', '.join(cols)}, user_name, rec_extract_date) VALUES ({placeholders})",

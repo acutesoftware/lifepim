@@ -143,7 +143,8 @@ class TestHowDatabaseAndTree(unittest.TestCase):
         )
         self.conn.execute(
             "CREATE TABLE lp_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, file_name TEXT, path TEXT, folder_id INTEGER, "
-            "size TEXT, date_modified TEXT, project TEXT, user_name TEXT, rec_extract_date TEXT)"
+            "size TEXT, date_modified TEXT, project TEXT, owner_user_id INTEGER, visibility TEXT NOT NULL DEFAULT 'private', "
+            "show_in_blog INTEGER NOT NULL DEFAULT 0, is_public INTEGER NOT NULL DEFAULT 0, user_name TEXT, rec_extract_date TEXT)"
         )
         self.tmp = tempfile.TemporaryDirectory()
 
@@ -337,6 +338,8 @@ Original HOW markdown.
         self.assertIsNone(self.conn.execute("SELECT 1 FROM lp_howto WHERE howto_id = ?", (howto_id,)).fetchone())
         note = self.conn.execute("SELECT * FROM lp_notes WHERE id = ?", (note_id,)).fetchone()
         self.assertIsNotNone(note)
+        self.assertEqual(note["visibility"], "private")
+        self.assertEqual(note["is_public"], 0)
         note_path = os.path.join(note["path"], note["file_name"])
         with open(note_path, "r", encoding="utf-8") as handle:
             self.assertEqual(handle.read(), markdown)
