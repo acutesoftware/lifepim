@@ -11,6 +11,7 @@ from modules.how.parser import parse_markdown
 from modules.how.schema import ensure_how_schema, utc_now
 from modules.how.service import apply_markdown, build_preview_model, build_tree, get_howto_detail, list_catalog
 from modules.how.service import create_child_stub, convert_howto_to_note, create_howto_from_markdown
+from modules.how.service import delete_catalog_item, get_catalog_item, upsert_catalog
 
 
 COFFEE_MD = """---
@@ -359,6 +360,50 @@ Original HOW markdown.
         self.assertEqual(row["markdown_full_content"], markdown)
         self.assertEqual(row["parse_status"], "NOT_PARSED")
         self.assertEqual(self.conn.execute("SELECT COUNT(1) FROM lp_howto_step_links").fetchone()[0], 0)
+
+    def test_tool_catalog_edit_and_delete_when_unused(self):
+        now = utc_now()
+        cur = self.conn.execute(
+            "INSERT INTO lp_howto_tools_needed (tool_key, tool_name, description, notes, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("hammer", "Hammer", "Old", "", now, now),
+        )
+        tool_id = cur.lastrowid
+        self.conn.commit()
+        upsert_catalog(
+            "tools",
+            {
+                "tool_key": "hammer",
+                "project_id": "",
+                "tool_name": "Framing Hammer",
+                "description": "Updated",
+                "notes": "manual",
+            },
+            item_id=tool_id,
+            conn=self.conn,
+        )
+        edited = get_catalog_item("tools", tool_id, conn=self.conn)
+        self.assertEqual(edited["tool_name"], "Framing Hammer")
+        delete_catalog_item("tools", tool_id, conn=self.conn)
+        self.assertIsNone(get_catalog_item("tools", tool_id, conn=self.conn))
+
+    def test_catalog_delete_blocks_used_tool(self):
+        now = utc_now()
+        tool_id = self.conn.execute(
+            "INSERT INTO lp_howto_tools_needed (tool_name, created_at, updated_at) VALUES (?, ?, ?)",
+            ("Used Tool", now, now),
+        ).lastrowid
+        howto_id = self.conn.execute(
+            "INSERT INTO lp_howto (title, parse_status, created_at, updated_at) VALUES (?, 'NOT_PARSED', ?, ?)",
+            ("Uses Tool", now, now),
+        ).lastrowid
+        self.conn.execute(
+            "INSERT INTO lp_howto_tool_links (howto_id, tool_id, item_order) VALUES (?, ?, 1)",
+            (howto_id, tool_id),
+        )
+        self.conn.commit()
+        with self.assertRaises(ValueError):
+            delete_catalog_item("tools", tool_id, conn=self.conn)
 
     def test_ambiguous_plain_name_blocks_save(self):
         now = utc_now()

@@ -104,6 +104,17 @@
   gap: 4px;
 }
 
+.how-catalog-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.how-catalog-project span {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
 .how-blueprint-grid {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);

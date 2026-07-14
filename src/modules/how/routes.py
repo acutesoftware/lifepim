@@ -161,6 +161,8 @@ def catalog_route(kind):
     if kind not in {"tools", "parts", "steps"}:
         return redirect(url_for("how.list_how_route", proj=_project()))
     project = _project()
+    message = request.args.get("message", "")
+    selected_project = project
     return render_template(
         "how_catalog.html",
         active_tab="how",
@@ -173,6 +175,8 @@ def catalog_route(kind):
         kind=kind,
         items=service.list_catalog(kind, project),
         edit_item=None,
+        message=message,
+        project_options=service.project_options(selected_project, include_blank=True, select_first=False),
     )
 
 
@@ -180,6 +184,46 @@ def catalog_route(kind):
 def catalog_add_route(kind):
     service.upsert_catalog(kind, request.form)
     return redirect(url_for("how.catalog_route", kind=kind, proj=_project()))
+
+
+@how_bp.route("/catalog/<kind>/<int:item_id>/edit", methods=["GET", "POST"])
+def catalog_edit_route(kind, item_id):
+    if kind not in {"tools", "parts"}:
+        return redirect(url_for("how.catalog_route", kind=kind, proj=_project()))
+    project = _project()
+    if request.method == "POST":
+        service.upsert_catalog(kind, request.form, item_id=item_id)
+        return redirect(url_for("how.catalog_route", kind=kind, proj=project))
+    return render_template(
+        "how_catalog.html",
+        active_tab="how",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="HOW",
+        content_html="",
+        subtab=kind,
+        project=project,
+        kind=kind,
+        items=service.list_catalog(kind, project),
+        edit_item=service.get_catalog_item(kind, item_id),
+        message="",
+        project_options=service.project_options(
+            (service.get_catalog_item(kind, item_id) or {}).get("project_id") or project,
+            include_blank=True,
+            select_first=False,
+        ),
+    )
+
+
+@how_bp.route("/catalog/<kind>/<int:item_id>/delete", methods=["POST"])
+def catalog_delete_route(kind, item_id):
+    project = _project()
+    try:
+        service.delete_catalog_item(kind, item_id)
+        message = ""
+    except Exception as exc:
+        message = str(exc)
+    return redirect(url_for("how.catalog_route", kind=kind, proj=project, message=message))
 
 
 @how_bp.route("/tree/<int:item_id>")

@@ -72,10 +72,19 @@ def _project_id_from_metadata(metadata, conn):
     return "", f"Ambiguous project '{project_name}'."
 
 
-def project_options(selected_project=""):
+def project_options(selected_project="", include_blank=False, select_first=True):
     conn = get_conn()
     selected_project = normalize_project(selected_project)
     options = []
+    if include_blank:
+        options.append(
+            {
+                "project_id": "",
+                "label": "No project",
+                "folder": how_save_folder(""),
+                "selected": not selected_project,
+            }
+        )
     seen = set()
     for row in projects_mod.projects_side_tabs(conn=conn):
         project_id = (row.get("id") or row.get("proj") or "").strip()
@@ -104,7 +113,7 @@ def project_options(selected_project=""):
                 "selected": True,
             },
         )
-    if options and not any(opt["selected"] for opt in options):
+    if select_first and options and not any(opt["selected"] for opt in options):
         options[0]["selected"] = True
     return options
 
@@ -618,8 +627,32 @@ def list_catalog(kind, project_id="", conn=None):
     return [dict(row) for row in rows]
 
 
-def upsert_catalog(kind, form, item_id=None):
-    conn = get_conn()
+def _catalog_spec(kind):
+    specs = {
+        "tools": ("lp_howto_tools_needed", "tool_id", "tool_name", "lp_howto_tool_links", "tool_id"),
+        "parts": ("lp_howto_parts", "part_id", "part_name", "lp_howto_part_links", "part_id"),
+        "steps": ("lp_howto_steps", "step_id", "step_title", "lp_howto_step_links", "step_id"),
+    }
+    if kind not in specs:
+        raise ValueError("Unknown catalog kind.")
+    return specs[kind]
+
+
+def get_catalog_item(kind, item_id, conn=None):
+    if kind not in {"tools", "parts"}:
+        return None
+    conn = get_conn(conn)
+    table, pk, _, link_table, link_fk = _catalog_spec(kind)
+    row = conn.execute(
+        f"SELECT c.*, (SELECT COUNT(1) FROM {link_table} l WHERE l.{link_fk}=c.{pk}) AS used_by_count "
+        f"FROM {table} c WHERE c.{pk} = ?",
+        (item_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def upsert_catalog(kind, form, item_id=None, conn=None):
+    conn = get_conn(conn)
     now = utc_now()
     if kind == "tools":
         table, pk, cols = "lp_howto_tools_needed", "tool_id", ["tool_key", "project_id", "tool_name", "description", "notes"]
@@ -638,6 +671,18 @@ def upsert_catalog(kind, form, item_id=None):
             f"INSERT INTO {table} ({', '.join(cols)}, created_at, updated_at) VALUES ({', '.join(['?'] * len(cols))}, ?, ?)",
             values + [now, now],
         )
+    conn.commit()
+
+
+def delete_catalog_item(kind, item_id, conn=None):
+    if kind not in {"tools", "parts"}:
+        raise ValueError("Only Tools and Parts can be deleted here.")
+    conn = get_conn(conn)
+    table, pk, _, link_table, link_fk = _catalog_spec(kind)
+    row = conn.execute(f"SELECT COUNT(1) AS cnt FROM {link_table} WHERE {link_fk} = ?", (item_id,)).fetchone()
+    if row and int(row["cnt"] or 0):
+        raise ValueError("Cannot delete a catalog item that is used by one or more How-tos.")
+    conn.execute(f"DELETE FROM {table} WHERE {pk} = ?", (item_id,))
     conn.commit()
 
 
