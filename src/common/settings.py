@@ -31,6 +31,7 @@ CALENDAR_THUMBNAIL_LIMIT_MAX = 20
 GENERAL_DEFAULTS = {
     "general.freeze_headers": ("0", "General", "Freeze headers"),
     "general.map_names_english": ("1", "General", "Map names English"),
+    "general.mobile_font_size": ("14", "General", "Mobile font size"),
 }
 
 AUDIO_VISUALIZATIONS = {
@@ -184,6 +185,9 @@ def get_general_settings(conn=None):
     return {
         "freeze_headers": _as_bool(get_setting("general.freeze_headers", "0", conn)),
         "map_names_english": _as_bool(get_setting("general.map_names_english", "1", conn)),
+        "mobile_font_size": normalize_mobile_font_size(
+            get_setting("general.mobile_font_size", "14", conn)
+        ),
     }
 
 
@@ -255,6 +259,10 @@ def save_general_settings(values, conn=None):
     updates = {
         "general.freeze_headers": ("1" if values.get("freeze_headers") else "0", "Freeze headers"),
         "general.map_names_english": ("1" if values.get("map_names_english") else "0", "Map names English"),
+        "general.mobile_font_size": (
+            str(normalize_mobile_font_size(values.get("mobile_font_size"))),
+            "Mobile font size",
+        ),
     }
     for key, (value, label) in updates.items():
         set_setting(key, value, "General", label, conn)
@@ -343,6 +351,14 @@ def normalize_media_thumbnail_size(value):
 def normalize_media_padding_size(value):
     normalized = str(value or "thin").strip().lower()
     return normalized if normalized in MEDIA_PADDING_SIZES else "thin"
+
+
+def normalize_mobile_font_size(value):
+    try:
+        size = int(value)
+    except (TypeError, ValueError):
+        size = 14
+    return max(12, min(22, size))
 
 
 def _utc_now():

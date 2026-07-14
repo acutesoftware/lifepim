@@ -190,8 +190,10 @@ _dbg("Blueprints registered")
 
 @app.context_processor
 def inject_layout_settings():
+    general_settings = settings_mod.get_general_settings()
     return {
-        "freeze_headers": settings_mod.get_general_settings().get("freeze_headers", False),
+        "freeze_headers": general_settings.get("freeze_headers", False),
+        "mobile_font_size": general_settings.get("mobile_font_size", 14),
     }
 
 

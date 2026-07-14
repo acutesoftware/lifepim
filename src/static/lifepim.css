@@ -416,6 +416,16 @@ body.freeze-headers {
   align-items: flex-end;
 }
 
+.mobile-nav-selects {
+  display: none;
+}
+
+.mobile-nav-select {
+  min-width: 0;
+  font-size: 12px;
+  padding: 3px 5px;
+}
+
 .search-form {
   margin-left: auto;
   display: flex;
@@ -2427,6 +2437,131 @@ button.calendar-nav {
     left: 0;
     height: calc(100vh - 30px);
     z-index: 50;
+  }
+}
+
+@media (max-width: 479px) {
+  .topbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+  }
+
+  body,
+  input,
+  select,
+  textarea,
+  button,
+  table,
+  th,
+  td,
+  a {
+    font-size: var(--mobile-font-size, 14px);
+  }
+
+  .menu-wrapper {
+    flex: 0 0 auto;
+  }
+
+  .menu-btn {
+    height: 28px;
+    margin-right: 0;
+  }
+
+  .top-nav-container,
+  .side-tabs {
+    display: none;
+  }
+
+  .mobile-nav-selects {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .mobile-nav-select {
+    flex: 1 1 0;
+    height: 32px;
+    width: 50%;
+  }
+
+  .search-form {
+    flex: 1 0 100%;
+    margin-left: 0;
+    order: 2;
+  }
+
+  .search-form input[type="text"] {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .search-form button,
+  .search-form select {
+    flex: 0 0 auto;
+  }
+
+  .container {
+    display: block;
+    min-height: calc(100vh - 62px);
+  }
+
+  body.freeze-headers {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  body.freeze-headers .container {
+    height: auto;
+    min-height: calc(100vh - 62px);
+    overflow: visible;
+  }
+
+  .main {
+    padding: 6px;
+    overflow: visible;
+  }
+
+  body.freeze-headers .main,
+  body.freeze-headers .content,
+  body.freeze-headers .content:has(.tabular-scroll),
+  body.freeze-headers .note-view {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .tabular-scroll,
+  body.freeze-headers .tabular-scroll {
+    display: block;
+    flex: none;
+    max-height: none;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabular-scroll table {
+    min-width: max-content;
+  }
+
+  .main h3 {
+    font-size: calc(var(--mobile-font-size, 14px) + 2px);
+  }
+
+  body.has-links-drawer {
+    padding-right: 0;
+  }
+
+  .links-drawer,
+  .links-drawer.open,
+  .links-drawer-handle {
+    display: none;
   }
 }
 

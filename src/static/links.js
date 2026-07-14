@@ -54,6 +54,10 @@
     return Array.from((root || document).querySelectorAll(selector));
   }
 
+  function linksDrawerDisabled() {
+    return window.matchMedia("(max-width: 479px)").matches;
+  }
+
   function fetchJson(url, options) {
     return fetch(url, options).then((res) => {
       if (!res.ok) {
@@ -100,6 +104,10 @@
     STATE.drawerHandle = qs("#links-drawer-handle");
     if (STATE.drawerHandle) {
       STATE.drawerHandle.addEventListener("click", () => {
+        if (linksDrawerDisabled()) {
+          setDrawerOpen(false);
+          return;
+        }
         if (STATE.drawer) {
           setDrawerOpen(!STATE.drawerOpen);
           if (STATE.drawerOpen) {
@@ -129,6 +137,11 @@
     initBulkToolbars();
     initMentions();
     initGlobalShortcuts();
+    window.addEventListener("resize", () => {
+      if (linksDrawerDisabled()) {
+        setDrawerOpen(false);
+      }
+    });
   }
 
   function initDrawer(drawer) {
@@ -143,7 +156,7 @@
     if (storedWidth) {
       applyDrawerWidth(storedWidth);
     }
-    setDrawerOpen(true);
+    setDrawerOpen(!linksDrawerDisabled());
     const requestedMode = getRequestedDrawerMode();
     const initialMode =
       requestedMode ||
@@ -213,6 +226,9 @@
     return "";
   }
   function setDrawerOpen(open) {
+    if (linksDrawerDisabled()) {
+      open = false;
+    }
     STATE.drawerOpen = open;
     if (!STATE.drawer) {
       return;
@@ -1256,13 +1272,13 @@
         return;
       }
       if (evt.ctrlKey && evt.shiftKey && evt.key.toLowerCase() === "l") {
-        if (STATE.drawer) {
+        if (STATE.drawer && !linksDrawerDisabled()) {
           evt.preventDefault();
           openLinkPicker({ mode: "single" });
         }
       }
       if (evt.ctrlKey && evt.altKey && evt.key.toLowerCase() === "l") {
-        if (STATE.drawer) {
+        if (STATE.drawer && !linksDrawerDisabled()) {
           evt.preventDefault();
           setDrawerOpen(!STATE.drawerOpen);
           STATE.drawer.focus();

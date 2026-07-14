@@ -293,6 +293,7 @@ def settings_route():
                 {
                     "freeze_headers": request.form.get("freeze_headers") == "1",
                     "map_names_english": request.form.get("map_names_english") == "1",
+                    "mobile_font_size": request.form.get("mobile_font_size"),
                 },
                 conn,
             )
