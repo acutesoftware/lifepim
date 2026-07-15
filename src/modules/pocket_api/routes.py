@@ -5,9 +5,10 @@ import os
 import re
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
+from flask_login import current_user
 
 from common import data
 from common.network_log import log_network
@@ -19,6 +20,11 @@ pocket_api_bp = Blueprint("pocket_api", __name__, url_prefix="/api/pocket/v1")
 
 ITEM_NAMESPACE = uuid.UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f")
 INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*]')
+PAIRING_CODE_TTL = timedelta(minutes=5)
+PAIRING_CODE_MAX_ACTIVE_PER_USER = 5
+REGISTRATION_FAILURE_LIMIT = 5
+REGISTRATION_FAILURE_WINDOW = timedelta(minutes=15)
+POCKET_MAX_SYNC_PAYLOAD_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", str(10 * 1024 * 1024)))
 
 
 def _utc_now():
@@ -76,13 +82,46 @@ def ensure_pocket_schema(conn=None):
             updated_at TEXT NOT NULL,
             PRIMARY KEY(entity_type, entity_id)
         );
+        CREATE TABLE IF NOT EXISTS pocket_client_item_map (
+            device_id TEXT NOT NULL,
+            client_item_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            PRIMARY KEY(device_id, client_item_id)
+        );
         CREATE TABLE IF NOT EXISTS pocket_user_settings (
             user_id INTEGER PRIMARY KEY,
             default_note_folder TEXT,
             updated_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS pocket_pairing_codes (
+            pairing_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pairing_code_hash TEXT NOT NULL UNIQUE,
+            user_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            created_ip TEXT
+        );
+        CREATE TABLE IF NOT EXISTS pocket_registration_attempts (
+            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            attempted_at TEXT NOT NULL,
+            was_successful INTEGER NOT NULL CHECK (was_successful IN (0, 1)),
+            ip_address TEXT,
+            username TEXT,
+            pairing_code_hash TEXT,
+            device_id TEXT,
+            reason TEXT,
+            user_agent TEXT
+        );
         CREATE INDEX IF NOT EXISTS idx_pocket_devices_token_hash ON pocket_devices(token_hash);
         CREATE INDEX IF NOT EXISTS idx_pocket_item_map_entity ON pocket_item_map(entity_type, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_pocket_client_item_entity ON pocket_client_item_map(entity_type, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_pocket_pairing_user_active ON pocket_pairing_codes(user_id, used_at, expires_at);
+        CREATE INDEX IF NOT EXISTS idx_pocket_registration_attempts_lookup
+            ON pocket_registration_attempts(attempted_at, was_successful, ip_address, username, pairing_code_hash, device_id);
         """
     )
     _add_column_if_missing(conn, "pocket_devices", "username", "TEXT")
@@ -147,6 +186,63 @@ def _lookup_user_id(username):
     return row["user_id"] if row else None
 
 
+def _lookup_active_user(user_id):
+    try:
+        row = data._get_conn().execute(
+            "SELECT user_id, username, display_name, is_active FROM users WHERE user_id = ? AND is_active = 1",
+            (user_id,),
+        ).fetchone()
+    except Exception:
+        return None
+    return dict(row) if row else None
+
+
+def _pairing_code_hash(pairing_code):
+    normalized = re.sub(r"[^A-Za-z0-9]", "", pairing_code or "").upper()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest() if normalized else ""
+
+
+def _generate_pairing_code():
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return "-".join("".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3))
+
+
+def create_pocket_pairing_code(user_id, created_ip=""):
+    ensure_pocket_schema()
+    user = _lookup_active_user(user_id)
+    if not user:
+        raise ValueError("Pocket pairing requires an active user.")
+    now = _utc_now()
+    now_sql = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    active_count = data._get_conn().execute(
+        """
+        SELECT COUNT(1) AS cnt
+        FROM pocket_pairing_codes
+        WHERE user_id = ? AND used_at IS NULL AND expires_at > ?
+        """,
+        (user["user_id"], now_sql),
+    ).fetchone()["cnt"]
+    if active_count >= PAIRING_CODE_MAX_ACTIVE_PER_USER:
+        raise ValueError("Too many active Pocket pairing codes for this user.")
+    for _ in range(10):
+        raw_code = _generate_pairing_code()
+        code_hash = _pairing_code_hash(raw_code)
+        try:
+            data._get_conn().execute(
+                """
+                INSERT INTO pocket_pairing_codes(pairing_code_hash, user_id, created_at, expires_at, created_ip)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (code_hash, user["user_id"], now_sql, (now + PAIRING_CODE_TTL).strftime("%Y-%m-%dT%H:%M:%SZ"), created_ip or ""),
+            )
+            data._get_conn().commit()
+            log_network("pocket_pairing_code_created", user_id=user["user_id"], username=user["username"], created_ip=created_ip or "")
+            return {"pairing_code": raw_code, "expires_at": (now + PAIRING_CODE_TTL).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        except Exception:
+            continue
+    raise RuntimeError("Could not create a unique Pocket pairing code.")
+
+
 def list_pocket_devices(conn=None):
     conn = data._get_conn() if conn is None else conn
     ensure_pocket_schema(conn)
@@ -179,6 +275,21 @@ def _json_error(error, status_code):
     return jsonify({"error": error}), status_code
 
 
+@pocket_api_bp.before_request
+def _reject_oversized_pocket_payload():
+    max_bytes = int(current_app.config.get("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", POCKET_MAX_SYNC_PAYLOAD_BYTES))
+    if request.path.endswith("/sync/push") and request.content_length and request.content_length > max_bytes:
+        log_network(
+            "pocket_payload_too_large",
+            path=request.path,
+            content_length=request.content_length,
+            max_bytes=max_bytes,
+            remote_addr=_client_ip(),
+        )
+        return _json_error("payload_too_large", 413)
+    return None
+
+
 def _client_ip():
     forwarded = (request.headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
     return forwarded or request.remote_addr or ""
@@ -186,6 +297,48 @@ def _client_ip():
 
 def _user_agent():
     return (request.headers.get("User-Agent") or "")[:500]
+
+
+def _record_registration_attempt(was_successful, username="", pairing_code_hash="", device_id="", reason="", user_id=None):
+    ensure_pocket_schema()
+    data._get_conn().execute(
+        """
+        INSERT INTO pocket_registration_attempts
+        (attempted_at, was_successful, ip_address, username, pairing_code_hash, device_id, reason, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (_utc_now_sql(), 1 if was_successful else 0, _client_ip(), username or "", pairing_code_hash or "", device_id or "", reason or "", _user_agent()),
+    )
+    data._get_conn().commit()
+    log_network(
+        "pocket_registration_attempt",
+        was_successful=bool(was_successful),
+        username=username or "",
+        user_id=user_id,
+        device_id=device_id or "",
+        reason=reason or "",
+        remote_addr=_client_ip(),
+    )
+
+
+def _registration_rate_limited(username="", pairing_code_hash="", device_id=""):
+    cutoff = (_utc_now() - REGISTRATION_FAILURE_WINDOW).strftime("%Y-%m-%dT%H:%M:%SZ")
+    row = data._get_conn().execute(
+        """
+        SELECT COUNT(1) AS cnt
+        FROM pocket_registration_attempts
+        WHERE was_successful = 0
+          AND attempted_at >= ?
+          AND (
+                ip_address = ?
+             OR (username != '' AND lower(username) = lower(?))
+             OR (pairing_code_hash != '' AND pairing_code_hash = ?)
+             OR (device_id != '' AND device_id = ?)
+          )
+        """,
+        (cutoff, _client_ip(), username or "", pairing_code_hash or "", device_id or ""),
+    ).fetchone()
+    return bool(row and row["cnt"] >= REGISTRATION_FAILURE_LIMIT)
 
 
 def _auth_device():
@@ -446,6 +599,43 @@ def _note_id_for_item(item_id):
         return None
 
 
+def _note_id_for_client_item(device_id, client_item_id):
+    ensure_pocket_schema()
+    device_id = (device_id or "").strip()
+    client_item_id = (client_item_id or "").strip()
+    if not device_id or not client_item_id:
+        return None
+    row = data._get_conn().execute(
+        """
+        SELECT entity_id
+        FROM pocket_client_item_map
+        WHERE device_id = ? AND client_item_id = ? AND entity_type = 'note'
+        """,
+        (device_id, client_item_id),
+    ).fetchone()
+    return int(row["entity_id"]) if row else None
+
+
+def _upsert_client_item_map(device_id, client_item_id, entity_type, entity_id):
+    device_id = (device_id or "").strip()
+    client_item_id = (client_item_id or "").strip()
+    if not device_id or not client_item_id:
+        return
+    now = _utc_now_sql()
+    data._get_conn().execute(
+        """
+        INSERT INTO pocket_client_item_map(device_id, client_item_id, entity_type, entity_id, created_at, last_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(device_id, client_item_id) DO UPDATE SET
+            entity_type = excluded.entity_type,
+            entity_id = excluded.entity_id,
+            last_seen_at = excluded.last_seen_at
+        """,
+        (device_id, client_item_id, entity_type, entity_id, now, now),
+    )
+    data._get_conn().commit()
+
+
 def _notes_root(user_id=None):
     roots = []
     for note in _note_rows(user_id=user_id):
@@ -601,11 +791,54 @@ def _payload_content(payload_item):
 
 
 def _payload_id(payload_item):
-    for key in ("id", "item_id", "itemId", "server_id", "serverId", "uuid"):
+    for key in ("id", "item_id", "itemId", "server_item_id", "serverItemId", "server_id", "serverId", "uuid"):
         value = payload_item.get(key)
         if value is not None and str(value).strip():
             return str(value).strip()
     return ""
+
+
+def _payload_client_change_id(payload_item):
+    value = payload_item.get("client_change_id") or payload_item.get("clientChangeId") or ""
+    return str(value).strip() if value is not None else ""
+
+
+def _content_sha256(content):
+    return hashlib.sha256(str(content).encode("utf-8")).hexdigest()
+
+
+def _parse_payload_modified_at(payload_item):
+    value = payload_item.get("modified_at") or payload_item.get("modifiedAt") or ""
+    if not value:
+        return None
+    text = str(value).strip()
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.timestamp()
+        except ValueError:
+            pass
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except ValueError:
+        return None
+
+
+def _state_timestamp(state, note_path):
+    if state and state.get("mtime_ns"):
+        try:
+            return int(state.get("mtime_ns")) / 1_000_000_000
+        except (TypeError, ValueError):
+            pass
+    try:
+        return os.path.getmtime(note_path)
+    except OSError:
+        return None
 
 
 def _payload_debug(payload_item):
@@ -637,6 +870,30 @@ def _unique_note_path(folder_path, file_name):
     return candidate, os.path.join(folder_path, candidate)
 
 
+def _note_by_mobile_file_name(payload_item, device):
+    folder_path = _default_note_folder_for_user(device.get("user_id"))
+    if not folder_path:
+        return None
+    file_name = _safe_mobile_file_name(payload_item)
+    tbl = _note_table()
+    columns = _table_columns(data._get_conn(), tbl["name"])
+    if "owner_user_id" not in columns:
+        return None
+    row = data._get_conn().execute(
+        f"""
+        SELECT *
+        FROM {tbl["name"]}
+        WHERE owner_user_id = ?
+          AND file_name = ?
+          AND lower(path) = lower(?)
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (device.get("user_id"), file_name, folder_path),
+    ).fetchone()
+    return dict(row) if row else None
+
+
 def _create_note_from_mobile(payload_item, device):
     content = _payload_content(payload_item)
     if content is None:
@@ -666,6 +923,8 @@ def _create_note_from_mobile(payload_item, device):
     record_id = data.add_record(data._get_conn(), tbl["name"], cols, [values_map.get(col, "") for col in cols])
     if not record_id:
         return {"id": payload_item.get("id") or "", "ok": False, "error": "create_failed"}
+    client_item_id = _payload_id(payload_item)
+    _upsert_client_item_map(device.get("device_id"), client_item_id, "note", record_id)
     _upsert_item_state("note", record_id, note_path, state)
     note = _note_row_by_id(record_id, user_id=device.get("user_id"))
     item = _serialize_note_item(note, include_content=False, state_override=state, note_path_override=note_path)
@@ -677,15 +936,35 @@ def _create_note_from_mobile(payload_item, device):
         note_id=record_id,
         file_name=file_name,
         folder_path=folder_path,
-        client_id=payload_item.get("id"),
+        client_id=client_item_id,
     )
-    return {"id": _payload_id(payload_item) or item["id"], "ok": True, "created": True, "item": item}
+    return {
+        "id": item["id"],
+        "client_change_id": _payload_client_change_id(payload_item),
+        "server_item_id": item["id"],
+        "ok": True,
+        "created": True,
+        "item": item,
+    }
 
 
 @pocket_api_bp.route("/health", methods=["GET"])
 def health_route():
     ensure_pocket_schema()
     return jsonify({"ok": True, "service": "lifepim-pocket", "version": 1})
+
+
+@pocket_api_bp.route("/auth/pairing-codes", methods=["POST"])
+def create_pairing_code_route():
+    ensure_pocket_schema()
+    if not current_user.is_authenticated:
+        return _json_error("unauthorized", 401)
+    user_id = getattr(current_user, "user_id", None)
+    try:
+        pairing = create_pocket_pairing_code(user_id, created_ip=_client_ip())
+    except ValueError as exc:
+        return _json_error(str(exc), 400)
+    return jsonify(pairing)
 
 
 @pocket_api_bp.route("/auth/register-device", methods=["POST"])
@@ -696,9 +975,45 @@ def register_device_route():
     device_name = (payload.get("device_name") or payload.get("name") or "").strip()
     platform = (payload.get("platform") or "").strip()
     username = (payload.get("username") or payload.get("user_name") or "").strip()
-    user_id = _lookup_user_id(username)
-    raw_token = secrets.token_urlsafe(48)
+    pairing_code = payload.get("pairing_code") or payload.get("pairingCode") or ""
+    code_hash = _pairing_code_hash(pairing_code)
+    if _registration_rate_limited(username=username, pairing_code_hash=code_hash, device_id=device_id):
+        _record_registration_attempt(False, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="rate_limited")
+        return _json_error("authentication_failed", 429)
+    if not code_hash:
+        _record_registration_attempt(False, username=username, device_id=device_id, reason="missing_pairing_code")
+        return _json_error("authentication_failed", 401)
     now = _utc_now_sql()
+    row = data._get_conn().execute(
+        """
+        SELECT p.*, u.username, u.display_name, u.is_active
+        FROM pocket_pairing_codes p
+        JOIN users u ON u.user_id = p.user_id
+        WHERE p.pairing_code_hash = ?
+        """,
+        (code_hash,),
+    ).fetchone()
+    if not row or row["used_at"] or row["expires_at"] <= now or not row["is_active"]:
+        _record_registration_attempt(False, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="invalid_pairing_code")
+        return _json_error("authentication_failed", 401)
+    if username and username.lower() != (row["username"] or "").lower():
+        _record_registration_attempt(False, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="username_mismatch")
+        return _json_error("authentication_failed", 401)
+    user_id = row["user_id"]
+    username = row["username"]
+    raw_token = secrets.token_urlsafe(48)
+    claimed = data._get_conn().execute(
+        """
+        UPDATE pocket_pairing_codes
+        SET used_at = ?
+        WHERE pairing_id = ? AND used_at IS NULL AND expires_at > ?
+        """,
+        (now, row["pairing_id"], now),
+    )
+    if not claimed.rowcount:
+        data._get_conn().commit()
+        _record_registration_attempt(False, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="pairing_code_already_used")
+        return _json_error("authentication_failed", 401)
     data._get_conn().execute(
         """
         INSERT INTO pocket_devices
@@ -729,6 +1044,7 @@ def register_device_route():
         ),
     )
     data._get_conn().commit()
+    _record_registration_attempt(True, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="paired", user_id=user_id)
     log_network(
         "pocket_register_device",
         device_id=device_id,
@@ -739,7 +1055,15 @@ def register_device_route():
         remote_addr=_client_ip(),
         user_agent=_user_agent(),
     )
-    return jsonify({"device_id": device_id, "device_token": raw_token, "token_type": "Bearer"})
+    return jsonify(
+        {
+            "device_id": device_id,
+            "device_token": raw_token,
+            "token_type": "Bearer",
+            "username": username,
+            "display_name": row["display_name"],
+        }
+    )
 
 
 @pocket_api_bp.route("/auth/logout-device", methods=["POST"])
@@ -832,32 +1156,76 @@ def item_route(item_id):
 def _push_one_item(payload_item, device):
     item_id = _payload_id(payload_item)
     note_id = _note_id_for_item(item_id)
+    if note_id is None:
+        note_id = _note_id_for_client_item(device.get("device_id"), item_id)
     note = _note_row_by_id(note_id, user_id=device.get("user_id")) if note_id is not None else None
+    if not note:
+        note = _note_by_mobile_file_name(payload_item, device)
+        if note and item_id:
+            _upsert_client_item_map(device.get("device_id"), item_id, "note", note["id"])
     if not note:
         if _payload_content(payload_item) is not None:
             return _create_note_from_mobile(payload_item, device)
         return {"id": item_id, "ok": False, "error": "not_found", "debug": _payload_debug(payload_item)}
+    note_id = note["id"]
     note_path = notes_routes._build_note_path(note)
     if not note_path:
         return {"id": item_id, "ok": False, "error": "invalid_note_path"}
     current_state = notes_routes._note_file_state(note_path)
     base_sha = (payload_item.get("base_sha256") or payload_item.get("sha256") or "").strip()
-    if base_sha and current_state and current_state.get("sha256") != base_sha:
-        return {
-            "id": item_id,
-            "ok": False,
-            "conflict": True,
-            "error": "conflict",
-            "server": _serialize_note_item(note, include_content=True),
-        }
     content = _payload_content(payload_item)
     if content is None:
         return {"id": item_id, "ok": False, "error": "missing_content", "debug": _payload_debug(payload_item)}
+    next_content_hash = _content_sha256(content)
+    if base_sha and current_state and current_state.get("sha256") != base_sha and current_state.get("sha256") != next_content_hash:
+        payload_ts = _parse_payload_modified_at(payload_item)
+        server_ts = _state_timestamp(current_state, note_path)
+        mobile_is_newer = payload_ts is not None and server_ts is not None and payload_ts > server_ts
+        if not mobile_is_newer:
+            return {
+                "id": item_id,
+                "client_change_id": _payload_client_change_id(payload_item),
+                "server_item_id": _item_uuid_for_note(note_id),
+                "ok": False,
+                "conflict": True,
+                "error": "conflict",
+                "server": _serialize_note_item(note, include_content=True),
+            }
+        log_network(
+            "pocket_push_mobile_newer_overwrite",
+            device_id=device.get("device_id"),
+            username=device.get("username"),
+            user_id=device.get("user_id"),
+            item_id=item_id,
+            note_id=note_id,
+            payload_modified_at=payload_item.get("modified_at") or payload_item.get("modifiedAt"),
+            server_mtime=server_ts,
+        )
+    elif base_sha and current_state and current_state.get("sha256") != base_sha and current_state.get("sha256") == next_content_hash:
+        if item_id:
+            _upsert_client_item_map(device.get("device_id"), item_id, "note", note_id)
+        _upsert_item_state("note", note_id, note_path, current_state)
+        return {
+            "id": item_id or _item_uuid_for_note(note_id),
+            "client_change_id": _payload_client_change_id(payload_item),
+            "server_item_id": _item_uuid_for_note(note_id),
+            "ok": True,
+            "item": _serialize_note_item(note, include_content=False, state_override=current_state, note_path_override=note_path),
+        }
     next_state = notes_routes._write_note_file_content(note_path, str(content))
+    if item_id:
+        _upsert_client_item_map(device.get("device_id"), item_id, "note", note_id)
     _upsert_item_state("note", note_id, note_path, next_state)
     _update_note_metadata(note_id, note, next_state)
-    updated_note = _note_row_by_id(note_id)
-    return {"id": item_id, "ok": True, "item": _serialize_note_item(updated_note, include_content=False)}
+    updated_note = _note_row_by_id(note_id, user_id=device.get("user_id"))
+    item = _serialize_note_item(updated_note, include_content=False)
+    return {
+        "id": item_id or item["id"],
+        "client_change_id": _payload_client_change_id(payload_item),
+        "server_item_id": item["id"],
+        "ok": True,
+        "item": item,
+    }
 
 
 @pocket_api_bp.route("/sync/push", methods=["POST"])
@@ -910,4 +1278,17 @@ def sync_push_route():
         error_count=len([result for result in results if not result.get("ok") and not result.get("conflict")]),
         status_code=status,
     )
-    return jsonify({"ok": all(result.get("ok") for result in results), "results": results}), status
+    accepted = []
+    for result in results:
+        if not result.get("ok"):
+            continue
+        item = result.get("item") or {}
+        accepted.append(
+            {
+                "client_change_id": result.get("client_change_id") or "",
+                "server_item_id": result.get("server_item_id") or item.get("id") or result.get("id") or "",
+                "version": item.get("version") or 0,
+                "sha256": item.get("sha256") or "",
+            }
+        )
+    return jsonify({"ok": all(result.get("ok") for result in results), "results": results, "accepted": accepted}), status

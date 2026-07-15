@@ -67,26 +67,26 @@ C:\apps\LifePIM_Prod\src\RUN_DESKTOP.BAT
 Default listener:
 
 ```text
-http://0.0.0.0:9741
+http://127.0.0.1:9741
 ```
 
 The launcher sets:
 
 ```text
 LIFEPIM_ENV=production
-LIFEPIM_HOST=0.0.0.0
+LIFEPIM_HOST=127.0.0.1
 LIFEPIM_PORT=9741
 ```
 
 You can override host/port before starting:
 
 ```bat
-set LIFEPIM_HOST=192.168.1.99
+set LIFEPIM_HOST=127.0.0.1
 set LIFEPIM_PORT=9741
 src\RUN_DESKTOP.BAT
 ```
 
-Use `0.0.0.0` or the fixed LAN IP when testing Pocket from Android over the local network.
+Do not use `0.0.0.0` or the fixed LAN IP in production. Pocket reaches LifePIM through Caddy on HTTPS.
 
 ## User and Device Administration
 
@@ -131,29 +131,30 @@ create "Caddyfile" with content below
 
 ```text
 http://192.168.1.99 {
-    handle /api/pocket/v1/* {
-        reverse_proxy 127.0.0.1:9741
-    }
-
-    handle {
-        redir https://{host}{uri} permanent
-    }
+    redir https://192.168.1.99{uri} permanent
 }
 
 https://192.168.1.99 {
-    reverse_proxy 127.0.0.1:9741
+    request_body {
+        max_size 10MB
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    reverse_proxy 127.0.0.1:9741 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+    }
 }
 ```
 
-The HTTP block is intentionally limited to the Pocket mobile API. It lets Android test:
-
-```text
-http://192.168.1.99/api/pocket/v1/health
-```
-
-without being redirected to HTTPS.
-
-All other HTTP desktop routes redirect back to HTTPS.
+HTTP redirects to HTTPS. Pocket must use `https://192.168.1.99`; do not expose the Pocket API on cleartext HTTP.
 
 Start the caddy service (also put this line into the startup BAT file)
 
@@ -248,9 +249,9 @@ It deletes and recreates the configured SQLite database. Do not run it against p
 Allow inbound LAN traffic to the LifePIM/Caddy ports from an elevated PowerShell prompt:
 
 ```powershell
-New-NetFirewallRule -DisplayName "LifePIM HTTP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80
-New-NetFirewallRule -DisplayName "LifePIM HTTPS" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443
-New-NetFirewallRule -DisplayName "LifePIM Waitress" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9741
+New-NetFirewallRule -DisplayName "LifePIM HTTP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80 -Profile Private -RemoteAddress 192.168.1.0/24
+New-NetFirewallRule -DisplayName "LifePIM HTTPS" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443 -Profile Private -RemoteAddress 192.168.1.0/24
+Remove-NetFirewallRule -DisplayName "LifePIM Waitress"
 ```
 
 Check app imports:

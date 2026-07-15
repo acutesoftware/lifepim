@@ -28,7 +28,7 @@ if not exist "%PYTHON_EXE%" (
 )
 
 if not defined LIFEPIM_ENV set "LIFEPIM_ENV=production"
-if not defined LIFEPIM_HOST set "LIFEPIM_HOST=0.0.0.0"
+if not defined LIFEPIM_HOST set "LIFEPIM_HOST=127.0.0.1"
 if not defined LIFEPIM_PORT set "LIFEPIM_PORT=9741"
 
 if /I "%LIFEPIM_ENV%"=="production" if not defined LIFEPIM_SECRET_KEY (
@@ -40,16 +40,36 @@ if /I "%LIFEPIM_ENV%"=="production" if not defined LIFEPIM_SECRET_KEY (
 
 set "CADDY_DIR=C:\apps\caddy"
 set "CADDY_EXE=%CADDY_DIR%\caddy_windows_amd64.exe"
+set "CADDY_CONFIG=%CADDY_DIR%\Caddyfile"
 
 if exist "%CADDY_EXE%" (
+    if /I "%LIFEPIM_ENV%"=="production" (
+        if not exist "%CADDY_CONFIG%" (
+            echo ERROR: Caddy config not found at %CADDY_CONFIG%.
+            echo Production startup requires Caddy in front of loopback-only Waitress.
+            exit /b 1
+        )
+        pushd "%CADDY_DIR%"
+        "%CADDY_EXE%" validate --config "%CADDY_CONFIG%"
+        if errorlevel 1 (
+            popd
+            echo ERROR: Caddy configuration validation failed. LifePIM was not started.
+            exit /b 1
+        )
+        popd
+    )
     tasklist /FI "IMAGENAME eq caddy_windows_amd64.exe" 2>NUL | find /I "caddy_windows_amd64.exe" >NUL
     if errorlevel 1 (
         echo Starting Caddy reverse proxy.
         pushd "%CADDY_DIR%"
-        "%CADDY_EXE%" start
+        "%CADDY_EXE%" start --config "%CADDY_CONFIG%"
         if errorlevel 1 (
             popd
-            echo WARNING: Caddy did not start cleanly. LifePIM will still start on Waitress.
+            if /I "%LIFEPIM_ENV%"=="production" (
+                echo ERROR: Caddy did not start cleanly. LifePIM was not started.
+                exit /b 1
+            )
+            echo WARNING: Caddy did not start cleanly. Development startup will continue on Waitress.
         ) else (
             popd
         )
@@ -57,8 +77,13 @@ if exist "%CADDY_EXE%" (
         echo Caddy reverse proxy is already running.
     )
 ) else (
+    if /I "%LIFEPIM_ENV%"=="production" (
+        echo ERROR: Caddy was not found at %CADDY_EXE%.
+        echo Production startup requires Caddy in front of loopback-only Waitress.
+        exit /b 1
+    )
     echo WARNING: Caddy was not found at %CADDY_EXE%.
-    echo LifePIM will still start on Waitress without HTTPS reverse proxy startup.
+    echo Development startup will continue on Waitress without HTTPS reverse proxy startup.
 )
 
 cd /d "%APP_DIR%"

@@ -760,6 +760,8 @@ def reset_password_route(user_id):
 @admin_bp.route("/trusted-devices", methods=["GET", "POST"])
 def trusted_devices_route():
     security.require_role("admin")
+    pairing = None
+    message = request.args.get("message", "")
     if request.method == "POST":
         action = request.form.get("action", "")
         if action == "revoke":
@@ -768,7 +770,14 @@ def trusted_devices_route():
             security.logout_all_devices(request.form.get("user_id"))
         elif action == "revoke_mobile":
             pocket_api.revoke_pocket_device(request.form.get("device_id"))
-        return redirect(url_for("admin.trusted_devices_route", message="Trusted device settings updated."))
+        elif action == "create_mobile_pairing":
+            try:
+                pairing = pocket_api.create_pocket_pairing_code(request.form.get("user_id"), created_ip=request.remote_addr or "")
+                message = "Pocket pairing code created."
+            except ValueError as exc:
+                message = str(exc)
+        if action != "create_mobile_pairing":
+            return redirect(url_for("admin.trusted_devices_route", message="Trusted device settings updated."))
     raw_token = request.cookies.get(security.TRUSTED_DEVICE_COOKIE)
     current_token_hash = security._hash_trusted_token(raw_token) if raw_token else ""
     return render_template(
@@ -780,6 +789,8 @@ def trusted_devices_route():
         content_html="",
         devices=security.get_trusted_devices(),
         mobile_devices=pocket_api.list_pocket_devices(),
+        users=security.list_users(),
+        pairing=pairing,
         current_token_hash=current_token_hash,
-        message=request.args.get("message", ""),
+        message=message,
     )

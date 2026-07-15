@@ -320,3 +320,833 @@
 2026-07-15T12:11:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
 2026-07-15T12:11:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
 2026-07-15T12:11:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_item_not_found_or_forbidden {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "user_id": 3}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpo4c6eusk", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "26"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpkg6t4ey4", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_failed {"path": "/api/pocket/v1/sync/manifest", "reason": "missing_bearer", "remote_addr": "127.0.0.1"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "markdownContent", "content_len": 13, "keys": ["markdownContent", "path", "uuid"], "relative_path": "alias phone note.md"}], "payload_keys": ["uploads"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_create_note {"client_id": "mobile-local-2", "device_id": "android-test", "file_name": "alias phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpif25js0l", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpr3778g5n", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "13"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_item_error {"conflict": true, "device_id": "android-test", "error": "conflict", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 1, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 0, "status_code": 409, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 31, "keys": ["content", "id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_create_note {"client_id": "mobile-local-1", "device_id": "android-test", "file_name": "phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpp9xx7mdu", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 18, "keys": ["content", "id", "relative_path"], "relative_path": "configured phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_create_note {"client_id": "mobile-local-configured", "device_id": "android-test", "file_name": "configured phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp02saktd9\\Pocket", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_item_error {"conflict": false, "debug": {"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}, "device_id": "android-test", "error": "not_found", "item_id": "mobile-local-1", "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp664bkisj", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_create_note {"client_id": "mobile-local-repeat", "device_id": "android-test", "file_name": "repeat phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpo7qiev0n", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_create_note {"client_id": "", "device_id": "android-test", "file_name": "unnamed phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpw9ffpxri", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:34:02Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_item_not_found_or_forbidden {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "user_id": 3}
+2026-07-15T12:41:36Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp7qfh9s03", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "26"}
+2026-07-15T12:41:36Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpt26vfr6f", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_auth_failed {"path": "/api/pocket/v1/sync/manifest", "reason": "missing_bearer", "remote_addr": "127.0.0.1"}
+2026-07-15T12:41:36Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:36Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "markdownContent", "content_len": 13, "keys": ["markdownContent", "path", "uuid"], "relative_path": "alias phone note.md"}], "payload_keys": ["uploads"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_create_note {"client_id": "mobile-local-2", "device_id": "android-test", "file_name": "alias phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpfscqo6p3", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpm2hz870z", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "client_change_id", "content", "relative_path", "server_item_id"], "relative_path": "Shopping.md"}], "payload_keys": ["changes"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp24qf3oq_", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "13"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_item_error {"conflict": true, "device_id": "android-test", "error": "conflict", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 1, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 0, "status_code": 409, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 31, "keys": ["content", "id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_create_note {"client_id": "mobile-local-1", "device_id": "android-test", "file_name": "phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpgle6v6c8", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 18, "keys": ["content", "id", "relative_path"], "relative_path": "configured phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_create_note {"client_id": "mobile-local-configured", "device_id": "android-test", "file_name": "configured phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpykda55r1\\Pocket", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_item_error {"conflict": false, "debug": {"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}, "device_id": "android-test", "error": "not_found", "item_id": "mobile-local-1", "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp0tt23mx5", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_create_note {"client_id": "mobile-local-repeat", "device_id": "android-test", "file_name": "repeat phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpqrvs7cwd", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_create_note {"client_id": "", "device_id": "android-test", "file_name": "unnamed phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpxc8byc0w", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T12:41:37Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_failed {"device_id": "wrong-device", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:23Z pocket_auth_failed {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_item_not_found_or_forbidden {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "user_id": 3}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpyt94x4g6", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "26"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpbmntiyuw", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_failed {"path": "/api/pocket/v1/sync/manifest", "reason": "missing_bearer", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_payload_too_large {"content_length": 2, "max_bytes": 1, "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "markdownContent", "content_len": 13, "keys": ["markdownContent", "path", "uuid"], "relative_path": "alias phone note.md"}], "payload_keys": ["uploads"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_create_note {"client_id": "mobile-local-2", "device_id": "android-test", "file_name": "alias phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp84v8m19z", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpjv2w09el", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "client_change_id", "content", "relative_path", "server_item_id"], "relative_path": "Shopping.md"}], "payload_keys": ["changes"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpop3597pg", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "13"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_item_error {"conflict": true, "device_id": "android-test", "error": "conflict", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 1, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 0, "status_code": 409, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 31, "keys": ["content", "id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_create_note {"client_id": "mobile-local-1", "device_id": "android-test", "file_name": "phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpcybdpsjl", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 18, "keys": ["content", "id", "relative_path"], "relative_path": "configured phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_create_note {"client_id": "mobile-local-configured", "device_id": "android-test", "file_name": "configured phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpo__c3m_a\\Pocket", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_item_error {"conflict": false, "debug": {"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}, "device_id": "android-test", "error": "not_found", "item_id": "mobile-local-1", "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 8, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_item_error {"conflict": false, "device_id": "android-test", "error": "no_default_note_folder", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp8vlxpupl", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "rate_limited", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_create_note {"client_id": "mobile-local-repeat", "device_id": "android-test", "file_name": "repeat phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpsigu_azb", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_create_note {"client_id": "", "device_id": "android-test", "file_name": "unnamed phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp1u7hjrov", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "", "platform": "", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test-2", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:23Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:23Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:23Z pocket_registration_attempt {"device_id": "android-test", "reason": "missing_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_failed {"device_id": "wrong-device", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:34Z pocket_auth_failed {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_item_not_found_or_forbidden {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "user_id": 3}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp64faqa3m", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "26"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmppj6g0e82", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_failed {"path": "/api/pocket/v1/sync/manifest", "reason": "missing_bearer", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_payload_too_large {"content_length": 2, "max_bytes": 1, "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "markdownContent", "content_len": 13, "keys": ["markdownContent", "path", "uuid"], "relative_path": "alias phone note.md"}], "payload_keys": ["uploads"], "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_create_note {"client_id": "mobile-local-2", "device_id": "android-test", "file_name": "alias phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpu00h_7r3", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpv3xgh4n7", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "client_change_id", "content", "relative_path", "server_item_id"], "relative_path": "Shopping.md"}], "payload_keys": ["changes"], "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmployltga3", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "13"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_item_error {"conflict": true, "device_id": "android-test", "error": "conflict", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_finish {"conflict_count": 1, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 0, "status_code": 409, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 31, "keys": ["content", "id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_create_note {"client_id": "mobile-local-1", "device_id": "android-test", "file_name": "phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp2yzfsr3j", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 18, "keys": ["content", "id", "relative_path"], "relative_path": "configured phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_create_note {"client_id": "mobile-local-configured", "device_id": "android-test", "file_name": "configured phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpsik2z1rb\\Pocket", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_item_error {"conflict": false, "debug": {"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}, "device_id": "android-test", "error": "not_found", "item_id": "mobile-local-1", "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:34Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 8, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_create_note {"client_id": "178faf8d-e8de-57cf-a090-421ebc25e1c6", "device_id": "android-test", "file_name": "Mobile note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp3_uk718x", "note_id": 3, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:34Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:35Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpc_sgifva", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:35Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "rate_limited", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:35Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:35Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_create_note {"client_id": "mobile-local-repeat", "device_id": "android-test", "file_name": "repeat phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpziynbcy9", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:35Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_create_note {"client_id": "", "device_id": "android-test", "file_name": "unnamed phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp3q94cxz6", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:35Z pocket_register_device {"device_id": "android-test", "device_name": "", "platform": "", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test-2", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:19:35Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:19:35Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:19:35Z pocket_registration_attempt {"device_id": "android-test", "reason": "missing_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_failed {"device_id": "wrong-device", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:20:19Z pocket_auth_failed {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_item_not_found_or_forbidden {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "user_id": 3}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpiq29d7m6", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "26"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp19k8ibf5", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_failed {"path": "/api/pocket/v1/sync/manifest", "reason": "missing_bearer", "remote_addr": "127.0.0.1"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_payload_too_large {"content_length": 2, "max_bytes": 1, "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "markdownContent", "content_len": 13, "keys": ["markdownContent", "path", "uuid"], "relative_path": "alias phone note.md"}], "payload_keys": ["uploads"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_create_note {"client_id": "mobile-local-2", "device_id": "android-test", "file_name": "alias phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpogmys0zb", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpksrksjla", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "client_change_id", "content", "relative_path", "server_item_id"], "relative_path": "Shopping.md"}], "payload_keys": ["changes"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpt270ho1g", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "13"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_item_error {"conflict": true, "device_id": "android-test", "error": "conflict", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 1, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 0, "status_code": 409, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 31, "keys": ["content", "id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_create_note {"client_id": "mobile-local-1", "device_id": "android-test", "file_name": "phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp4olhl_w_", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 18, "keys": ["content", "id", "relative_path"], "relative_path": "configured phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_create_note {"client_id": "mobile-local-configured", "device_id": "android-test", "file_name": "configured phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpig6itrrv\\Pocket", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_item_error {"conflict": false, "debug": {"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}, "device_id": "android-test", "error": "not_found", "item_id": "mobile-local-1", "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 8, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_create_note {"client_id": "178faf8d-e8de-57cf-a090-421ebc25e1c6", "device_id": "android-test", "file_name": "Mobile note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpbbx8jrpa", "note_id": 3, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpsjs4vuij", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "rate_limited", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_create_note {"client_id": "mobile-local-repeat", "device_id": "android-test", "file_name": "repeat phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpup6i5wcq", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_create_note {"client_id": "", "device_id": "android-test", "file_name": "unnamed phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpw0d94u9s", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "", "platform": "", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test-2", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:20:19Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:20:19Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:20:19Z pocket_registration_attempt {"device_id": "android-test", "reason": "missing_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_failed {"device_id": "wrong-device", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:11Z pocket_auth_failed {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_item_not_found_or_forbidden {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "user_id": 3}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpc3011ok4", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "26"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpfjrdre49", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_failed {"path": "/api/pocket/v1/sync/manifest", "reason": "missing_bearer", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_payload_too_large {"content_length": 2, "max_bytes": 1, "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "markdownContent", "content_len": 13, "keys": ["markdownContent", "path", "uuid"], "relative_path": "alias phone note.md"}], "payload_keys": ["uploads"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_create_note {"client_id": "mobile-local-2", "device_id": "android-test", "file_name": "alias phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpu115ccon", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp23ds5ko4", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "client_change_id", "content", "relative_path", "server_item_id"], "relative_path": "Shopping.md"}], "payload_keys": ["changes"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpeyzz725j", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "13"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_item_error {"conflict": true, "device_id": "android-test", "error": "conflict", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 1, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 0, "status_code": 409, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 31, "keys": ["content", "id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_create_note {"client_id": "mobile-local-1", "device_id": "android-test", "file_name": "phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpdc2whrac", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 18, "keys": ["content", "id", "relative_path"], "relative_path": "configured phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_create_note {"client_id": "mobile-local-configured", "device_id": "android-test", "file_name": "configured phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpyydt4dd3\\Pocket", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_item_error {"conflict": false, "debug": {"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}, "device_id": "android-test", "error": "not_found", "item_id": "mobile-local-1", "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 8, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_create_note {"client_id": "178faf8d-e8de-57cf-a090-421ebc25e1c6", "device_id": "android-test", "file_name": "Mobile note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp_lii0xv6", "note_id": 3, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp4j3dqcah", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "rate_limited", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_create_note {"client_id": "mobile-local-repeat", "device_id": "android-test", "file_name": "repeat phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmppjlwq50y", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_create_note {"client_id": "", "device_id": "android-test", "file_name": "unnamed phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpikd8vqbi", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "", "platform": "", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test-2", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:11Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:11Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:11Z pocket_registration_attempt {"device_id": "android-test", "reason": "missing_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_failed {"device_id": "wrong-device", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:54Z pocket_auth_failed {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "reason": "token_not_found_or_revoked", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_item_not_found_or_forbidden {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "user_id": 3}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp60h3x9wf", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "26"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpbp4w5_zc", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_failed {"path": "/api/pocket/v1/sync/manifest", "reason": "missing_bearer", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_payload_too_large {"content_length": 2, "max_bytes": 1, "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "markdownContent", "content_len": 13, "keys": ["markdownContent", "path", "uuid"], "relative_path": "alias phone note.md"}], "payload_keys": ["uploads"], "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_create_note {"client_id": "mobile-local-2", "device_id": "android-test", "file_name": "alias phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpvzcl12z5", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmph3ia2ieu", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "client_change_id", "content", "relative_path", "server_item_id"], "relative_path": "Shopping.md"}], "payload_keys": ["changes"], "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpdr7vp92r", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/items/d44b9baf-c330-5a6b-acce-cc745d4e84a8", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_item_download {"device_id": "android-test", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "note_id": 1, "relative_path": "Shopping.md", "size": "13"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_item_error {"conflict": true, "device_id": "android-test", "error": "conflict", "item_id": "d44b9baf-c330-5a6b-acce-cc745d4e84a8", "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_finish {"conflict_count": 1, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 0, "status_code": 409, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:54Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:54Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 31, "keys": ["content", "id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_create_note {"client_id": "mobile-local-1", "device_id": "android-test", "file_name": "phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpcijfjl7o", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 18, "keys": ["content", "id", "relative_path"], "relative_path": "configured phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_create_note {"client_id": "mobile-local-configured", "device_id": "android-test", "file_name": "configured phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp5c7iywwa\\Pocket", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}], "payload_keys": ["id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_item_error {"conflict": false, "debug": {"content_key": "", "content_len": null, "keys": ["id", "relative_path"], "relative_path": "phone note.md"}, "device_id": "android-test", "error": "not_found", "item_id": "mobile-local-1", "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 1, "item_count": 1, "ok_count": 0, "status_code": 400, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 8, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_create_note {"client_id": "178faf8d-e8de-57cf-a090-421ebc25e1c6", "device_id": "android-test", "file_name": "Mobile note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpx6cv754e", "note_id": 3, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/manifest", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_manifest_start {"device_id": "android-test", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_manifest_finish {"device_id": "android-test", "item_count": 1, "root": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpmcr8gxu5", "skipped_count": 0, "total_count": 1, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 23, "keys": ["base_sha256", "content", "id"], "relative_path": null}], "payload_keys": ["base_sha256", "content", "id"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "rate_limited", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_create_note {"client_id": "mobile-local-repeat", "device_id": "android-test", "file_name": "repeat phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmpkfq0dg0c", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "id", "relative_path"], "relative_path": "repeat phone note.md"}], "payload_keys": ["content", "id", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 13, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_create_note {"client_id": "", "device_id": "android-test", "file_name": "unnamed phone note.md", "folder_path": "C:\\Users\\xblad\\AppData\\Local\\Temp\\tmp0hsxjsm7", "note_id": 2, "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_auth_ok {"device_id": "android-test", "path": "/api/pocket/v1/sync/push", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_start {"device_id": "android-test", "item_count": 1, "item_debug": [{"content_key": "content", "content_len": 14, "keys": ["content", "relative_path"], "relative_path": "unnamed phone note.md"}], "payload_keys": ["content", "relative_path"], "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_push_finish {"conflict_count": 0, "device_id": "android-test", "error_count": 0, "item_count": 1, "ok_count": 1, "status_code": 200, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "", "platform": "", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test-2", "reason": "invalid_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}
+2026-07-15T13:21:55Z pocket_pairing_code_created {"created_ip": "", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "paired", "remote_addr": "127.0.0.1", "user_id": 3, "username": "duncanmobile", "was_successful": true}
+2026-07-15T13:21:55Z pocket_register_device {"device_id": "android-test", "device_name": "Android Test", "platform": "android", "remote_addr": "127.0.0.1", "user_agent": "Werkzeug/3.1.6", "user_id": 3, "username": "duncanmobile"}
+2026-07-15T13:21:55Z pocket_registration_attempt {"device_id": "android-test", "reason": "missing_pairing_code", "remote_addr": "127.0.0.1", "username": "duncanmobile", "was_successful": false}

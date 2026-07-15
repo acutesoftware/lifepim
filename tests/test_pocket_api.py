@@ -14,6 +14,7 @@ if root_folder not in sys.path:
 from common import data
 from common import utils as common_utils
 from modules.pocket_api.routes import (
+    create_pocket_pairing_code,
     get_user_pocket_settings,
     list_pocket_devices,
     pocket_api_bp,
@@ -62,6 +63,10 @@ class TestPocketApi(unittest.TestCase):
             "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
             "VALUES (3, 'duncanmobile', 'Duncan Mobile', 'hash', 'user', 1)"
         )
+        self.conn.execute(
+            "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
+            "VALUES (4, 'inactive', 'Inactive User', 'hash', 'user', 0)"
+        )
         self.tmpdir = tempfile.TemporaryDirectory()
         self.app = Flask(__name__)
         self.app.register_blueprint(pocket_api_bp)
@@ -96,6 +101,7 @@ class TestPocketApi(unittest.TestCase):
         return data.add_record(self.conn, tbl["name"], cols, values)
 
     def _register_headers(self):
+        code = create_pocket_pairing_code(3)["pairing_code"]
         resp = self.client.post(
             "/api/pocket/v1/auth/register-device",
             json={
@@ -103,6 +109,7 @@ class TestPocketApi(unittest.TestCase):
                 "device_name": "Android Test",
                 "platform": "android",
                 "username": "duncanmobile",
+                "pairing_code": code,
             },
         )
         self.assertEqual(resp.status_code, 200)
@@ -111,6 +118,89 @@ class TestPocketApi(unittest.TestCase):
             "Authorization": f"Bearer {payload['device_token']}",
             "X-LifePIM-Device-ID": payload["device_id"],
         }
+
+    def test_username_only_registration_is_rejected(self):
+        resp = self.client.post(
+            "/api/pocket/v1/auth/register-device",
+            json={"device_id": "android-test", "username": "duncanmobile"},
+        )
+
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.get_json()["error"], "authentication_failed")
+        self.assertIsNone(self.conn.execute("SELECT token_hash FROM pocket_devices").fetchone())
+
+    def test_invalid_pairing_code_is_rejected(self):
+        resp = self.client.post(
+            "/api/pocket/v1/auth/register-device",
+            json={"device_id": "android-test", "username": "duncanmobile", "pairing_code": "WRONG-CODE"},
+        )
+
+        self.assertEqual(resp.status_code, 401)
+
+    def test_expired_pairing_code_is_rejected(self):
+        code = create_pocket_pairing_code(3)["pairing_code"]
+        self.conn.execute("UPDATE pocket_pairing_codes SET expires_at = '2000-01-01T00:00:00Z'")
+        self.conn.commit()
+
+        resp = self.client.post(
+            "/api/pocket/v1/auth/register-device",
+            json={"device_id": "android-test", "username": "duncanmobile", "pairing_code": code},
+        )
+
+        self.assertEqual(resp.status_code, 401)
+
+    def test_reused_pairing_code_is_rejected(self):
+        code = create_pocket_pairing_code(3)["pairing_code"]
+        first = self.client.post(
+            "/api/pocket/v1/auth/register-device",
+            json={"device_id": "android-test", "username": "duncanmobile", "pairing_code": code},
+        )
+        second = self.client.post(
+            "/api/pocket/v1/auth/register-device",
+            json={"device_id": "android-test-2", "username": "duncanmobile", "pairing_code": code},
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 401)
+
+    def test_successful_pairing_creates_device_bound_to_correct_user(self):
+        headers = self._register_headers()
+
+        row = self.conn.execute("SELECT device_id, username, user_id, token_hash FROM pocket_devices").fetchone()
+        self.assertEqual(row["device_id"], "android-test")
+        self.assertEqual(row["username"], "duncanmobile")
+        self.assertEqual(row["user_id"], 3)
+        self.assertNotIn(headers["Authorization"].replace("Bearer ", ""), row["token_hash"])
+
+    def test_inactive_users_cannot_pair(self):
+        with self.assertRaises(ValueError):
+            create_pocket_pairing_code(4)
+
+    def test_registration_rate_limit_activates_after_failures(self):
+        for _ in range(5):
+            self.client.post(
+                "/api/pocket/v1/auth/register-device",
+                json={"device_id": "android-test", "username": "duncanmobile", "pairing_code": "BAD-CODE"},
+            )
+
+        resp = self.client.post(
+            "/api/pocket/v1/auth/register-device",
+            json={"device_id": "android-test", "username": "duncanmobile", "pairing_code": "BAD-CODE"},
+        )
+
+        self.assertEqual(resp.status_code, 429)
+
+    def test_auth_rejects_wrong_device_id_and_revoked_device(self):
+        headers = self._register_headers()
+        wrong_device_headers = dict(headers)
+        wrong_device_headers["X-LifePIM-Device-ID"] = "wrong-device"
+
+        wrong = self.client.get("/api/pocket/v1/sync/manifest", headers=wrong_device_headers)
+        self.assertEqual(wrong.status_code, 401)
+
+        revoke_pocket_device("android-test", self.conn)
+        revoked = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+        self.assertEqual(revoked.status_code, 401)
 
     def test_manifest_requires_device_auth(self):
         resp = self.client.get("/api/pocket/v1/sync/manifest")
@@ -185,6 +275,23 @@ class TestPocketApi(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 404)
 
+    def test_push_rejects_note_owned_by_another_user(self):
+        self._add_note(file_name="owned.md", content="owned", owner_user_id=3)
+        other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)
+        headers = self._register_headers()
+        item_id = str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{other_id}"))
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={"id": item_id, "base_sha256": "ignored", "content": "takeover"},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["results"][0]["created"])
+        with open(os.path.join(self.tmpdir.name, "other.md"), "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "other")
+
     def test_push_updates_note_when_base_hash_matches(self):
         self._add_note()
         headers = self._register_headers()
@@ -200,6 +307,34 @@ class TestPocketApi(unittest.TestCase):
         self.assertTrue(resp.get_json()["ok"])
         with open(os.path.join(self.tmpdir.name, "Shopping.md"), "r", encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "# Shopping\n\n- [x] Milk\n")
+
+    def test_push_accepts_server_item_id_and_returns_accepted(self):
+        self._add_note()
+        headers = self._register_headers()
+        item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "changes": [
+                    {
+                        "client_change_id": "change-1",
+                        "server_item_id": item["id"],
+                        "relative_path": "Shopping.md",
+                        "base_sha256": item["sha256"],
+                        "content": "# Shopping\n\n- [x] Milk\n",
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["accepted"][0]["client_change_id"], "change-1")
+        self.assertEqual(payload["accepted"][0]["server_item_id"], item["id"])
+        self.assertTrue(payload["accepted"][0]["sha256"])
 
     def test_push_conflict_returns_server_version_without_overwriting(self):
         self._add_note(content="desktop first")
@@ -244,6 +379,65 @@ class TestPocketApi(unittest.TestCase):
         row = self.conn.execute("SELECT file_name, owner_user_id FROM lp_notes WHERE file_name = ?", ("phone note.md",)).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row["owner_user_id"], 3)
+
+    def test_repeated_mobile_only_push_updates_same_note_by_client_id(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        first = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-repeat",
+                "relative_path": "repeat phone note.md",
+                "content": "first version",
+            },
+        )
+        second = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-repeat",
+                "relative_path": "repeat phone note.md",
+                "content": "second version",
+            },
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        rows = self.conn.execute("SELECT file_name FROM lp_notes WHERE file_name LIKE 'repeat phone note%'").fetchall()
+        self.assertEqual([row["file_name"] for row in rows], ["repeat phone note.md"])
+        with open(os.path.join(self.tmpdir.name, "repeat phone note.md"), "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "second version")
+        self.assertFalse(second.get_json()["results"][0].get("created", False))
+
+    def test_repeated_mobile_only_push_updates_same_note_by_file_name_without_client_id(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        first = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "relative_path": "unnamed phone note.md",
+                "content": "first version",
+            },
+        )
+        second = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "relative_path": "unnamed phone note.md",
+                "content": "second version",
+            },
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        rows = self.conn.execute("SELECT file_name FROM lp_notes WHERE file_name LIKE 'unnamed phone note%'").fetchall()
+        self.assertEqual([row["file_name"] for row in rows], ["unnamed phone note.md"])
+        with open(os.path.join(self.tmpdir.name, "unnamed phone note.md"), "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "second version")
 
     def test_push_creates_mobile_only_note_in_configured_user_folder(self):
         self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
@@ -309,6 +503,19 @@ class TestPocketApi(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 400)
         self.assertFalse(resp.get_json()["ok"])
+
+    def test_oversized_sync_payload_is_rejected(self):
+        headers = self._register_headers()
+        self.app.config["LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES"] = 1
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            data="{}",
+            content_type="application/json",
+        )
+
+        self.assertEqual(resp.status_code, 413)
 
 
 if __name__ == "__main__":

@@ -54,10 +54,10 @@ echo Compiling deployed Python files.
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 if exist "C:\apps\caddy\Caddyfile" (
-  findstr /C:"/api/pocket/v1/*" "C:\apps\caddy\Caddyfile" >nul
+  findstr /C:"https://192.168.1.99" "C:\apps\caddy\Caddyfile" >nul
   if errorlevel 1 (
-    echo WARNING: C:\apps\caddy\Caddyfile does not mention /api/pocket/v1/*.
-    echo          Mobile HTTP sync may redirect to HTTPS until Caddy is updated.
+    echo WARNING: C:\apps\caddy\Caddyfile does not mention https://192.168.1.99.
+    echo          Pocket requires HTTPS through Caddy; update Caddy before pairing Android.
   )
 )
 

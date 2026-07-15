@@ -141,6 +141,8 @@ def _last_python_source_update():
 
 _dbg("Creating Flask app")
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("LIFEPIM_MAX_CONTENT_LENGTH", str(10 * 1024 * 1024)))
+app.config["LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES"] = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", str(10 * 1024 * 1024)))
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.jinja_env.filters["duration_friendly"] = format_duration_friendly
 app.jinja_env.filters["duration_label"] = format_duration_label

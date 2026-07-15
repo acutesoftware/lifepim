@@ -1,44 +1,32 @@
 # LifePIM Networking
 
-This document describes the current LAN setup for LifePIM Desktop and LifePIM Pocket.
+LifePIM Desktop production traffic is LAN-reachable only through Caddy.
+Waitress binds to loopback and must not be exposed directly to another device.
 
-## Current Shape
+## Production Listeners
 
-LifePIM Desktop runs a local Waitress server on port `9741`.
-
-Caddy sits in front of it on the LAN IP:
-
-```text
-192.168.1.99
-```
-
-The intended split is:
+Expected listeners:
 
 ```text
-https://192.168.1.99/*                  Desktop web app
-http://192.168.1.99/api/pocket/v1/*     Pocket mobile API only
+127.0.0.1:9741       Waitress
+192.168.1.99:80      Caddy HTTP redirect, if retained
+192.168.1.99:443     Caddy HTTPS
 ```
 
-The Pocket HTTP exception exists because the first Android build permits cleartext HTTP only for `192.168.1.99`.
+Check them with:
 
-## Ports
+```powershell
+Get-NetTCPConnection -LocalPort 80,443,9741 -State Listen |
+  Select-Object LocalAddress,LocalPort,OwningProcess
+```
+
+From another LAN machine, this must be unreachable:
 
 ```text
-80     Caddy HTTP listener, Pocket API only plus desktop HTTP-to-HTTPS redirect
-443    Caddy HTTPS listener for the desktop web app
-9741   Waitress / Flask app
+http://192.168.1.99:9741
 ```
 
-Waitress should bind to either:
-
-```text
-0.0.0.0
-192.168.1.99
-```
-
-Do not bind Waitress to `127.0.0.1` only if Android or another LAN client needs to hit port `9741` directly. Caddy can still proxy to `127.0.0.1:9741`, but binding to `0.0.0.0` is simpler for local testing.
-
-## Caddy Setup
+## Caddy
 
 Install Caddy at:
 
@@ -50,305 +38,140 @@ Use this `C:\apps\caddy\Caddyfile`:
 
 ```caddy
 http://192.168.1.99 {
-    handle /api/pocket/v1/* {
-        reverse_proxy 127.0.0.1:9741
-    }
-
-    handle {
-        redir https://{host}{uri} permanent
-    }
+    redir https://192.168.1.99{uri} permanent
 }
 
 https://192.168.1.99 {
-    reverse_proxy 127.0.0.1:9741
+    request_body {
+        max_size 10MB
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    reverse_proxy 127.0.0.1:9741 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+    }
 }
 ```
 
-This means:
-
-```text
-http://192.168.1.99/api/pocket/v1/health  -> HTTP 200
-http://192.168.1.99/notes                 -> redirects to https://192.168.1.99/notes
-https://192.168.1.99/notes                -> desktop app
-```
-
-Validate and reload Caddy:
-
-```powershell
-cd C:\apps\caddy
-.\caddy_windows_amd64.exe validate --config Caddyfile
-.\caddy_windows_amd64.exe reload --config Caddyfile
-```
-
-Start Caddy if it is not already running:
-
-```powershell
-cd C:\apps\caddy
-.\caddy_windows_amd64.exe start
-```
-
-## LifePIM Server
-
-The production launcher is:
-
-```text
-src\RUN_DESKTOP.BAT
-```
-
-Default environment:
-
-```bat
-set LIFEPIM_ENV=production
-set LIFEPIM_HOST=0.0.0.0
-set LIFEPIM_PORT=9741
-```
-
-Manual start from the repo:
-
-```powershell
-cd D:\DATA_LLM\dev\lifepim-desktop\src
-$env:LIFEPIM_HOST = "0.0.0.0"
-$env:LIFEPIM_PORT = "9741"
-..\.venv\Scripts\python.exe run_waitress.py
-```
-
-Check listeners:
-
-```powershell
-Get-NetTCPConnection -LocalPort 80,443,9741 -State Listen |
-  Select-Object LocalAddress,LocalPort,OwningProcess
-```
-
-Expected:
-
-```text
-80     Caddy
-443    Caddy
-9741   Waitress, ideally bound to 0.0.0.0
-```
-
-## Windows Firewall
-
-Run from an elevated PowerShell prompt:
-
-```powershell
-New-NetFirewallRule -DisplayName "LifePIM HTTP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80
-New-NetFirewallRule -DisplayName "LifePIM HTTPS" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443
-New-NetFirewallRule -DisplayName "LifePIM Waitress" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9741
-```
-
-Check existing rules:
-
-```powershell
-Get-NetFirewallRule -DisplayName "LifePIM*" |
-  Select-Object DisplayName,Enabled,Direction,Action
-```
-
-## Desktop Browser Use
-
-Use HTTPS for the desktop web app:
+Do not expose the Pocket API on HTTP. The mobile base URL is:
 
 ```text
 https://192.168.1.99
 ```
 
-The browser may warn about the certificate because this is a local IP address with a local/self-signed certificate. That warning is different from plain HTTP being marked "Not secure".
+Validate Caddy before starting LifePIM:
 
-Do not use this for the desktop UI:
+```powershell
+cd C:\apps\caddy
+.\caddy_windows_amd64.exe validate --config Caddyfile
+.\caddy_windows_amd64.exe start --config Caddyfile
+```
+
+`src\RUN_DESKTOP.BAT` performs this validation in production. If Caddy is missing, invalid, or cannot start, production startup stops instead of falling back to direct HTTP.
+
+## Waitress
+
+Production defaults:
+
+```bat
+set "LIFEPIM_ENV=production"
+set "LIFEPIM_HOST=127.0.0.1"
+set "LIFEPIM_PORT=9741"
+```
+
+Manual run:
+
+```powershell
+cd D:\DATA_LLM\dev\lifepim-desktop\src
+$env:LIFEPIM_HOST = "127.0.0.1"
+$env:LIFEPIM_PORT = "9741"
+..\.venv\Scripts\python.exe run_waitress.py
+```
+
+Flask uses `ProxyFix` for one proxy layer. This is safe only because Waitress is loopback-only and Caddy is the sole proxy. Caddy must overwrite forwarded headers as shown above; forwarded headers from direct external clients are not trusted.
+
+## Windows Firewall
+
+Use the Private network profile only. Allow inbound LAN traffic to ports 80 and 443 only; optionally restrict remote addresses to `192.168.1.0/24`.
+
+```powershell
+New-NetFirewallRule -DisplayName "LifePIM HTTP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80 -Profile Private -RemoteAddress 192.168.1.0/24
+New-NetFirewallRule -DisplayName "LifePIM HTTPS" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443 -Profile Private -RemoteAddress 192.168.1.0/24
+```
+
+Remove any old Waitress firewall rule:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "LifePIM Waitress"
+```
+
+Do not create an inbound firewall rule for port 9741.
+
+## Android Certificate Trust
+
+Caddy local HTTPS uses Caddy's local CA. Export the root certificate from the LifePIM desktop machine, copy it to the Android phone used for LifePIM Pocket, then install it as a user CA certificate in Android settings.
+
+Typical Caddy local CA path:
 
 ```text
-http://192.168.1.99
+%APPDATA%\Caddy\pki\authorities\local\root.crt
 ```
 
-If you do, Caddy should redirect desktop routes back to HTTPS.
-
-## Pocket Mobile API
-
-Android should be configured with:
+On Android, install the certificate through:
 
 ```text
-Server URL: http://192.168.1.99
-Username: duncanmobile
+Settings -> Security -> Encryption and credentials -> Install a certificate -> CA certificate
 ```
 
-Pocket API base path:
+Do not disable TLS certificate validation in the Android client. Do not use a trust-all hostname verifier or SSL context.
 
-```text
-/api/pocket/v1
-```
+## Pocket Registration
 
-Health check:
+Pocket devices no longer register with only a username.
 
-```text
-GET http://192.168.1.99/api/pocket/v1/health
-```
+1. A logged-in desktop user starts Pocket pairing.
+2. LifePIM creates a random one-time pairing code.
+3. The code expires after five minutes and can be used once.
+4. The mobile app submits the pairing code, username, and device details.
+5. The desktop resolves the user from the pairing record and returns a bearer token.
 
-Expected response:
+Failed and successful registration attempts are recorded in `pocket_registration_attempts`. Repeated failures by IP, username, pairing code, or device ID are temporarily rate-limited.
 
-```json
-{"ok":true,"service":"lifepim-pocket","version":1}
-```
-
-The health endpoint does not require authentication.
-
-After registration, Pocket uses:
+After registration, Pocket sends:
 
 ```text
 Authorization: Bearer <device_token>
 X-LifePIM-Device-ID: <device_id>
 ```
 
-Required endpoints:
+Only token hashes are stored in `pocket_devices`; raw bearer tokens are never stored.
+
+## Device Administration
+
+Open:
 
 ```text
-GET  /api/pocket/v1/health
-POST /api/pocket/v1/auth/register-device
-GET  /api/pocket/v1/sync/manifest
-GET  /api/pocket/v1/items/{id}
-POST /api/pocket/v1/sync/push
-POST /api/pocket/v1/auth/logout-device
+/admin/trusted-devices
 ```
 
-## Pocket Note Folder
+The Mobile devices table shows device name, platform, username, user ID, creation time, last-seen time, last IP, user agent, and revoked status. Revoking a mobile device immediately invalidates its bearer token.
 
-Pocket sync is scoped to the LifePIM user that registered the mobile device.
+## Validation
 
-New mobile-only notes are saved to the user's Pocket default note folder when it is set:
+Verify:
 
 ```text
-Admin -> Users -> Edit -> Pocket default note folder
+http://192.168.1.99              redirects to HTTPS
+https://192.168.1.99/api/pocket/v1/health works after Android trusts the local CA
+http://192.168.1.99:9741         is unreachable from another LAN machine
 ```
 
-Use an absolute Windows path, for example:
-
-```text
-N:\duncan\LifePIM_Data\DATA\notes\Mobile
-```
-
-If the field is blank, LifePIM falls back to the user's most common existing note folder. For a new or test user with only one desktop note, that means mobile uploads will go into the same folder as that note.
-
-## Testing
-
-From the LifePIM machine:
-
-```powershell
-Invoke-WebRequest -Uri "http://192.168.1.99/api/pocket/v1/health" -MaximumRedirection 0 -UseBasicParsing
-```
-
-Expected:
-
-```text
-StatusCode: 200
-Content-Type: application/json
-Body: {"ok":true,"service":"lifepim-pocket","version":1}
-```
-
-Check that desktop HTTP redirects to HTTPS:
-
-```powershell
-Invoke-WebRequest -Uri "http://192.168.1.99/notes" -MaximumRedirection 0 -UseBasicParsing
-```
-
-Expected:
-
-```text
-StatusCode: 301
-Location: https://192.168.1.99/notes
-```
-
-Check HTTPS desktop path:
-
-```powershell
-curl.exe -k -I https://192.168.1.99/notes
-```
-
-Expected when not logged in:
-
-```text
-HTTP/1.1 302 Found
-Location: /login?next=/notes
-```
-
-From another device on the same Wi-Fi, open:
-
-```text
-http://192.168.1.99/api/pocket/v1/health
-```
-
-The page should show:
-
-```json
-{"ok":true,"service":"lifepim-pocket","version":1}
-```
-
-## Network Log
-
-LifePIM writes network and mobile API diagnostics to:
-
-```text
-lp_network.log
-```
-
-By default the file is created in the current app folder, which is normally:
-
-```text
-D:\DATA_LLM\dev\lifepim-desktop\src
-```
-
-Override the path with:
-
-```powershell
-$env:LIFEPIM_NETWORK_LOG = "D:\DATA_LLM\dev\lifepim-desktop\lp_network.log"
-```
-
-The log includes:
-
-```text
-request_start
-request_finish
-request_exception
-pocket_register_device
-pocket_auth_ok
-pocket_auth_failed
-pocket_manifest_start
-pocket_manifest_finish
-pocket_item_download
-pocket_push_start
-pocket_push_finish
-login_attempt
-login_success
-login_failure
-trusted_device_restore_ok
-trusted_device_restore_failed
-logout
-```
-
-Sensitive values such as bearer tokens, cookies, and passwords are not written.
-
-To watch the log while pressing Sync in the Android app:
-
-```powershell
-Get-Content D:\DATA_LLM\dev\lifepim-desktop\src\lp_network.log -Wait -Tail 80
-```
-
-## Trusted Devices vs Pocket Devices
-
-The Admin `Trusted devices` page currently lists browser trusted-login cookies from:
-
-```text
-auth_trusted_devices
-```
-
-Those rows are tied to a LifePIM web user by `user_id`.
-
-The Pocket API uses its own table:
-
-```text
-pocket_devices
-```
-
-`pocket_devices` stores the mobile device token hash, device name, platform, IP, user agent, username, and bound LifePIM `user_id`.
-
-If the Admin `Trusted devices` page shows the same phone under an old user, that is the web trusted-device cookie record, not the Pocket bearer token record. Revoke the old trusted web device if needed, then log into the desktop web app as the intended user to create a new browser trusted-device record.
-
-The Admin `Trusted devices` page also has a separate `Mobile devices` table for Pocket devices.
+Also verify a device cannot register with only a known username, and a paired device can sync only notes owned by its bound LifePIM user.

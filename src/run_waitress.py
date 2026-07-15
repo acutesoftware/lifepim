@@ -7,6 +7,6 @@ from app import app
 
 
 if __name__ == "__main__":
-    host = os.getenv("LIFEPIM_HOST", "0.0.0.0")
+    host = os.getenv("LIFEPIM_HOST", "127.0.0.1")
     port = int(os.getenv("LIFEPIM_PORT", str(cfg.port_num)))
     serve(app, host=host, port=port, threads=8)
