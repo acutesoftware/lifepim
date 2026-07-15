@@ -10,6 +10,7 @@ from common import note_search_index
 from common import settings as settings_mod
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr, paginate_total, build_pagination
 from modules.calendar.services import calendar_index
+from modules.pocket_api import routes as pocket_api
 from core import security
 
 
@@ -670,11 +671,13 @@ def new_user_route():
         display_name = request.form.get("display_name", "").strip()
         password = request.form.get("password", "")
         role = request.form.get("role", "user")
+        pocket_default_note_folder = request.form.get("pocket_default_note_folder", "").strip()
         if not username or not display_name or not password:
             error = "Username, display name, and password are required."
         else:
             try:
                 user_id = security.create_user(username, display_name, password, role=role, is_active=True)
+                pocket_api.set_user_default_note_folder(user_id, pocket_default_note_folder)
                 return redirect(url_for("admin.users_route", message=f"Created user {username}."))
             except Exception as exc:
                 error = f"User creation failed: {exc}"
@@ -686,6 +689,7 @@ def new_user_route():
         content_title="New User",
         content_html="",
         user=None,
+        pocket_settings={"default_note_folder": request.form.get("pocket_default_note_folder", "")},
         error=error,
     )
 
@@ -706,9 +710,13 @@ def edit_user_route(user_id):
                 request.form.get("role", "user"),
                 request.form.get("is_active") == "1",
             )
+            pocket_api.set_user_default_note_folder(user_id, request.form.get("pocket_default_note_folder", ""))
             return redirect(url_for("admin.users_route", message="User updated."))
         except Exception as exc:
             error = f"User update failed: {exc}"
+    pocket_settings = pocket_api.get_user_pocket_settings(user_id)
+    if request.method == "POST" and error:
+        pocket_settings["default_note_folder"] = request.form.get("pocket_default_note_folder", "")
     return render_template(
         "admin_user_form.html",
         active_tab="admin",
@@ -717,6 +725,7 @@ def edit_user_route(user_id):
         content_title="Edit User",
         content_html="",
         user=dict(row),
+        pocket_settings=pocket_settings,
         error=error,
     )
 
@@ -757,6 +766,8 @@ def trusted_devices_route():
             security.revoke_trusted_device(request.form.get("trusted_device_id"))
         elif action == "revoke_user":
             security.logout_all_devices(request.form.get("user_id"))
+        elif action == "revoke_mobile":
+            pocket_api.revoke_pocket_device(request.form.get("device_id"))
         return redirect(url_for("admin.trusted_devices_route", message="Trusted device settings updated."))
     raw_token = request.cookies.get(security.TRUSTED_DEVICE_COOKIE)
     current_token_hash = security._hash_trusted_token(raw_token) if raw_token else ""
@@ -768,6 +779,7 @@ def trusted_devices_route():
         content_title="Trusted Devices",
         content_html="",
         devices=security.get_trusted_devices(),
+        mobile_devices=pocket_api.list_pocket_devices(),
         current_token_hash=current_token_hash,
         message=request.args.get("message", ""),
     )

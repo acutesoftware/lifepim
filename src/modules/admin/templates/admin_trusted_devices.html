@@ -49,4 +49,51 @@
     {% endfor %}
   </tbody>
 </table>
+
+<h3>Mobile devices</h3>
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Device</th>
+      <th>Username</th>
+      <th>Platform</th>
+      <th>Created</th>
+      <th>Last seen</th>
+      <th>Last IP</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for device in mobile_devices %}
+      <tr>
+        <td>
+          {{ device.device_name or 'Mobile device' }}
+          <br><small>{{ device.device_id }}</small>
+          <br><small>{{ device.user_agent or '' }}</small>
+        </td>
+        <td>{{ device.username or '' }}</td>
+        <td>{{ device.platform or '' }}</td>
+        <td>{{ device.created_at }}</td>
+        <td>{{ device.last_seen_at }}</td>
+        <td>{{ device.last_ip or '' }}</td>
+        <td>{{ 'Revoked' if device.revoked_at else 'Active' }}</td>
+        <td>
+          {% if not device.revoked_at %}
+            <form method="post" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="revoke_mobile">
+              <input type="hidden" name="device_id" value="{{ device.device_id }}">
+              <button type="submit">Revoke</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="8">No mobile devices registered.</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% endblock %}

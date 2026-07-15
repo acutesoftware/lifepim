@@ -1,0 +1,315 @@
+import os
+import sqlite3
+import sys
+import tempfile
+import unittest
+from datetime import datetime
+
+from flask import Flask
+
+root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
+if root_folder not in sys.path:
+    sys.path.append(root_folder)
+
+from common import data
+from common import utils as common_utils
+from modules.pocket_api.routes import (
+    get_user_pocket_settings,
+    list_pocket_devices,
+    pocket_api_bp,
+    revoke_pocket_device,
+    set_user_default_note_folder,
+)
+
+
+class TestPocketApi(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:")
+        self.conn.row_factory = sqlite3.Row
+        self._old_conn = data.conn
+        data.conn = self.conn
+        self.conn.execute(
+            """
+            CREATE TABLE lp_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_name TEXT,
+                path TEXT,
+                folder_id INTEGER,
+                size TEXT,
+                date_modified TEXT,
+                project TEXT,
+                owner_user_id INTEGER,
+                visibility TEXT NOT NULL DEFAULT 'private',
+                is_public INTEGER NOT NULL DEFAULT 0,
+                user_name TEXT,
+                rec_extract_date TEXT
+            )
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE TABLE users (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                display_name TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                is_active INTEGER NOT NULL DEFAULT 1
+            )
+            """
+        )
+        self.conn.execute(
+            "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
+            "VALUES (3, 'duncanmobile', 'Duncan Mobile', 'hash', 'user', 1)"
+        )
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.app = Flask(__name__)
+        self.app.register_blueprint(pocket_api_bp)
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        try:
+            self.tmpdir.cleanup()
+        finally:
+            data.conn = self._old_conn
+            self.conn.close()
+
+    def _add_note(self, file_name="Shopping.md", content="# Shopping\n\n- [ ] Milk\n", owner_user_id=3):
+        full_path = os.path.join(self.tmpdir.name, file_name)
+        with open(full_path, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        stat = os.stat(full_path)
+        tbl = common_utils.get_table_def("notes")
+        values_map = {
+            "file_name": file_name,
+            "path": self.tmpdir.name,
+            "folder_id": "",
+            "size": str(stat.st_size),
+            "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+            "project": "pers",
+            "owner_user_id": owner_user_id,
+            "visibility": "private",
+            "is_public": 0,
+        }
+        cols = list(tbl["col_list"]) + ["owner_user_id", "visibility", "is_public"]
+        values = [values_map.get(col, "") for col in cols]
+        return data.add_record(self.conn, tbl["name"], cols, values)
+
+    def _register_headers(self):
+        resp = self.client.post(
+            "/api/pocket/v1/auth/register-device",
+            json={
+                "device_id": "android-test",
+                "device_name": "Android Test",
+                "platform": "android",
+                "username": "duncanmobile",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        return {
+            "Authorization": f"Bearer {payload['device_token']}",
+            "X-LifePIM-Device-ID": payload["device_id"],
+        }
+
+    def test_manifest_requires_device_auth(self):
+        resp = self.client.get("/api/pocket/v1/sync/manifest")
+
+        self.assertEqual(resp.status_code, 401)
+
+    def test_registered_mobile_device_is_listed_for_admin(self):
+        self._register_headers()
+
+        devices = list_pocket_devices(self.conn)
+
+        self.assertEqual(len(devices), 1)
+        self.assertEqual(devices[0]["device_id"], "android-test")
+        self.assertEqual(devices[0]["device_name"], "Android Test")
+        self.assertEqual(devices[0]["platform"], "android")
+        self.assertEqual(devices[0]["username"], "duncanmobile")
+        self.assertIsNone(devices[0]["revoked_at"])
+
+    def test_mobile_device_can_be_revoked(self):
+        self._register_headers()
+
+        self.assertTrue(revoke_pocket_device("android-test", self.conn))
+        devices = list_pocket_devices(self.conn)
+
+        self.assertIsNotNone(devices[0]["revoked_at"])
+
+    def test_health_does_not_require_device_auth(self):
+        resp = self.client.get("/api/pocket/v1/health")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content_type, "application/json")
+        self.assertEqual(resp.get_json(), {"ok": True, "service": "lifepim-pocket", "version": 1})
+
+    def test_manifest_and_item_download_return_markdown_content(self):
+        self._add_note()
+        headers = self._register_headers()
+
+        manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+        self.assertEqual(manifest_resp.status_code, 200)
+        item = manifest_resp.get_json()["items"][0]
+        self.assertEqual(item["relative_path"], "Shopping.md")
+        self.assertEqual(item["kind"], "NOTE")
+        self.assertEqual(item["ownership"], "DESKTOP_MASTER")
+
+        item_resp = self.client.get(f"/api/pocket/v1/items/{item['id']}", headers=headers)
+        self.assertEqual(item_resp.status_code, 200)
+        item_payload = item_resp.get_json()
+        self.assertEqual(item_payload["kind"], "LIST")
+        self.assertEqual(item_payload["content"], "# Shopping\n\n- [ ] Milk\n")
+
+    def test_manifest_only_returns_notes_owned_by_mobile_user(self):
+        owned_id = self._add_note(file_name="owned.md", content="owned", owner_user_id=3)
+        other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)
+        headers = self._register_headers()
+
+        manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+
+        self.assertEqual(manifest_resp.status_code, 200)
+        paths = {item["relative_path"] for item in manifest_resp.get_json()["items"]}
+        self.assertIn("owned.md", paths)
+        self.assertNotIn("other.md", paths)
+        item_ids = {item["id"] for item in manifest_resp.get_json()["items"]}
+        self.assertIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{owned_id}")), item_ids)
+        self.assertNotIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{other_id}")), item_ids)
+
+    def test_item_download_rejects_note_owned_by_another_user(self):
+        other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)
+        headers = self._register_headers()
+        item_id = str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{other_id}"))
+
+        resp = self.client.get(f"/api/pocket/v1/items/{item_id}", headers=headers)
+
+        self.assertEqual(resp.status_code, 404)
+
+    def test_push_updates_note_when_base_hash_matches(self):
+        self._add_note()
+        headers = self._register_headers()
+        item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={"id": item["id"], "base_sha256": item["sha256"], "content": "# Shopping\n\n- [x] Milk\n"},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["ok"])
+        with open(os.path.join(self.tmpdir.name, "Shopping.md"), "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "# Shopping\n\n- [x] Milk\n")
+
+    def test_push_conflict_returns_server_version_without_overwriting(self):
+        self._add_note(content="desktop first")
+        headers = self._register_headers()
+        item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+        item = self.client.get(f"/api/pocket/v1/items/{item['id']}", headers=headers).get_json()
+        with open(os.path.join(self.tmpdir.name, "Shopping.md"), "w", encoding="utf-8") as handle:
+            handle.write("desktop changed")
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={"id": item["id"], "base_sha256": item["sha256"], "content": "phone changed"},
+        )
+
+        self.assertEqual(resp.status_code, 409)
+        payload = resp.get_json()
+        self.assertTrue(payload["results"][0]["conflict"])
+        self.assertEqual(payload["results"][0]["server"]["content"], "desktop changed")
+        with open(os.path.join(self.tmpdir.name, "Shopping.md"), "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "desktop changed")
+
+    def test_push_creates_mobile_only_note_for_bound_user(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-1",
+                "relative_path": "phone note.md",
+                "content": "# Phone note\n\nCreated on phone\n",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        result = resp.get_json()["results"][0]
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["created"])
+        self.assertTrue(os.path.exists(os.path.join(self.tmpdir.name, "phone note.md")))
+        row = self.conn.execute("SELECT file_name, owner_user_id FROM lp_notes WHERE file_name = ?", ("phone note.md",)).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["owner_user_id"], 3)
+
+    def test_push_creates_mobile_only_note_in_configured_user_folder(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        configured_dir = os.path.join(self.tmpdir.name, "Pocket")
+        set_user_default_note_folder(3, configured_dir, self.conn)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-configured",
+                "relative_path": "configured phone note.md",
+                "content": "# Configured note\n",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["results"][0]["created"])
+        self.assertTrue(os.path.exists(os.path.join(configured_dir, "configured phone note.md")))
+        row = self.conn.execute("SELECT path FROM lp_notes WHERE file_name = ?", ("configured phone note.md",)).fetchone()
+        self.assertEqual(row["path"], configured_dir)
+
+    def test_user_pocket_settings_can_be_cleared(self):
+        configured_dir = os.path.join(self.tmpdir.name, "Pocket")
+        set_user_default_note_folder(3, configured_dir, self.conn)
+
+        set_user_default_note_folder(3, "", self.conn)
+
+        self.assertEqual(get_user_pocket_settings(3, self.conn)["default_note_folder"], "")
+
+    def test_push_accepts_android_alias_payload(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "uploads": [
+                    {
+                        "uuid": "mobile-local-2",
+                        "path": "alias phone note.md",
+                        "markdownContent": "# Alias note\n",
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["results"][0]["created"])
+        self.assertTrue(os.path.exists(os.path.join(self.tmpdir.name, "alias phone note.md")))
+
+    def test_push_missing_unknown_note_content_returns_400(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={"id": "mobile-local-1", "relative_path": "phone note.md"},
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.get_json()["ok"])
+
+
+if __name__ == "__main__":
+    unittest.main()

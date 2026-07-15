@@ -14,6 +14,7 @@ from flask_login import LoginManager, UserMixin, current_user, login_user, logou
 from flask_wtf.csrf import CSRFProtect
 
 from common import data as db
+from common.network_log import log_network
 
 
 TRUSTED_DEVICE_COOKIE = "lifepim_trusted_device"
@@ -213,6 +214,8 @@ def configure_security(app):
     login_manager.session_protection = "basic"
     login_manager.init_app(app)
     csrf.init_app(app)
+    if "pocket_api" in app.blueprints:
+        csrf.exempt(app.blueprints["pocket_api"])
 
     @app.before_request
     def _security_before_request():
@@ -239,6 +242,8 @@ def _route_is_public():
     if endpoint in {"static", "auth.login"}:
         return True
     if endpoint.startswith("static") or endpoint.startswith("public."):
+        return True
+    if endpoint.startswith("pocket_api.") or request.path.startswith("/api/pocket/v1/"):
         return True
     if request.path.startswith("/static/") or request.path.startswith("/public/"):
         return True
@@ -317,12 +322,28 @@ def _hash_trusted_token(raw_token):
 
 def login(username, password, response, device_name=None, trust_device=True):
     username = (username or "").strip()
+    log_network(
+        "login_attempt",
+        username=username,
+        trust_device=trust_device,
+        device_name=device_name,
+        remote_addr=_client_ip(),
+        user_agent=_user_agent(),
+    )
     if is_login_rate_limited(username, request):
         record_login_failure(username, request)
+        log_network("login_failure", username=username, reason="rate_limited", remote_addr=_client_ip())
         return LoginResult(False, error=LOGIN_FAILURE_MESSAGE, rate_limited=True)
     row = get_user_by_username(username)
     if not row or not row["is_active"] or not verify_password(row["password_hash"], password):
         record_login_failure(username, request, user_id=row["user_id"] if row else None)
+        log_network(
+            "login_failure",
+            username=username,
+            reason="invalid_credentials_or_inactive",
+            user_id=row["user_id"] if row else None,
+            remote_addr=_client_ip(),
+        )
         return LoginResult(False, error=LOGIN_FAILURE_MESSAGE)
     if password_hasher.check_needs_rehash(row["password_hash"]):
         update_user_password_hash(row["user_id"], hash_password(password))
@@ -334,12 +355,16 @@ def login(username, password, response, device_name=None, trust_device=True):
     conn.execute("UPDATE users SET last_login_at=?, modified_at=? WHERE user_id=?", (now, now, user.user_id))
     conn.commit()
     record_login_success(user.user_id, request)
+    log_network("login_success", username=user.username, user_id=user.user_id, trust_device=trust_device, remote_addr=_client_ip())
     if trust_device:
-        create_trusted_device(user.user_id, response, device_name=device_name)
+        trusted_device_id = create_trusted_device(user.user_id, response, device_name=device_name)
+        log_network("trusted_device_created", username=user.username, user_id=user.user_id, trusted_device_id=trusted_device_id, device_name=device_name)
     return LoginResult(True, user=user)
 
 
 def logout(response, forget_device=False):
+    username = getattr(current_user, "username", "")
+    user_id = getattr(current_user, "user_id", None)
     if forget_device:
         raw_token = request.cookies.get(TRUSTED_DEVICE_COOKIE)
         if raw_token:
@@ -348,7 +373,9 @@ def logout(response, forget_device=False):
                 (_utc_now_sql(), _hash_trusted_token(raw_token)),
             )
             db._get_conn().commit()
+            log_network("trusted_device_revoked_current", username=username, user_id=user_id, remote_addr=_client_ip())
         _clear_trusted_cookie(response)
+    log_network("logout", username=username, user_id=user_id, forget_device=forget_device, remote_addr=_client_ip())
     logout_user()
     return response
 
@@ -360,6 +387,7 @@ def logout_all_devices(user_id):
         (_utc_now_sql(), user_id),
     )
     conn.commit()
+    log_network("trusted_devices_revoked_for_user", user_id=user_id)
 
 
 def revoke_trusted_device(trusted_device_id):
@@ -369,6 +397,7 @@ def revoke_trusted_device(trusted_device_id):
         (_utc_now_sql(), trusted_device_id),
     )
     conn.commit()
+    log_network("trusted_device_revoked", trusted_device_id=trusted_device_id)
 
 
 def create_trusted_device(user_id, response, device_name=None):
@@ -409,11 +438,19 @@ def restore_login_from_trusted_device(req, response=None):
     ).fetchone()
     if not row or not _trusted_device_row_is_active(row):
         g.clear_trusted_device_cookie = True
+        log_network("trusted_device_restore_failed", reason="missing_revoked_expired_or_inactive", remote_addr=_client_ip(req), user_agent=_user_agent(req))
         return None
     user = LifePIMUser(row["user_id"], row["username"], row["display_name"], row["role"], row["is_active"])
     login_user(user)
     session.permanent = True
     update_trusted_device_last_used(row["trusted_device_id"], req)
+    log_network(
+        "trusted_device_restore_ok",
+        username=user.username,
+        user_id=user.user_id,
+        trusted_device_id=row["trusted_device_id"],
+        remote_addr=_client_ip(req),
+    )
     return user
 
 

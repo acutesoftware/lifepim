@@ -1,11 +1,13 @@
 import sys
 import socket
 import os
+import time
 
 from datetime import date, datetime
 
-from flask import Flask, render_template, request, url_for
+from flask import Flask, g, render_template, request, url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from common.utils import get_tabs, get_side_tabs, get_table_def, format_duration_friendly, format_duration_label
 import common.config as mod_cfg
@@ -13,6 +15,7 @@ from common import data as db
 from common import search as search_mod
 from common import projects as projects_mod
 from common import settings as settings_mod
+from common.network_log import log_network
 from core.security import configure_security
 from modules.how.schema import ensure_how_schema
 
@@ -138,11 +141,80 @@ def _last_python_source_update():
 
 _dbg("Creating Flask app")
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.jinja_env.filters["duration_friendly"] = format_duration_friendly
 app.jinja_env.filters["duration_label"] = format_duration_label
 projects_mod.ensure_projects_schema(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
 ensure_how_schema(db._get_conn())
+
+
+def _should_network_log():
+    path = request.path or ""
+    if path.startswith("/static/"):
+        return False
+    return True
+
+
+@app.before_request
+def _network_log_request_start():
+    if not _should_network_log():
+        return None
+    g.network_log_start = time.perf_counter()
+    log_network(
+        "request_start",
+        method=request.method,
+        path=request.path,
+        query=request.query_string.decode("utf-8", errors="replace")[:500],
+        endpoint=request.endpoint,
+        scheme=request.scheme,
+        host=request.host,
+        remote_addr=request.remote_addr,
+        forwarded_for=request.headers.get("X-Forwarded-For"),
+        forwarded_proto=request.headers.get("X-Forwarded-Proto"),
+        user_agent=(request.headers.get("User-Agent") or "")[:300],
+        has_authorization=bool(request.headers.get("Authorization")),
+        has_cookie=bool(request.headers.get("Cookie")),
+    )
+
+
+@app.after_request
+def _network_log_request_finish(response):
+    if _should_network_log():
+        started = getattr(g, "network_log_start", None)
+        duration_ms = None
+        if started is not None:
+            duration_ms = int((time.perf_counter() - started) * 1000)
+        log_network(
+            "request_finish",
+            method=request.method,
+            path=request.path,
+            endpoint=request.endpoint,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            location=response.headers.get("Location"),
+            content_type=response.headers.get("Content-Type"),
+        )
+    return response
+
+
+@app.teardown_request
+def _network_log_request_exception(exc):
+    if exc is None or not _should_network_log():
+        return None
+    started = getattr(g, "network_log_start", None)
+    duration_ms = None
+    if started is not None:
+        duration_ms = int((time.perf_counter() - started) * 1000)
+    log_network(
+        "request_exception",
+        method=request.method,
+        path=request.path,
+        endpoint=request.endpoint,
+        duration_ms=duration_ms,
+        error_type=type(exc).__name__,
+        error=str(exc),
+    )
 
 # Register blueprints
 _dbg("Importing blueprints")
@@ -165,6 +237,7 @@ from modules.tasks.tasks import tasks_bp
 from modules.admin.routes import admin_bp
 from modules.links.routes import links_bp
 from modules.projects.routes import projects_bp
+from modules.pocket_api.routes import pocket_api_bp
 
 _dbg("Registering blueprints")
 app.register_blueprint(auth_bp)
@@ -186,6 +259,7 @@ app.register_blueprint(tasks_bp, url_prefix="/tasks")
 app.register_blueprint(admin_bp, url_prefix="/admin")
 app.register_blueprint(links_bp, url_prefix="/links")
 app.register_blueprint(projects_bp, url_prefix="/projects")
+app.register_blueprint(pocket_api_bp)
 configure_security(app)
 _dbg("Blueprints registered")
 

@@ -28,7 +28,7 @@ if not exist "%PYTHON_EXE%" (
 )
 
 if not defined LIFEPIM_ENV set "LIFEPIM_ENV=production"
-if not defined LIFEPIM_HOST set "LIFEPIM_HOST=127.0.0.1"
+if not defined LIFEPIM_HOST set "LIFEPIM_HOST=0.0.0.0"
 if not defined LIFEPIM_PORT set "LIFEPIM_PORT=9741"
 
 if /I "%LIFEPIM_ENV%"=="production" if not defined LIFEPIM_SECRET_KEY (

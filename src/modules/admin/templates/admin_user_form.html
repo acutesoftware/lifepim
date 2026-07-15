@@ -27,6 +27,10 @@
       <input type="password" name="password" autocomplete="new-password" required>
     </label>
   {% endif %}
+  <label>Pocket default note folder
+    <input type="text" name="pocket_default_note_folder" value="{{ pocket_settings.default_note_folder if pocket_settings else '' }}" placeholder="N:\duncan\LifePIM_Data\DATA\notes\Mobile">
+  </label>
+  <p class="form-help">New mobile-only notes for this user are saved here. Leave blank to use the user's most common existing note folder.</p>
   <button type="submit">Save</button>
 </form>
 {% endblock %}

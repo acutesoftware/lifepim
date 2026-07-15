@@ -67,26 +67,26 @@ C:\apps\LifePIM_Prod\src\RUN_DESKTOP.BAT
 Default listener:
 
 ```text
-http://127.0.0.1:9741
+http://0.0.0.0:9741
 ```
 
 The launcher sets:
 
 ```text
 LIFEPIM_ENV=production
-LIFEPIM_HOST=127.0.0.1
+LIFEPIM_HOST=0.0.0.0
 LIFEPIM_PORT=9741
 ```
 
 You can override host/port before starting:
 
 ```bat
-set LIFEPIM_HOST=127.0.0.1
+set LIFEPIM_HOST=192.168.1.99
 set LIFEPIM_PORT=9741
 src\RUN_DESKTOP.BAT
 ```
 
-Keep Waitress bound to `127.0.0.1` when using an HTTPS reverse proxy on the same machine.
+Use `0.0.0.0` or the fixed LAN IP when testing Pocket from Android over the local network.
 
 ## User and Device Administration
 
@@ -130,10 +130,30 @@ copy the download to C:\apps\caddy
 create "Caddyfile" with content below
 
 ```text
+http://192.168.1.99 {
+    handle /api/pocket/v1/* {
+        reverse_proxy 127.0.0.1:9741
+    }
+
+    handle {
+        redir https://{host}{uri} permanent
+    }
+}
+
 https://192.168.1.99 {
     reverse_proxy 127.0.0.1:9741
 }
 ```
+
+The HTTP block is intentionally limited to the Pocket mobile API. It lets Android test:
+
+```text
+http://192.168.1.99/api/pocket/v1/health
+```
+
+without being redirected to HTTPS.
+
+All other HTTP desktop routes redirect back to HTTPS.
 
 Start the caddy service (also put this line into the startup BAT file)
 
@@ -224,6 +244,14 @@ cd src
 It deletes and recreates the configured SQLite database. Do not run it against production data unless you intend to rebuild the DB.
 
 ## Operational Checks
+
+Allow inbound LAN traffic to the LifePIM/Caddy ports from an elevated PowerShell prompt:
+
+```powershell
+New-NetFirewallRule -DisplayName "LifePIM HTTP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80
+New-NetFirewallRule -DisplayName "LifePIM HTTPS" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443
+New-NetFirewallRule -DisplayName "LifePIM Waitress" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 9741
+```
 
 Check app imports:
 
