@@ -303,10 +303,41 @@ def projects_sidebar_tree(status="active", conn=None, owner_user_id=None):
     return ordered
 
 
-def _default_sidebar_rows(owner_user_id=None):
+SIMPLE_SIDE_TABS = [
+    {"icon": "🏠", "id": "home", "label": "Home"},
+    {"icon": "💼", "id": "work", "label": "Work"},
+    {"icon": "👪", "id": "family", "label": "Family"},
+    {"icon": "🎉", "id": "fun", "label": "Fun"},
+]
+
+
+def _username_for_owner(conn, owner_user_id):
+    if owner_user_id is None:
+        return _current_username()
+    try:
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'"
+        ).fetchone()
+        if not exists:
+            return "duncan"
+        row = conn.execute("SELECT username FROM users WHERE user_id = ?", (owner_user_id,)).fetchone()
+    except Exception:
+        return _current_username()
+    return (row["username"] or "").strip() if row else _current_username()
+
+
+def _owner_is_duncan(conn, owner_user_id):
+    return _username_for_owner(conn, owner_user_id).lower() == "duncan"
+
+
+def _default_sidebar_source(conn, owner_user_id):
+    return cfg.SIDE_TABS if _owner_is_duncan(conn, owner_user_id) or owner_user_id is None else SIMPLE_SIDE_TABS
+
+
+def _default_sidebar_rows(owner_user_id=None, source_rows=None):
     rows = []
     current_group = "Projects"
-    for idx, entry in enumerate(cfg.SIDE_TABS):
+    for idx, entry in enumerate(source_rows or cfg.SIDE_TABS):
         entry_id = (entry.get("id") or "").strip()
         label = (entry.get("label") or entry_id).strip()
         icon = entry.get("icon") or ""
@@ -341,6 +372,22 @@ def _default_sidebar_rows(owner_user_id=None):
     return rows
 
 
+def _sidebar_looks_like_source(conn, owner_user_id, source_rows):
+    expected = {
+        (row["project_id"], row["project_name"], int(row["is_header"] or 0), int(row["is_system"] or 0))
+        for row in _default_sidebar_rows(owner_user_id, source_rows=source_rows)
+    }
+    rows = conn.execute(
+        "SELECT project_id, project_name, is_header, is_system FROM lp_projects WHERE owner_user_id IS ?",
+        (owner_user_id,),
+    ).fetchall()
+    actual = {
+        (row["project_id"], row["project_name"], int(row["is_header"] or 0), int(row["is_system"] or 0))
+        for row in rows
+    }
+    return bool(actual) and actual == expected
+
+
 def _sidebar_looks_like_flat_legacy(conn, owner_user_id):
     row = conn.execute(
         """
@@ -368,12 +415,15 @@ def seed_default_projects_for_user(owner_user_id=None, conn=None, replace=False)
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
     owner_user_id = _owner_user_id(owner_user_id)
+    source_rows = _default_sidebar_source(conn, owner_user_id)
     existing = conn.execute(
         "SELECT COUNT(1) AS cnt FROM lp_projects WHERE owner_user_id IS ?",
         (owner_user_id,),
     ).fetchone()
     if existing and int(existing["cnt"] or 0) and not replace:
         if _sidebar_looks_like_flat_legacy(conn, owner_user_id):
+            replace = True
+        elif owner_user_id is not None and not _owner_is_duncan(conn, owner_user_id) and _sidebar_looks_like_source(conn, owner_user_id, cfg.SIDE_TABS):
             replace = True
         else:
             return 0
@@ -402,7 +452,7 @@ def seed_default_projects_for_user(owner_user_id=None, conn=None, replace=False)
         conn.execute("DELETE FROM lp_projects WHERE owner_user_id IS ?", (owner_user_id,))
         conn.commit()
     count = 0
-    for row in _default_sidebar_rows(owner_user_id):
+    for row in _default_sidebar_rows(owner_user_id, source_rows=source_rows):
         project_upsert(row, conn=conn, owner_user_id=owner_user_id)
         count += 1
     return count

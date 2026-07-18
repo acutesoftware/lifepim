@@ -394,7 +394,23 @@ def _current_owner_user_id():
     return None
 
 
+def _current_username():
+    try:
+        if getattr(current_user, "is_authenticated", False):
+            return (getattr(current_user, "username", "") or "").strip()
+    except Exception:
+        return ""
+    return ""
+
+
+def _uses_project_folder_mapping():
+    username = _current_username()
+    return not username or username.lower() == "duncan"
+
+
 def _project_folder_owner_sql(alias):
+    if not _uses_project_folder_mapping():
+        return "1 = 0"
     owner_user_id = _current_owner_user_id()
     if owner_user_id is None:
         return f"{alias}.owner_user_id IS NULL"
@@ -459,7 +475,7 @@ def _derived_project_expr():
         "LIMIT 1"
         ")"
     )
-    return f"COALESCE({named_child_expr}, {normal_expr})"
+    return f"COALESCE({named_child_expr}, {normal_expr}, NULLIF(t.project, ''))"
 
 
 def _project_scope_ids(project):
@@ -503,7 +519,14 @@ def _project_scope_ids(project):
 def _notes_base_condition(project, folder_path=None):
     params = []
     folder_expr = _note_folder_match_expr()
-    if project and project.lower() == "unmapped":
+    if not _uses_project_folder_mapping() and project and project.lower() == "unmapped":
+        condition = "COALESCE(t.project, '') = ''"
+    elif not _uses_project_folder_mapping() and project:
+        scope_ids = _project_scope_ids(project)
+        placeholders = ", ".join(["?"] * len(scope_ids))
+        condition = f"lower(COALESCE(t.project, '')) IN ({', '.join(['lower(?)'] * len(scope_ids))})"
+        params.extend(scope_ids)
+    elif project and project.lower() == "unmapped":
         condition = (
             "NOT EXISTS ("
             "  SELECT 1 FROM lp_project_folders pf "
@@ -564,9 +587,12 @@ def _current_user_notes_root(create_dirs=False):
                 data._get_conn(),
                 current_user.user_id,
                 username=getattr(current_user, "username", None),
-                create_dirs=create_dirs,
+                create_dirs=False,
             )
-            return _normalize_note_path(paths.get("notes_root_path") or "")
+            notes_root = _normalize_note_path(paths.get("notes_root_path") or "")
+            if create_dirs and notes_root:
+                os.makedirs(notes_root, exist_ok=True)
+            return notes_root
     except Exception:
         return ""
     return ""
@@ -1451,10 +1477,8 @@ def open_note_folder_route(note_id):
 @notes_bp.route('/api/new-note-options')
 def new_note_options_route():
     project_id = (request.args.get("project_id") or request.args.get("proj") or "").strip()
-    if not project_id:
-        return jsonify({"error": "Project is required."}), 400
-    project = projects_mod.project_get(project_id)
-    if not project:
+    project = projects_mod.project_get(project_id) if project_id else None
+    if project_id and not project:
         return jsonify({"error": "Project not found."}), 404
     folders = projects_mod.project_folders_list(project_id, include_disabled=False)
     default_folder = None
@@ -1464,11 +1488,41 @@ def new_note_options_route():
             default_folder = {"path_prefix": default_path}
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 500
+    if not default_folder and not _uses_project_folder_mapping():
+        notes_root = _current_user_notes_root(create_dirs=False)
+        if notes_root:
+            default_folder = {"path_prefix": notes_root, "is_user_notes_root": True}
+    if not default_folder and not project_id:
+        notes_root = _current_user_notes_root(create_dirs=False)
+        if notes_root:
+            default_folder = {"path_prefix": notes_root, "is_user_notes_root": True}
     return jsonify({
         "project": project,
         "default_folder": default_folder,
         "folders": folders,
     })
+
+
+def _note_create_target_folder(project_id, path_prefix=""):
+    project_id = (project_id or "").strip()
+    path_prefix = _normalize_note_path(path_prefix)
+    if not project_id or project_id.lower() == "unmapped":
+        return _current_user_notes_root(create_dirs=True), ""
+    owner_user_id = _current_owner_user_id()
+    if not projects_mod.project_get(project_id, owner_user_id=owner_user_id):
+        raise ValueError("Project not found.")
+    try:
+        default_path = projects_mod.project_default_folder_get(project_id, owner_user_id=owner_user_id) or ""
+    except ValueError:
+        raise
+    if default_path:
+        default_path = _normalize_note_path(default_path)
+        if path_prefix and path_prefix.lower() != default_path.lower():
+            raise ValueError("Notes can only be created in the default folder for this project.")
+        return default_path, project_id
+    if _uses_project_folder_mapping():
+        raise ValueError("No default folder set for this project.")
+    return _current_user_notes_root(create_dirs=True), project_id
 
 
 @notes_bp.route('/api/create-note', methods=["POST"])
@@ -1477,22 +1531,12 @@ def create_note_route():
     project_id = (payload.get("project_id") or "").strip()
     title = (payload.get("title") or "").strip()
     path_prefix = (payload.get("path_prefix") or "").strip()
-    if not project_id:
-        return jsonify({"error": "Project is required."}), 400
-    if not projects_mod.project_get(project_id):
-        return jsonify({"error": "Project not found."}), 404
     if not title:
         return jsonify({"error": "Title is required."}), 400
     try:
-        default_path = projects_mod.project_default_folder_get(project_id) or ""
+        path_prefix, project_id = _note_create_target_folder(project_id, path_prefix)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 500
-    if not default_path:
-        return jsonify({"error": "No default folder set for this project."}), 400
-    if path_prefix:
-        if _normalize_note_path(path_prefix).lower() != _normalize_note_path(default_path).lower():
-            return jsonify({"error": "Notes can only be created in the default folder for this project."}), 400
-    path_prefix = default_path
+        return jsonify({"error": str(exc)}), 400
     if not path_prefix:
         return jsonify({"error": "Folder path is required."}), 400
     try:

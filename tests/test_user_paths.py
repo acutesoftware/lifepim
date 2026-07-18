@@ -30,7 +30,7 @@ class TestUserPaths(unittest.TestCase):
         data.conn = self._old_conn
         self.conn.close()
 
-    def test_create_user_creates_isolated_file_roots_and_project_defaults(self):
+    def test_create_user_creates_isolated_file_roots_and_simple_project_list(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             old_env = os.environ.get("LIFEPIM_LAN_USER_ROOT_BASE")
             os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = tmpdir
@@ -50,12 +50,21 @@ class TestUserPaths(unittest.TestCase):
                 self.assertTrue(os.path.isdir(row["notes_root_path"]))
                 self.assertTrue(os.path.isdir(row["projects_root_path"]))
                 self.assertTrue(os.path.isdir(row["lists_root_path"]))
-                default_folder = projects.project_default_folder_get(
-                    "pers/health",
-                    owner_user_id=user_id,
-                    conn=self.conn,
+                project_ids = {
+                    row["project_id"]
+                    for row in self.conn.execute(
+                        "SELECT project_id FROM lp_projects WHERE owner_user_id = ?",
+                        (user_id,),
+                    ).fetchall()
+                }
+                self.assertEqual(project_ids, {"home", "work", "family", "fun"})
+                self.assertEqual(
+                    self.conn.execute(
+                        "SELECT COUNT(1) AS cnt FROM lp_project_folders WHERE owner_user_id = ?",
+                        (user_id,),
+                    ).fetchone()["cnt"],
+                    0,
                 )
-                self.assertTrue(default_folder.lower().startswith(row["notes_root_path"].lower()))
             finally:
                 if old_env is None:
                     os.environ.pop("LIFEPIM_LAN_USER_ROOT_BASE", None)
@@ -85,12 +94,13 @@ class TestUserPaths(unittest.TestCase):
             self.assertEqual(row["file_root_path"], custom_paths["file_root_path"])
             self.assertEqual(row["notes_root_path"], custom_paths["notes_root_path"])
             self.assertTrue(os.path.isdir(custom_paths["notes_root_path"]))
-            default_folder = projects.project_default_folder_get(
-                "pers/health",
-                owner_user_id=user_id,
-                conn=self.conn,
+            self.assertEqual(
+                self.conn.execute(
+                    "SELECT COUNT(1) AS cnt FROM lp_project_folders WHERE owner_user_id = ?",
+                    (user_id,),
+                ).fetchone()["cnt"],
+                0,
             )
-            self.assertTrue(default_folder.lower().startswith(custom_paths["notes_root_path"].lower()))
 
     def test_admin_submitted_default_username_segment_resolves_to_new_username(self):
         app = Flask(__name__)
@@ -193,6 +203,86 @@ class TestUserPaths(unittest.TestCase):
                     os.environ.pop("LIFEPIM_LAN_USER_ROOT_BASE", None)
                 else:
                     os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = old_env
+
+    def test_non_duncan_note_create_uses_notes_root_without_project_mapping(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_env = os.environ.get("LIFEPIM_LAN_USER_ROOT_BASE")
+            os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = tmpdir
+            try:
+                security.ensure_security_schema(self.conn)
+                projects.ensure_projects_schema(self.conn)
+                self.conn.execute(
+                    """
+                    CREATE TABLE lp_notes (
+                        id INTEGER PRIMARY KEY,
+                        file_name TEXT,
+                        path TEXT,
+                        folder_id TEXT,
+                        size TEXT,
+                        date_modified TEXT,
+                        project TEXT,
+                        owner_user_id INTEGER,
+                        visibility TEXT DEFAULT 'private',
+                        is_public INTEGER DEFAULT 0
+                    )
+                    """
+                )
+                user_id = security.create_user("alice", "Alice", "password", role="user", is_active=True)
+                fake_user = type(
+                    "FakeUser",
+                    (),
+                    {"is_authenticated": True, "user_id": user_id, "username": "alice"},
+                )()
+
+                with patch("modules.notes.routes.current_user", fake_user):
+                    folder, project_id = notes_routes._note_create_target_folder("home")
+
+                self.assertEqual(folder, os.path.join(tmpdir, "alice", "notes"))
+                self.assertEqual(project_id, "home")
+                self.assertTrue(os.path.isdir(folder))
+                self.assertFalse(os.path.isdir(os.path.join(tmpdir, "alice", "notes", "home")))
+            finally:
+                if old_env is None:
+                    os.environ.pop("LIFEPIM_LAN_USER_ROOT_BASE", None)
+                else:
+                    os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = old_env
+
+    def test_duncan_note_create_requires_project_mapping(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            security.ensure_security_schema(self.conn)
+            projects.ensure_projects_schema(self.conn)
+            user_id = security.create_user(
+                "duncan",
+                "Duncan",
+                "password",
+                role="admin",
+                is_active=True,
+                file_paths={
+                    "file_root_path": tmpdir,
+                    "notes_root_path": os.path.join(tmpdir, "notes"),
+                    "projects_root_path": os.path.join(tmpdir, "projects"),
+                    "lists_root_path": os.path.join(tmpdir, "lists"),
+                },
+            )
+            projects.project_upsert(
+                {
+                    "project_id": "home",
+                    "tab": "HOME",
+                    "group_name": "HOME",
+                    "project_name": "Home",
+                },
+                owner_user_id=user_id,
+                conn=self.conn,
+            )
+            fake_user = type(
+                "FakeUser",
+                (),
+                {"is_authenticated": True, "user_id": user_id, "username": "duncan"},
+            )()
+
+            with patch("modules.notes.routes.current_user", fake_user):
+                with self.assertRaises(ValueError):
+                    notes_routes._note_create_target_folder("home")
 
 
 if __name__ == "__main__":

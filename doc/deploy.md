@@ -147,9 +147,12 @@ New users default to:
 N:\duncan\LifePIM_Data\DATA\lan_users\<username>
 ```
 
-LifePIM creates `notes`, `projects`, and `lists` under that root. Project
-default folders for new users are created inside their `notes` root. Media and
-audio paths remain global.
+LifePIM creates `notes`, `projects`, and `lists` under that root at user setup.
+Only `duncan` uses the full legacy project list and project-folder mappings by
+default. Other users start with an editable `Home`, `Work`, `Family`, and `Fun`
+project list, and new notes are saved directly in the user's `notes` root unless
+a project folder mapping is explicitly added. Sync paths should only ensure the
+notes folder exists. Media and audio paths remain global.
 
 ## Using https instead of HTTP
 

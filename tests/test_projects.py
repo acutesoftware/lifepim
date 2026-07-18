@@ -228,7 +228,7 @@ class TestProjects(unittest.TestCase):
 
                 self.assertGreater(created, 0)
                 default_path = projects.project_default_folder_get(
-                    "pers/health",
+                    "home",
                     owner_user_id=7,
                     conn=self.conn,
                 )

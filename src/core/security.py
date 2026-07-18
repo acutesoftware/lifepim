@@ -746,7 +746,6 @@ def create_user(username, display_name, password, role="user", is_active=True, f
         projects_mod.claim_legacy_project_folders_for_user(user_id, conn=conn)
     else:
         projects_mod.seed_default_projects_for_user(user_id, conn=conn, replace=False)
-        projects_mod.ensure_default_project_folders_for_user(user_id, username=username, conn=conn, create_dirs=True)
     return user_id
 
 

@@ -205,8 +205,10 @@ projects
 lists
 ```
 
-Project default note folders for new users are created under that user's
-`notes` root. Media and audio remain global.
+Only the `duncan` account uses the full legacy project list and project-folder
+mapping by default. Other users start with an editable `Home`, `Work`, `Family`,
+and `Fun` project list, and new notes go into that user's `notes` root unless a
+project folder mapping is explicitly added. Media and audio remain global.
 
 ## Tests
 

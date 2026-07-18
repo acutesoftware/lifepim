@@ -74,21 +74,9 @@ def edit_projects_route():
         try:
             if action == "reset":
                 count = projects_mod.seed_default_projects_for_user(current_user.user_id, replace=True)
-                if (current_user.username or "").strip().lower() != "duncan":
-                    projects_mod.ensure_default_project_folders_for_user(
-                        current_user.user_id,
-                        username=current_user.username,
-                        create_dirs=True,
-                    )
                 return redirect(url_for("projects.edit_projects_route", message=f"Reset {count} project rows."))
             rows = _sidebar_rows_from_form(request.form)
             projects_mod.save_user_sidebar_rows(rows, owner_user_id=current_user.user_id)
-            if (current_user.username or "").strip().lower() != "duncan":
-                projects_mod.ensure_default_project_folders_for_user(
-                    current_user.user_id,
-                    username=current_user.username,
-                    create_dirs=True,
-                )
             return redirect(url_for("projects.edit_projects_route", message="Projects saved."))
         except Exception as exc:
             error = f"Projects were not saved: {exc}"

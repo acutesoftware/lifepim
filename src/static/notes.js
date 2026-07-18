@@ -68,14 +68,13 @@
 
   async function fetchProjectInfo(projectId) {
     const pid = (projectId || "").trim();
-    if (!pid) {
-      throw new Error("Project is required.");
-    }
     if (OPTIONS_CACHE.has(pid)) {
       return OPTIONS_CACHE.get(pid);
     }
     const params = new URLSearchParams();
-    params.set("project_id", pid);
+    if (pid) {
+      params.set("project_id", pid);
+    }
     const request = fetch(`/notes/api/new-note-options?${params.toString()}`)
       .then(async (resp) => {
         const data = await resp.json();
@@ -263,10 +262,6 @@
       return;
     }
     const projectId = getProjectId(sidebarLabel);
-    if (!projectId) {
-      alert("Select a project first.");
-      return;
-    }
     const title = promptForTitle(defaultTitle);
     if (!title) {
       return;
@@ -301,6 +296,10 @@
     }
     if (folders.length) {
       openModal(folders, title, projectId, "choose");
+      return;
+    }
+    if (!projectId) {
+      alert("No notes root is configured for this user.");
       return;
     }
     const newPath = window.prompt("No default folder set. Enter a folder path:");

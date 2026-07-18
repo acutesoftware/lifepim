@@ -754,8 +754,11 @@ def _default_note_folder_for_user(user_id):
         (user_id,),
     ).fetchall()
     if not rows:
-        paths = user_paths.get_or_create_user_paths(data._get_conn(), user_id, create_dirs=True)
-        return notes_routes._normalize_note_path(paths.get("notes_root_path") or "")
+        paths = user_paths.get_or_create_user_paths(data._get_conn(), user_id, create_dirs=False)
+        notes_root = notes_routes._normalize_note_path(paths.get("notes_root_path") or "")
+        if notes_root:
+            os.makedirs(notes_root, exist_ok=True)
+        return notes_root
     return notes_routes._normalize_note_path(rows[0]["path"])
 
 
