@@ -15,6 +15,7 @@ from flask_wtf.csrf import CSRFProtect
 
 from common import data as db
 from common.network_log import log_network
+from common import user_paths
 
 
 TRUSTED_DEVICE_COOKIE = "lifepim_trusted_device"
@@ -178,6 +179,18 @@ def ensure_security_schema(conn=None):
     )
     _ensure_visibility_columns(conn, "lp_notes")
     _ensure_visibility_columns(conn, "lp_media")
+    user_paths.ensure_user_path_columns(conn)
+    user_paths.backfill_duncan_user_paths(conn)
+    try:
+        from common import projects as projects_mod
+
+        rows = conn.execute(
+            "SELECT user_id FROM users WHERE lower(username) = 'duncan'"
+        ).fetchall()
+        for row in rows:
+            projects_mod.claim_legacy_project_folders_for_user(row["user_id"], conn=conn)
+    except Exception:
+        pass
     conn.execute(
         "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
         ("20260713_auth_security", _utc_now_sql()),
@@ -697,15 +710,44 @@ def is_login_rate_limited(username, req):
     return bool(row and row["cnt"] >= 5)
 
 
-def create_user(username, display_name, password, role="user", is_active=True):
+def create_user(username, display_name, password, role="user", is_active=True, file_paths=None):
     conn = db._get_conn()
-    cur = conn.execute(
-        "INSERT INTO users(username, display_name, password_hash, role, is_active, password_changed_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        ((username or "").strip(), (display_name or "").strip(), hash_password(password), role, 1 if is_active else 0, _utc_now_sql()),
-    )
-    conn.commit()
-    return cur.lastrowid
+    username = (username or "").strip()
+    display_name = (display_name or "").strip()
+    preserve_existing_paths = username.lower() == "duncan"
+    savepoint = "lifepim_create_user"
+    try:
+        conn.execute(f"SAVEPOINT {savepoint}")
+        cur = conn.execute(
+            "INSERT INTO users(username, display_name, password_hash, role, is_active, password_changed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (username, display_name, hash_password(password), role, 1 if is_active else 0, _utc_now_sql()),
+        )
+        user_id = cur.lastrowid
+        if file_paths and not preserve_existing_paths:
+            user_paths.set_user_paths(conn, user_id, file_paths, create_dirs=True)
+        else:
+            user_paths.initialize_user_paths(
+                conn,
+                user_id,
+                username,
+                preserve_existing=preserve_existing_paths,
+                create_dirs=not preserve_existing_paths,
+                force=True,
+            )
+        conn.execute(f"RELEASE {savepoint}")
+    except Exception:
+        conn.execute(f"ROLLBACK TO {savepoint}")
+        conn.execute(f"RELEASE {savepoint}")
+        raise
+    from common import projects as projects_mod
+
+    if preserve_existing_paths:
+        projects_mod.claim_legacy_project_folders_for_user(user_id, conn=conn)
+    else:
+        projects_mod.seed_default_projects_for_user(user_id, conn=conn, replace=False)
+        projects_mod.ensure_default_project_folders_for_user(user_id, username=username, conn=conn, create_dirs=True)
+    return user_id
 
 
 def update_user(user_id, username, display_name, role, is_active=True):

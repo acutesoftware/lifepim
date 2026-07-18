@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
 from flask import Flask
 
@@ -13,6 +14,7 @@ if root_folder not in sys.path:
 
 from common import data
 from common import utils as common_utils
+from core import security
 from modules.pocket_api.routes import (
     create_pocket_pairing_code,
     get_user_pocket_settings,
@@ -172,6 +174,44 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(row["user_id"], 3)
         self.assertNotIn(headers["Authorization"].replace("Bearer ", ""), row["token_hash"])
 
+    def test_password_login_creates_device_bound_to_correct_user(self):
+        self.conn.execute("UPDATE users SET password_hash=? WHERE username='duncanmobile'", (security.hash_password("secret"),))
+        self.conn.commit()
+
+        resp = self.client.post(
+            "/api/pocket/v1/auth/login",
+            json={
+                "device_id": "android-password-test",
+                "device_name": "Android Password Test",
+                "platform": "android",
+                "username": "duncanmobile",
+                "password": "secret",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        row = self.conn.execute("SELECT device_id, username, user_id, token_hash FROM pocket_devices").fetchone()
+        self.assertEqual(row["device_id"], "android-password-test")
+        self.assertEqual(row["username"], "duncanmobile")
+        self.assertEqual(row["user_id"], 3)
+        self.assertNotIn(payload["device_token"], row["token_hash"])
+
+    def test_invalid_password_login_is_rejected(self):
+        with patch("core.security.verify_password", return_value=False):
+            resp = self.client.post(
+                "/api/pocket/v1/auth/login",
+                json={
+                    "device_id": "android-password-test",
+                    "username": "duncanmobile",
+                    "password": "wrong",
+                },
+            )
+
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.get_json()["error"], "authentication_failed")
+        self.assertIsNone(self.conn.execute("SELECT token_hash FROM pocket_devices").fetchone())
+
     def test_inactive_users_cannot_pair(self):
         with self.assertRaises(ValueError):
             create_pocket_pairing_code(4)
@@ -263,13 +303,13 @@ class TestPocketApi(unittest.TestCase):
         self.assertIn("owned.md", paths)
         self.assertNotIn("other.md", paths)
         item_ids = {item["id"] for item in manifest_resp.get_json()["items"]}
-        self.assertIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{owned_id}")), item_ids)
-        self.assertNotIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{other_id}")), item_ids)
+        self.assertIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:3:note:{owned_id}")), item_ids)
+        self.assertNotIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:1:note:{other_id}")), item_ids)
 
     def test_item_download_rejects_note_owned_by_another_user(self):
         other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)
         headers = self._register_headers()
-        item_id = str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{other_id}"))
+        item_id = str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:1:note:{other_id}"))
 
         resp = self.client.get(f"/api/pocket/v1/items/{item_id}", headers=headers)
 
@@ -279,7 +319,7 @@ class TestPocketApi(unittest.TestCase):
         self._add_note(file_name="owned.md", content="owned", owner_user_id=3)
         other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)
         headers = self._register_headers()
-        item_id = str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"note:{other_id}"))
+        item_id = str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:1:note:{other_id}"))
 
         resp = self.client.post(
             "/api/pocket/v1/sync/push",

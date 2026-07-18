@@ -19,6 +19,7 @@ from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total,
 from common import config as cfg
 import etl_folder_mapping as folder_etl
 from common import projects as projects_mod
+from common import user_paths
 from core import security
 from modules.how import service as how_service
 
@@ -384,6 +385,22 @@ def _note_path_expr():
     return "rtrim(replace(t.path, '/', '\\'))"
 
 
+def _current_owner_user_id():
+    try:
+        if getattr(current_user, "is_authenticated", False):
+            return getattr(current_user, "user_id", None)
+    except Exception:
+        return None
+    return None
+
+
+def _project_folder_owner_sql(alias):
+    owner_user_id = _current_owner_user_id()
+    if owner_user_id is None:
+        return f"{alias}.owner_user_id IS NULL"
+    return f"{alias}.owner_user_id = {int(owner_user_id)}"
+
+
 def _derived_project_expr():
     folder_expr = _note_folder_match_expr()
     path_expr = _note_path_expr()
@@ -391,7 +408,8 @@ def _derived_project_expr():
         "("
         "SELECT MAX(LENGTH(pf_len.path_prefix)) "
         "FROM lp_project_folders pf_len "
-        "WHERE pf_len.is_enabled = 1 "
+        f"WHERE {_project_folder_owner_sql('pf_len')} "
+        "  AND pf_len.is_enabled = 1 "
         "  AND pf_len.folder_role IN ('default','include','archive','output') "
         f"  AND {folder_expr} IS NOT NULL "
         f"  AND lower({folder_expr}) LIKE lower(pf_len.path_prefix) || '%'"
@@ -401,8 +419,9 @@ def _derived_project_expr():
         "("
         "SELECT pf.project_id "
         "FROM lp_project_folders pf "
-        "LEFT JOIN lp_projects p ON p.project_id = pf.project_id "
-        "WHERE pf.is_enabled = 1 "
+        "LEFT JOIN lp_projects p ON p.owner_user_id IS pf.owner_user_id AND p.project_id = pf.project_id "
+        f"WHERE {_project_folder_owner_sql('pf')} "
+        "  AND pf.is_enabled = 1 "
         "  AND pf.folder_role IN ('default','include','archive','output') "
         f"  AND {folder_expr} IS NOT NULL "
         f"  AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%' "
@@ -424,7 +443,8 @@ def _derived_project_expr():
         "("
         "SELECT pf.project_id "
         "FROM lp_project_folders pf "
-        "WHERE pf.is_enabled = 1 "
+        f"WHERE {_project_folder_owner_sql('pf')} "
+        "  AND pf.is_enabled = 1 "
         "  AND pf.folder_role IN ('default','include','archive','output') "
         f"  AND {folder_expr} IS NOT NULL "
         f"  AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%' "
@@ -449,27 +469,28 @@ def _project_scope_ids(project):
     conn = data._get_conn()
     projects_mod.ensure_projects_schema(conn)
     project_lower = project.lower()
+    owner_user_id = _current_owner_user_id()
     ids = []
 
     exact = projects_mod.project_get(project, conn=conn)
     if exact:
         rows = conn.execute(
             "SELECT project_id FROM lp_projects "
-            "WHERE status = 'active' "
+            "WHERE owner_user_id IS ? AND status = 'active' "
             "AND (lower(project_id) = lower(?) OR lower(project_id) LIKE lower(?) || '/%') "
             "ORDER BY LENGTH(project_id), project_id",
-            (project, project),
+            (owner_user_id, project, project),
         ).fetchall()
     else:
         rows = conn.execute(
             "SELECT project_id FROM lp_projects "
-            "WHERE status = 'active' "
+            "WHERE owner_user_id IS ? AND status = 'active' "
             "AND (lower(project_id) LIKE lower(?) || '/%' "
             "     OR lower(tab) = ? "
             "     OR lower(group_name) = ? "
             "     OR lower(project_id) = ?) "
             "ORDER BY LENGTH(project_id), project_id",
-            (project, project_lower, project_lower, f"{project_lower}.{project_lower}.{project_lower}"),
+            (owner_user_id, project, project_lower, project_lower, f"{project_lower}.{project_lower}.{project_lower}"),
         ).fetchall()
 
     for row in rows:
@@ -486,7 +507,8 @@ def _notes_base_condition(project, folder_path=None):
         condition = (
             "NOT EXISTS ("
             "  SELECT 1 FROM lp_project_folders pf "
-            "  WHERE pf.is_enabled = 1 "
+            f"  WHERE {_project_folder_owner_sql('pf')} "
+            "    AND pf.is_enabled = 1 "
             "    AND pf.folder_role IN ('default','include','archive','output') "
             f"    AND {folder_expr} IS NOT NULL "
             f"    AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%'"
@@ -535,7 +557,22 @@ def _notes_url_args(project=None, folder_path=None, **extra):
     return args
 
 
-def _notes_root_path(project=None):
+def _current_user_notes_root(create_dirs=False):
+    try:
+        if getattr(current_user, "is_authenticated", False):
+            paths = user_paths.get_or_create_user_paths(
+                data._get_conn(),
+                current_user.user_id,
+                username=getattr(current_user, "username", None),
+                create_dirs=create_dirs,
+            )
+            return _normalize_note_path(paths.get("notes_root_path") or "")
+    except Exception:
+        return ""
+    return ""
+
+
+def _notes_root_path(project=None, *, create_dirs=False):
     tbl = get_table_def("notes")
     if not tbl:
         return None
@@ -552,12 +589,12 @@ def _notes_root_path(project=None):
     )
     row = data._get_conn().execute(sql, params).fetchone()
     if not row:
-        return None
+        return _current_user_notes_root(create_dirs=create_dirs) or None
     parts = [part for part in _normalize_folder_filter(row["path"]).split("\\") if part]
     for idx in range(len(parts) - 1):
         if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
             return "\\".join(parts[: idx + 2])
-    return None
+    return _current_user_notes_root(create_dirs=create_dirs) or None
 
 
 def _note_folder_breadcrumb(folder_path, project=None):
@@ -1912,7 +1949,7 @@ def _sync_notes_message(result):
 def sync_notes_route():
     folder_path = request.form.get("notes_folder", "").strip()
     if not folder_path:
-        folder_path = _notes_root_path() or ""
+        folder_path = _notes_root_path(create_dirs=True) or ""
     try:
         result = _sync_note_rows(folder_path)
         msg = _sync_notes_message(result)
@@ -2007,7 +2044,8 @@ def _rewrite_lp_project_folder_paths(conn, old_root, new_root):
     updated = 0
     rows = conn.execute(
         "SELECT project_folder_id, project_id, path_prefix FROM lp_project_folders "
-        "WHERE lower(path_prefix) = lower(?) OR lower(path_prefix) LIKE lower(?)",
+        f"WHERE {_project_folder_owner_sql('lp_project_folders')} "
+        "AND (lower(path_prefix) = lower(?) OR lower(path_prefix) LIKE lower(?))",
         (_normalize_note_path(old_root), _normalize_note_path(old_root) + "\\%"),
     ).fetchall()
     for row in rows:
@@ -2022,7 +2060,8 @@ def _rewrite_lp_project_folder_paths(conn, old_root, new_root):
             updated += 1
         except Exception:
             conflict = conn.execute(
-                "SELECT project_folder_id FROM lp_project_folders WHERE project_id = ? AND path_prefix = ?",
+                "SELECT project_folder_id FROM lp_project_folders "
+                f"WHERE {_project_folder_owner_sql('lp_project_folders')} AND project_id = ? AND path_prefix = ?",
                 (row["project_id"], next_path),
             ).fetchone()
             if conflict:

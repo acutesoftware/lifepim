@@ -254,6 +254,24 @@ def _table_has_project(conn, tbl_name):
     return _has_project_col(col_names)
 
 
+def _current_owner_user_id():
+    try:
+        from flask_login import current_user
+
+        if getattr(current_user, "is_authenticated", False):
+            return getattr(current_user, "user_id", None)
+    except Exception:
+        return None
+    return None
+
+
+def _project_folder_owner_sql(alias="pf"):
+    owner_user_id = _current_owner_user_id()
+    if owner_user_id is None:
+        return f"{alias}.owner_user_id IS NULL"
+    return f"{alias}.owner_user_id = {int(owner_user_id)}"
+
+
 def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None, order_by=None):
     conn = _get_conn() if conn is None else conn
     cols = _qualify_cols(col_list, "t")
@@ -268,7 +286,8 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE NOT EXISTS ("
                 "  SELECT 1 FROM lp_project_folders pf "
-                "  WHERE pf.is_enabled = 1 "
+                f"  WHERE {_project_folder_owner_sql('pf')} "
+                "    AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
                 "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
@@ -281,7 +300,8 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE EXISTS ("
                 "  SELECT 1 FROM lp_project_folders pf "
-                "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
+                f"  WHERE {_project_folder_owner_sql('pf')} "
+                "    AND pf.project_id = ? AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
                 "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
@@ -326,7 +346,8 @@ def count_mapped_rows(conn, tbl_name, tab=None):
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE NOT EXISTS ("
                 "  SELECT 1 FROM lp_project_folders pf "
-                "  WHERE pf.is_enabled = 1 "
+                f"  WHERE {_project_folder_owner_sql('pf')} "
+                "    AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
                 "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
@@ -338,7 +359,8 @@ def count_mapped_rows(conn, tbl_name, tab=None):
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE EXISTS ("
                 "  SELECT 1 FROM lp_project_folders pf "
-                "  WHERE pf.project_id = ? AND pf.is_enabled = 1 "
+                f"  WHERE {_project_folder_owner_sql('pf')} "
+                "    AND pf.project_id = ? AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
                 "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"

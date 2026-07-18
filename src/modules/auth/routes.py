@@ -41,10 +41,11 @@ def login():
     )
 
 
-@auth_bp.route("/logout", methods=["POST"])
+@auth_bp.route("/logout", methods=["GET", "POST"])
+@auth_bp.route("/auth/logout", methods=["GET", "POST"])
 def logout():
     response = make_response(redirect(url_for("auth.login")))
-    forget_device = request.form.get("forget_device", "1") == "1"
+    forget_device = request.values.get("forget_device", "1") == "1"
     return security.logout(response, forget_device=forget_device)
 
 
@@ -78,6 +79,7 @@ def user_profile():
 
 
 @auth_bp.route("/change-password", methods=["GET", "POST"])
+@auth_bp.route("/auth/change-password", methods=["GET", "POST"])
 def change_password():
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login"))

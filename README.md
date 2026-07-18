@@ -8,6 +8,11 @@ The current desktop app is a Flask web application that runs on your PC and
 uses a local SQLite database. The current entry point is `src/app.py`; on
 Windows the expected launcher is `src/RUN_DESKTOP.BAT`.
 
+LifePIM Desktop is a standalone tool. It does not require the mobile app,
+cloud sync, or LifePIM.com to run. When you want phone access, LifePIM Pocket
+can be paired as a mobile companion over the local network using the Pocket API
+served by Desktop through Caddy HTTPS.
+
 ## Current Status
 
 This is active v3 desktop development. The web UI is usable for local browsing
@@ -17,6 +22,8 @@ developer-oriented and machine-specific in places.
 Working at a high level:
 
 - Local Flask app served at `http://127.0.0.1:9741`
+- Optional LAN companion sync for LifePIM Pocket through
+  `https://192.168.1.99` via Caddy, with Waitress kept loopback-only
 - Overview dashboard with recent notes, tasks, and calendar context
 - Top-level modules for Calendar, Goals, Tasks, How, Notes, Data, Files, Media,
   Audio, 3D, Money, People, Places, Apps, Admin, Links, and Projects
@@ -143,6 +150,63 @@ refreshes folder/project mapping data. Do not run it against a database you want
 to preserve.
 
 More operational detail is in [doc/deploy.md](doc/deploy.md).
+
+## Mobile Companion
+
+LifePIM Desktop remains the standalone desktop application and source of the
+local SQLite-backed data. LifePIM Pocket is optional and should be treated as a
+LAN companion, not as a required service or public cloud client.
+
+The companion setup requires:
+
+- Desktop running Waitress on `127.0.0.1:9741`.
+- Caddy listening on the Desktop LAN IP, currently `192.168.1.99`, and reverse
+  proxying HTTPS traffic to Waitress.
+- Pocket configured with `https://192.168.1.99`; HTTP Pocket API access is not
+  supported for normal use.
+- Pocket built with the public Caddy local root certificate for this Desktop
+  installation. The private Caddy CA key stays on the Desktop machine and must
+  not be copied into the mobile project or committed.
+- A logged-in Desktop user creating a one-time Pocket pairing code under
+  Trusted devices. Pocket registration uses that code plus the device identity,
+  then sends `Authorization: Bearer <device_token>` and
+  `X-LifePIM-Device-ID: <device_id>` on API calls.
+
+Pocket currently syncs with Desktop through explicit directions:
+
+- `Sync Mobile to LAN Server` uploads local Pocket changes to Desktop through
+  `/api/pocket/v1/sync/push`.
+- `Sync from LAN Server` reads Desktop's manifest from
+  `/api/pocket/v1/sync/manifest` and downloads item content from
+  `/api/pocket/v1/items/<item_id>`.
+
+Desktop rejects unauthenticated or revoked devices, scopes manifest and item
+access to the paired user, limits sync payload size, and returns conflicts when
+Desktop and Pocket have both changed a note and Desktop cannot safely accept the
+mobile overwrite. More detail is in [doc/network.md](doc/network.md).
+
+## Per-User File Roots
+
+Notes are user-owned in the database and new note files are also separated by
+user on disk. Existing `duncan` note and project-folder settings are preserved
+so the production desktop login continues using the current folders.
+
+New users get a default root under:
+
+```text
+N:\duncan\LifePIM_Data\DATA\lan_users\<username>
+```
+
+LifePIM creates these subfolders for new users:
+
+```text
+notes
+projects
+lists
+```
+
+Project default note folders for new users are created under that user's
+`notes` root. Media and audio remain global.
 
 ## Tests
 

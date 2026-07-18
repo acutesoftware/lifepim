@@ -22,18 +22,18 @@
       <div class="dropdown-menu" id="menuDropdown">
         <a href="#" id="showSidebar">Show project list</a>
         <a href="#" id="hideSidebar">Hide project list</a>
-        <a href="{{ url_for('projects.edit_projects_route') }}">Edit projects</a>
+        <a href="/projects/edit">Edit projects</a>
         <div class="menu-spacer"></div>
-        <a href="{{ url_for('admin.settings_route') }}">Settings</a>
-        <a href="{{ url_for('help_route') }}">Help</a>
-        <a href="{{ url_for('admin.user_history_route') }}">User history</a>
+        <a href="/admin/settings">Settings</a>
+        <a href="/help">Help</a>
+        <a href="/admin/user-history">User history</a>
         {% if security_current_user is defined and security_current_user.is_authenticated %}
         {% if security_current_user.role == 'admin' %}
-        <a href="{{ url_for('admin.users_route') }}">Users</a>
-        <a href="{{ url_for('admin.trusted_devices_route') }}">Trusted devices</a>
+        <a href="/admin/users">Users</a>
+        <a href="/admin/trusted-devices">Trusted devices</a>
         {% endif %}
-        <a href="{{ url_for('auth.change_password') }}">Change password</a>
-        <form method="post" action="{{ url_for('auth.logout') }}" style="margin:0;">
+        <a href="/change-password">Change password</a>
+        <form method="post" action="/logout" style="margin:0;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="forget_device" value="1">
           <button type="submit" style="width:100%; text-align:left;">Log out</button>

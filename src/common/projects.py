@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from common import data as db
 from common import config as cfg
+from common import user_paths
 
 PROJECTS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS lp_projects (
@@ -33,6 +34,7 @@ ON lp_projects (owner_user_id, status);
 
 CREATE TABLE IF NOT EXISTS lp_project_folders (
     project_folder_id    INTEGER PRIMARY KEY,
+    owner_user_id        INTEGER,
     project_id           TEXT NOT NULL,
     path_prefix          TEXT NOT NULL,
     folder_role          TEXT NOT NULL,
@@ -45,17 +47,17 @@ CREATE TABLE IF NOT EXISTS lp_project_folders (
     is_enabled           INTEGER NOT NULL DEFAULT 1,
     created_utc          TEXT NOT NULL,
     updated_utc          TEXT NOT NULL,
-    UNIQUE (project_id, path_prefix)
+    UNIQUE (owner_user_id, project_id, path_prefix)
 );
 
 CREATE INDEX IF NOT EXISTS idx_lp_project_folders_project
-ON lp_project_folders (project_id, folder_role, sort_order);
+ON lp_project_folders (owner_user_id, project_id, folder_role, sort_order);
 
 CREATE INDEX IF NOT EXISTS idx_lp_project_folders_path
 ON lp_project_folders (path_prefix);
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_lp_project_default_folder
-ON lp_project_folders (project_id)
+ON lp_project_folders (owner_user_id, project_id)
 WHERE folder_role = 'default' AND is_enabled = 1;
 """
 
@@ -75,6 +77,7 @@ def _get_conn(conn=None):
 def ensure_projects_schema(conn=None):
     conn = _get_conn(conn)
     _migrate_projects_schema(conn)
+    _migrate_project_folders_schema(conn)
     conn.executescript(PROJECTS_SCHEMA)
     conn.commit()
 
@@ -127,6 +130,81 @@ def _migrate_projects_schema(conn):
     conn.commit()
 
 
+def _duncan_user_id(conn):
+    try:
+        row = conn.execute(
+            "SELECT user_id FROM users WHERE lower(username) = 'duncan' ORDER BY user_id LIMIT 1"
+        ).fetchone()
+    except Exception:
+        return None
+    return row["user_id"] if row else None
+
+
+def _single_project_owner(conn, project_id):
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT owner_user_id FROM lp_projects WHERE project_id = ?",
+            (project_id,),
+        ).fetchall()
+    except Exception:
+        return None
+    owners = [row["owner_user_id"] for row in rows if row["owner_user_id"] is not None]
+    return owners[0] if len(owners) == 1 else None
+
+
+def _migrate_project_folders_schema(conn):
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lp_project_folders'"
+    ).fetchone()
+    if not exists:
+        return
+    columns = _table_columns(conn, "lp_project_folders")
+    column_names = {row["name"] for row in columns}
+    if "owner_user_id" in column_names:
+        return
+    legacy_rows = conn.execute("SELECT * FROM lp_project_folders").fetchall()
+    conn.execute("ALTER TABLE lp_project_folders RENAME TO lp_project_folders_legacy")
+    for index_name in (
+        "idx_lp_project_folders_project",
+        "idx_lp_project_folders_path",
+        "ux_lp_project_default_folder",
+    ):
+        conn.execute(f"DROP INDEX IF EXISTS {index_name}")
+    conn.executescript(PROJECTS_SCHEMA)
+    duncan_user_id = _duncan_user_id(conn)
+    for row in legacy_rows:
+        owner_user_id = duncan_user_id
+        if owner_user_id is None:
+            owner_user_id = _single_project_owner(conn, row["project_id"])
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO lp_project_folders "
+                "(project_folder_id, owner_user_id, project_id, path_prefix, folder_role, create_type, "
+                "is_write_enabled, confidence, tags, notes, sort_order, is_enabled, created_utc, updated_utc) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    row["project_folder_id"],
+                    owner_user_id,
+                    row["project_id"],
+                    row["path_prefix"],
+                    row["folder_role"],
+                    row["create_type"],
+                    row["is_write_enabled"],
+                    row["confidence"],
+                    row["tags"],
+                    row["notes"],
+                    row["sort_order"],
+                    row["is_enabled"],
+                    row["created_utc"],
+                    row["updated_utc"],
+                ),
+            )
+        except sqlite3.IntegrityError:
+            pass
+    conn.execute("DROP TABLE lp_project_folders_legacy")
+    conn.commit()
+
+
 def _current_owner_user_id():
     try:
         from flask_login import current_user
@@ -151,6 +229,10 @@ def _current_username():
 
 def _owner_user_id(owner_user_id=None):
     return _current_owner_user_id() if owner_user_id is None else owner_user_id
+
+
+def _owner_condition(column="owner_user_id", owner_user_id=None):
+    return f"{column} IS ?", [_owner_user_id(owner_user_id)]
 
 
 def _int_value(value, default=0):
@@ -311,6 +393,7 @@ def seed_default_projects_for_user(owner_user_id=None, conn=None, replace=False)
             replace = True
         else:
             conn.execute("UPDATE lp_projects SET owner_user_id = ? WHERE owner_user_id IS NULL", (owner_user_id,))
+            claim_legacy_project_folders_for_user(owner_user_id, conn=conn)
             conn.commit()
             return int(legacy["cnt"] or 0)
     if existing and int(existing["cnt"] or 0) and not replace:
@@ -323,6 +406,26 @@ def seed_default_projects_for_user(owner_user_id=None, conn=None, replace=False)
         project_upsert(row, conn=conn, owner_user_id=owner_user_id)
         count += 1
     return count
+
+
+def claim_legacy_project_folders_for_user(owner_user_id, conn=None):
+    if owner_user_id is None:
+        return 0
+    conn = _get_conn(conn)
+    ensure_projects_schema(conn)
+    cur = conn.execute(
+        """
+        UPDATE lp_project_folders
+        SET owner_user_id = ?
+        WHERE owner_user_id IS NULL
+          AND project_id IN (
+              SELECT project_id FROM lp_projects WHERE owner_user_id IS ?
+          )
+        """,
+        (owner_user_id, owner_user_id),
+    )
+    conn.commit()
+    return cur.rowcount if cur.rowcount is not None else 0
 
 
 def projects_side_tabs(owner_user_id=None, conn=None, seed=True):
@@ -503,17 +606,18 @@ def project_set_status(project_id, status, conn=None, owner_user_id=None):
     conn.commit()
 
 
-def project_folders_list(project_id, include_disabled=False, conn=None):
+def project_folders_list(project_id, include_disabled=False, conn=None, owner_user_id=None):
     if not project_id:
         return []
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
-    params = [project_id]
-    condition = "project_id = ?"
+    owner_condition, owner_params = _owner_condition("owner_user_id", owner_user_id)
+    params = owner_params + [project_id]
+    condition = f"{owner_condition} AND project_id = ?"
     if not include_disabled:
         condition += " AND is_enabled = 1"
     sql = (
-        "SELECT project_folder_id, project_id, path_prefix, folder_role, create_type, "
+        "SELECT project_folder_id, owner_user_id, project_id, path_prefix, folder_role, create_type, "
         "is_write_enabled, confidence, tags, notes, sort_order, is_enabled, "
         "created_utc, updated_utc "
         f"FROM lp_project_folders WHERE {condition} "
@@ -540,42 +644,28 @@ def project_folder_add(
     sort_order=100,
     is_enabled=1,
     conn=None,
+    owner_user_id=None,
 ):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
     if not project_id:
         raise ValueError("project_id is required.")
+    owner_user_id = _owner_user_id(owner_user_id)
     normalized = normalize_path_prefix(path_prefix)
     now = _utc_now()
     wants_default = folder_role == "default"
     insert_role = "include" if wants_default else folder_role
     insert_write = 0 if wants_default else int(is_write_enabled)
-    try:
-        conn.execute(
-            "INSERT INTO lp_project_folders "
-            "(project_id, path_prefix, folder_role, create_type, is_write_enabled, "
-            "confidence, tags, notes, sort_order, is_enabled, created_utc, updated_utc) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                project_id,
-                normalized,
-                insert_role,
-                create_type,
-                insert_write,
-                float(confidence),
-                tags,
-                notes,
-                int(sort_order),
-                int(is_enabled),
-                now,
-                now,
-            ),
-        )
-    except sqlite3.IntegrityError:
+    existing = conn.execute(
+        "SELECT project_folder_id FROM lp_project_folders "
+        "WHERE owner_user_id IS ? AND project_id = ? AND path_prefix = ?",
+        (owner_user_id, project_id, normalized),
+    ).fetchone()
+    if existing:
         conn.execute(
             "UPDATE lp_project_folders SET folder_role = ?, create_type = ?, "
             "is_write_enabled = ?, confidence = ?, tags = ?, notes = ?, sort_order = ?, "
-            "is_enabled = ?, updated_utc = ? WHERE project_id = ? AND path_prefix = ?",
+            "is_enabled = ?, updated_utc = ? WHERE project_folder_id = ?",
             (
                 insert_role,
                 create_type,
@@ -586,95 +676,162 @@ def project_folder_add(
                 int(sort_order),
                 int(is_enabled),
                 now,
-                project_id,
-                normalized,
+                existing["project_folder_id"],
             ),
         )
+        folder_id = existing["project_folder_id"]
+    else:
+        try:
+            conn.execute(
+                "INSERT INTO lp_project_folders "
+                "(owner_user_id, project_id, path_prefix, folder_role, create_type, is_write_enabled, "
+                "confidence, tags, notes, sort_order, is_enabled, created_utc, updated_utc) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    owner_user_id,
+                    project_id,
+                    normalized,
+                    insert_role,
+                    create_type,
+                    insert_write,
+                    float(confidence),
+                    tags,
+                    notes,
+                    int(sort_order),
+                    int(is_enabled),
+                    now,
+                    now,
+                ),
+            )
+        except sqlite3.IntegrityError:
+            conn.execute(
+                "UPDATE lp_project_folders SET folder_role = ?, create_type = ?, "
+                "is_write_enabled = ?, confidence = ?, tags = ?, notes = ?, sort_order = ?, "
+                "is_enabled = ?, updated_utc = ? WHERE owner_user_id IS ? AND project_id = ? AND path_prefix = ?",
+                (
+                    insert_role,
+                    create_type,
+                    insert_write,
+                    float(confidence),
+                    tags,
+                    notes,
+                    int(sort_order),
+                    int(is_enabled),
+                    now,
+                    owner_user_id,
+                    project_id,
+                    normalized,
+                ),
+            )
+        row = conn.execute(
+            "SELECT project_folder_id FROM lp_project_folders "
+            "WHERE owner_user_id IS ? AND project_id = ? AND path_prefix = ?",
+            (owner_user_id, project_id, normalized),
+        ).fetchone()
+        folder_id = row["project_folder_id"] if row else None
     conn.commit()
-    row = conn.execute(
-        "SELECT project_folder_id FROM lp_project_folders WHERE project_id = ? AND path_prefix = ?",
-        (project_id, normalized),
-    ).fetchone()
-    folder_id = row["project_folder_id"] if row else None
     if wants_default and folder_id:
-        project_folder_set_default(project_id, folder_id, conn=conn)
+        project_folder_set_default(project_id, folder_id, conn=conn, owner_user_id=owner_user_id)
     return folder_id
 
 
-def project_folder_set_default(project_id, project_folder_id, conn=None):
+def project_folder_set_default(project_id, project_folder_id, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    selected = conn.execute(
+        "SELECT project_folder_id FROM lp_project_folders "
+        "WHERE project_folder_id = ? AND owner_user_id IS ? AND project_id = ?",
+        (project_folder_id, owner_user_id, project_id),
+    ).fetchone()
+    if not selected:
+        return False
     now = _utc_now()
     conn.execute("BEGIN")
     conn.execute(
         "UPDATE lp_project_folders SET folder_role = 'include', is_write_enabled = 0, updated_utc = ? "
-        "WHERE project_id = ? AND folder_role = 'default'",
-        (now, project_id),
+        "WHERE owner_user_id IS ? AND project_id = ? AND folder_role = 'default'",
+        (now, owner_user_id, project_id),
     )
     conn.execute(
         "UPDATE lp_project_folders SET folder_role = 'default', is_write_enabled = 1, "
-        "is_enabled = 1, updated_utc = ? WHERE project_folder_id = ? AND project_id = ?",
-        (now, project_folder_id, project_id),
+        "is_enabled = 1, updated_utc = ? "
+        "WHERE project_folder_id = ? AND owner_user_id IS ? AND project_id = ?",
+        (now, project_folder_id, owner_user_id, project_id),
     )
     conn.commit()
+    return True
 
 
-def project_folder_disable(project_folder_id, conn=None):
+def project_folder_disable(project_folder_id, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     conn.execute(
         "UPDATE lp_project_folders SET is_enabled = 0, is_write_enabled = 0, updated_utc = ? "
-        "WHERE project_folder_id = ?",
-        (_utc_now(), project_folder_id),
+        "WHERE project_folder_id = ? AND owner_user_id IS ?",
+        (_utc_now(), project_folder_id, owner_user_id),
     )
     conn.commit()
 
 
-def project_folder_enable(project_folder_id, conn=None):
+def project_folder_enable(project_folder_id, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
-    folder = project_folder_get(project_folder_id, conn=conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    folder = project_folder_get(project_folder_id, conn=conn, owner_user_id=owner_user_id)
     if not folder:
         return
     if folder.get("folder_role") == "default":
-        project_folder_set_default(folder["project_id"], project_folder_id, conn=conn)
+        project_folder_set_default(
+            folder["project_id"],
+            project_folder_id,
+            conn=conn,
+            owner_user_id=folder.get("owner_user_id"),
+        )
         return
     conn.execute(
         "UPDATE lp_project_folders SET is_enabled = 1, updated_utc = ? "
-        "WHERE project_folder_id = ?",
-        (_utc_now(), project_folder_id),
+        "WHERE project_folder_id = ? AND owner_user_id IS ?",
+        (_utc_now(), project_folder_id, owner_user_id),
     )
     conn.commit()
 
 
-def project_folder_remove(project_folder_id, conn=None):
+def project_folder_remove(project_folder_id, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
-    conn.execute("DELETE FROM lp_project_folders WHERE project_folder_id = ?", (project_folder_id,))
+    owner_user_id = _owner_user_id(owner_user_id)
+    conn.execute(
+        "DELETE FROM lp_project_folders WHERE project_folder_id = ? AND owner_user_id IS ?",
+        (project_folder_id, owner_user_id),
+    )
     conn.commit()
 
 
-def project_folder_get(project_folder_id, conn=None):
+def project_folder_get(project_folder_id, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     row = conn.execute(
-        "SELECT project_folder_id, project_id, path_prefix, folder_role, create_type, "
+        "SELECT project_folder_id, owner_user_id, project_id, path_prefix, folder_role, create_type, "
         "is_write_enabled, confidence, tags, notes, sort_order, is_enabled, created_utc, updated_utc "
-        "FROM lp_project_folders WHERE project_folder_id = ?",
-        (project_folder_id,),
+        "FROM lp_project_folders WHERE project_folder_id = ? AND owner_user_id IS ?",
+        (project_folder_id, owner_user_id),
     ).fetchone()
     return dict(row) if row else None
 
 
-def project_default_folder_get(project_id, conn=None):
+def project_default_folder_get(project_id, conn=None, owner_user_id=None):
     if not project_id:
         return None
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     rows = conn.execute(
         "SELECT path_prefix FROM lp_project_folders "
-        "WHERE project_id = ? AND folder_role = 'default' AND is_enabled = 1",
-        (project_id,),
+        "WHERE owner_user_id IS ? AND project_id = ? AND folder_role = 'default' AND is_enabled = 1",
+        (owner_user_id, project_id),
     ).fetchall()
     if not rows:
         return None
@@ -683,41 +840,44 @@ def project_default_folder_get(project_id, conn=None):
     return rows[0]["path_prefix"]
 
 
-def project_folder_scope(project_id, conn=None):
+def project_folder_scope(project_id, conn=None, owner_user_id=None):
     if not project_id:
         return []
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     rows = conn.execute(
-        "SELECT project_folder_id, project_id, path_prefix, folder_role, create_type, "
+        "SELECT project_folder_id, owner_user_id, project_id, path_prefix, folder_role, create_type, "
         "is_write_enabled, confidence, tags, notes, sort_order, is_enabled, created_utc, updated_utc "
         "FROM lp_project_folders "
-        "WHERE project_id = ? AND is_enabled = 1 "
+        "WHERE owner_user_id IS ? AND project_id = ? AND is_enabled = 1 "
         "AND folder_role IN ('default','include','archive','output') "
         "ORDER BY CASE folder_role WHEN 'default' THEN 0 WHEN 'include' THEN 1 "
         "WHEN 'output' THEN 2 WHEN 'archive' THEN 3 ELSE 9 END, sort_order, path_prefix",
-        (project_id,),
+        (owner_user_id, project_id),
     ).fetchall()
     return [dict(row) for row in rows]
 
 
-def diagnose_projects(conn=None):
+def diagnose_projects(conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     issues = {
         "missing_default": [],
         "disabled_default": [],
         "multiple_default": [],
     }
     rows = conn.execute(
-        "SELECT project_id, project_name FROM lp_projects WHERE status = 'active'"
+        "SELECT project_id, project_name FROM lp_projects WHERE owner_user_id IS ? AND status = 'active'",
+        (owner_user_id,),
     ).fetchall()
     for row in rows:
         project_id = row["project_id"]
         defaults = conn.execute(
             "SELECT project_folder_id, is_enabled FROM lp_project_folders "
-            "WHERE project_id = ? AND folder_role = 'default'",
-            (project_id,),
+            "WHERE owner_user_id IS ? AND project_id = ? AND folder_role = 'default'",
+            (owner_user_id, project_id),
         ).fetchall()
         if not defaults:
             issues["missing_default"].append(project_id)
@@ -730,30 +890,37 @@ def diagnose_projects(conn=None):
     return issues
 
 
-def assign_defaults_if_missing(conn=None):
+def assign_defaults_if_missing(conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     rows = conn.execute(
-        "SELECT project_id FROM lp_projects WHERE status = 'active'"
+        "SELECT project_id FROM lp_projects WHERE owner_user_id IS ? AND status = 'active'",
+        (owner_user_id,),
     ).fetchall()
     updated = 0
     for row in rows:
         project_id = row["project_id"]
         defaults = conn.execute(
             "SELECT project_folder_id FROM lp_project_folders "
-            "WHERE project_id = ? AND folder_role = 'default' AND is_enabled = 1",
-            (project_id,),
+            "WHERE owner_user_id IS ? AND project_id = ? AND folder_role = 'default' AND is_enabled = 1",
+            (owner_user_id, project_id),
         ).fetchall()
         if defaults:
             continue
         candidate = conn.execute(
             "SELECT project_folder_id FROM lp_project_folders "
-            "WHERE project_id = ? AND is_enabled = 1 "
+            "WHERE owner_user_id IS ? AND project_id = ? AND is_enabled = 1 "
             "ORDER BY sort_order, path_prefix LIMIT 1",
-            (project_id,),
+            (owner_user_id, project_id),
         ).fetchone()
         if candidate:
-            project_folder_set_default(project_id, candidate["project_folder_id"], conn=conn)
+            project_folder_set_default(
+                project_id,
+                candidate["project_folder_id"],
+                conn=conn,
+                owner_user_id=owner_user_id,
+            )
             updated += 1
     return updated
 
@@ -763,11 +930,13 @@ def import_project_mappings_csv(
     *,
     default_flag_columns=None,
     conn=None,
+    owner_user_id=None,
 ):
     import csv
 
     conn = _get_conn(conn)
     ensure_projects_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
     default_flag_columns = default_flag_columns or ["is_default", "default", "folder_role"]
 
     def _slug(value):
@@ -893,6 +1062,7 @@ def import_project_mappings_csv(
                     "notes": row.get("notes"),
                 },
                 conn=conn,
+                owner_user_id=owner_user_id,
             )
             path_prefix = row.get("path_prefix") or ""
             folder_role = "include"
@@ -915,4 +1085,53 @@ def import_project_mappings_csv(
                 tags=row.get("tags"),
                 notes=row.get("notes"),
                 conn=conn,
+                owner_user_id=owner_user_id,
             )
+
+
+def ensure_default_project_folders_for_user(owner_user_id, username=None, conn=None, create_dirs=True):
+    conn = _get_conn(conn)
+    ensure_projects_schema(conn)
+    if owner_user_id is None:
+        return 0
+    paths = user_paths.get_or_create_user_paths(
+        conn,
+        owner_user_id,
+        username=username,
+        create_dirs=create_dirs,
+    )
+    notes_root = user_paths.normalize_path(paths.get("notes_root_path") or "")
+    if not notes_root:
+        return 0
+    if create_dirs:
+        for key in ("file_root_path", "notes_root_path", "projects_root_path", "lists_root_path"):
+            path_value = paths.get(key)
+            if path_value:
+                os.makedirs(path_value, exist_ok=True)
+    rows = projects_list_sidebar(conn=conn, owner_user_id=owner_user_id)
+    created = 0
+    for row in rows:
+        if int(row.get("is_header") or 0) or int(row.get("is_system") or 0):
+            continue
+        project_id = row.get("project_id") or ""
+        if not project_id:
+            continue
+        if project_default_folder_get(project_id, conn=conn, owner_user_id=owner_user_id):
+            continue
+        folder_name = user_paths.safe_project_folder_name(project_id, row.get("project_name") or "")
+        folder_path = user_paths.normalize_path(os.path.join(notes_root, folder_name))
+        if create_dirs:
+            os.makedirs(folder_path, exist_ok=True)
+        project_folder_add(
+            project_id,
+            folder_path,
+            folder_role="default",
+            create_type="markdown",
+            is_write_enabled=1,
+            tags="user_default",
+            notes="Default per-user notes folder",
+            conn=conn,
+            owner_user_id=owner_user_id,
+        )
+        created += 1
+    return created

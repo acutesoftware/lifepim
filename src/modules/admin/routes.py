@@ -8,6 +8,7 @@ from common import config as cfg
 from common import media_migration
 from common import note_search_index
 from common import settings as settings_mod
+from common import user_paths
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr, paginate_total, build_pagination
 from modules.calendar.services import calendar_index
 from modules.pocket_api import routes as pocket_api
@@ -662,22 +663,90 @@ def users_route():
     )
 
 
+def _requested_username(default="username"):
+    return (request.form.get("username") or request.args.get("username") or default).strip() or default
+
+
+def _resolve_username_segment(path_value, username):
+    path_value = user_paths.normalize_path(path_value)
+    username = (username or "").strip()
+    if not path_value or not username or username.lower() == "username":
+        return path_value
+    parts = path_value.split("\\")
+    changed = False
+    safe_username = user_paths.safe_path_segment(username)
+    for idx, part in enumerate(parts):
+        if part.lower() == "username":
+            parts[idx] = safe_username
+            changed = True
+    return "\\".join(parts) if changed else path_value
+
+
+def _default_or_submitted_user_paths(username):
+    defaults = user_paths.default_paths_for_username(username or "username")
+    if request.method != "POST":
+        return defaults
+    file_root = _resolve_username_segment(
+        request.form.get("file_root_path", "").strip() or defaults.get("file_root_path") or "",
+        username,
+    )
+    derived = user_paths.paths_from_root(file_root)
+    return {
+        "file_root_path": user_paths.normalize_path(file_root),
+        "notes_root_path": _resolve_username_segment(
+            request.form.get("notes_root_path", "").strip() or derived.get("notes_root_path") or defaults.get("notes_root_path")
+            or "",
+            username,
+        ),
+        "projects_root_path": _resolve_username_segment(
+            request.form.get("projects_root_path", "").strip()
+            or derived.get("projects_root_path")
+            or defaults.get("projects_root_path")
+            or "",
+            username,
+        ),
+        "lists_root_path": _resolve_username_segment(
+            request.form.get("lists_root_path", "").strip() or derived.get("lists_root_path") or defaults.get("lists_root_path")
+            or "",
+            username,
+        ),
+    }
+
+
 @admin_bp.route("/users/new", methods=["GET", "POST"])
 def new_user_route():
     security.require_role("admin")
     error = ""
+    form_username = _requested_username()
+    form_paths = _default_or_submitted_user_paths(form_username)
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         display_name = request.form.get("display_name", "").strip()
         password = request.form.get("password", "")
         role = request.form.get("role", "user")
-        pocket_default_note_folder = request.form.get("pocket_default_note_folder", "").strip()
+        form_username = username or form_username
+        form_paths = _default_or_submitted_user_paths(form_username)
+        pocket_default_note_folder = _resolve_username_segment(
+            request.form.get("pocket_default_note_folder", "").strip(),
+            form_username,
+        )
         if not username or not display_name or not password:
             error = "Username, display name, and password are required."
         else:
             try:
-                user_id = security.create_user(username, display_name, password, role=role, is_active=True)
-                pocket_api.set_user_default_note_folder(user_id, pocket_default_note_folder)
+                user_id = security.create_user(
+                    username,
+                    display_name,
+                    password,
+                    role=role,
+                    is_active=True,
+                    file_paths=form_paths,
+                )
+                paths = user_paths.get_or_create_user_paths(db._get_conn(), user_id, username=username, create_dirs=True)
+                pocket_api.set_user_default_note_folder(
+                    user_id,
+                    pocket_default_note_folder or paths.get("notes_root_path") or "",
+                )
                 return redirect(url_for("admin.users_route", message=f"Created user {username}."))
             except Exception as exc:
                 error = f"User creation failed: {exc}"
@@ -689,7 +758,10 @@ def new_user_route():
         content_title="New User",
         content_html="",
         user=None,
-        pocket_settings={"default_note_folder": request.form.get("pocket_default_note_folder", "")},
+        pocket_settings={
+            "default_note_folder": request.form.get("pocket_default_note_folder", "") or form_paths.get("notes_root_path", "")
+        },
+        user_paths=form_paths,
         error=error,
     )
 
@@ -710,11 +782,18 @@ def edit_user_route(user_id):
                 request.form.get("role", "user"),
                 request.form.get("is_active") == "1",
             )
-            pocket_api.set_user_default_note_folder(user_id, request.form.get("pocket_default_note_folder", ""))
+            paths = _default_or_submitted_user_paths(request.form.get("username", row["username"]))
+            user_paths.set_user_paths(db._get_conn(), user_id, paths, create_dirs=True)
+            pocket_default_note_folder = _resolve_username_segment(
+                request.form.get("pocket_default_note_folder", ""),
+                request.form.get("username", row["username"]),
+            )
+            pocket_api.set_user_default_note_folder(user_id, pocket_default_note_folder)
             return redirect(url_for("admin.users_route", message="User updated."))
         except Exception as exc:
             error = f"User update failed: {exc}"
     pocket_settings = pocket_api.get_user_pocket_settings(user_id)
+    paths = user_paths.get_or_create_user_paths(db._get_conn(), user_id, username=row["username"], create_dirs=False)
     if request.method == "POST" and error:
         pocket_settings["default_note_folder"] = request.form.get("pocket_default_note_folder", "")
     return render_template(
@@ -726,6 +805,7 @@ def edit_user_route(user_id):
         content_html="",
         user=dict(row),
         pocket_settings=pocket_settings,
+        user_paths=paths,
         error=error,
     )
 

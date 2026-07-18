@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import tempfile
 import unittest
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
@@ -42,6 +43,7 @@ class TestProjects(unittest.TestCase):
         cols = [row[1] for row in self.conn.execute("PRAGMA table_info(lp_project_folders)").fetchall()]
         expected = [
             "project_folder_id",
+            "owner_user_id",
             "project_id",
             "path_prefix",
             "folder_role",
@@ -140,6 +142,176 @@ class TestProjects(unittest.TestCase):
         id2 = projects.project_folder_add("proj.two", path, conn=self.conn)
         self.assertTrue(id1)
         self.assertTrue(id2)
+
+    def test_project_folders_are_scoped_by_user(self):
+        project_id = "pers/health"
+        folder_ids = {}
+        for owner_id, path in [(1, r"C:\\Users\\One\\notes\\health"), (2, r"C:\\Users\\Two\\notes\\health")]:
+            projects.project_upsert(
+                {
+                    "project_id": project_id,
+                    "tab": "PERS",
+                    "group_name": "PERS",
+                    "project_name": "Health",
+                },
+                owner_user_id=owner_id,
+                conn=self.conn,
+            )
+            folder_ids[owner_id] = projects.project_folder_add(
+                project_id,
+                path,
+                folder_role="default",
+                is_write_enabled=1,
+                owner_user_id=owner_id,
+                conn=self.conn,
+            )
+
+        self.assertIn(
+            r"One\notes\health".lower(),
+            projects.project_default_folder_get(project_id, owner_user_id=1, conn=self.conn).lower(),
+        )
+        self.assertIn(
+            r"Two\notes\health".lower(),
+            projects.project_default_folder_get(project_id, owner_user_id=2, conn=self.conn).lower(),
+        )
+        self.assertEqual(
+            len(projects.project_folders_list(project_id, owner_user_id=1, conn=self.conn)),
+            1,
+        )
+        projects.project_folder_set_default(project_id, folder_ids[2], owner_user_id=1, conn=self.conn)
+        self.assertIn(
+            r"One\notes\health".lower(),
+            projects.project_default_folder_get(project_id, owner_user_id=1, conn=self.conn).lower(),
+        )
+        projects.project_folder_disable(folder_ids[2], owner_user_id=1, conn=self.conn)
+        row = self.conn.execute(
+            "SELECT is_enabled FROM lp_project_folders WHERE project_folder_id = ?",
+            (folder_ids[2],),
+        ).fetchone()
+        self.assertEqual(row["is_enabled"], 1)
+        projects.project_folder_remove(folder_ids[2], owner_user_id=1, conn=self.conn)
+        row = self.conn.execute(
+            "SELECT project_folder_id FROM lp_project_folders WHERE project_folder_id = ?",
+            (folder_ids[2],),
+        ).fetchone()
+        self.assertIsNotNone(row)
+
+    def test_default_project_folders_for_new_user_use_user_notes_root(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_env = os.environ.get("LIFEPIM_LAN_USER_ROOT_BASE")
+            os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = tmpdir
+            try:
+                self.conn.execute(
+                    """
+                    CREATE TABLE users (
+                        user_id INTEGER PRIMARY KEY,
+                        username TEXT,
+                        display_name TEXT,
+                        password_hash TEXT,
+                        role TEXT,
+                        is_active INTEGER
+                    )
+                    """
+                )
+                self.conn.execute(
+                    "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
+                    "VALUES (7, 'alice', 'Alice', 'hash', 'user', 1)"
+                )
+                projects.seed_default_projects_for_user(7, conn=self.conn)
+
+                created = projects.ensure_default_project_folders_for_user(
+                    7,
+                    username="alice",
+                    conn=self.conn,
+                    create_dirs=True,
+                )
+
+                self.assertGreater(created, 0)
+                default_path = projects.project_default_folder_get(
+                    "pers/health",
+                    owner_user_id=7,
+                    conn=self.conn,
+                )
+                expected_prefix = os.path.join(tmpdir, "alice", "notes")
+                self.assertTrue(default_path.lower().startswith(expected_prefix.lower()))
+                self.assertTrue(os.path.isdir(os.path.join(tmpdir, "alice", "notes")))
+                self.assertTrue(os.path.isdir(os.path.join(tmpdir, "alice", "projects")))
+                self.assertTrue(os.path.isdir(os.path.join(tmpdir, "alice", "lists")))
+            finally:
+                if old_env is None:
+                    os.environ.pop("LIFEPIM_LAN_USER_ROOT_BASE", None)
+                else:
+                    os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = old_env
+
+    def test_legacy_project_folders_are_claimed_for_duncan_on_migration(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute(
+                "CREATE TABLE users (user_id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, password_hash TEXT, role TEXT, is_active INTEGER)"
+            )
+            conn.execute(
+                "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
+                "VALUES (3, 'duncan', 'Duncan', 'hash', 'admin', 1)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE lp_projects (
+                    owner_user_id INTEGER,
+                    project_id TEXT,
+                    icon TEXT,
+                    tab TEXT,
+                    group_name TEXT,
+                    project_name TEXT,
+                    is_header INTEGER,
+                    is_system INTEGER,
+                    status TEXT,
+                    tags TEXT,
+                    sort_order INTEGER,
+                    pinned INTEGER,
+                    notes TEXT,
+                    created_utc TEXT,
+                    updated_utc TEXT
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO lp_projects VALUES (3, 'pers/health', '', 'PERS', 'PERS', 'Health', 0, 0, 'active', NULL, 10, 0, NULL, 'now', 'now')"
+            )
+            conn.execute(
+                """
+                CREATE TABLE lp_project_folders (
+                    project_folder_id INTEGER PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    path_prefix TEXT NOT NULL,
+                    folder_role TEXT NOT NULL,
+                    create_type TEXT NOT NULL DEFAULT 'none',
+                    is_write_enabled INTEGER NOT NULL DEFAULT 0,
+                    confidence REAL NOT NULL DEFAULT 1.0,
+                    tags TEXT,
+                    notes TEXT,
+                    sort_order INTEGER NOT NULL DEFAULT 100,
+                    is_enabled INTEGER NOT NULL DEFAULT 1,
+                    created_utc TEXT NOT NULL,
+                    updated_utc TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO lp_project_folders VALUES "
+                "(11, 'pers/health', 'N:\\duncan\\LifePIM_Data\\DATA\\notes\\10-Pers\\12-Health', "
+                "'default', 'none', 1, 1.0, NULL, NULL, 100, 1, 'now', 'now')"
+            )
+
+            projects.ensure_projects_schema(conn)
+
+            row = conn.execute(
+                "SELECT owner_user_id, path_prefix FROM lp_project_folders WHERE project_folder_id = 11"
+            ).fetchone()
+            self.assertEqual(row["owner_user_id"], 3)
+            self.assertEqual(row["path_prefix"], r"N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health")
+        finally:
+            conn.close()
 
     def test_user_sidebar_can_be_saved_and_reset(self):
         projects.seed_default_projects_for_user(1, conn=self.conn)

@@ -41,6 +41,36 @@ if /I "%LIFEPIM_ENV%"=="production" if not defined LIFEPIM_SECRET_KEY (
 set "CADDY_DIR=C:\apps\caddy"
 set "CADDY_EXE=%CADDY_DIR%\caddy_windows_amd64.exe"
 set "CADDY_CONFIG=%CADDY_DIR%\Caddyfile"
+set "CADDY_DATA_DIR=%APPDATA%\Caddy"
+set "CADDY_LOCAL_CA_DIR=%CADDY_DATA_DIR%\pki\authorities\local"
+
+if /I "%LIFEPIM_ENV%"=="production" (
+    if not exist "%CADDY_DATA_DIR%" (
+        echo ERROR: Expected persistent Caddy data directory was not found:
+        echo   %CADDY_DATA_DIR%
+        echo Starting Caddy without the existing local CA would generate a new CA.
+        echo Rebuilding LifePIM Pocket would then be required.
+        exit /b 1
+    )
+    if not exist "%CADDY_LOCAL_CA_DIR%\root.crt" (
+        echo ERROR: Expected Caddy local CA public root certificate was not found:
+        echo   %CADDY_LOCAL_CA_DIR%\root.crt
+        echo Starting Caddy without the existing local CA would generate a new CA.
+        echo Rebuilding LifePIM Pocket would then be required.
+        exit /b 1
+    )
+    if not exist "%CADDY_LOCAL_CA_DIR%\root.key" (
+        echo ERROR: Expected Caddy local CA private key was not found:
+        echo   %CADDY_LOCAL_CA_DIR%\root.key
+        echo Do not copy this key into Android or Git. Restore it from the desktop backup before starting production.
+        exit /b 1
+    )
+) else (
+    if not exist "%CADDY_LOCAL_CA_DIR%\root.crt" (
+        echo WARNING: Caddy local CA root certificate was not found at %CADDY_LOCAL_CA_DIR%\root.crt.
+        echo WARNING: If Caddy generates a new CA, LifePIM Pocket must be rebuilt with the new public root certificate.
+    )
+)
 
 if exist "%CADDY_EXE%" (
     if /I "%LIFEPIM_ENV%"=="production" (

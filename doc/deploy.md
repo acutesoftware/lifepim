@@ -13,6 +13,11 @@ C:\apps\LifePIM_Prod
 - Production launcher: `src\RUN_DESKTOP.BAT`
 - Expected virtual environment: `.venv\Scripts\python.exe` under the LifePIM root.
 
+LifePIM Desktop is a standalone local-first tool. LifePIM Pocket is optional:
+when installed, it acts as a mobile companion over the LAN through Desktop's
+Pocket API and Caddy HTTPS. Do not treat Pocket as a required service for
+Desktop startup.
+
 `RUN_DESKTOP.BAT` works from either:
 
 ```text
@@ -88,6 +93,18 @@ src\RUN_DESKTOP.BAT
 
 Do not use `0.0.0.0` or the fixed LAN IP in production. Pocket reaches LifePIM through Caddy on HTTPS.
 
+For normal LAN/mobile use, the reachable URL is:
+
+```text
+https://192.168.1.99
+```
+
+The direct Waitress URL remains local-only:
+
+```text
+http://127.0.0.1:9741
+```
+
 ## User and Device Administration
 
 Log in as the admin user, then open:
@@ -114,6 +131,25 @@ Available actions:
 - Reset passwords: `/admin/users/<id>/reset-password`
 - Revoke one trusted device: `/admin/trusted-devices`
 - Revoke all devices for a user: `/admin/trusted-devices`
+
+## Per-User Markdown Roots
+
+The database already scopes private note rows by user. Production also keeps
+new users' markdown note files under separate per-user roots.
+
+Existing `duncan` paths are intentionally preserved. On migration, legacy
+project-folder rows are claimed for `duncan` rather than rewritten to
+`lan_users\duncan`, so the current production note folders keep working.
+
+New users default to:
+
+```text
+N:\duncan\LifePIM_Data\DATA\lan_users\<username>
+```
+
+LifePIM creates `notes`, `projects`, and `lists` under that root. Project
+default folders for new users are created inside their `notes` root. Media and
+audio paths remain global.
 
 ## Using https instead of HTTP
 
@@ -156,6 +192,11 @@ https://192.168.1.99 {
 
 HTTP redirects to HTTPS. Pocket must use `https://192.168.1.99`; do not expose the Pocket API on cleartext HTTP.
 
+LifePIM Pocket release builds require HTTPS for Desktop sync. They trust the
+bundled public Caddy local root certificate for `192.168.1.99` and normal
+system CAs for unrelated HTTPS. Do not disable Android certificate validation
+or hostname verification to make local sync work.
+
 Start the caddy service (also put this line into the startup BAT file)
 
 ```text
@@ -171,6 +212,58 @@ https://192.168.1.99
 
 Note that you still get a warning about untrusted certificates, because the browser cant prove where certificate came from
 
+LifePIM Pocket does not use Android's system CA store for this local CA. It trusts the bundled public Caddy root certificate inside the Pocket app only.
+
+On this installation, Caddy stores its persistent local CA at:
+
+```text
+C:\Users\xblad\AppData\Roaming\Caddy\pki\authorities\local
+```
+
+Back up the whole Caddy data directory with LifePIM Desktop:
+
+```text
+C:\Users\xblad\AppData\Roaming\Caddy
+```
+
+`root.crt` is the public root certificate and may be copied into the Pocket Android project. `root.key` is the private CA key; keep it on the Desktop machine, include it only in private Desktop backups, and never commit it to Git. If this CA is lost or regenerated, existing Pocket builds will no longer trust Desktop and Pocket must be rebuilt with the new public root certificate.
+
+
+## Pocket Companion Sync
+
+Pocket sync is optional and explicit. Desktop can be used normally without a
+paired phone. When a phone is paired, Pocket has two separate sync directions:
+
+- `Sync Mobile to LAN Server`: uploads local Pocket changes to Desktop through
+  `/api/pocket/v1/sync/push`.
+- `Sync from LAN Server`: reads Desktop's manifest from
+  `/api/pocket/v1/sync/manifest` and downloads item content from
+  `/api/pocket/v1/items/<item_id>`.
+
+Device setup:
+
+1. Start Desktop in production behind Caddy.
+2. Log in as the Desktop user who should own the paired mobile data.
+3. Open `/admin/trusted-devices`.
+4. Create a Pocket pairing code.
+5. In Pocket, use `https://192.168.1.99` as the server URL and enter the pairing
+   code.
+
+After pairing, Pocket sends a bearer token and `X-LifePIM-Device-ID` on sync
+requests. Desktop stores only token hashes, binds each device to a Desktop user,
+and rejects revoked devices.
+
+The current Desktop Pocket API is primarily note-focused. Pocket may store
+notes, lists, media, and its own sync metadata locally, but Desktop's documented
+LAN API support here is the manifest/item/push flow implemented under
+`/api/pocket/v1`.
+
+Duplicate handling is path- and identity-based. Pocket compares its local files
+with Desktop's manifest before upload and should skip same-path uploads unless
+the mobile copy is clearly newer. Desktop also maps mobile client item IDs and
+same mobile filenames so repeated mobile-only pushes update the same Desktop
+note instead of creating new copies. Existing older duplicates with different
+filenames are not cleaned up automatically.
 
 ## Secure Cookies and Local HTTP
 

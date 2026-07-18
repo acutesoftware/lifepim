@@ -11,8 +11,10 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 
 from common import data
+from common import user_paths
 from common.network_log import log_network
 from common.utils import get_table_def
+from core import security
 from modules.notes import routes as notes_routes
 
 
@@ -562,23 +564,28 @@ def _note_row_by_id(note_id, user_id=None):
     return dict(row) if row else None
 
 
-def _item_uuid_for_note(note_id):
+def _item_uuid_for_note(note_id, user_id=None):
     conn = data._get_conn()
-    row = conn.execute(
-        "SELECT item_uuid FROM pocket_item_map WHERE entity_type = 'note' AND entity_id = ?",
-        (note_id,),
-    ).fetchone()
-    now = _utc_now_sql()
+    if user_id is None:
+        row = conn.execute("SELECT owner_user_id FROM lp_notes WHERE id = ?", (note_id,)).fetchone()
+        if row and "owner_user_id" in row.keys():
+            user_id = row["owner_user_id"]
+    item_uuid = str(uuid.uuid5(ITEM_NAMESPACE, f"user:{user_id}:note:{int(note_id)}"))
+    row = conn.execute("SELECT entity_id FROM pocket_item_map WHERE item_uuid = ?", (item_uuid,)).fetchone()
     if row:
-        return row["item_uuid"]
-    item_uuid = str(uuid.uuid5(ITEM_NAMESPACE, f"note:{int(note_id)}"))
+        return item_uuid
+    now = _utc_now_sql()
     conn.execute(
         """
-        INSERT OR IGNORE INTO pocket_item_map(item_uuid, entity_type, entity_id, created_at, last_seen_at)
+        INSERT INTO pocket_item_map(item_uuid, entity_type, entity_id, created_at, last_seen_at)
         VALUES (?, 'note', ?, ?, ?)
+        ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+            item_uuid = excluded.item_uuid,
+            last_seen_at = excluded.last_seen_at
         """,
         (item_uuid, note_id, now, now),
     )
+    conn.commit()
     return item_uuid
 
 
@@ -703,7 +710,7 @@ def _serialize_note_item(note, include_content=False, root=None, state_override=
         state = state_override or _note_file_metadata(note_path)
     content = notes_routes._read_note_file(note_path) if include_content else None
     item = {
-        "id": _item_uuid_for_note(note["id"]),
+        "id": _item_uuid_for_note(note["id"], note.get("owner_user_id")),
         "relative_path": _relative_note_path(note, root=root),
         "kind": _item_kind(note, content=content) if include_content else "NOTE",
         "ownership": "DESKTOP_MASTER",
@@ -747,7 +754,8 @@ def _default_note_folder_for_user(user_id):
         (user_id,),
     ).fetchall()
     if not rows:
-        return ""
+        paths = user_paths.get_or_create_user_paths(data._get_conn(), user_id, create_dirs=True)
+        return notes_routes._normalize_note_path(paths.get("notes_root_path") or "")
     return notes_routes._normalize_note_path(rows[0]["path"])
 
 
@@ -948,6 +956,40 @@ def _create_note_from_mobile(payload_item, device):
     }
 
 
+def _save_pocket_device(device_id, raw_token, device_name, platform, username, user_id):
+    now = _utc_now_sql()
+    data._get_conn().execute(
+        """
+        INSERT INTO pocket_devices
+        (device_id, token_hash, device_name, platform, username, user_id, created_at, last_seen_at, last_ip, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(device_id) DO UPDATE SET
+            token_hash = excluded.token_hash,
+            device_name = excluded.device_name,
+            platform = excluded.platform,
+            username = excluded.username,
+            user_id = excluded.user_id,
+            last_seen_at = excluded.last_seen_at,
+            revoked_at = NULL,
+            last_ip = excluded.last_ip,
+            user_agent = excluded.user_agent
+        """,
+        (
+            device_id,
+            _token_hash(raw_token),
+            device_name,
+            platform,
+            username,
+            user_id,
+            now,
+            now,
+            _client_ip(),
+            _user_agent(),
+        ),
+    )
+    data._get_conn().commit()
+
+
 @pocket_api_bp.route("/health", methods=["GET"])
 def health_route():
     ensure_pocket_schema()
@@ -1014,36 +1056,7 @@ def register_device_route():
         data._get_conn().commit()
         _record_registration_attempt(False, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="pairing_code_already_used")
         return _json_error("authentication_failed", 401)
-    data._get_conn().execute(
-        """
-        INSERT INTO pocket_devices
-        (device_id, token_hash, device_name, platform, username, user_id, created_at, last_seen_at, last_ip, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(device_id) DO UPDATE SET
-            token_hash = excluded.token_hash,
-            device_name = excluded.device_name,
-            platform = excluded.platform,
-            username = excluded.username,
-            user_id = excluded.user_id,
-            last_seen_at = excluded.last_seen_at,
-            revoked_at = NULL,
-            last_ip = excluded.last_ip,
-            user_agent = excluded.user_agent
-        """,
-        (
-            device_id,
-            _token_hash(raw_token),
-            device_name,
-            platform,
-            username,
-            user_id,
-            now,
-            now,
-            _client_ip(),
-            _user_agent(),
-        ),
-    )
-    data._get_conn().commit()
+    _save_pocket_device(device_id, raw_token, device_name, platform, username, user_id)
     _record_registration_attempt(True, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="paired", user_id=user_id)
     log_network(
         "pocket_register_device",
@@ -1062,6 +1075,41 @@ def register_device_route():
             "token_type": "Bearer",
             "username": username,
             "display_name": row["display_name"],
+        }
+    )
+
+
+@pocket_api_bp.route("/auth/login", methods=["POST"])
+def password_login_route():
+    ensure_pocket_schema()
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get("username") or payload.get("user_name") or "").strip()
+    password = payload.get("password") or ""
+    device_id = (payload.get("device_id") or "").strip() or str(uuid.uuid4())
+    device_name = (payload.get("device_name") or payload.get("name") or "").strip()
+    platform = (payload.get("platform") or "").strip()
+    user = security.authenticate_user(username, password)
+    if not user:
+        log_network("pocket_password_login_failed", username=username, device_id=device_id, remote_addr=_client_ip())
+        return _json_error("authentication_failed", 401)
+    raw_token = secrets.token_urlsafe(48)
+    _save_pocket_device(device_id, raw_token, device_name, platform, user.username, user.user_id)
+    log_network(
+        "pocket_password_login",
+        device_id=device_id,
+        device_name=device_name,
+        platform=platform,
+        username=user.username,
+        user_id=user.user_id,
+        remote_addr=_client_ip(),
+    )
+    return jsonify(
+        {
+            "device_id": device_id,
+            "device_token": raw_token,
+            "token_type": "Bearer",
+            "username": user.username,
+            "display_name": user.display_name,
         }
     )
 
@@ -1185,7 +1233,7 @@ def _push_one_item(payload_item, device):
             return {
                 "id": item_id,
                 "client_change_id": _payload_client_change_id(payload_item),
-                "server_item_id": _item_uuid_for_note(note_id),
+                "server_item_id": _item_uuid_for_note(note_id, device.get("user_id")),
                 "ok": False,
                 "conflict": True,
                 "error": "conflict",
@@ -1206,9 +1254,9 @@ def _push_one_item(payload_item, device):
             _upsert_client_item_map(device.get("device_id"), item_id, "note", note_id)
         _upsert_item_state("note", note_id, note_path, current_state)
         return {
-            "id": item_id or _item_uuid_for_note(note_id),
+            "id": item_id or _item_uuid_for_note(note_id, device.get("user_id")),
             "client_change_id": _payload_client_change_id(payload_item),
-            "server_item_id": _item_uuid_for_note(note_id),
+            "server_item_id": _item_uuid_for_note(note_id, device.get("user_id")),
             "ok": True,
             "item": _serialize_note_item(note, include_content=False, state_override=current_state, note_path_override=note_path),
         }

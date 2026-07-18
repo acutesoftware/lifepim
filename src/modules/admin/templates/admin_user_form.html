@@ -27,10 +27,25 @@
       <input type="password" name="password" autocomplete="new-password" required>
     </label>
   {% endif %}
+  <fieldset>
+    <legend>File roots</legend>
+    <label>User root
+      <input type="text" name="file_root_path" value="{{ user_paths.file_root_path if user_paths else '' }}">
+    </label>
+    <label>Notes root
+      <input type="text" name="notes_root_path" value="{{ user_paths.notes_root_path if user_paths else '' }}">
+    </label>
+    <label>Projects root
+      <input type="text" name="projects_root_path" value="{{ user_paths.projects_root_path if user_paths else '' }}">
+    </label>
+    <label>Lists root
+      <input type="text" name="lists_root_path" value="{{ user_paths.lists_root_path if user_paths else '' }}">
+    </label>
+  </fieldset>
   <label>Pocket default note folder
-    <input type="text" name="pocket_default_note_folder" value="{{ pocket_settings.default_note_folder if pocket_settings else '' }}" placeholder="N:\duncan\LifePIM_Data\DATA\notes\Mobile">
+    <input type="text" name="pocket_default_note_folder" value="{{ (pocket_settings.default_note_folder if pocket_settings else '') or (user_paths.notes_root_path if user_paths else '') }}">
   </label>
-  <p class="form-help">New mobile-only notes for this user are saved here. Leave blank to use the user's most common existing note folder.</p>
+  <p class="form-help">New mobile-only notes for this user are saved here. By default this matches the notes root.</p>
   <button type="submit">Save</button>
 </form>
 {% endblock %}
