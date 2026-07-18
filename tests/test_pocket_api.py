@@ -1,9 +1,11 @@
 import os
+import base64
+import hashlib
 import sqlite3
 import sys
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from flask import Flask
@@ -419,6 +421,71 @@ class TestPocketApi(unittest.TestCase):
         row = self.conn.execute("SELECT file_name, owner_user_id FROM lp_notes WHERE file_name = ?", ("phone note.md",)).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row["owner_user_id"], 3)
+
+    def test_push_creates_mobile_only_note_with_image_attachment(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+        image_bytes = b"fake png bytes"
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-with-image",
+                "relative_path": "image note.md",
+                "content": "# Image note\n\n[img]photo.png[/img]\n",
+                "attachments": [
+                    {
+                        "file_name": "photo.png",
+                        "content_base64": base64.b64encode(image_bytes).decode("ascii"),
+                        "sha256": hashlib.sha256(image_bytes).hexdigest(),
+                        "modified_at": "2026-07-15T10:00:00Z",
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        result = resp.get_json()["results"][0]
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["attachments_saved"], 1)
+        image_path = os.path.join(self.tmpdir.name, "photo.png")
+        self.assertTrue(os.path.exists(image_path))
+        with open(image_path, "rb") as handle:
+            self.assertEqual(handle.read(), image_bytes)
+
+    def test_push_attachment_does_not_overwrite_newer_desktop_image(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+        image_path = os.path.join(self.tmpdir.name, "photo.png")
+        with open(image_path, "wb") as handle:
+            handle.write(b"desktop newer")
+        newer_ts = datetime(2026, 7, 16, tzinfo=timezone.utc).timestamp()
+        os.utime(image_path, (newer_ts, newer_ts))
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-with-old-image",
+                "relative_path": "old image note.md",
+                "content": "# Image note\n\n[img]photo.png[/img]\n",
+                "attachments": [
+                    {
+                        "file_name": "photo.png",
+                        "content_base64": base64.b64encode(b"mobile older").decode("ascii"),
+                        "modified_at": "2026-07-15T10:00:00Z",
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        result = resp.get_json()["results"][0]
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["attachments_saved"], 0)
+        with open(image_path, "rb") as handle:
+            self.assertEqual(handle.read(), b"desktop newer")
 
     def test_repeated_mobile_only_push_updates_same_note_by_client_id(self):
         self._add_note(file_name="existing.md", content="existing", owner_user_id=3)

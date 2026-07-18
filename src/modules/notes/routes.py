@@ -1186,7 +1186,15 @@ def note_asset_route(note_id, asset_path):
     if not full_path.startswith(base_dir + os.sep):
         abort(404)
     if not os.path.isfile(full_path):
-        abort(404)
+        media_basename = os.path.basename((asset_path or "").replace("\\", "/"))
+        if asset_path.replace("\\", "/").lower().startswith("media/") and media_basename:
+            fallback_path = os.path.abspath(os.path.join(base_dir, media_basename))
+            if fallback_path.startswith(base_dir + os.sep) and os.path.isfile(fallback_path):
+                full_path = fallback_path
+            else:
+                abort(404)
+        else:
+            abort(404)
     return send_file(full_path)
 
 
@@ -1427,6 +1435,35 @@ def archive_delete_note_route(note_id):
     except Exception as exc:
         return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Delete failed: {exc}"))
     return redirect(url_for("notes.list_notes_route"))
+
+
+@notes_bp.route('/api/delete-selected', methods=["POST"])
+def delete_selected_notes_route():
+    payload = request.get_json(silent=True) or {}
+    note_ids = []
+    for raw_id in payload.get("note_ids") or []:
+        try:
+            note_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    note_ids = list(dict.fromkeys(note_ids))
+    if not note_ids:
+        return jsonify({"deleted": 0, "deleted_ids": [], "errors": []})
+    deleted = 0
+    deleted_ids = []
+    errors = []
+    for note_id in note_ids:
+        if not security.can_delete_note(note_id, current_user):
+            errors.append({"note_id": note_id, "error": "forbidden"})
+            continue
+        try:
+            _archive_and_delete_note(note_id)
+            deleted += 1
+            deleted_ids.append(note_id)
+        except Exception as exc:
+            errors.append({"note_id": note_id, "error": str(exc)})
+    status = 207 if errors and deleted else (403 if errors else 200)
+    return jsonify({"deleted": deleted, "deleted_ids": deleted_ids, "errors": errors}), status
 
 
 @notes_bp.route('/convert-to-howto/<int:note_id>', methods=["POST"])

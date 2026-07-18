@@ -3468,6 +3468,43 @@ body.links-resizing {
   color: #444;
 }
 
+.link-bulk-action {
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.delete-confirm-ok,
+.delete-confirm-cancel {
+  display: inline-block;
+  min-width: 130px;
+  padding: 14px 18px;
+  border: 1px solid #9b1c1c;
+  border-radius: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.delete-confirm-ok {
+  background: #b91c1c;
+  color: #fff;
+  cursor: pointer;
+}
+
+.delete-confirm-cancel {
+  background: #f6f6f6;
+  color: #222;
+  border-color: #999;
+  text-decoration: none;
+}
+
 .links-drawer-handle {
   position: fixed;
   top: 120px;
@@ -3647,6 +3684,19 @@ body.links-resizing {
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
+}
+
+.note-rendered-content {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.note-rendered-content img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  box-sizing: border-box;
 }
 
 .note-folder-list {

@@ -1,7 +1,9 @@
 from datetime import datetime
 import json
+import os
 
 from flask import Blueprint, abort, render_template, request, redirect, url_for
+from flask_login import current_user
 
 from common import data as db
 from common import config as cfg
@@ -663,6 +665,113 @@ def users_route():
     )
 
 
+def _table_exists(conn, table_name):
+    try:
+        return bool(conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)).fetchone())
+    except Exception:
+        return False
+
+
+def _table_columns(conn, table_name):
+    try:
+        return {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    except Exception:
+        return set()
+
+
+def _delete_by_column_if_exists(conn, table_name, column_name, value):
+    if _table_exists(conn, table_name) and column_name in _table_columns(conn, table_name):
+        conn.execute(f"DELETE FROM {table_name} WHERE {column_name} = ?", (value,))
+
+
+def _user_note_delete_plan(conn, user_id):
+    if not _table_exists(conn, "lp_notes"):
+        return {"note_record_count": 0, "note_file_count": 0, "note_ids": [], "note_file_paths": []}
+    columns = _table_columns(conn, "lp_notes")
+    if "owner_user_id" not in columns:
+        return {"note_record_count": 0, "note_file_count": 0, "note_ids": [], "note_file_paths": []}
+    select_cols = ["id"]
+    if "path" in columns:
+        select_cols.append("path")
+    if "file_name" in columns:
+        select_cols.append("file_name")
+    rows = conn.execute(
+        f"SELECT {', '.join(select_cols)} FROM lp_notes WHERE owner_user_id = ?",
+        (user_id,),
+    ).fetchall()
+    note_ids = [row["id"] for row in rows]
+    note_file_paths = []
+    seen_paths = set()
+    for row in rows:
+        file_name = (row["file_name"] if "file_name" in row.keys() else "") or ""
+        path = (row["path"] if "path" in row.keys() else "") or ""
+        full_path = ""
+        if path and file_name:
+            full_path = os.path.join(path, file_name)
+        elif file_name and os.path.isabs(file_name):
+            full_path = file_name
+        elif path:
+            full_path = path
+        if full_path and os.path.isfile(full_path):
+            key = os.path.normcase(os.path.abspath(full_path))
+            if key not in seen_paths:
+                seen_paths.add(key)
+                note_file_paths.append(full_path)
+    return {
+        "note_record_count": len(note_ids),
+        "note_file_count": len(note_file_paths),
+        "note_ids": note_ids,
+        "note_file_paths": note_file_paths,
+    }
+
+
+def _delete_user_and_owned_notes(conn, user_id):
+    user = security.get_user_by_id(user_id)
+    if not user:
+        raise ValueError("User not found.")
+    if getattr(current_user, "is_authenticated", False) and int(getattr(current_user, "user_id", 0) or 0) == int(user_id):
+        raise ValueError("You cannot delete the user you are currently logged in as.")
+    plan = _user_note_delete_plan(conn, user_id)
+    for note_path in plan["note_file_paths"]:
+        if os.path.isfile(note_path):
+            os.remove(note_path)
+    note_ids = plan["note_ids"]
+    if note_ids:
+        placeholders = ", ".join(["?"] * len(note_ids))
+        if _table_exists(conn, "lp_links"):
+            conn.execute(
+                f"DELETE FROM lp_links WHERE (src_type = 'note' AND src_id IN ({placeholders})) "
+                f"OR (dst_type = 'note' AND dst_id IN ({placeholders}))",
+                note_ids + note_ids,
+            )
+        if _table_exists(conn, "pocket_item_map"):
+            conn.execute(
+                f"DELETE FROM pocket_item_map WHERE entity_type = 'note' AND entity_id IN ({placeholders})",
+                note_ids,
+            )
+        if _table_exists(conn, "pocket_item_state"):
+            conn.execute(
+                f"DELETE FROM pocket_item_state WHERE entity_type = 'note' AND entity_id IN ({placeholders})",
+                note_ids,
+            )
+        if _table_exists(conn, "pocket_client_item_map"):
+            conn.execute(
+                f"DELETE FROM pocket_client_item_map WHERE entity_type = 'note' AND entity_id IN ({placeholders})",
+                note_ids,
+            )
+    _delete_by_column_if_exists(conn, "lp_notes", "owner_user_id", user_id)
+    _delete_by_column_if_exists(conn, "lp_project_folders", "owner_user_id", user_id)
+    _delete_by_column_if_exists(conn, "lp_projects", "owner_user_id", user_id)
+    _delete_by_column_if_exists(conn, "pocket_user_settings", "user_id", user_id)
+    _delete_by_column_if_exists(conn, "pocket_pairing_codes", "user_id", user_id)
+    _delete_by_column_if_exists(conn, "pocket_devices", "user_id", user_id)
+    _delete_by_column_if_exists(conn, "auth_trusted_devices", "user_id", user_id)
+    _delete_by_column_if_exists(conn, "auth_login_attempts", "user_id", user_id)
+    conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+    conn.commit()
+    return plan
+
+
 def _requested_username(default="username"):
     return (request.form.get("username") or request.args.get("username") or default).strip() or default
 
@@ -806,6 +915,36 @@ def edit_user_route(user_id):
         user=dict(row),
         pocket_settings=pocket_settings,
         user_paths=paths,
+        error=error,
+    )
+
+
+@admin_bp.route("/users/<int:user_id>/delete", methods=["GET", "POST"])
+def delete_user_route(user_id):
+    security.require_role("admin")
+    row = security.get_user_by_id(user_id)
+    if not row:
+        abort(404)
+    conn = db._get_conn()
+    error = ""
+    plan = _user_note_delete_plan(conn, user_id)
+    if request.method == "POST":
+        try:
+            _delete_user_and_owned_notes(conn, user_id)
+            return redirect(url_for("notes.list_notes_route"))
+        except Exception as exc:
+            error = f"User delete failed: {exc}"
+            plan = _user_note_delete_plan(conn, user_id)
+    return render_template(
+        "admin_delete_user_confirm.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Delete User",
+        content_html="",
+        user=dict(row),
+        note_record_count=plan["note_record_count"],
+        note_file_count=plan["note_file_count"],
         error=error,
     )
 

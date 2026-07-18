@@ -64,7 +64,7 @@
       <p>File not found: {{ note_path }}</p>
     {% else %}
       {% if render_mode == 'markdown' %}
-        <div>{{ content_html_rendered|safe }}</div>
+        <div class="note-rendered-content">{{ content_html_rendered|safe }}</div>
       {% elif render_mode == 'hex' %}
         <div style="display:flex; gap:12px; margin-top:8px;">
           <div style="flex:1; border:1px solid #ccc; padding:6px;">

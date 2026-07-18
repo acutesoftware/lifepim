@@ -26,6 +26,7 @@
         <td>
           <a href="{{ url_for('admin.edit_user_route', user_id=user.user_id) }}">Edit</a>
           <a href="{{ url_for('admin.reset_password_route', user_id=user.user_id) }}">Reset password</a>
+          <a href="{{ url_for('admin.delete_user_route', user_id=user.user_id) }}">Delete</a>
         </td>
       </tr>
     {% endfor %}

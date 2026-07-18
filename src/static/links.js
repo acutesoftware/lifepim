@@ -115,7 +115,7 @@
           }
           return;
         }
-        const bulkBtn = qs(".link-bulk-open");
+        const bulkBtn = qs(".link-bulk-open, .link-bulk-action");
         if (bulkBtn && !bulkBtn.disabled) {
           bulkBtn.click();
         } else if (bulkBtn) {
@@ -127,10 +127,10 @@
     if (drawer) {
       initDrawer(drawer);
     } else if (STATE.drawerHandle) {
-      const bulkBtn = qs(".link-bulk-open");
+      const bulkBtn = qs(".link-bulk-open, .link-bulk-action");
       STATE.drawerHandle.classList.toggle("hidden", !bulkBtn);
       if (bulkBtn) {
-        STATE.drawerHandle.textContent = "Link to";
+        STATE.drawerHandle.textContent = "Selected";
       }
     }
     initDragSources();
@@ -1097,10 +1097,16 @@
       }
       const countEl = qs(".link-bulk-count", toolbar);
       const actionBtn = qs(".link-bulk-open", toolbar);
+      const actionSelect = qs(".link-bulk-action", toolbar);
       const updateCount = () => {
         const selected = qsa("input.link-select:checked", table);
         countEl.textContent = `${selected.length} selected`;
-        actionBtn.disabled = selected.length === 0;
+        if (actionBtn) {
+          actionBtn.disabled = selected.length === 0;
+        }
+        if (actionSelect) {
+          actionSelect.disabled = selected.length === 0;
+        }
       };
       qsa("input.link-select", table).forEach((checkbox) => {
         checkbox.addEventListener("change", updateCount);
@@ -1114,12 +1120,18 @@
           updateCount();
         });
       }
-      actionBtn.addEventListener("click", () => {
-        const selected = qsa("input.link-select:checked", table).map((checkbox) => ({
+      const selectedRecords = () =>
+        qsa("input.link-select:checked", table).map((checkbox) => ({
           type: checkbox.dataset.recordType,
           id: checkbox.dataset.recordId,
           title: checkbox.dataset.recordTitle || "",
         }));
+      const openBulkLinkPicker = () => {
+        const selected = selectedRecords();
+        if (!selected.length) {
+          showToast({ message: "Select one or more records first." });
+          return;
+        }
         openLinkPicker({
           mode: "bulk",
           sources: selected,
@@ -1127,7 +1139,68 @@
           contextType: "list_bulk_link",
           contextId: toolbar.dataset.contextId,
         });
-      });
+      };
+      const deleteSelectedNotes = () => {
+        const selected = selectedRecords();
+        const noteIds = selected.filter((record) => record.type === "note").map((record) => record.id);
+        if (!noteIds.length) {
+          showToast({ message: "Select one or more notes first." });
+          return;
+        }
+        if (!window.confirm(`Delete ${noteIds.length} selected note(s)?`)) {
+          return;
+        }
+        postJson("/notes/api/delete-selected", { note_ids: noteIds })
+          .then((data) => {
+            const deletedIds = new Set((data.deleted_ids || []).map((id) => String(id)));
+            qsa("input.link-select:checked", table).forEach((checkbox) => {
+              if (deletedIds.has(String(checkbox.dataset.recordId))) {
+                const row = checkbox.closest("tr");
+                if (row) {
+                  row.remove();
+                }
+              } else {
+                checkbox.checked = false;
+              }
+            });
+            qsa("input.link-select", table).forEach((checkbox) => {
+              checkbox.checked = false;
+            });
+            const selectAll = qs("input.link-select-all", table);
+            if (selectAll) {
+              selectAll.checked = false;
+            }
+            const noteStatus = qs(".note-status");
+            if (noteStatus && data.deleted) {
+              const match = noteStatus.textContent.match(/(\d+)/);
+              if (match) {
+                const remaining = Math.max(0, Number(match[1]) - Number(data.deleted || 0));
+                noteStatus.textContent = `${remaining} notes`;
+              }
+            }
+            updateCount();
+            if (data.errors && data.errors.length) {
+              showToast({ message: `Deleted ${data.deleted || 0}; ${data.errors.length} failed.` });
+            } else {
+              showToast({ message: `Deleted ${data.deleted || 0} selected note(s).` });
+            }
+          })
+          .catch(() => showToast({ message: "Couldn't delete selected notes." }));
+      };
+      if (actionBtn) {
+        actionBtn.addEventListener("click", openBulkLinkPicker);
+      }
+      if (actionSelect) {
+        actionSelect.addEventListener("change", () => {
+          const action = actionSelect.value;
+          actionSelect.value = "";
+          if (action === "link") {
+            openBulkLinkPicker();
+          } else if (action === "delete") {
+            deleteSelectedNotes();
+          }
+        });
+      }
       updateCount();
     });
   }

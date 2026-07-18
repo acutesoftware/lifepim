@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import re
@@ -26,7 +27,9 @@ PAIRING_CODE_TTL = timedelta(minutes=5)
 PAIRING_CODE_MAX_ACTIVE_PER_USER = 5
 REGISTRATION_FAILURE_LIMIT = 5
 REGISTRATION_FAILURE_WINDOW = timedelta(minutes=15)
-POCKET_MAX_SYNC_PAYLOAD_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", str(10 * 1024 * 1024)))
+POCKET_MAX_SYNC_PAYLOAD_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", str(50 * 1024 * 1024)))
+POCKET_MAX_ATTACHMENT_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_ATTACHMENT_BYTES", str(25 * 1024 * 1024)))
+POCKET_ATTACHMENT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
 def _utc_now():
@@ -868,7 +871,118 @@ def _payload_debug(payload_item):
         "content_key": content_key,
         "content_len": content_len,
         "relative_path": payload_item.get("relative_path") or payload_item.get("path") or payload_item.get("file_name"),
+        "attachment_count": len(_payload_attachments(payload_item)),
     }
+
+
+def _payload_attachments(payload_item):
+    attachments = payload_item.get("attachments") or payload_item.get("files") or payload_item.get("media") or []
+    return attachments if isinstance(attachments, list) else []
+
+
+def _safe_attachment_file_name(attachment):
+    raw_name = (
+        attachment.get("file_name")
+        or attachment.get("filename")
+        or attachment.get("name")
+        or attachment.get("relative_path")
+        or attachment.get("path")
+        or ""
+    )
+    raw_name = os.path.basename(str(raw_name).replace("\\", "/")).strip()
+    stem, ext = os.path.splitext(raw_name)
+    ext = ext.lower()
+    if ext not in POCKET_ATTACHMENT_EXTENSIONS:
+        raise ValueError("unsupported_attachment_type")
+    stem = INVALID_FILENAME_CHARS.sub("", stem).strip().strip(".")
+    if not stem:
+        raise ValueError("invalid_attachment_name")
+    return f"{stem}{ext}"
+
+
+def _attachment_content_bytes(attachment):
+    encoded = (
+        attachment.get("content_base64")
+        or attachment.get("contentBase64")
+        or attachment.get("base64")
+        or attachment.get("data")
+        or ""
+    )
+    encoded = str(encoded).strip()
+    if encoded.lower().startswith("data:") and "," in encoded:
+        encoded = encoded.split(",", 1)[1]
+    if not encoded:
+        raise ValueError("missing_attachment_content")
+    content = base64.b64decode(encoded, validate=True)
+    if len(content) > POCKET_MAX_ATTACHMENT_BYTES:
+        raise ValueError("attachment_too_large")
+    supplied_sha = (attachment.get("sha256") or "").strip().lower()
+    actual_sha = hashlib.sha256(content).hexdigest()
+    if supplied_sha and supplied_sha != actual_sha:
+        raise ValueError("attachment_hash_mismatch")
+    return content, actual_sha
+
+
+def _write_payload_attachments(payload_item, note_path):
+    attachments = _payload_attachments(payload_item)
+    if not attachments:
+        return {"saved": 0, "skipped": 0, "errors": []}
+    base_dir = os.path.abspath(os.path.dirname(note_path or ""))
+    if not base_dir:
+        return {"saved": 0, "skipped": 0, "errors": ["invalid_note_folder"]}
+    os.makedirs(base_dir, exist_ok=True)
+    saved = 0
+    skipped = 0
+    errors = []
+    for attachment in attachments:
+        try:
+            if not isinstance(attachment, dict):
+                raise ValueError("invalid_attachment")
+            file_name = _safe_attachment_file_name(attachment)
+            content, actual_sha = _attachment_content_bytes(attachment)
+            target_path = os.path.abspath(os.path.join(base_dir, file_name))
+            if not target_path.startswith(base_dir + os.sep):
+                raise ValueError("invalid_attachment_path")
+            status = _write_attachment_file(target_path, content, actual_sha, attachment)
+            if status == "saved":
+                saved += 1
+            else:
+                skipped += 1
+        except Exception as exc:
+            errors.append(f"{attachment.get('file_name') if isinstance(attachment, dict) else 'attachment'}: {exc}")
+    return {"saved": saved, "skipped": skipped, "errors": errors}
+
+
+def _write_attachment_file(target_path, content, actual_sha, attachment):
+    if os.path.exists(target_path):
+        try:
+            with open(target_path, "rb") as handle:
+                if hashlib.sha256(handle.read()).hexdigest() == actual_sha:
+                    return "same"
+        except OSError:
+            pass
+        source_ts = _parse_payload_modified_at({"modified_at": attachment.get("modified_at") or attachment.get("modifiedAt")})
+        try:
+            dest_ts = os.path.getmtime(target_path)
+        except OSError:
+            dest_ts = None
+        if source_ts is not None and dest_ts is not None and source_ts <= dest_ts:
+            return "destination_newer"
+    temp_path = f"{target_path}.tmp"
+    try:
+        with open(temp_path, "wb") as handle:
+            handle.write(content)
+        os.replace(temp_path, target_path)
+        source_ts = _parse_payload_modified_at({"modified_at": attachment.get("modified_at") or attachment.get("modifiedAt")})
+        if source_ts is not None:
+            os.utime(target_path, (source_ts, source_ts))
+        return "saved"
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 
 def _unique_note_path(folder_path, file_name):
@@ -915,6 +1029,7 @@ def _create_note_from_mobile(payload_item, device):
     os.makedirs(folder_path, exist_ok=True)
     file_name, note_path = _unique_note_path(folder_path, _safe_mobile_file_name(payload_item))
     state = notes_routes._write_note_file_content(note_path, str(content))
+    attachment_result = _write_payload_attachments(payload_item, note_path)
 
     tbl = _note_table()
     table_columns = _table_columns(data._get_conn(), tbl["name"])
@@ -948,6 +1063,8 @@ def _create_note_from_mobile(payload_item, device):
         file_name=file_name,
         folder_path=folder_path,
         client_id=client_item_id,
+        attachments_saved=attachment_result["saved"],
+        attachment_errors=attachment_result["errors"],
     )
     return {
         "id": item["id"],
@@ -956,6 +1073,8 @@ def _create_note_from_mobile(payload_item, device):
         "ok": True,
         "created": True,
         "item": item,
+        "attachments_saved": attachment_result["saved"],
+        "attachment_errors": attachment_result["errors"],
     }
 
 
@@ -1264,6 +1383,7 @@ def _push_one_item(payload_item, device):
             "item": _serialize_note_item(note, include_content=False, state_override=current_state, note_path_override=note_path),
         }
     next_state = notes_routes._write_note_file_content(note_path, str(content))
+    attachment_result = _write_payload_attachments(payload_item, note_path)
     if item_id:
         _upsert_client_item_map(device.get("device_id"), item_id, "note", note_id)
     _upsert_item_state("note", note_id, note_path, next_state)
@@ -1276,6 +1396,8 @@ def _push_one_item(payload_item, device):
         "server_item_id": item["id"],
         "ok": True,
         "item": item,
+        "attachments_saved": attachment_result["saved"],
+        "attachment_errors": attachment_result["errors"],
     }
 
 

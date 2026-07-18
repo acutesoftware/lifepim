@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+<p class="form-message">
+  About to delete user {{ user.username }} = there are {{ note_record_count }} note records and {{ note_file_count }} note files that will be deleted.
+</p>
+<form method="post" action="{{ url_for('admin.delete_user_route', user_id=user.user_id) }}" class="delete-confirm-actions">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="delete-confirm-ok">OK</button>
+  <a class="delete-confirm-cancel" href="{{ url_for('notes.list_notes_route') }}">Forget it</a>
+</form>
+{% endblock %}

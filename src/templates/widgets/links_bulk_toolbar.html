@@ -3,5 +3,13 @@
      data-context-id="{{ link_list_context_id }}"
      data-table-id="{{ link_table_id }}">
   <span class="link-bulk-count">0 selected</span>
-  <button type="button" class="links-btn link-bulk-open" disabled>Link to...</button>
+  <select class="link-bulk-action" aria-label="Selected" disabled>
+    <option value="">Selected</option>
+    {% if link_list_type == "note" %}
+      <option value="link">Link selected notes to ...</option>
+      <option value="delete">Delete Selected notes</option>
+    {% else %}
+      <option value="link">Link selected records to ...</option>
+    {% endif %}
+  </select>
 </div>
