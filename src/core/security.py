@@ -252,7 +252,7 @@ def configure_security(app):
 
 def _route_is_public():
     endpoint = request.endpoint or ""
-    if endpoint in {"static", "auth.login"}:
+    if endpoint in {"static", "auth.login", "favicon_route", "site_webmanifest"}:
         return True
     if endpoint.startswith("static") or endpoint.startswith("public."):
         return True

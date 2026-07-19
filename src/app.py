@@ -5,7 +5,7 @@ import time
 
 from datetime import date, datetime
 
-from flask import Flask, g, render_template, request, url_for
+from flask import Flask, g, jsonify, render_template, request, send_from_directory, url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -469,6 +469,40 @@ def search_route():
         media_search=media_search,
         media_other_results=media_other_results,
     )
+
+
+@app.route("/favicon.ico")
+def favicon_route():
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "favicon.ico",
+        mimetype="image/vnd.microsoft.icon",
+    )
+
+
+@app.route("/site.webmanifest")
+def site_webmanifest():
+    icon_url = url_for("static", filename="favicon.ico")
+    response = jsonify(
+        {
+            "name": APP_NAME,
+            "short_name": APP_NAME,
+            "start_url": url_for("index"),
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#243447",
+            "icons": [
+                {
+                    "src": icon_url,
+                    "sizes": "16x16 32x32 48x48 64x64 128x128 256x256",
+                    "type": "image/x-icon",
+                    "purpose": "any",
+                }
+            ],
+        }
+    )
+    response.headers["Content-Type"] = "application/manifest+json"
+    return response
 
 
 @app.route("/help")
