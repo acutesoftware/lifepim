@@ -156,24 +156,36 @@ notes folder exists. Media and audio paths remain global.
 
 ## Using https instead of HTTP
 
-Set the machine you are running LifePIM desktop on to a fixed IP address
+Set the machine you are running LifePIM desktop on to a fixed IP address for
+normal Wi-Fi/LAN use:
 
 ```text
 192.168.1.99
 ```
 
+When a phone is connected through USB tethering, Windows may also expose a
+separate private IPv4 address such as `10.181.130.24`. LifePIM Desktop startup
+runs `scripts\prod\update_caddy_lan_hosts.py` to include active private IPv4
+addresses in Caddy as well as the fixed address.
+
 Download Caddy from https://caddyserver.com/download
 
 copy the download to C:\apps\caddy
 
-create "Caddyfile" with content below
+create "Caddyfile"; production startup refreshes it with content like this
 
 ```text
-http://192.168.1.99 {
-    redir https://192.168.1.99{uri} permanent
+http://192.168.1.99, http://10.181.130.24 {
+    handle /api/pocket/v1/* {
+        reverse_proxy 127.0.0.1:9741
+    }
+
+    handle {
+        redir https://{host}{uri} permanent
+    }
 }
 
-https://192.168.1.99 {
+https://192.168.1.99, https://10.181.130.24 {
     request_body {
         max_size 10MB
     }
@@ -193,12 +205,14 @@ https://192.168.1.99 {
 }
 ```
 
-HTTP redirects to HTTPS. Pocket must use `https://192.168.1.99`; do not expose the Pocket API on cleartext HTTP.
+Pocket should use HTTPS, usually `https://192.168.1.99`. When syncing over USB
+tethering, use the current tether adapter IP shown by Windows, for example
+`https://10.181.130.24`.
 
 LifePIM Pocket release builds require HTTPS for Desktop sync. They trust the
-bundled public Caddy local root certificate for `192.168.1.99` and normal
-system CAs for unrelated HTTPS. Do not disable Android certificate validation
-or hostname verification to make local sync work.
+bundled public Caddy local root certificate for local Desktop IP certificates
+and normal system CAs for unrelated HTTPS. Do not disable Android certificate
+validation or hostname verification to make local sync work.
 
 Start the caddy service (also put this line into the startup BAT file)
 
@@ -207,10 +221,12 @@ C:\apps\caddy> .\caddy_windows_amd64.exe start
 ```
 
 
-Then browse from any PC on network or mobile on Wifi
+Then browse from any PC on the network, mobile on Wi-Fi, or mobile on USB
+tethering by using the matching desktop IP:
 
 ```text
 https://192.168.1.99
+https://10.181.130.24
 ```
 
 Note that you still get a warning about untrusted certificates, because the browser cant prove where certificate came from
@@ -249,8 +265,9 @@ Device setup:
 2. Log in as the Desktop user who should own the paired mobile data.
 3. Open `/admin/trusted-devices`.
 4. Create a Pocket pairing code.
-5. In Pocket, use `https://192.168.1.99` as the server URL and enter the pairing
-   code.
+5. In Pocket, use `https://192.168.1.99` as the server URL for Wi-Fi/LAN, or
+   the current tether adapter URL such as `https://10.181.130.24`, and enter the
+   pairing code.
 
 After pairing, Pocket sends a bearer token and `X-LifePIM-Device-ID` on sync
 requests. Desktop stores only token hashes, binds each device to a Desktop user,
@@ -342,11 +359,12 @@ It deletes and recreates the configured SQLite database. Do not run it against p
 
 ## Operational Checks
 
-Allow inbound LAN traffic to the LifePIM/Caddy ports from an elevated PowerShell prompt:
+Allow inbound LAN traffic to the LifePIM/Caddy ports from an elevated PowerShell
+prompt. This covers normal Private Wi-Fi networks and Public-profile USB tether
+adapters while only opening ports 80 and 443 to the local subnet:
 
 ```powershell
-New-NetFirewallRule -DisplayName "LifePIM HTTP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80 -Profile Private -RemoteAddress 192.168.1.0/24
-New-NetFirewallRule -DisplayName "LifePIM HTTPS" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443 -Profile Private -RemoteAddress 192.168.1.0/24
+.\scripts\prod\allow_lifepim_caddy_firewall.ps1
 Remove-NetFirewallRule -DisplayName "LifePIM Waitress"
 ```
 

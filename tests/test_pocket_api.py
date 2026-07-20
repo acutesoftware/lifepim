@@ -5,6 +5,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+import uuid
 from datetime import datetime, timezone
 from unittest.mock import patch
 
@@ -294,6 +295,8 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["date_modified"], "")
         self.assertFalse(item["important"])
         self.assertEqual(item["color"], "")
+        self.assertEqual(item["title"], "")
+        self.assertEqual(item["source_note_id"], "")
         self.assertEqual(item["metadata"]["project"], "pers")
 
         item_resp = self.client.get(f"/api/pocket/v1/items/{item['id']}", headers=headers)
@@ -342,6 +345,7 @@ class TestPocketApi(unittest.TestCase):
                 "- colour-red\n"
                 "- important\n"
                 "title: \"start a bug database\"\n"
+                "note_id: 1234\n"
                 "date_created: \"2018-09-24 21:36:54\"\n"
                 "date_updated: 2019-07-27 12:02:43\n"
                 "folder: Business\n"
@@ -360,6 +364,9 @@ class TestPocketApi(unittest.TestCase):
         for payload in (manifest_item, item_payload):
             self.assertEqual(payload["project"], "work/business")
             self.assertEqual(payload["derived_project"], "work/business")
+            self.assertEqual(payload["title"], "start a bug database")
+            self.assertEqual(payload["source_note_id"], "1234")
+            self.assertEqual(payload["metadata"]["note_id"], "1234")
             self.assertEqual(payload["date_created"], "2018-09-24 21:36:54")
             self.assertEqual(payload["date_modified"], "2019-07-27 12:02:43")
             self.assertTrue(payload["important"])
@@ -391,6 +398,20 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(payload["errors"][0]["note_id"], 1)
         self.assertEqual(payload["errors"][0]["error_type"], "ValueError")
 
+    def test_manifest_tolerates_windows_encoded_note_front_matter(self):
+        self._add_note(file_name="legacy-encoding.md", content="placeholder")
+        note_path = os.path.join(self.tmpdir.name, "legacy-encoding.md")
+        with open(note_path, "wb") as handle:
+            handle.write(b"---\ntitle: Bob\x92s note\n---\nBody with dash \x97 here\n")
+        headers = self._register_headers()
+
+        manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+
+        self.assertEqual(manifest_resp.status_code, 200)
+        payload = manifest_resp.get_json()
+        self.assertEqual(payload["error_count"], 0)
+        self.assertEqual(payload["items"][0]["relative_path"], "legacy-encoding.md")
+
     def test_manifest_only_returns_notes_owned_by_mobile_user(self):
         owned_id = self._add_note(file_name="owned.md", content="owned", owner_user_id=3)
         other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)
@@ -405,6 +426,33 @@ class TestPocketApi(unittest.TestCase):
         item_ids = {item["id"] for item in manifest_resp.get_json()["items"]}
         self.assertIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:3:note:{owned_id}")), item_ids)
         self.assertNotIn(str(__import__("uuid").uuid5(__import__("uuid").UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:1:note:{other_id}")), item_ids)
+
+    def test_manifest_includes_legacy_unowned_notes_for_bound_user(self):
+        legacy_null_id = self._add_note(file_name="legacy-null.md", content="legacy null", owner_user_id=None)
+        legacy_zero_id = self._add_note(file_name="legacy-zero.md", content="legacy zero", owner_user_id=0)
+        self._add_note(file_name="other.md", content="other", owner_user_id=1)
+        headers = self._register_headers()
+
+        manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+
+        self.assertEqual(manifest_resp.status_code, 200)
+        items = {item["relative_path"]: item for item in manifest_resp.get_json()["items"]}
+        self.assertIn("legacy-null.md", items)
+        self.assertIn("legacy-zero.md", items)
+        self.assertNotIn("other.md", items)
+        self.assertEqual(
+            items["legacy-null.md"]["id"],
+            str(uuid.uuid5(uuid.UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:3:note:{legacy_null_id}")),
+        )
+        self.assertEqual(
+            items["legacy-zero.md"]["id"],
+            str(uuid.uuid5(uuid.UUID("0dd8c9ea-42a1-4e9e-bcbb-5b0885df5d2f"), f"user:3:note:{legacy_zero_id}")),
+        )
+
+        item_resp = self.client.get(f"/api/pocket/v1/items/{items['legacy-null.md']['id']}", headers=headers)
+
+        self.assertEqual(item_resp.status_code, 200)
+        self.assertEqual(item_resp.get_json()["content"], "legacy null")
 
     def test_item_download_rejects_note_owned_by_another_user(self):
         other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)

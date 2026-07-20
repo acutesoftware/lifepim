@@ -13,8 +13,10 @@ Expected listeners:
 
 ```text
 127.0.0.1:9741       Waitress
-192.168.1.99:80      Caddy HTTP redirect, if retained
+192.168.1.99:80      Caddy HTTP redirect/Pocket proxy
 192.168.1.99:443     Caddy HTTPS
+<USB tether IP>:80    Caddy HTTP redirect/Pocket proxy, when tethered
+<USB tether IP>:443   Caddy HTTPS, when tethered
 ```
 
 Check them with:
@@ -38,14 +40,25 @@ Install Caddy at:
 C:\apps\caddy\caddy_windows_amd64.exe
 ```
 
-Use this `C:\apps\caddy\Caddyfile`:
+`src\RUN_DESKTOP.BAT` runs `scripts\prod\update_caddy_lan_hosts.py` before
+starting Caddy. The helper writes `C:\apps\caddy\Caddyfile` with the fixed
+desktop LAN address plus active private IPv4 addresses, including USB tether
+adapters.
+
+The generated `C:\apps\caddy\Caddyfile` has this shape:
 
 ```caddy
-http://192.168.1.99 {
-    redir https://192.168.1.99{uri} permanent
+http://192.168.1.99, http://10.181.130.24 {
+    handle /api/pocket/v1/* {
+        reverse_proxy 127.0.0.1:9741
+    }
+
+    handle {
+        redir https://{host}{uri} permanent
+    }
 }
 
-https://192.168.1.99 {
+https://192.168.1.99, https://10.181.130.24 {
     request_body {
         max_size 10MB
     }
@@ -65,17 +78,24 @@ https://192.168.1.99 {
 }
 ```
 
-Do not expose the Pocket API on HTTP. The mobile base URL is:
+Use HTTPS as the mobile base URL:
 
 ```text
 https://192.168.1.99
 ```
 
+When the phone is connected through USB tethering, use the desktop's tether
+adapter IP instead, for example:
+
+```text
+https://10.181.130.24
+```
+
 Release Pocket builds reject non-HTTPS server URLs except for tightly scoped
 development cases. If a saved Pocket URL is exactly `http://192.168.1.99`, the
 mobile app migrates it to `https://192.168.1.99`. Do not configure Pocket to use
-`http://192.168.1.99`, `http://192.168.1.99:9741`, or another direct Waitress
-URL for normal LAN use.
+direct Waitress URLs such as `http://192.168.1.99:9741` or
+`http://10.181.130.24:9741` for normal LAN use.
 
 Validate Caddy before starting LifePIM:
 
@@ -124,11 +144,13 @@ Flask uses `ProxyFix` for one proxy layer. This is safe only because Waitress is
 
 ## Windows Firewall
 
-Use the Private network profile only. Allow inbound LAN traffic to ports 80 and 443 only; optionally restrict remote addresses to `192.168.1.0/24`.
+Allow inbound LAN traffic to Caddy on ports 80 and 443 only. USB tether
+adapters can appear as a Public network, so the production helper uses
+`LocalSubnet` for both Private and Public profiles while keeping Waitress
+loopback-only.
 
 ```powershell
-New-NetFirewallRule -DisplayName "LifePIM HTTP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 80 -Profile Private -RemoteAddress 192.168.1.0/24
-New-NetFirewallRule -DisplayName "LifePIM HTTPS" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 443 -Profile Private -RemoteAddress 192.168.1.0/24
+.\scripts\prod\allow_lifepim_caddy_firewall.ps1
 ```
 
 Remove any old Waitress firewall rule:
@@ -315,6 +337,7 @@ Verify:
 ```text
 http://192.168.1.99              redirects to HTTPS
 https://192.168.1.99/api/pocket/v1/health works after Android trusts the local CA
+https://10.181.130.24/api/pocket/v1/health works when USB tethering is active
 http://192.168.1.99:9741         is unreachable from another LAN machine
 ```
 

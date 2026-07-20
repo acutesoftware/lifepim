@@ -457,13 +457,24 @@ def _note_rows(user_id=None):
         if "owner_user_id" not in columns:
             log_network("pocket_note_security_missing_owner_column", table=tbl["name"])
             return []
-        where = "owner_user_id = ?"
+        where = _note_owner_or_legacy_filter()
         params.append(user_id)
     rows = data._get_conn().execute(
         f"SELECT {', '.join(select_cols)} FROM {tbl['name']} WHERE {where} ORDER BY id",
         params,
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def _note_owner_or_legacy_filter():
+    return "(owner_user_id = ? OR owner_user_id IS NULL OR owner_user_id = '' OR owner_user_id = 0)"
+
+
+def _effective_note_owner_user_id(note, user_id=None):
+    owner_user_id = note.get("owner_user_id") if note else None
+    if owner_user_id in (None, "", 0, "0"):
+        return user_id
+    return owner_user_id
 
 
 def _cached_item_sha(entity_type, entity_id):
@@ -534,7 +545,7 @@ def _read_note_front_matter(note_path):
     if not note_path:
         return {}
     try:
-        with open(note_path, "r", encoding="utf-8-sig") as handle:
+        with open(note_path, "r", encoding="utf-8-sig", errors="replace") as handle:
             text = handle.read(POCKET_FRONT_MATTER_READ_LIMIT)
     except OSError:
         return {}
@@ -574,11 +585,16 @@ def _first_front_matter_value(front_matter, keys):
 
 
 def _metadata_from_front_matter(front_matter):
+    title = _first_front_matter_value(front_matter, ("title", "name"))
+    source_note_id = _first_front_matter_value(front_matter, ("source_note_id", "lifepim_com_note_id", "note_id"))
     created = _first_front_matter_value(front_matter, ("date_created", "created", "created_at", "created_utc"))
     modified = _first_front_matter_value(front_matter, ("date_modified", "date_updated", "modified", "updated", "updated_at", "updated_utc"))
     important = _first_front_matter_value(front_matter, ("important", "is_important"))
     color = _first_front_matter_value(front_matter, ("color", "colour"))
     metadata = {
+        "title": "",
+        "source_note_id": "",
+        "note_id": "",
         "date_created": "",
         "created_at": "",
         "date_modified": "",
@@ -586,6 +602,11 @@ def _metadata_from_front_matter(front_matter):
         "important": False,
         "color": "",
     }
+    if title:
+        metadata["title"] = title
+    if source_note_id:
+        metadata["source_note_id"] = source_note_id
+        metadata["note_id"] = source_note_id
     if created:
         metadata["date_created"] = created
         metadata["created_at"] = _iso_from_note_value(created)
@@ -640,7 +661,7 @@ def _note_row_by_id(note_id, user_id=None):
         if "owner_user_id" not in columns:
             log_network("pocket_note_security_missing_owner_column", table=tbl["name"])
             return None
-        where += " AND owner_user_id = ?"
+        where += f" AND {_note_owner_or_legacy_filter()}"
         params.append(user_id)
     row = data._get_conn().execute(f"SELECT * FROM {tbl['name']} WHERE {where}", params).fetchone()
     return dict(row) if row else None
@@ -909,8 +930,9 @@ def _serialize_note_item(note, include_content=False, root=None, state_override=
     content = notes_routes._read_note_file(note_path) if include_content else None
     front_matter_metadata = _metadata_from_front_matter(_read_note_front_matter(note_path))
     derived_project = _derived_project_for_note(note, owner_user_id=user_id)
+    item_owner_user_id = _effective_note_owner_user_id(note, user_id=user_id)
     item = {
-        "id": _item_uuid_for_note(note["id"], note.get("owner_user_id")),
+        "id": _item_uuid_for_note(note["id"], item_owner_user_id),
         "relative_path": _relative_note_path(note, root=root) or "",
         "kind": _item_kind(note, content=content) if include_content else "NOTE",
         "ownership": "DESKTOP_MASTER",

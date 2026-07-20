@@ -79,6 +79,13 @@ if exist "%CADDY_EXE%" (
             echo Production startup requires Caddy in front of loopback-only Waitress.
             exit /b 1
         )
+        if exist "%ROOT_DIR%\scripts\prod\update_caddy_lan_hosts.py" (
+            "%PYTHON_EXE%" "%ROOT_DIR%\scripts\prod\update_caddy_lan_hosts.py" --config "%CADDY_CONFIG%" --upstream "127.0.0.1:%LIFEPIM_PORT%"
+            if errorlevel 1 (
+                echo ERROR: Could not update Caddy LAN host configuration.
+                exit /b 1
+            )
+        )
         pushd "%CADDY_DIR%"
         "%CADDY_EXE%" validate --config "%CADDY_CONFIG%"
         if errorlevel 1 (
