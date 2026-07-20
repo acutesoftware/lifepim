@@ -83,19 +83,21 @@ class TestPocketApi(unittest.TestCase):
             data.conn = self._old_conn
             self.conn.close()
 
-    def _add_note(self, file_name="Shopping.md", content="# Shopping\n\n- [ ] Milk\n", owner_user_id=3):
-        full_path = os.path.join(self.tmpdir.name, file_name)
+    def _add_note(self, file_name="Shopping.md", content="# Shopping\n\n- [ ] Milk\n", owner_user_id=3, folder_path=None, project="pers"):
+        folder_path = folder_path or self.tmpdir.name
+        os.makedirs(folder_path, exist_ok=True)
+        full_path = os.path.join(folder_path, file_name)
         with open(full_path, "w", encoding="utf-8") as handle:
             handle.write(content)
         stat = os.stat(full_path)
         tbl = common_utils.get_table_def("notes")
         values_map = {
             "file_name": file_name,
-            "path": self.tmpdir.name,
+            "path": folder_path,
             "folder_id": "",
             "size": str(stat.st_size),
             "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-            "project": "pers",
+            "project": project,
             "owner_user_id": owner_user_id,
             "visibility": "private",
             "is_public": 0,
@@ -286,12 +288,108 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["relative_path"], "Shopping.md")
         self.assertEqual(item["kind"], "NOTE")
         self.assertEqual(item["ownership"], "DESKTOP_MASTER")
+        self.assertEqual(item["project"], "pers")
+        self.assertEqual(item["derived_project"], "pers")
+        self.assertEqual(item["date_created"], "")
+        self.assertEqual(item["date_modified"], "")
+        self.assertFalse(item["important"])
+        self.assertEqual(item["color"], "")
+        self.assertEqual(item["metadata"]["project"], "pers")
 
         item_resp = self.client.get(f"/api/pocket/v1/items/{item['id']}", headers=headers)
         self.assertEqual(item_resp.status_code, 200)
         item_payload = item_resp.get_json()
         self.assertEqual(item_payload["kind"], "LIST")
         self.assertEqual(item_payload["content"], "# Shopping\n\n- [ ] Milk\n")
+
+    def test_manifest_and_item_download_include_note_metadata(self):
+        project_dir = os.path.join(self.tmpdir.name, "notes", "20-Biz", "22-Acute", "22-7-Support")
+        self.conn.executescript(
+            """
+            CREATE TABLE lp_projects (
+                owner_user_id INTEGER,
+                project_id TEXT,
+                project_name TEXT
+            );
+            CREATE TABLE lp_project_folders (
+                owner_user_id INTEGER,
+                project_id TEXT,
+                path_prefix TEXT,
+                folder_role TEXT,
+                is_enabled INTEGER,
+                sort_order INTEGER
+            );
+            """
+        )
+        self.conn.execute(
+            "INSERT INTO lp_projects(owner_user_id, project_id, project_name) VALUES (3, 'work/business', 'Business')"
+        )
+        self.conn.execute(
+            """
+            INSERT INTO lp_project_folders(owner_user_id, project_id, path_prefix, folder_role, is_enabled, sort_order)
+            VALUES (3, 'work/business', ?, 'default', 1, 10)
+            """,
+            (project_dir,),
+        )
+        self._add_note(
+            file_name="start_a_bug_database.md",
+            folder_path=project_dir,
+            project="stale/project",
+            content=(
+                "---\n"
+                "tags:\n"
+                "- Business\n"
+                "- colour-red\n"
+                "- important\n"
+                "title: \"start a bug database\"\n"
+                "date_created: \"2018-09-24 21:36:54\"\n"
+                "date_updated: 2019-07-27 12:02:43\n"
+                "folder: Business\n"
+                "important: on\n"
+                "color: red\n"
+                "---\n"
+                "\n"
+                "this can be current support folder\n"
+            ),
+        )
+        headers = self._register_headers()
+
+        manifest_item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+        item_payload = self.client.get(f"/api/pocket/v1/items/{manifest_item['id']}", headers=headers).get_json()
+
+        for payload in (manifest_item, item_payload):
+            self.assertEqual(payload["project"], "work/business")
+            self.assertEqual(payload["derived_project"], "work/business")
+            self.assertEqual(payload["date_created"], "2018-09-24 21:36:54")
+            self.assertEqual(payload["date_modified"], "2019-07-27 12:02:43")
+            self.assertTrue(payload["important"])
+            self.assertEqual(payload["color"], "red")
+            self.assertEqual(payload["metadata"]["project"], "work/business")
+
+    def test_manifest_skips_one_note_when_metadata_serialization_fails(self):
+        self._add_note(file_name="bad.md", content="bad")
+        self._add_note(file_name="good.md", content="good")
+        headers = self._register_headers()
+
+        from modules.pocket_api import routes as pocket_routes
+
+        original_serialize = pocket_routes._serialize_note_item
+
+        def fail_bad_note(note, *args, **kwargs):
+            if note.get("file_name") == "bad.md":
+                raise ValueError("bad metadata")
+            return original_serialize(note, *args, **kwargs)
+
+        with patch("modules.pocket_api.routes._serialize_note_item", side_effect=fail_bad_note):
+            manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+
+        self.assertEqual(manifest_resp.status_code, 200)
+        payload = manifest_resp.get_json()
+        self.assertEqual(payload["skipped_count"], 1)
+        self.assertEqual(payload["error_count"], 1)
+        self.assertEqual([item["relative_path"] for item in payload["items"]], ["good.md"])
+        self.assertEqual(payload["errors"][0]["note_id"], 1)
+        self.assertEqual(payload["errors"][0]["error_type"], "ValueError")
 
     def test_manifest_only_returns_notes_owned_by_mobile_user(self):
         owned_id = self._add_note(file_name="owned.md", content="owned", owner_user_id=3)

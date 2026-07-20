@@ -232,6 +232,24 @@ The mobile upload flow is:
 
 The upload action does not download Desktop changes back to Pocket.
 
+The manifest read in step 2 also carries Desktop note metadata that Pocket can
+use when matching or importing Desktop-backed notes:
+
+- `project` and `derived_project`: Desktop's derived project value, copied
+  verbatim from the project-folder mapping, for example `work/business`.
+- `date_created`: note creation date from the markdown YAML front matter.
+- `date_modified`: note modified date from the markdown YAML front matter, with
+  aliases such as `date_updated` accepted by Desktop.
+- `important`: note importance parsed from YAML front matter values such as
+  `on`, `yes`, `true`, or `1`.
+- `color`: note color from YAML front matter, for example `red`.
+
+Desktop also includes the same metadata under a nested `metadata` object for
+clients that prefer grouped note properties. Pocket should continue to treat
+`modified_at`, `version`, and `sha256` as sync/conflict fields. Do not use
+`modified_at` as the note's displayed Date Modified when `date_modified` is
+present.
+
 Desktop accepts supported note pushes for the paired user. Existing notes are
 updated when the server item ID, client item map, or same mobile filename can be
 matched. Mobile-only notes can be created in the user's configured Pocket
