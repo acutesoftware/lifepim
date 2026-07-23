@@ -364,7 +364,19 @@ The UI import and migration forms do not read `FOLDER_NOTES` from `tests/LOAD_TE
 
 If you later reload mapping CSVs from disk and those CSVs still contain old paths such as `E:\BK_fangorn`, the old paths can come back. Update the CSVs too if the NAS path is now the permanent source of truth.
 
-## TODO
 
-- Consider adding a missing-file review screen for rows counted by sync as missing on disk.
-- Replace `tests/LOAD_TESTING.py` with explicit import/sync flows for each data source.
+## Note Functions
+Should be functions below on either the Note or the text selected (whichever works)
+
+Right click a note, or selected text or pick from [...] menu:
+Find in Note : search this note / text for a string
+Find in LifePIM : search ALL notes for a string
+Find in Wikipedia : search wikipedia for a string (search string with site:wikipedia.org)
+Find in Google : search internet for a string
+
+Extract URL's : opens a new text window with list of URLs from this note
+Extract emails : opens a new text window with list of emails from this note
+
+Jump to Line : jumps to line number (-1 means end of file)
+Jump to Heading : opens a new  window with list of clickable Links to headings in this note
+

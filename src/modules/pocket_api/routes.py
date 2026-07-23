@@ -31,6 +31,7 @@ POCKET_MAX_SYNC_PAYLOAD_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_B
 POCKET_MAX_ATTACHMENT_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_ATTACHMENT_BYTES", str(25 * 1024 * 1024)))
 POCKET_ATTACHMENT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 POCKET_FRONT_MATTER_READ_LIMIT = 128 * 1024
+POCKET_MANIFEST_FRONT_MATTER_LIMIT = int(os.getenv("LIFEPIM_POCKET_MANIFEST_FRONT_MATTER_LIMIT", "100"))
 
 
 def _utc_now():
@@ -451,6 +452,23 @@ def _note_rows(user_id=None):
         select_cols.append("is_public")
     if "rec_extract_date" in columns:
         select_cols.append("rec_extract_date")
+    for optional_col in (
+        "title",
+        "name",
+        "source_note_id",
+        "lifepim_com_note_id",
+        "note_id",
+        "date_created",
+        "created",
+        "created_at",
+        "created_utc",
+        "important",
+        "is_important",
+        "color",
+        "colour",
+    ):
+        if optional_col in columns and optional_col not in select_cols:
+            select_cols.append(optional_col)
     where = "1=1"
     params = []
     if user_id is not None:
@@ -489,6 +507,24 @@ def _cached_item_sha(entity_type, entity_id):
     except Exception:
         return ""
     return (row["sha256"] or "") if row else ""
+
+
+def _cached_note_sha_map(note_ids):
+    note_ids = [int(note_id) for note_id in note_ids if note_id is not None]
+    if not note_ids:
+        return {}
+    placeholders = ", ".join("?" for _ in note_ids)
+    try:
+        rows = data._get_conn().execute(
+            f"""
+            SELECT entity_id, sha256 FROM pocket_item_state
+            WHERE entity_type = 'note' AND entity_id IN ({placeholders})
+            """,
+            note_ids,
+        ).fetchall()
+    except Exception:
+        return {}
+    return {int(row["entity_id"]): (row["sha256"] or "") for row in rows}
 
 
 def _upsert_item_state(entity_type, entity_id, note_path, state):
@@ -620,6 +656,42 @@ def _metadata_from_front_matter(front_matter):
     return metadata
 
 
+def _empty_note_metadata():
+    return {
+        "title": "",
+        "source_note_id": "",
+        "note_id": "",
+        "date_created": "",
+        "created_at": "",
+        "date_modified": "",
+        "front_matter_modified_at": "",
+        "important": False,
+        "color": "",
+    }
+
+
+def _metadata_from_note_columns(note):
+    metadata = _empty_note_metadata()
+    title = note.get("title") or note.get("name") or ""
+    source_note_id = note.get("source_note_id") or note.get("lifepim_com_note_id") or note.get("note_id") or ""
+    created = note.get("date_created") or note.get("created") or note.get("created_at") or note.get("created_utc") or ""
+    important = note.get("important") if "important" in note else note.get("is_important")
+    color = note.get("color") or note.get("colour") or ""
+    if title:
+        metadata["title"] = title
+    if source_note_id:
+        metadata["source_note_id"] = source_note_id
+        metadata["note_id"] = source_note_id
+    if created:
+        metadata["date_created"] = created
+        metadata["created_at"] = _iso_from_note_value(created)
+    if important not in (None, ""):
+        metadata["important"] = _front_matter_bool(important)
+    if color:
+        metadata["color"] = color
+    return metadata
+
+
 def _metadata_from_note_row(note):
     size_value = note.get("size") or 0
     try:
@@ -690,6 +762,53 @@ def _item_uuid_for_note(note_id, user_id=None):
     )
     conn.commit()
     return item_uuid
+
+
+def _item_uuid_map_for_notes(notes, user_id=None):
+    now = _utc_now_sql()
+    note_ids = []
+    expected = {}
+    existing = {}
+    item_ids = {}
+    for note in notes:
+        note_id = int(note["id"])
+        note_ids.append(note_id)
+        item_owner_user_id = _effective_note_owner_user_id(note, user_id=user_id)
+        item_uuid = str(uuid.uuid5(ITEM_NAMESPACE, f"user:{item_owner_user_id}:note:{note_id}"))
+        expected[note_id] = item_uuid
+        item_ids[note_id] = item_uuid
+    if note_ids:
+        placeholders = ", ".join("?" for _ in note_ids)
+        try:
+            rows = data._get_conn().execute(
+                f"""
+                SELECT entity_id, item_uuid
+                FROM pocket_item_map
+                WHERE entity_type = 'note' AND entity_id IN ({placeholders})
+                """,
+                note_ids,
+            ).fetchall()
+            existing = {int(row["entity_id"]): (row["item_uuid"] or "") for row in rows}
+        except Exception:
+            existing = {}
+    values = [
+        (item_uuid, note_id, now, now)
+        for note_id, item_uuid in expected.items()
+        if existing.get(note_id) != item_uuid
+    ]
+    if values:
+        conn = data._get_conn()
+        conn.executemany(
+            """
+            INSERT INTO pocket_item_map(item_uuid, entity_type, entity_id, created_at, last_seen_at)
+            VALUES (?, 'note', ?, ?, ?)
+            ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                item_uuid = excluded.item_uuid,
+                last_seen_at = excluded.last_seen_at
+            """,
+            values,
+        )
+    return item_ids
 
 
 def _note_id_for_item(item_id):
@@ -859,10 +978,105 @@ def _matching_project_folder_rows(note, owner_user_id):
     return owner_rows or _rows_for_owner(None)
 
 
-def _derived_project_for_note(note, owner_user_id=None):
+def _project_folder_rows_for_manifest(owner_user_id):
+    conn = data._get_conn()
+    try:
+        table_names = {
+            row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        }
+    except Exception:
+        return []
+    if "lp_project_folders" not in table_names:
+        return []
+    folder_columns = _table_columns(conn, "lp_project_folders")
+    if not {"project_id", "path_prefix"}.issubset(folder_columns):
+        return []
+    project_join = ""
+    project_name_expr = "'' AS project_name"
+    if "lp_projects" in table_names:
+        project_columns = _table_columns(conn, "lp_projects")
+        if {"owner_user_id", "project_id", "project_name"}.issubset(project_columns):
+            project_join = (
+                "LEFT JOIN lp_projects p "
+                "ON p.owner_user_id IS pf.owner_user_id "
+                "AND p.project_id = pf.project_id"
+            )
+            project_name_expr = "COALESCE(p.project_name, '') AS project_name"
+    owner_condition = "pf.owner_user_id IS ?" if "owner_user_id" in folder_columns else "? IS NULL"
+    enabled_condition = "AND pf.is_enabled = 1" if "is_enabled" in folder_columns else ""
+    role_condition = (
+        "AND pf.folder_role IN ('default','include','archive','output')" if "folder_role" in folder_columns else ""
+    )
+    folder_role_expr = "pf.folder_role" if "folder_role" in folder_columns else "'default'"
+    sort_order_expr = "pf.sort_order" if "sort_order" in folder_columns else "100"
+    rows = []
+    for owner_value in (owner_user_id, None):
+        if owner_value is None and owner_user_id is None:
+            continue
+        try:
+            fetched = conn.execute(
+                f"""
+                SELECT pf.project_id, pf.path_prefix, {folder_role_expr} AS folder_role,
+                       {sort_order_expr} AS sort_order, {project_name_expr}
+                FROM lp_project_folders pf
+                {project_join}
+                WHERE {owner_condition}
+                  {enabled_condition}
+                  {role_condition}
+                """,
+                (owner_value,),
+            ).fetchall()
+        except Exception:
+            continue
+        for row in fetched:
+            try:
+                path_prefix = notes_routes._normalize_note_path(row["path_prefix"])
+            except Exception:
+                continue
+            if not path_prefix:
+                continue
+            item = dict(row)
+            item["path_prefix"] = path_prefix
+            item["_manifest_owner_user_id"] = owner_value
+            rows.append(item)
+    return rows
+
+
+def _matching_project_folder_rows_from_cache(note, owner_user_id, project_folder_rows):
+    if project_folder_rows is None:
+        return _matching_project_folder_rows(note, owner_user_id)
+    try:
+        folder_path = notes_routes._normalize_note_path(note.get("path")) or os.path.dirname(notes_routes._build_note_path(note))
+    except Exception:
+        folder_path = os.path.dirname(notes_routes._build_note_path(note))
+    if not folder_path:
+        return []
+    try:
+        full_path = notes_routes._normalize_note_path(notes_routes._build_note_path(note))
+    except Exception:
+        full_path = notes_routes._build_note_path(note)
+    folder_lower = folder_path.lower()
+
+    def _matches(owner_value):
+        matched = []
+        for row in project_folder_rows:
+            if row.get("_manifest_owner_user_id") != owner_value:
+                continue
+            path_prefix = row.get("path_prefix") or ""
+            if folder_lower.startswith(path_prefix.lower()):
+                item = dict(row)
+                item["full_path"] = full_path
+                matched.append(item)
+        return matched
+
+    owner_rows = _matches(owner_user_id) if owner_user_id is not None else []
+    return owner_rows or _matches(None)
+
+
+def _derived_project_for_note(note, owner_user_id=None, project_folder_rows=None):
     fallback = note.get("project") or ""
     owner_user_id = owner_user_id if owner_user_id is not None else note.get("owner_user_id")
-    rows = _matching_project_folder_rows(note, owner_user_id)
+    rows = _matching_project_folder_rows_from_cache(note, owner_user_id, project_folder_rows)
     if not rows:
         return fallback
     best_prefix_len = max(len(row.get("path_prefix") or "") for row in rows)
@@ -920,7 +1134,18 @@ def _version_from_state(state):
         return 0
 
 
-def _serialize_note_item(note, include_content=False, root=None, state_override=None, note_path_override=None, user_id=None):
+def _serialize_note_item(
+    note,
+    include_content=False,
+    root=None,
+    state_override=None,
+    note_path_override=None,
+    user_id=None,
+    include_front_matter=True,
+    item_uuid=None,
+    cached_sha="",
+    project_folder_rows=None,
+):
     note_path = note_path_override or notes_routes._build_note_path(note)
     if include_content:
         state = notes_routes._note_file_state(note_path)
@@ -928,15 +1153,19 @@ def _serialize_note_item(note, include_content=False, root=None, state_override=
     else:
         state = state_override or _note_file_metadata(note_path)
     content = notes_routes._read_note_file(note_path) if include_content else None
-    front_matter_metadata = _metadata_from_front_matter(_read_note_front_matter(note_path))
-    derived_project = _derived_project_for_note(note, owner_user_id=user_id)
+    front_matter_metadata = (
+        _metadata_from_front_matter(_read_note_front_matter(note_path))
+        if include_front_matter
+        else _metadata_from_note_columns(note)
+    )
+    derived_project = _derived_project_for_note(note, owner_user_id=user_id, project_folder_rows=project_folder_rows)
     item_owner_user_id = _effective_note_owner_user_id(note, user_id=user_id)
     item = {
-        "id": _item_uuid_for_note(note["id"], item_owner_user_id),
+        "id": item_uuid or _item_uuid_for_note(note["id"], item_owner_user_id),
         "relative_path": _relative_note_path(note, root=root) or "",
         "kind": _item_kind(note, content=content) if include_content else "NOTE",
         "ownership": "DESKTOP_MASTER",
-        "sha256": state.get("sha256") if state and state.get("sha256") else (_cached_item_sha("note", note["id"]) or ""),
+        "sha256": state.get("sha256") if state and state.get("sha256") else (cached_sha or _cached_item_sha("note", note["id"]) or ""),
         "version": _version_from_state(state),
         "modified_at": _iso_from_state_or_note(state, note) or "",
         "project": derived_project or "",
@@ -1496,6 +1725,12 @@ def sync_manifest_route():
     errors = []
     error_count = 0
     rows = _note_rows(user_id=device.get("user_id"))
+    include_front_matter = str(request.args.get("include_metadata") or "").strip().lower() in {"1", "true", "yes"}
+    if not include_front_matter:
+        include_front_matter = len(rows) <= int(current_app.config.get("LIFEPIM_POCKET_MANIFEST_FRONT_MATTER_LIMIT", POCKET_MANIFEST_FRONT_MATTER_LIMIT))
+    item_uuid_map = _item_uuid_map_for_notes(rows, user_id=device.get("user_id"))
+    cached_sha_map = _cached_note_sha_map([note.get("id") for note in rows])
+    project_folder_rows = _project_folder_rows_for_manifest(device.get("user_id"))
     for idx, note in enumerate(rows, start=1):
         try:
             note_path = notes_routes._build_note_path(note)
@@ -1513,6 +1748,10 @@ def sync_manifest_route():
                     state_override=state,
                     note_path_override=note_path,
                     user_id=device.get("user_id"),
+                    include_front_matter=include_front_matter,
+                    item_uuid=item_uuid_map.get(int(note["id"])),
+                    cached_sha=cached_sha_map.get(int(note["id"]), ""),
+                    project_folder_rows=project_folder_rows,
                 )
             )
         except Exception as exc:
@@ -1555,12 +1794,14 @@ def sync_manifest_route():
         error_count=error_count,
         total_count=len(rows),
         root=root,
+        front_matter_included=include_front_matter,
     )
     payload = {
         "generated_at": _utc_now().isoformat(),
         "items": items,
         "skipped_count": skipped,
         "error_count": error_count,
+        "front_matter_included": include_front_matter,
     }
     if errors:
         payload["errors"] = errors

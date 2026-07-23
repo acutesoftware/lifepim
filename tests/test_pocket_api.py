@@ -412,6 +412,25 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(payload["error_count"], 0)
         self.assertEqual(payload["items"][0]["relative_path"], "legacy-encoding.md")
 
+    def test_large_manifest_skips_front_matter_file_reads(self):
+        self.app.config["LIFEPIM_POCKET_MANIFEST_FRONT_MATTER_LIMIT"] = 1
+        self._add_note(file_name="first.md", content="---\ntitle: First\n---\nBody")
+        self._add_note(file_name="second.md", content="---\ntitle: Second\n---\nBody")
+        headers = self._register_headers()
+
+        with patch("modules.pocket_api.routes._read_note_front_matter", side_effect=AssertionError("front matter read")):
+            manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+
+        self.assertEqual(manifest_resp.status_code, 200)
+        payload = manifest_resp.get_json()
+        self.assertFalse(payload["front_matter_included"])
+        self.assertEqual(payload["error_count"], 0)
+        self.assertEqual([item["title"] for item in payload["items"]], ["", ""])
+        self.assertEqual(self.conn.execute("SELECT COUNT(1) AS cnt FROM pocket_item_map").fetchone()["cnt"], 2)
+
+        item_payload = self.client.get(f"/api/pocket/v1/items/{payload['items'][0]['id']}", headers=headers).get_json()
+        self.assertEqual(item_payload["title"], "First")
+
     def test_manifest_only_returns_notes_owned_by_mobile_user(self):
         owned_id = self._add_note(file_name="owned.md", content="owned", owner_user_id=3)
         other_id = self._add_note(file_name="other.md", content="other", owner_user_id=1)
