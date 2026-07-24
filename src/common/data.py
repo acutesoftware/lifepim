@@ -96,6 +96,34 @@ def add_column_if_missing(conn, tbl_name, col_name, col_type):
     conn.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type}")
 
 
+NOTE_SCHEMA_COLUMNS = {
+    "file_name": "TEXT",
+    "path": "TEXT",
+    "folder_id": "INTEGER",
+    "size": "TEXT",
+    "title": "TEXT",
+    "color": "TEXT",
+    "date_created": "TEXT",
+    "date_modified": "TEXT",
+    "project": "TEXT",
+    "important": "TEXT",
+    "source_note_id": "TEXT",
+}
+
+
+def ensure_notes_schema(conn=None):
+    conn = _get_conn() if conn is None else conn
+    table_row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_notes'"
+    ).fetchone()
+    if not table_row:
+        return
+    for col_name, col_type in NOTE_SCHEMA_COLUMNS.items():
+        add_column_if_missing(conn, "lp_notes", col_name, col_type)
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_folder_id ON lp_notes(folder_id)")
+    conn.commit()
+
+
 def ensure_folder_schema(conn=None):
     conn = _get_conn() if conn is None else conn
     conn.execute("PRAGMA foreign_keys = OFF")
@@ -115,6 +143,7 @@ def ensure_folder_schema(conn=None):
     for tbl_name in folder_tables:
         add_column_if_missing(conn, tbl_name, "folder_id", "INTEGER")
         conn.execute(f"CREATE INDEX IF NOT EXISTS ix_{tbl_name}_folder_id ON {tbl_name}(folder_id)")
+    ensure_notes_schema(conn)
     conn.commit()
 
 
@@ -395,6 +424,7 @@ def add_record(conn, tbl_name, col_list, value_list):
     cols = list(col_list)
     vals = list(value_list)
     conn = _get_conn() if conn is None else conn
+    table_cols = None
     try:
         table_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()}
         if "owner_user_id" in table_cols and "owner_user_id" not in cols:
@@ -405,8 +435,16 @@ def add_record(conn, tbl_name, col_list, value_list):
                 vals.append(current_user.user_id)
     except Exception:
         pass
-    cols.extend(["user_name", "rec_extract_date"])
-    vals.extend([_current_user(), _now_str()])
+    if table_cols:
+        filtered = [(col, val) for col, val in zip(cols, vals) if col in table_cols]
+        cols = [col for col, _ in filtered]
+        vals = [val for _, val in filtered]
+    standard_cols = ["user_name", "rec_extract_date"]
+    standard_vals = [_current_user(), _now_str()]
+    for col, val in zip(standard_cols, standard_vals):
+        if table_cols is None or col in table_cols:
+            cols.append(col)
+            vals.append(val)
     placeholders = ", ".join(["?"] * len(cols))
     sql = f"INSERT INTO {tbl_name} ({', '.join(cols)}) VALUES ({placeholders})"
     try:
@@ -438,13 +476,20 @@ def update_record(conn, tbl_name, record_id, col_list, value_list):
     """
     cols = list(col_list)
     vals = list(value_list)
-    cols.append("rec_extract_date")
-    vals.append(_now_str())
-    set_clause = ", ".join([f"{col} = ?" for col in cols])
-    sql = f"UPDATE {tbl_name} SET {set_clause} WHERE id = ?"
-    vals.append(record_id)
     try:
         conn = _get_conn() if conn is None else conn
+        table_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()}
+        filtered = [(col, val) for col, val in zip(cols, vals) if col in table_cols]
+        cols = [col for col, _ in filtered]
+        vals = [val for _, val in filtered]
+        if "rec_extract_date" in table_cols:
+            cols.append("rec_extract_date")
+            vals.append(_now_str())
+        if not cols:
+            return False
+        set_clause = ", ".join([f"{col} = ?" for col in cols])
+        sql = f"UPDATE {tbl_name} SET {set_clause} WHERE id = ?"
+        vals.append(record_id)
         before = _fetch_row_by_id(conn, tbl_name, record_id)
         _dbg(f"UPDATE {tbl_name} id={record_id} cols={col_list}")
         conn.execute(sql, vals)

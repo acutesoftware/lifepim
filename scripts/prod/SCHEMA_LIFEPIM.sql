@@ -63,6 +63,10 @@ INSERT INTO sys_meta_cols ("tbl", "col_name", "data_type", "display_widget", "di
 -- Notes table metadata
 ('notes', 'title', 'TEXT', 'Label', 80, 'TEXTAREA'),
 ('notes', 'content', 'TEXT', 'Label', 500, 'TEXTAREA'),
-('notes', 'date_updated', 'TEXT', 'Label', 10, 'DATEPICKER');
+('notes', 'color', 'TEXT', 'Label', 20, 'TEXTBOX'),
+('notes', 'date_created', 'TEXT', 'Label', 19, 'DATEPICKER'),
+('notes', 'date_modified', 'TEXT', 'Label', 19, 'DATEPICKER'),
+('notes', 'important', 'TEXT', 'Label', 10, 'TEXTBOX'),
+('notes', 'source_note_id', 'TEXT', 'Label', 40, 'TEXTBOX');
 
 

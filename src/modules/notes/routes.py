@@ -29,6 +29,141 @@ notes_bp = Blueprint("notes", __name__, url_prefix="/notes",
 INVALID_TITLE_CHARS = re.compile(r'[<>:"/\\|?*]')
 WHITESPACE_RE = re.compile(r"\s+")
 NOTE_TITLE_MAX_LEN = 80
+NOTE_FRONT_MATTER_READ_LIMIT = 128 * 1024
+DEFAULT_NOTE_COLOR = "#FFF7CC"
+NOTE_COLOR_HEX_RE = re.compile(r"^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$")
+NOTE_COLOR_NAMES = {
+    "yellow": "#ffff93",
+    "aqua": "#ccffee",
+    "blue": "#81ecec",
+    "green": "#b8e994",
+    "orange": "#eccc68",
+    "red": "#fab1a0",
+    "pink": "#ff9ff3",
+    "purple": "#e056fd",
+    "brown": "#deb887",
+    "grey": "#dfe6e9",
+    "gray": "#dfe6e9",
+    "white": "#f1f2f6",
+}
+
+
+def _ensure_notes_schema(conn=None):
+    try:
+        data.ensure_notes_schema(data._get_conn() if conn is None else conn)
+    except Exception:
+        pass
+
+
+def _file_created_at(stat):
+    created = getattr(stat, "st_birthtime", None)
+    if created is None:
+        created = getattr(stat, "st_ctime", None)
+    if created is None:
+        return ""
+    return datetime.fromtimestamp(created).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _strip_front_matter_scalar(value):
+    value = (value or "").strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    if " #" in value:
+        value = value.split(" #", 1)[0].rstrip()
+    return value
+
+
+def _read_note_front_matter(note_path):
+    if not note_path:
+        return {}
+    try:
+        with open(note_path, "r", encoding="utf-8-sig", errors="replace") as handle:
+            text = handle.read(NOTE_FRONT_MATTER_READ_LIMIT)
+    except OSError:
+        return {}
+    return _parse_note_front_matter_text(text)
+
+
+def _parse_note_front_matter_text(text):
+    lines = (text or "").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    values = {}
+    for line in lines[1:]:
+        stripped = line.strip()
+        if stripped in ("---", "..."):
+            break
+        if not stripped or stripped.startswith("#") or ":" not in line:
+            continue
+        key, raw_value = line.split(":", 1)
+        key = key.strip().lower().replace(" ", "_")
+        if key:
+            values[key] = _strip_front_matter_scalar(raw_value)
+    return values
+
+
+def _front_matter_value(front_matter, keys):
+    for key in keys:
+        value = front_matter.get(key)
+        if value not in (None, ""):
+            return value
+    return ""
+
+
+def _front_matter_bool_text(value):
+    normalized = str(value or "").strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return "true"
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return "false"
+    return ""
+
+
+def _note_color_style(value):
+    color = (value or "").strip()
+    if NOTE_COLOR_HEX_RE.match(color):
+        return color
+    return NOTE_COLOR_NAMES.get(color.lower(), "")
+
+
+def _apply_note_display_fields(note):
+    if note is not None:
+        note["color_style"] = _note_color_style(note.get("color"))
+    return note
+
+
+def _note_metadata_from_file(note_path, stat=None, fallback_project=""):
+    file_name = os.path.basename(note_path or "")
+    title_from_file, _ = os.path.splitext(file_name)
+    front_matter = _read_note_front_matter(note_path)
+    if stat is None and note_path:
+        try:
+            stat = os.stat(note_path)
+        except OSError:
+            stat = None
+    date_modified = (
+        datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        if stat is not None
+        else ""
+    )
+    date_created = _front_matter_value(
+        front_matter,
+        ("date_created", "created", "created_at", "created_utc", "file_created_at", "birthtime"),
+    )
+    if not date_created and stat is not None:
+        date_created = _file_created_at(stat)
+    project = _front_matter_value(front_matter, ("project", "folder", "sidebar_tab")) or fallback_project
+    if project.lower() in {"all", "all notes", "untitled"}:
+        project = ""
+    return {
+        "title": _front_matter_value(front_matter, ("title", "name")) or title_from_file,
+        "color": _front_matter_value(front_matter, ("color", "colour")),
+        "date_created": date_created,
+        "date_modified": date_modified,
+        "project": project,
+        "important": _front_matter_bool_text(_front_matter_value(front_matter, ("important", "is_important"))),
+        "source_note_id": _front_matter_value(front_matter, ("source_note_id", "lifepim_com_note_id", "note_id")),
+    }
 
 
 def _normalize_project_param(project):
@@ -316,16 +451,17 @@ def _select_write_root_candidates(sidebar_label):
 
 
 def _note_template(title, created_utc, sidebar_label):
-    title_value = (title or "").replace('"', '\\"')
+    title_value = (title or "").replace("\n", " ").replace("\r", " ").strip()
+    escaped_title = title_value.replace('"', '\\"')
+    project_value = (sidebar_label or "").replace("\n", " ").replace("\r", " ").strip()
     lines = [
         "---",
-        f'title: "{title_value}"',
-        f'created_utc: "{created_utc}"',
+        f'title: "{escaped_title}"',
+        f"color: {DEFAULT_NOTE_COLOR}",
+        f"project: {project_value}",
+        f"date_created: {created_utc}",
+        f"date_modified: {created_utc}",
     ]
-    if sidebar_label:
-        sidebar_value = (sidebar_label or "").replace('"', '\\"')
-        lines.append(f'sidebar_tab: "{sidebar_value}"')
-    lines.append("tags: []")
     lines.append("---")
     lines.append("")
     lines.append(f"# {title}")
@@ -352,7 +488,7 @@ def _create_note_file(folder_path, title, sidebar_label):
     file_name = raw_title if ext else f"{raw_title}.md"
     title_base = root_name if ext.lower() == ".md" else raw_title
     title_clean = _sanitize_title(title_base)
-    created_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     content = _note_template(title_clean, created_utc, sidebar_label)
     file_name, full_path = _write_note_file(folder_path, file_name, content)
     return {
@@ -721,6 +857,7 @@ def _fetch_note_subfolders(project, folder_path=None):
 
 
 def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None):
+    _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         return []
@@ -731,7 +868,12 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
         "path": "t.path",
         "folder_id": "t.folder_id",
         "size": "t.size",
+        "title": "t.title",
+        "color": "t.color",
+        "date_created": "t.date_created",
         "project": "t.project",
+        "important": "t.important",
+        "source_note_id": "t.source_note_id",
         "date_modified": "t.date_modified",
         "updated": "t.rec_extract_date",
         "derived_project": "derived_project",
@@ -761,11 +903,13 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
     for note in notes:
         note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
         note["date_modified_dt"] = _parse_datetime(note.get("date_modified")) or note["updated"]
+        _apply_note_display_fields(note)
     return notes
 
 
 
 def _get_note_record(note_id):
+    _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         return None, None
@@ -780,6 +924,7 @@ def _get_note_record(note_id):
         return None, tbl
     note = dict(rows[0])
     note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
+    _apply_note_display_fields(note)
     return note, tbl
 
 @notes_bp.route('/')
@@ -1103,6 +1248,7 @@ def view_note_route(note_id):
     if not security.can_view_note(note_id, current_user):
         abort(404)
     render_mode = request.args.get("format") or "markdown"
+    _ensure_notes_schema()
     tbl = get_table_def("notes")
     note = None
     projects_mod.ensure_projects_schema(data._get_conn())
@@ -1121,6 +1267,7 @@ def view_note_route(note_id):
         if rows:
             note = dict(rows[0])
             note["updated"] = _parse_datetime(note.get("updated")) or datetime.now()
+            _apply_note_display_fields(note)
     if not note:
         return redirect(url_for("notes.list_notes_route"))
     note_path = _build_note_path(note)
@@ -1130,6 +1277,15 @@ def view_note_route(note_id):
     note_text = ""
     if file_exists:
         note_text = _read_note_file(note_path)
+        note_state = _note_file_state(note_path)
+        if note_state:
+            note["size"] = note_state["size"]
+            note["date_modified"] = note_state["date_modified"]
+        note_metadata = _note_metadata_from_file(note_path, fallback_project=note.get("project") or "")
+        for key in ("title", "color", "date_created", "project", "important", "source_note_id"):
+            if note_metadata.get(key):
+                note[key] = note_metadata.get(key)
+        _apply_note_display_fields(note)
     content_html = ""
     hex_rows = []
     if render_mode == "markdown":
@@ -1234,7 +1390,7 @@ def _update_note_title_content(note_path, old_title, new_title):
     escaped_title = (new_title or "").replace('"', '\\"')
     if updated.startswith("---"):
         updated = re.sub(
-            r'(?m)^title:\s*".*?"\s*$',
+            r'(?m)^title:\s*(?:"(?:\\"|[^"])*"|[^\r\n]*)\s*$',
             f'title: "{escaped_title}"',
             updated,
             count=1,
@@ -1266,21 +1422,30 @@ def _update_note_file_metadata(note_id, note, file_name, folder_path, project=No
     tbl = get_table_def("notes")
     if not tbl:
         return False
+    _ensure_notes_schema()
     note_path = os.path.join(folder_path, file_name)
     try:
         stat = os.stat(note_path)
         size = str(stat.st_size)
         date_modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     except OSError:
+        stat = None
         size = note.get("size") or ""
         date_modified = note.get("date_modified") or ""
+    metadata = _note_metadata_from_file(note_path, stat=stat, fallback_project=project or note.get("project") or "")
     values_map = {col: note.get(col, "") for col in tbl["col_list"]}
     values_map.update(
         {
             "file_name": file_name,
             "path": folder_path,
             "size": size,
+            "title": metadata.get("title") or values_map.get("title") or os.path.splitext(file_name)[0],
+            "color": metadata.get("color") or values_map.get("color", ""),
+            "date_created": metadata.get("date_created") or values_map.get("date_created", ""),
             "date_modified": date_modified,
+            "project": metadata.get("project") or values_map.get("project", ""),
+            "important": metadata.get("important") or values_map.get("important", ""),
+            "source_note_id": metadata.get("source_note_id") or values_map.get("source_note_id", ""),
         }
     )
     if project is not None:
@@ -1595,20 +1760,28 @@ def create_note_route():
 
     try:
         size = str(os.path.getsize(created["full_path"]))
+        stat = os.stat(created["full_path"])
         date_modified = datetime.fromtimestamp(
-            os.path.getmtime(created["full_path"])
+            stat.st_mtime
         ).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         size = ""
+        stat = None
         date_modified = ""
+    metadata = _note_metadata_from_file(created["full_path"], stat=stat, fallback_project=project_id)
 
     values_map = {
         "file_name": created["file_name"],
         "path": created["folder_path"],
         "folder_id": "",
         "size": size,
+        "title": metadata.get("title") or created["title"],
+        "color": metadata.get("color") or DEFAULT_NOTE_COLOR,
+        "date_created": metadata.get("date_created") or created["created_utc"],
         "date_modified": date_modified,
-        "project": project_id,
+        "project": metadata.get("project") or project_id,
+        "important": metadata.get("important") or "",
+        "source_note_id": metadata.get("source_note_id") or "",
     }
     values = [values_map.get(col, "") for col in tbl["col_list"]]
     note_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
@@ -1629,6 +1802,7 @@ def create_note_route():
 
 @notes_bp.route('/add', methods=["GET", "POST"])
 def add_note_route():
+    _ensure_notes_schema()
     tbl = get_table_def("notes")
     project = request.args.get("proj") or "General"
     if request.method == "POST" and tbl:
@@ -1637,11 +1811,19 @@ def add_note_route():
             form_values["project"] = project
         note_path = _build_note_path(form_values)
         if note_path and os.path.isfile(note_path):
+            try:
+                stat = os.stat(note_path)
+            except OSError:
+                stat = None
+            metadata = _note_metadata_from_file(note_path, stat=stat, fallback_project=form_values.get("project") or project)
+            for key in ("title", "color", "date_created", "project", "important", "source_note_id"):
+                if not form_values.get(key):
+                    form_values[key] = metadata.get(key) or ""
             if not form_values.get("size"):
-                form_values["size"] = str(os.path.getsize(note_path))
+                form_values["size"] = str(stat.st_size) if stat is not None else str(os.path.getsize(note_path))
             if not form_values.get("date_modified"):
                 form_values["date_modified"] = datetime.fromtimestamp(
-                    os.path.getmtime(note_path)
+                    stat.st_mtime if stat is not None else os.path.getmtime(note_path)
                 ).strftime("%Y-%m-%d %H:%M:%S")
         values = [form_values.get(col, "") for col in tbl["col_list"]]
         data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
@@ -1668,6 +1850,12 @@ def edit_note_route(note_id):
             if note_path and not os.path.isdir(note_path):
                 try:
                     _write_note_file_content(note_path, content)
+                    _update_note_file_metadata(
+                        note_id,
+                        note,
+                        note.get("file_name") or os.path.basename(note_path),
+                        _normalize_note_path(note.get("path")) or os.path.dirname(note_path),
+                    )
                 except OSError:
                     pass
         return redirect(url_for("notes.edit_note_route", note_id=note_id))
@@ -1681,6 +1869,11 @@ def edit_note_route(note_id):
         if note_state:
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
+        note_metadata = _note_metadata_from_file(note_path, fallback_project=note.get("project") or "")
+        for key in ("title", "color", "date_created", "project", "important", "source_note_id"):
+            if note_metadata.get(key):
+                note[key] = note_metadata.get(key)
+        _apply_note_display_fields(note)
     note_folder = _normalize_folder_filter(note.get("path")) if note else ""
     breadcrumb_project = note.get("derived_project") or note.get("project") if note else None
     return render_template(
@@ -1743,13 +1936,12 @@ def save_note_route(note_id):
         sha256 = ""
 
     if tbl:
-        values_map = {col: note.get(col, "") for col in tbl["col_list"]}
-        if "size" in values_map:
-            values_map["size"] = size
-        if "date_modified" in values_map:
-            values_map["date_modified"] = date_modified
-        values = [values_map.get(col, "") for col in tbl["col_list"]]
-        data.update_record(data.conn, tbl["name"], note_id, tbl["col_list"], values)
+        _update_note_file_metadata(
+            note_id,
+            note,
+            note.get("file_name") or os.path.basename(note_path),
+            _normalize_note_path(note.get("path")) or os.path.dirname(note_path),
+        )
 
     return jsonify({
         "ok": True,
@@ -1863,13 +2055,19 @@ def _collect_note_import_rows(folder_path, project):
                 stat = os.stat(full_path)
             except OSError:
                 continue
+            metadata = _note_metadata_from_file(full_path, stat=stat, fallback_project=project)
             rows.append(
                 {
                     "file_name": name,
                     "path": root,
                     "size": str(stat.st_size),
+                    "title": metadata.get("title") or os.path.splitext(name)[0],
+                    "color": metadata.get("color") or "",
+                    "date_created": metadata.get("date_created") or "",
                     "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                    "project": project,
+                    "project": metadata.get("project") or project,
+                    "important": metadata.get("important") or "",
+                    "source_note_id": metadata.get("source_note_id") or "",
                 }
             )
     return rows
@@ -1911,6 +2109,7 @@ def _note_folder_id_matches(conn, folder_id, folder_path):
 
 
 def _sync_note_rows(folder_path):
+    _ensure_notes_schema()
     folder_path = _normalize_note_path(folder_path)
     tbl = get_table_def("notes")
     if not tbl:
@@ -1961,6 +2160,7 @@ def _sync_note_rows(folder_path):
             scanned += 1
             size = str(stat.st_size)
             date_modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            metadata = _note_metadata_from_file(full_path, stat=stat)
             key = _note_full_path_key(root_norm, name)
             seen.add(key)
             current = existing.get(key)
@@ -1971,14 +2171,26 @@ def _sync_note_rows(folder_path):
                         "file_name": name,
                         "path": root_norm,
                         "size": size,
+                        "title": metadata.get("title") or os.path.splitext(name)[0],
+                        "color": metadata.get("color") or current.get("color", ""),
+                        "date_created": metadata.get("date_created") or current.get("date_created", ""),
                         "date_modified": date_modified,
+                        "project": metadata.get("project") or current.get("project", ""),
+                        "important": metadata.get("important") or current.get("important", ""),
+                        "source_note_id": metadata.get("source_note_id") or current.get("source_note_id", ""),
                     }
                 )
                 needs_update = (
                     (current.get("file_name") or "") != name
                     or _normalize_note_path(current.get("path")).lower() != root_norm.lower()
                     or str(current.get("size") or "") != size
+                    or str(current.get("title") or "") != str(values_map.get("title") or "")
+                    or str(current.get("color") or "") != str(values_map.get("color") or "")
+                    or str(current.get("date_created") or "") != str(values_map.get("date_created") or "")
                     or str(current.get("date_modified") or "") != date_modified
+                    or str(current.get("project") or "") != str(values_map.get("project") or "")
+                    or str(current.get("important") or "") != str(values_map.get("important") or "")
+                    or str(current.get("source_note_id") or "") != str(values_map.get("source_note_id") or "")
                     or not _note_folder_id_matches(conn, current.get("folder_id"), root_norm)
                 )
                 if needs_update:
@@ -1996,8 +2208,13 @@ def _sync_note_rows(folder_path):
                     "path": root_norm,
                     "folder_id": "",
                     "size": size,
+                    "title": metadata.get("title") or os.path.splitext(name)[0],
+                    "color": metadata.get("color") or "",
+                    "date_created": metadata.get("date_created") or "",
                     "date_modified": date_modified,
-                    "project": "",
+                    "project": metadata.get("project") or "",
+                    "important": metadata.get("important") or "",
+                    "source_note_id": metadata.get("source_note_id") or "",
                 }
                 values = [values_map.get(col, "") for col in tbl["col_list"]]
                 record_id = data.add_record(conn, tbl["name"], tbl["col_list"], values)
@@ -2290,7 +2507,11 @@ def _sort_notes(notes, sort_col, sort_dir):
         "file_name": lambda n: (n.get("file_name") or "").lower(),
         "path": lambda n: (n.get("path") or "").lower(),
         "size": lambda n: _parse_size(n.get("size")),
+        "title": lambda n: (n.get("title") or "").lower(),
+        "color": lambda n: (n.get("color") or "").lower(),
+        "date_created": lambda n: _parse_datetime(n.get("date_created")) or datetime.min,
         "project": lambda n: (n.get("project") or "").lower(),
+        "important": lambda n: (n.get("important") or "").lower(),
         "date_modified": lambda n: n.get("date_modified_dt") or datetime.min,
         "updated": lambda n: n.get("updated") or datetime.min,
     }

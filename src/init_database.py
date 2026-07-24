@@ -5,6 +5,7 @@
 import os, sys, sqlite3, subprocess
 import etl_folder_mapping as folder_etl
 import common.config as cfg
+from common import data as db
 from common import projects as projects_mod
 from common.media_schema import ensure_media_schema
 from common.settings import ensure_settings_schema
@@ -44,6 +45,7 @@ def reset_database(db_file):
     ensure_media_schema(db_conn)
     ensure_import_schema(db_conn)
     ensure_settings_schema(db_conn)
+    db.ensure_notes_schema(db_conn)
     run_calendar_migration(db_conn)
     ensure_how_schema(db_conn)
     ensure_security_schema(db_conn)

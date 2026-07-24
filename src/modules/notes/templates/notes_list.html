@@ -41,6 +41,9 @@
     {% set dir_path = 'asc' if sort_col != 'path' or sort_dir == 'desc' else 'desc' %}
     {% set dir_folder_id = 'asc' if sort_col != 'folder_id' or sort_dir == 'desc' else 'desc' %}
     {% set dir_size = 'asc' if sort_col != 'size' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_title = 'asc' if sort_col != 'title' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_color = 'asc' if sort_col != 'color' or sort_dir == 'desc' else 'desc' %}
+    {% set dir_created = 'asc' if sort_col != 'date_created' or sort_dir == 'desc' else 'desc' %}
     {% set dir_project = 'asc' if sort_col != 'project' or sort_dir == 'desc' else 'desc' %}
     {% set dir_derived = 'asc' if sort_col != 'derived_project' or sort_dir == 'desc' else 'desc' %}
     {% set dir_modified = 'asc' if sort_col != 'date_modified' or sort_dir == 'desc' else 'desc' %}
@@ -59,6 +62,18 @@
     <th>
       <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='size', dir=dir_size) }}">Size</a>
       {% if sort_col == 'size' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='title', dir=dir_title) }}">Title</a>
+      {% if sort_col == 'title' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='color', dir=dir_color) }}">Color</a>
+      {% if sort_col == 'color' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+    </th>
+    <th>
+      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='date_created', dir=dir_created) }}">Created</a>
+      {% if sort_col == 'date_created' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>
       <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='project', dir=dir_project) }}">Project</a>
@@ -81,6 +96,14 @@
     <td>{{ n.path }}</td>
     <td>{{ n.folder_id }}</td>
     <td>{{ n.size }}</td>
+    <td>{{ n.title or '' }}</td>
+    <td>
+      {% if n.color_style %}
+        <span class="note-color-swatch" style="background:{{ n.color_style }};"></span>
+      {% endif %}
+      {{ n.color or '' }}
+    </td>
+    <td>{{ n.date_created or '' }}</td>
     <td>{{ n.project }}</td>
     <td>{{ n.derived_project }}</td>
     <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>

@@ -3686,6 +3686,44 @@ body.links-resizing {
   align-items: center;
 }
 
+.note-markdown-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  margin: 8px 0;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.note-markdown-toolbar button {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background: #f7f7f7;
+  color: #222;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.note-markdown-toolbar button:hover,
+.note-markdown-toolbar button:focus {
+  background: #e9eef8;
+  border-color: #666;
+}
+
+.note-color-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  border: 1px solid #777;
+  border-radius: 3px;
+  vertical-align: -2px;
+}
+
 .note-rendered-content {
   max-width: 100%;
   overflow-wrap: anywhere;

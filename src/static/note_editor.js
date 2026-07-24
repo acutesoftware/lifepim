@@ -14,6 +14,7 @@
   const sizeEl = qs("#note-meta-size");
   const modifiedEl = qs("#note-meta-modified");
   const saveNowBtn = qs("#note-save-now");
+  const toolbar = qs(".note-markdown-toolbar");
   const noteId = editor.dataset.noteId || "";
   const saveUrl = editor.dataset.saveUrl || "";
   const saveDelayMs = 1500;
@@ -84,6 +85,172 @@
     }
     statusEl.textContent = text;
     statusEl.style.color = isError ? "#b00020" : "#555";
+  }
+
+  function selection() {
+    const start = Math.max(0, editor.selectionStart || 0);
+    const end = Math.max(0, editor.selectionEnd || 0);
+    return start <= end ? { start, end } : { start: end, end: start };
+  }
+
+  function setEditorSelection(start, end) {
+    editor.focus();
+    editor.setSelectionRange(start, end);
+  }
+
+  function replaceSelection(start, end, replacement, cursorStart, cursorEnd) {
+    const before = editor.value.slice(0, start);
+    const after = editor.value.slice(end);
+    editor.value = before + replacement + after;
+    setEditorSelection(cursorStart, cursorEnd);
+    scheduleSave();
+  }
+
+  function needsLeadingNewline(position) {
+    return position > 0 && editor.value.charAt(position - 1) !== "\n";
+  }
+
+  function needsTrailingNewline(position) {
+    return position < editor.value.length && editor.value.charAt(position) !== "\n";
+  }
+
+  function wrapSelection(prefix, suffix, placeholder) {
+    const sel = selection();
+    const selected = editor.value.slice(sel.start, sel.end);
+    const inner = selected || placeholder;
+    const replacement = prefix + inner + suffix;
+    const innerStart = sel.start + prefix.length;
+    replaceSelection(sel.start, sel.end, replacement, innerStart, innerStart + inner.length);
+  }
+
+  function lineSelection() {
+    const sel = selection();
+    let start = sel.start;
+    let end = sel.end;
+    while (start > 0 && editor.value.charAt(start - 1) !== "\n") {
+      start -= 1;
+    }
+    while (end < editor.value.length && editor.value.charAt(end) !== "\n") {
+      end += 1;
+    }
+    return { start, end };
+  }
+
+  function prefixSelectedLines(prefix) {
+    const sel = lineSelection();
+    const selected = editor.value.slice(sel.start, sel.end);
+    if (!selected) {
+      replaceSelection(sel.start, sel.end, prefix, sel.start + prefix.length, sel.start + prefix.length);
+      return;
+    }
+    const lines = selected.split("\n");
+    const replacement = lines.map((line, index) => {
+      if (index === lines.length - 1 && line === "") {
+        return "";
+      }
+      return prefix + line;
+    }).join("\n");
+    replaceSelection(sel.start, sel.end, replacement, sel.start, sel.start + replacement.length);
+  }
+
+  function prefixNumberedList() {
+    const sel = lineSelection();
+    const selected = editor.value.slice(sel.start, sel.end);
+    if (!selected) {
+      replaceSelection(sel.start, sel.end, "1. ", sel.start + 3, sel.start + 3);
+      return;
+    }
+    let number = 1;
+    const lines = selected.split("\n");
+    const replacement = lines.map((line, index) => {
+      if (index === lines.length - 1 && line === "") {
+        return "";
+      }
+      return `${number++}. ${line}`;
+    }).join("\n");
+    replaceSelection(sel.start, sel.end, replacement, sel.start, sel.start + replacement.length);
+  }
+
+  function wrapBlock(prefix, suffix, placeholder) {
+    const sel = selection();
+    const selected = editor.value.slice(sel.start, sel.end);
+    const inner = selected || placeholder;
+    const before = needsLeadingNewline(sel.start) ? "\n" : "";
+    const after = needsTrailingNewline(sel.end) ? "\n" : "";
+    const replacement = before + prefix + inner + suffix + after;
+    const innerStart = sel.start + before.length + prefix.length;
+    replaceSelection(sel.start, sel.end, replacement, innerStart, innerStart + inner.length);
+  }
+
+  function insertBlock(snippet) {
+    const sel = selection();
+    const before = needsLeadingNewline(sel.start) ? "\n" : "";
+    const after = needsTrailingNewline(sel.end) ? "\n" : "";
+    const replacement = before + snippet + after;
+    const cursor = sel.start + replacement.length;
+    replaceSelection(sel.start, sel.end, replacement, cursor, cursor);
+  }
+
+  function insertLink() {
+    const url = (window.prompt("Link URL", "https://") || "").trim();
+    if (!url) {
+      return;
+    }
+    const sel = selection();
+    const label = editor.value.slice(sel.start, sel.end) || "link text";
+    const replacement = `[${label}](${url})`;
+    replaceSelection(sel.start, sel.end, replacement, sel.start + 1, sel.start + 1 + label.length);
+  }
+
+  function insertImage(lifePimTag) {
+    const source = (window.prompt("Image source", "image.jpg") || "").trim();
+    if (!source) {
+      return;
+    }
+    insertBlock(lifePimTag ? `[img]${source}[/img]` : `![image](${source})`);
+  }
+
+  function insertTable() {
+    const cols = Math.max(1, Math.min(8, parseInt(window.prompt("Columns", "2") || "2", 10) || 2));
+    const rows = Math.max(1, Math.min(20, parseInt(window.prompt("Rows", "4") || "4", 10) || 4));
+    const header = Array.from({ length: cols }, (_, idx) => `| Header ${idx + 1} `).join("") + "|";
+    const divider = Array.from({ length: cols }, () => "| --- ").join("") + "|";
+    const body = Array.from({ length: rows }, () => Array.from({ length: cols }, () => "|  ").join("") + "|").join("\n");
+    insertBlock(`${header}\n${divider}\n${body}`);
+  }
+
+  function runMarkdownAction(action) {
+    if (action === "bold") {
+      wrapSelection("**", "**", "bold text");
+    } else if (action === "italic") {
+      wrapSelection("*", "*", "italic text");
+    } else if (action === "strike") {
+      wrapSelection("~~", "~~", "struck text");
+    } else if (action === "inline-code") {
+      wrapSelection("`", "`", "code");
+    } else if (action === "h1") {
+      prefixSelectedLines("# ");
+    } else if (action === "h2") {
+      prefixSelectedLines("## ");
+    } else if (action === "bullet") {
+      prefixSelectedLines("- ");
+    } else if (action === "numbered") {
+      prefixNumberedList();
+    } else if (action === "task") {
+      prefixSelectedLines("- [ ] ");
+    } else if (action === "quote") {
+      prefixSelectedLines("> ");
+    } else if (action === "code-block") {
+      wrapBlock("```\n", "\n```", "code block");
+    } else if (action === "link") {
+      insertLink();
+    } else if (action === "image") {
+      insertImage(false);
+    } else if (action === "lifepim-image") {
+      insertImage(true);
+    } else if (action === "table") {
+      insertTable();
+    }
   }
 
   function scheduleSave() {
@@ -178,6 +345,16 @@
         saveTimer = null;
       }
       void doSave();
+    });
+  }
+  if (toolbar) {
+    toolbar.addEventListener("click", (evt) => {
+      const btn = evt.target.closest("[data-md-action]");
+      if (!btn) {
+        return;
+      }
+      evt.preventDefault();
+      runMarkdownAction(btn.dataset.mdAction || "");
     });
   }
   window.addEventListener("beforeunload", (evt) => {

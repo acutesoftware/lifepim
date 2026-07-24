@@ -11,6 +11,9 @@ note,pinned,Checkbox,Label,10,TEXTBOX
 note,important,Checkbox,Label,10,TEXTBOX
 note,is_archived,Checkbox,Label,10,TEXTBOX
 note,color,Color,Label,20,TEXTBOX
+note,date_created,Date,Label,19,DATEPICKER
+note,date_modified,Date,Label,19,DATEPICKER
+note,source_note_id,Text,Label,40,TEXTBOX
 note,content,Note,Label,200,TEXTAREA
 note,proj,List,DROPDOWNLIST,80,DROPDOWNLIST
 task,id,id,Label,20,HIDDEN

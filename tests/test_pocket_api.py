@@ -291,9 +291,11 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["ownership"], "DESKTOP_MASTER")
         self.assertEqual(item["project"], "pers")
         self.assertEqual(item["derived_project"], "pers")
-        expected_created = datetime.fromtimestamp(os.stat(os.path.join(self.tmpdir.name, "Shopping.md")).st_ctime).strftime("%Y-%m-%d %H:%M:%S")
-        self.assertEqual(item["date_created"], "")
-        self.assertEqual(item["date_modified"], "")
+        note_stat = os.stat(os.path.join(self.tmpdir.name, "Shopping.md"))
+        expected_created = datetime.fromtimestamp(note_stat.st_ctime).strftime("%Y-%m-%d %H:%M:%S")
+        expected_modified = datetime.fromtimestamp(note_stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        self.assertEqual(item["date_created"], expected_created)
+        self.assertEqual(item["date_modified"], expected_modified)
         self.assertFalse(item["important"])
         self.assertEqual(item["color"], "")
         self.assertEqual(item["title"], "")
@@ -315,7 +317,7 @@ class TestPocketApi(unittest.TestCase):
         manifest_item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
         item_payload = self.client.get(f"/api/pocket/v1/items/{manifest_item['id']}", headers=headers).get_json()
 
-        self.assertEqual(manifest_item["date_created"], "")
+        self.assertEqual(manifest_item["date_created"], expected_created)
         self.assertEqual(item_payload["date_created"], expected_created)
         self.assertEqual(item_payload["metadata"]["date_created"], expected_created)
 
@@ -600,6 +602,80 @@ class TestPocketApi(unittest.TestCase):
         row = self.conn.execute("SELECT file_name, owner_user_id FROM lp_notes WHERE file_name = ?", ("phone note.md",)).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row["owner_user_id"], 3)
+
+    def test_push_creates_mobile_only_note_with_metadata(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-metadata",
+                "relative_path": "metadata phone note.md",
+                "content": (
+                    "---\n"
+                    "title: Metadata phone note\n"
+                    "color: Purple\n"
+                    "project: phone/project\n"
+                    "date_created: 2026-07-01 08:30:00\n"
+                    "date_modified: 2026-07-02 09:45:00\n"
+                    "important: true\n"
+                    "source_note_id: 9876\n"
+                    "---\n"
+                    "Body\n"
+                ),
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        row = self.conn.execute(
+            "SELECT title, color, date_created, project, important, source_note_id FROM lp_notes WHERE file_name = ?",
+            ("metadata phone note.md",),
+        ).fetchone()
+        self.assertEqual(row["title"], "Metadata phone note")
+        self.assertEqual(row["color"], "Purple")
+        self.assertEqual(row["date_created"], "2026-07-01 08:30:00")
+        self.assertEqual(row["project"], "phone/project")
+        self.assertEqual(row["important"], "true")
+        self.assertEqual(row["source_note_id"], "9876")
+
+    def test_push_updates_existing_note_metadata_from_front_matter(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+        item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": item["id"],
+                "base_sha256": item["sha256"],
+                "content": (
+                    "---\n"
+                    "title: Updated from phone\n"
+                    "color: Aqua\n"
+                    "project: updated/project\n"
+                    "date_created: 2026-06-15 07:00:00\n"
+                    "important: yes\n"
+                    "note_id: 5432\n"
+                    "---\n"
+                    "Updated body\n"
+                ),
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        row = self.conn.execute(
+            "SELECT title, color, date_created, project, important, source_note_id FROM lp_notes WHERE file_name = ?",
+            ("existing.md",),
+        ).fetchone()
+        self.assertEqual(row["title"], "Updated from phone")
+        self.assertEqual(row["color"], "Aqua")
+        self.assertEqual(row["date_created"], "2026-06-15 07:00:00")
+        self.assertEqual(row["project"], "updated/project")
+        self.assertEqual(row["important"], "true")
+        self.assertEqual(row["source_note_id"], "5432")
 
     def test_push_creates_mobile_only_note_with_image_attachment(self):
         self._add_note(file_name="existing.md", content="existing", owner_user_id=3)

@@ -22,8 +22,21 @@
         <tr><th>Path</th><td>{{ note.path }}</td></tr>
         <tr><th>Folder ID</th><td>{{ note.folder_id }}</td></tr>
         <tr><th>Size</th><td id="note-meta-size">{{ note.size }}</td></tr>
+        <tr><th>Title</th><td>{{ note.title or '' }}</td></tr>
+        <tr>
+          <th>Color</th>
+          <td>
+            {% if note.color_style %}
+              <span class="note-color-swatch" style="background:{{ note.color_style }};"></span>
+            {% endif %}
+            {{ note.color or '' }}
+          </td>
+        </tr>
+        <tr><th>Date Created</th><td>{{ note.date_created or '' }}</td></tr>
         <tr><th>Date Modified</th><td id="note-meta-modified">{{ note.date_modified }}</td></tr>
         <tr><th>Project</th><td>{{ note.project }}</td></tr>
+        <tr><th>Important</th><td>{{ note.important or '' }}</td></tr>
+        <tr><th>Source Note ID</th><td>{{ note.source_note_id or '' }}</td></tr>
         <tr><th>Updated</th><td>{{ note.updated.strftime('%Y-%m-%d %H:%M') }}</td></tr>
       </table>
 
@@ -31,6 +44,23 @@
         <p>File not found: {{ note_path }}</p>
       {% else %}
         <div id="note-edit-status" style="margin:8px 0; font-size: 0.9em; color:#555;">Saved</div>
+        <div class="note-markdown-toolbar" aria-label="Markdown controls">
+          <button type="button" data-md-action="bold" title="Bold">B</button>
+          <button type="button" data-md-action="italic" title="Italic">I</button>
+          <button type="button" data-md-action="strike" title="Strikethrough">S</button>
+          <button type="button" data-md-action="inline-code" title="Inline code">`</button>
+          <button type="button" data-md-action="h1" title="Heading 1">H1</button>
+          <button type="button" data-md-action="h2" title="Heading 2">H2</button>
+          <button type="button" data-md-action="bullet" title="Bullet list">-</button>
+          <button type="button" data-md-action="numbered" title="Numbered list">1.</button>
+          <button type="button" data-md-action="task" title="Task item">[]</button>
+          <button type="button" data-md-action="quote" title="Blockquote">&gt;</button>
+          <button type="button" data-md-action="code-block" title="Code block">```</button>
+          <button type="button" data-md-action="link" title="Link">Link</button>
+          <button type="button" data-md-action="image" title="Markdown image">Image</button>
+          <button type="button" data-md-action="lifepim-image" title="LifePIM image tag">[img]</button>
+          <button type="button" data-md-action="table" title="Table">Table</button>
+        </div>
         <textarea id="note-editor"
                   data-note-id="{{ note.id }}"
                   data-save-url="{{ url_for('notes.save_note_route', note_id=note.id) }}"

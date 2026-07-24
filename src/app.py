@@ -148,6 +148,7 @@ app.jinja_env.filters["duration_friendly"] = format_duration_friendly
 app.jinja_env.filters["duration_label"] = format_duration_label
 projects_mod.ensure_projects_schema(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
+db.ensure_notes_schema(db._get_conn())
 ensure_how_schema(db._get_conn())
 
 

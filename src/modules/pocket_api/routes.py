@@ -434,6 +434,7 @@ def require_bound_pocket_user(device):
 
 
 def _note_table():
+    notes_routes._ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         raise RuntimeError("Notes table not found.")
@@ -561,11 +562,12 @@ def _note_file_metadata(note_path):
         stat = os.stat(note_path)
     except OSError:
         return None
-    return {
+    state = {
         "size": str(stat.st_size),
         "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
         "mtime_ns": stat.st_mtime_ns,
     }
+    return _state_with_file_created_at(state, stat)
 
 
 def _state_with_file_created_at(state, stat_or_path):
@@ -701,6 +703,7 @@ def _metadata_from_note_columns(note):
     title = note.get("title") or note.get("name") or ""
     source_note_id = note.get("source_note_id") or note.get("lifepim_com_note_id") or note.get("note_id") or ""
     created = note.get("date_created") or note.get("created") or note.get("created_at") or note.get("created_utc") or ""
+    modified = note.get("date_modified") or note.get("modified") or note.get("modified_at") or note.get("date_updated") or ""
     important = note.get("important") if "important" in note else note.get("is_important")
     color = note.get("color") or note.get("colour") or ""
     if title:
@@ -711,6 +714,9 @@ def _metadata_from_note_columns(note):
     if created:
         metadata["date_created"] = created
         metadata["created_at"] = _iso_from_note_value(created)
+    if modified:
+        metadata["date_modified"] = modified
+        metadata["front_matter_modified_at"] = _iso_from_note_value(modified)
     if important not in (None, ""):
         metadata["important"] = _front_matter_bool(important)
     if color:
@@ -731,12 +737,17 @@ def _metadata_from_note_row(note):
             mtime_ns = int(datetime.fromisoformat(modified_at.replace("Z", "+00:00")).timestamp() * 1_000_000_000)
         except ValueError:
             mtime_ns = 0
-    return {
+    result = {
         "size": str(size_value),
         "date_modified": note.get("date_modified") or note.get("rec_extract_date") or "",
         "modified_at": modified_at,
         "mtime_ns": mtime_ns,
     }
+    date_created = note.get("date_created") or note.get("created_at") or note.get("created_utc") or ""
+    if date_created:
+        result["date_created"] = date_created
+        result["created_at"] = _iso_from_note_value(date_created)
+    return result
 
 
 def _iso_from_note_value(value):
@@ -1179,11 +1190,28 @@ def _serialize_note_item(
     else:
         state = state_override or _note_file_metadata(note_path)
     content = notes_routes._read_note_file(note_path) if include_content else None
+    front_matter = _read_note_front_matter(note_path) if include_front_matter else {}
     front_matter_metadata = (
-        _metadata_from_front_matter(_read_note_front_matter(note_path))
+        _metadata_from_front_matter(front_matter)
         if include_front_matter
         else _metadata_from_note_columns(note)
     )
+    if include_front_matter:
+        column_metadata = _metadata_from_note_columns(note)
+        for key in (
+            "title",
+            "source_note_id",
+            "note_id",
+            "date_created",
+            "created_at",
+            "date_modified",
+            "front_matter_modified_at",
+            "color",
+        ):
+            if not front_matter_metadata.get(key) and column_metadata.get(key):
+                front_matter_metadata[key] = column_metadata.get(key)
+        if not any(key in front_matter for key in ("important", "is_important")) and column_metadata.get("important") not in (None, ""):
+            front_matter_metadata["important"] = column_metadata.get("important")
     if state and not front_matter_metadata.get("date_created") and state.get("date_created"):
         front_matter_metadata["date_created"] = state.get("date_created") or ""
         front_matter_metadata["created_at"] = state.get("created_at") or _iso_from_note_value(state.get("date_created") or "")
@@ -1212,9 +1240,17 @@ def _serialize_note_item(
 def _update_note_metadata(note_id, note, state):
     tbl = _note_table()
     values_map = {col: note.get(col, "") for col in tbl["col_list"]}
+    note_path = notes_routes._build_note_path(note)
+    metadata = notes_routes._note_metadata_from_file(note_path, fallback_project=note.get("project") or "")
     if state:
         values_map["size"] = state.get("size", values_map.get("size", ""))
         values_map["date_modified"] = state.get("date_modified", values_map.get("date_modified", ""))
+    values_map["title"] = metadata.get("title") or values_map.get("title", "")
+    values_map["color"] = metadata.get("color") or values_map.get("color", "")
+    values_map["date_created"] = metadata.get("date_created") or values_map.get("date_created", "")
+    values_map["project"] = metadata.get("project") or values_map.get("project", "")
+    values_map["important"] = metadata.get("important") or values_map.get("important", "")
+    values_map["source_note_id"] = metadata.get("source_note_id") or values_map.get("source_note_id", "")
     values = [values_map.get(col, "") for col in tbl["col_list"]]
     return data.update_record(data._get_conn(), tbl["name"], note_id, tbl["col_list"], values)
 
@@ -1513,6 +1549,9 @@ def _create_note_from_mobile(payload_item, device):
     file_name, note_path = _unique_note_path(folder_path, _safe_mobile_file_name(payload_item))
     state = notes_routes._write_note_file_content(note_path, str(content))
     attachment_result = _write_payload_attachments(payload_item, note_path)
+    front_matter = notes_routes._parse_note_front_matter_text(str(content))
+    content_metadata = _metadata_from_front_matter(front_matter)
+    file_metadata = notes_routes._note_metadata_from_file(note_path, fallback_project=payload_item.get("project") or "")
 
     tbl = _note_table()
     table_columns = _table_columns(data._get_conn(), tbl["name"])
@@ -1521,8 +1560,35 @@ def _create_note_from_mobile(payload_item, device):
         "path": folder_path,
         "folder_id": "",
         "size": state.get("size", "") if state else "",
+        "title": (
+            payload_item.get("title")
+            or content_metadata.get("title")
+            or file_metadata.get("title")
+            or os.path.splitext(file_name)[0]
+        ),
+        "color": payload_item.get("color") or content_metadata.get("color") or file_metadata.get("color") or "",
+        "date_created": (
+            payload_item.get("date_created")
+            or payload_item.get("dateCreated")
+            or payload_item.get("created_at")
+            or content_metadata.get("date_created")
+            or file_metadata.get("date_created")
+            or ""
+        ),
         "date_modified": state.get("date_modified", "") if state else "",
-        "project": payload_item.get("project") or "",
+        "project": payload_item.get("project") or content_metadata.get("project") or file_metadata.get("project") or "",
+        "important": (
+            notes_routes._front_matter_bool_text(payload_item.get("important"))
+            if payload_item.get("important") is not None
+            else file_metadata.get("important", "")
+        ),
+        "source_note_id": (
+            payload_item.get("source_note_id")
+            or payload_item.get("lifepim_com_note_id")
+            or payload_item.get("note_id")
+            or content_metadata.get("source_note_id")
+            or ""
+        ),
         "owner_user_id": device.get("user_id"),
         "visibility": "private",
         "is_public": 0,
@@ -1763,7 +1829,7 @@ def sync_manifest_route():
     for idx, note in enumerate(rows, start=1):
         try:
             note_path = notes_routes._build_note_path(note)
-            state = _metadata_from_note_row(note)
+            state = _state_with_file_created_at(_metadata_from_note_row(note), note_path)
             if not note_path:
                 skipped += 1
                 error_count += 1
