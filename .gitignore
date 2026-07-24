@@ -5,7 +5,7 @@ sdist/
 #dist/
 build/
 src/build/
-src/lp_*.log
+lp_*.log
 var/
 *.egg-info/
 .installed.cfg

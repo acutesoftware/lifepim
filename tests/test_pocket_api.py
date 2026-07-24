@@ -291,6 +291,7 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["ownership"], "DESKTOP_MASTER")
         self.assertEqual(item["project"], "pers")
         self.assertEqual(item["derived_project"], "pers")
+        expected_created = datetime.fromtimestamp(os.stat(os.path.join(self.tmpdir.name, "Shopping.md")).st_ctime).strftime("%Y-%m-%d %H:%M:%S")
         self.assertEqual(item["date_created"], "")
         self.assertEqual(item["date_modified"], "")
         self.assertFalse(item["important"])
@@ -304,6 +305,19 @@ class TestPocketApi(unittest.TestCase):
         item_payload = item_resp.get_json()
         self.assertEqual(item_payload["kind"], "LIST")
         self.assertEqual(item_payload["content"], "# Shopping\n\n- [ ] Milk\n")
+        self.assertEqual(item_payload["date_created"], expected_created)
+
+    def test_item_download_uses_file_created_date_when_front_matter_is_missing(self):
+        self._add_note(file_name="Plain.md", content="Plain body")
+        headers = self._register_headers()
+        expected_created = datetime.fromtimestamp(os.stat(os.path.join(self.tmpdir.name, "Plain.md")).st_ctime).strftime("%Y-%m-%d %H:%M:%S")
+
+        manifest_item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+        item_payload = self.client.get(f"/api/pocket/v1/items/{manifest_item['id']}", headers=headers).get_json()
+
+        self.assertEqual(manifest_item["date_created"], "")
+        self.assertEqual(item_payload["date_created"], expected_created)
+        self.assertEqual(item_payload["metadata"]["date_created"], expected_created)
 
     def test_manifest_and_item_download_include_note_metadata(self):
         project_dir = os.path.join(self.tmpdir.name, "notes", "20-Biz", "22-Acute", "22-7-Support")

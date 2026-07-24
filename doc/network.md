@@ -259,7 +259,8 @@ use when matching or importing Desktop-backed notes:
 
 - `project` and `derived_project`: Desktop's derived project value, copied
   verbatim from the project-folder mapping, for example `work/business`.
-- `date_created`: note creation date from the markdown YAML front matter.
+- `date_created`: note creation date from the markdown YAML front matter, or the
+  source file creation timestamp when front matter does not provide one.
 - `date_modified`: note modified date from the markdown YAML front matter, with
   aliases such as `date_updated` accepted by Desktop.
 - `important`: note importance parsed from YAML front matter values such as

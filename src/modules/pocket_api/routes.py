@@ -568,6 +568,32 @@ def _note_file_metadata(note_path):
     }
 
 
+def _state_with_file_created_at(state, stat_or_path):
+    if not state:
+        return state
+    stat = stat_or_path
+    if isinstance(stat_or_path, str):
+        try:
+            stat = os.stat(stat_or_path)
+        except OSError:
+            return state
+    created_at = _file_created_at(stat)
+    if created_at:
+        state = dict(state)
+        state["date_created"] = created_at
+        state["created_at"] = _iso_from_note_value(created_at)
+    return state
+
+
+def _file_created_at(stat):
+    created = getattr(stat, "st_birthtime", None)
+    if created is None:
+        created = getattr(stat, "st_ctime", None)
+    if created is None:
+        return ""
+    return datetime.fromtimestamp(created).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _strip_yaml_scalar(value):
     value = (value or "").strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
@@ -1148,7 +1174,7 @@ def _serialize_note_item(
 ):
     note_path = note_path_override or notes_routes._build_note_path(note)
     if include_content:
-        state = notes_routes._note_file_state(note_path)
+        state = _state_with_file_created_at(notes_routes._note_file_state(note_path), note_path)
         _upsert_item_state("note", note["id"], note_path, state)
     else:
         state = state_override or _note_file_metadata(note_path)
@@ -1158,6 +1184,9 @@ def _serialize_note_item(
         if include_front_matter
         else _metadata_from_note_columns(note)
     )
+    if state and not front_matter_metadata.get("date_created") and state.get("date_created"):
+        front_matter_metadata["date_created"] = state.get("date_created") or ""
+        front_matter_metadata["created_at"] = state.get("created_at") or _iso_from_note_value(state.get("date_created") or "")
     derived_project = _derived_project_for_note(note, owner_user_id=user_id, project_folder_rows=project_folder_rows)
     item_owner_user_id = _effective_note_owner_user_id(note, user_id=user_id)
     item = {
