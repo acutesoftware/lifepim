@@ -36,6 +36,44 @@ class TestMarkdownUtils(unittest.TestCase):
 
         self.assertIn("https://example.com/pic.jpg", html)
 
+    def test_fenced_tree_renders_as_code_block(self):
+        text = (
+            "```text\n"
+            "DATA\n"
+            "\u251c\u2500\u2500 Overview\n"
+            "\u251c\u2500\u2500 Sources\n"
+            "\u2502   \u251c\u2500\u2500 Databases\n"
+            "\u2502   \u2514\u2500\u2500 File Sources\n"
+            "\u2514\u2500\u2500 Tasks\n"
+            "```"
+        )
+
+        rendered = markdown_utils.render_markdown(text)
+
+        self.assertIn("<pre><code", rendered)
+        self.assertIn("DATA\n\u251c\u2500\u2500 Overview", rendered)
+        self.assertNotIn("<p><code>", rendered)
+
+    def test_fallback_fenced_tree_renders_as_code_block(self):
+        previous_md_lib = markdown_utils.md_lib
+        try:
+            markdown_utils.md_lib = None
+            rendered = markdown_utils.render_markdown("```\nDATA\n\u2514\u2500\u2500 Tasks\n```")
+        finally:
+            markdown_utils.md_lib = previous_md_lib
+
+        self.assertEqual(rendered, "<pre><code>DATA\n\u2514\u2500\u2500 Tasks</code></pre>")
+
+    def test_safe_markdown_mode_escapes_raw_html(self):
+        rendered = markdown_utils.render_markdown(
+            '<div class="loose">Loose **bold** text',
+            allow_html=False,
+        )
+
+        self.assertNotIn("<div", rendered)
+        self.assertIn("&lt;div", rendered)
+        self.assertIn("<strong>bold</strong>", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

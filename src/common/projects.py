@@ -74,12 +74,33 @@ def _get_conn(conn=None):
     return conn
 
 
+_PROJECTS_SCHEMA_READY_CONN_IDS = set()
+
+
 def ensure_projects_schema(conn=None):
     conn = _get_conn(conn)
+    conn_id = id(conn)
+    if conn_id in _PROJECTS_SCHEMA_READY_CONN_IDS:
+        try:
+            if _projects_schema_is_current(conn):
+                return
+        except Exception:
+            pass
+        _PROJECTS_SCHEMA_READY_CONN_IDS.discard(conn_id)
     _migrate_projects_schema(conn)
     _migrate_project_folders_schema(conn)
     conn.executescript(PROJECTS_SCHEMA)
     conn.commit()
+    _PROJECTS_SCHEMA_READY_CONN_IDS.add(conn_id)
+
+
+def _projects_schema_is_current(conn):
+    project_cols = {row["name"] for row in _table_columns(conn, "lp_projects")}
+    folder_cols = {row["name"] for row in _table_columns(conn, "lp_project_folders")}
+    return (
+        {"owner_user_id", "project_id", "status"}.issubset(project_cols)
+        and {"owner_user_id", "project_id", "path_prefix"}.issubset(folder_cols)
+    )
 
 
 def _table_columns(conn, table_name):

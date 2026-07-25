@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
 from flask import Flask
 
@@ -13,6 +14,8 @@ if root_folder not in sys.path:
 
 from common import config as cfg
 from common import data
+from common import note_search_index
+from common import settings
 from common import search
 from common import utils as common_utils
 from common import projects as projects_mod
@@ -124,6 +127,139 @@ class TestNoteCreation(unittest.TestCase):
         }
         self.assertIn(note1.get("file_name"), note_titles)
         self.assertIn(note2.get("file_name"), note_titles)
+
+    def test_note_card_preview_uses_body_color_and_markdown(self):
+        note_dir = os.path.join(self.tmpdir.name, "card_preview")
+        os.makedirs(note_dir, exist_ok=True)
+        note_path = os.path.join(note_dir, "card.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write(
+                "---\n"
+                "title: Card Preview\n"
+                "color: Blue\n"
+                "---\n"
+                "# Card Preview\n\n"
+                "This is **bold** preview text.\n"
+                "Second line."
+            )
+        note = {
+            "id": 42,
+            "file_name": "card.md",
+            "path": notes_routes._normalize_note_path(note_dir),
+            "title": "Card Preview",
+            "color": "Blue",
+        }
+        notes_routes._apply_note_display_fields(note)
+        note_search_index.ensure_schema(self.conn)
+        self.conn.execute(
+            """
+            INSERT INTO lp_note_search_index
+            (note_id, file_path, file_mtime, file_size, title, content_text, indexed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                42,
+                note_path,
+                1.0,
+                10,
+                "Card Preview",
+                "---\n"
+                "title: Card Preview\n"
+                "color: Blue\n"
+                "---\n"
+                "# Card Preview\n\n"
+                "This is **bold** preview text.\n"
+                "Second line.",
+                "2026-01-01T00:00:00Z",
+            ),
+        )
+
+        with patch("modules.notes.routes._read_note_file", side_effect=AssertionError("card list must not read note files")):
+            notes_routes._prepare_note_card_previews([note], max_chars=80)
+
+        self.assertEqual(note["list_color_style"], "#81ecec")
+        self.assertNotIn("title: Card Preview", note["preview_text"])
+        self.assertNotIn("# Card Preview", note["preview_text"])
+        self.assertIn("This is **bold** preview text.", note["preview_text"])
+        self.assertIn("<strong>bold</strong>", note["preview_html"])
+
+    def test_note_card_grid_preview_skips_markdown_rendering(self):
+        note = {"id": 43, "file_name": "grid.md", "path": self.tmpdir.name, "title": "Grid", "color": ""}
+        note_search_index.ensure_schema(self.conn)
+        self.conn.execute(
+            """
+            INSERT INTO lp_note_search_index
+            (note_id, file_path, file_mtime, file_size, title, content_text, indexed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (43, "", 1.0, 10, "Grid", "This is **raw** text.", "2026-01-01T00:00:00Z"),
+        )
+
+        with patch("modules.notes.routes.markdown_utils.render_markdown") as render_markdown:
+            notes_routes._prepare_note_card_previews([note], max_chars=80, render_html=False)
+
+        render_markdown.assert_not_called()
+        self.assertEqual(note["preview_text"], "This is **raw** text.")
+        self.assertEqual(note["preview_html"], "")
+
+    def test_note_card_preview_escapes_raw_html(self):
+        note = {"id": 44, "file_name": "unsafe.md", "path": self.tmpdir.name, "title": "Unsafe", "color": ""}
+        note_search_index.ensure_schema(self.conn)
+        self.conn.execute(
+            """
+            INSERT INTO lp_note_search_index
+            (note_id, file_path, file_mtime, file_size, title, content_text, indexed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (44, "", 1.0, 10, "Unsafe", '<div class="loose">Loose **bold** text', "2026-01-01T00:00:00Z"),
+        )
+
+        notes_routes._prepare_note_card_previews([note], max_chars=120, render_html=True)
+
+        self.assertNotIn("<div", note["preview_html"])
+        self.assertIn("&lt;div", note["preview_html"])
+        self.assertIn("<strong>bold</strong>", note["preview_html"])
+
+    def test_fetch_notes_does_not_read_front_matter(self):
+        note_dir = os.path.join(self.tmpdir.name, "metadata_only")
+        note_id, _ = self._create_note_record("metadata_only", note_dir, project="")
+
+        with patch(
+            "modules.notes.routes._read_note_front_matter",
+            side_effect=AssertionError("list fetch must not read note files"),
+        ):
+            notes = notes_routes._fetch_notes("unmapped")
+
+        self.assertIn(note_id, {note.get("id") for note in notes})
+
+    def test_note_preview_text_uses_mobile_requested_limit(self):
+        self.assertEqual(notes_routes.NOTES_PER_PAGE, 50)
+        self.assertEqual(notes_routes.NOTE_CARD_MAX_CHARS, 50)
+        self.assertEqual(notes_routes.NOTE_CARD_TITLE_FONT_SIZE, 18)
+        self.assertEqual(notes_routes.NOTE_CARD_PREVIEW_CHARS, 300)
+        self.assertEqual(notes_routes._preview_text("abcdef", 3), "abc")
+        self.assertEqual(
+            notes_routes._note_body_text("---\r\ntitle: X\r\n---\r\nBody", "x.md", "X"),
+            "Body",
+        )
+
+    def test_note_display_settings_are_loaded_from_database(self):
+        settings.save_note_display_settings(
+            {
+                "card_width_chars": "64",
+                "title_font_size": "20",
+                "preview_chars": "720",
+                "notes_per_page": "75",
+            },
+            self.conn,
+        )
+
+        loaded = notes_routes._note_display_settings()
+
+        self.assertEqual(loaded["card_width_chars"], 64)
+        self.assertEqual(loaded["title_font_size"], 20)
+        self.assertEqual(loaded["preview_chars"], 720)
+        self.assertEqual(loaded["notes_per_page"], 75)
 
     def test_note_folder_id_preserves_live_note_path_alias_on_update(self):
         project_id = "pers/health"

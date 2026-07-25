@@ -74,6 +74,48 @@ class TestSettingsSchema(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_note_display_settings_are_saved_and_clamped(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            defaults = settings.get_note_display_settings(conn)
+            self.assertEqual(defaults["card_width_chars"], 50)
+            self.assertEqual(defaults["title_font_size"], 18)
+            self.assertEqual(defaults["preview_chars"], 300)
+            self.assertEqual(defaults["notes_per_page"], 50)
+
+            settings.save_note_display_settings(
+                {
+                    "card_width_chars": "75",
+                    "title_font_size": "22",
+                    "preview_chars": "900",
+                    "notes_per_page": "80",
+                },
+                conn,
+            )
+            saved = settings.get_note_display_settings(conn)
+            self.assertEqual(saved["card_width_chars"], 75)
+            self.assertEqual(saved["title_font_size"], 22)
+            self.assertEqual(saved["preview_chars"], 900)
+            self.assertEqual(saved["notes_per_page"], 80)
+
+            settings.save_note_display_settings(
+                {
+                    "card_width_chars": "500",
+                    "title_font_size": "2",
+                    "preview_chars": "bad",
+                    "notes_per_page": "0",
+                },
+                conn,
+            )
+            clamped = settings.get_note_display_settings(conn)
+            self.assertEqual(clamped["card_width_chars"], 120)
+            self.assertEqual(clamped["title_font_size"], 12)
+            self.assertEqual(clamped["preview_chars"], 300)
+            self.assertEqual(clamped["notes_per_page"], 5)
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,6 +4,12 @@
     <a href="{{ url_for('notes.list_notes_table_route', proj=project, folder=folder_filter) }}">Table</a> |
     <a href="{{ url_for('notes.list_notes_list_route', proj=project, folder=folder_filter) }}">List</a> |
     <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter) }}">Card</a> |
+    <span class="note-card-mode-toggle">
+      <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter, mode='grid') }}"
+         class="{% if card_mode == 'grid' %}active{% endif %}">Grid</a>
+      <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter, mode='preview') }}"
+         class="{% if card_mode == 'preview' %}active{% endif %}">Preview</a>
+    </span> |
     <a href="#" class="new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a> |
     <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
     <span class="note-status">{{ total_notes|default(notes|length) }} notes</span>
@@ -29,9 +35,23 @@
     </div>
   {% endif %}
 
-  {% set col_values = card_values %}
-  <div data-notes-context="true">
-    {% include "widgets/wid_card_list.html" %}
+  <div class="note-card-page">
+    <div class="note-card-grid note-card-grid-{{ card_mode }}"
+         data-notes-context="true"
+         style="--note-card-width: {{ note_card_max_chars|default(50) }}ch; --note-title-size: {{ note_card_title_font_size|default(18) }}px;">
+      {% for n in notes %}
+        <a class="note-card"
+           href="{{ url_for('notes.view_note_route', note_id=n.id) }}"
+           style="--note-color: {{ n.list_color_style }};">
+          <div class="note-card-title">{{ n.title or n.file_name }}</div>
+          {% if card_mode == 'preview' %}
+            <div class="note-card-markdown note-rendered-content">{{ n.preview_html|safe }}</div>
+          {% else %}
+            <div class="note-card-raw">{{ n.preview_text }}</div>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+    {% include "widgets/wid_pagination.html" %}
   </div>
-  {% include "widgets/wid_pagination.html" %}
 {% endblock %}

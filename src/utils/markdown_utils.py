@@ -15,6 +15,8 @@ _OBSIDIAN_IMG_RE = re.compile(r"!\[\[([^\]]+)\]\]")
 _LIFEPIM_IMG_RE = re.compile(r"\[img\](.*?)\[/img\]", re.IGNORECASE | re.DOTALL)
 _MARKDOWN_IMG_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 _HTML_IMG_RE = re.compile(r"(?is)<img\b([^>]*?)\bsrc\s*=\s*(['\"]?)([^'\"\s>]+)\2([^>]*)>")
+_FENCE_RE = re.compile(r"^```[\w+-]*\s*$")
+_FENCE_CLOSE_RE = re.compile(r"^```\s*$")
 
 
 def _is_absolute_asset(source):
@@ -121,11 +123,63 @@ def _convert_note_images(text, asset_resolver):
     return _convert_markdown_images(text, asset_resolver)
 
 
-def render_markdown(text, asset_resolver=None):
+def _escape_fallback_paragraph(value):
+    placeholders = []
+
+    def _replace_img(match):
+        token = f"@@LIFEPIM_IMG_{len(placeholders)}@@"
+        placeholders.append((token, match.group(0)))
+        return token
+
+    value = _HTML_IMG_RE.sub(_replace_img, value)
+    escaped = html.escape(value).replace("\n", "<br>")
+    for token, image_tag in placeholders:
+        escaped = escaped.replace(token, image_tag)
+    return escaped
+
+
+def _render_fallback_markdown(text):
+    blocks = []
+    paragraph_lines = []
+    code_lines = []
+    in_code = False
+
+    def flush_paragraph():
+        if paragraph_lines:
+            blocks.append(_escape_fallback_paragraph("\n".join(paragraph_lines)))
+            paragraph_lines.clear()
+
+    def flush_code():
+        blocks.append("<pre><code>{0}</code></pre>".format(html.escape("\n".join(code_lines))))
+        code_lines.clear()
+
+    for line in text.splitlines():
+        if in_code:
+            if _FENCE_CLOSE_RE.match(line.strip()):
+                flush_code()
+                in_code = False
+            else:
+                code_lines.append(line)
+            continue
+        if _FENCE_RE.match(line.strip()):
+            flush_paragraph()
+            in_code = True
+            continue
+        paragraph_lines.append(line)
+
+    if in_code:
+        paragraph_lines.insert(0, "```")
+        paragraph_lines.extend(code_lines)
+    flush_paragraph()
+    return "<br>".join(blocks)
+
+
+def render_markdown(text, asset_resolver=None, allow_html=True):
     if text is None:
         return ""
+    if not allow_html:
+        text = html.escape(text, quote=False)
     text = _convert_note_images(text, asset_resolver)
     if md_lib:
-        return md_lib.markdown(text, extensions=["nl2br", "sane_lists", "tables"])
-    escaped = html.escape(text)
-    return escaped.replace("\n", "<br>")
+        return md_lib.markdown(text, extensions=["fenced_code", "nl2br", "sane_lists", "tables"])
+    return _render_fallback_markdown(text)

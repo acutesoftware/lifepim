@@ -312,7 +312,18 @@ def settings_route():
             message = "Audio settings saved."
         elif active_settings_tab == "notes":
             action = request.form.get("action", "")
-            if action == "rebuild_note_search_index":
+            if action == "save_note_display":
+                settings_mod.save_note_display_settings(
+                    {
+                        "card_width_chars": request.form.get("card_width_chars"),
+                        "title_font_size": request.form.get("title_font_size"),
+                        "preview_chars": request.form.get("preview_chars"),
+                        "notes_per_page": request.form.get("notes_per_page"),
+                    },
+                    conn,
+                )
+                message = "Note display settings saved."
+            elif action == "rebuild_note_search_index":
                 try:
                     result = note_search_index.rebuild_index(conn)
                     message = (
@@ -386,6 +397,7 @@ def settings_route():
     media_settings = settings_mod.get_media_settings(conn)
     audio_settings = settings_mod.get_audio_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
+    note_settings = settings_mod.get_note_display_settings(conn)
     config_settings = cfg.list_config_settings(conn)
     all_settings = settings_mod.list_settings(conn)
     try:
@@ -408,6 +420,7 @@ def settings_route():
         media_settings=media_settings,
         audio_settings=audio_settings,
         general_settings=general_settings,
+        note_settings=note_settings,
         config_settings=config_settings,
         all_settings=all_settings,
         note_index_count=note_index_count,

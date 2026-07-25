@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlite3
 
 from common import data as db
@@ -82,6 +82,26 @@ MEDIA_DEFAULTS = {
     "media.display.padding_size": ("thin", "Media", "Padding size"),
 }
 
+NOTE_DISPLAY_DEFAULTS = {
+    "notes.display.card_width_chars": ("50", "Notes", "Card width characters"),
+    "notes.display.title_font_size": ("18", "Notes", "Title font size"),
+    "notes.display.preview_chars": ("300", "Notes", "Preview characters"),
+    "notes.display.notes_per_page": ("50", "Notes", "Notes per page"),
+}
+
+NOTE_CARD_WIDTH_DEFAULT = 50
+NOTE_CARD_WIDTH_MIN = 20
+NOTE_CARD_WIDTH_MAX = 120
+NOTE_TITLE_FONT_SIZE_DEFAULT = 18
+NOTE_TITLE_FONT_SIZE_MIN = 12
+NOTE_TITLE_FONT_SIZE_MAX = 32
+NOTE_PREVIEW_CHARS_DEFAULT = 300
+NOTE_PREVIEW_CHARS_MIN = 20
+NOTE_PREVIEW_CHARS_MAX = 5000
+NOTE_NOTES_PER_PAGE_DEFAULT = 50
+NOTE_NOTES_PER_PAGE_MIN = 5
+NOTE_NOTES_PER_PAGE_MAX = 200
+
 _SCHEMA_READY_CONN_IDS = set()
 
 
@@ -109,6 +129,7 @@ def ensure_settings_schema(conn=None):
         **GENERAL_DEFAULTS,
         **AUDIO_DEFAULTS,
         **MEDIA_DEFAULTS,
+        **NOTE_DISPLAY_DEFAULTS,
     }.items():
         conn.execute(
             "INSERT OR IGNORE INTO sys_settings "
@@ -220,6 +241,48 @@ def get_media_settings(conn=None):
             "wide": "Wide",
         },
     }
+
+
+def get_note_display_settings(conn=None):
+    return {
+        "card_width_chars": normalize_note_card_width_chars(
+            get_setting("notes.display.card_width_chars", str(NOTE_CARD_WIDTH_DEFAULT), conn)
+        ),
+        "title_font_size": normalize_note_title_font_size(
+            get_setting("notes.display.title_font_size", str(NOTE_TITLE_FONT_SIZE_DEFAULT), conn)
+        ),
+        "preview_chars": normalize_note_preview_chars(
+            get_setting("notes.display.preview_chars", str(NOTE_PREVIEW_CHARS_DEFAULT), conn)
+        ),
+        "notes_per_page": normalize_note_notes_per_page(
+            get_setting("notes.display.notes_per_page", str(NOTE_NOTES_PER_PAGE_DEFAULT), conn)
+        ),
+    }
+
+
+def save_note_display_settings(values, conn=None):
+    conn = db._get_conn() if conn is None else conn
+    ensure_settings_schema(conn)
+    updates = {
+        "notes.display.card_width_chars": (
+            str(normalize_note_card_width_chars(values.get("card_width_chars"))),
+            "Card width characters",
+        ),
+        "notes.display.title_font_size": (
+            str(normalize_note_title_font_size(values.get("title_font_size"))),
+            "Title font size",
+        ),
+        "notes.display.preview_chars": (
+            str(normalize_note_preview_chars(values.get("preview_chars"))),
+            "Preview characters",
+        ),
+        "notes.display.notes_per_page": (
+            str(normalize_note_notes_per_page(values.get("notes_per_page"))),
+            "Notes per page",
+        ),
+    }
+    for key, (value, label) in updates.items():
+        set_setting(key, value, "Notes", label, conn)
 
 
 def save_media_settings(values, conn=None):
@@ -361,5 +424,29 @@ def normalize_mobile_font_size(value):
     return max(12, min(22, size))
 
 
+def normalize_note_card_width_chars(value):
+    return _clamp_int(value, NOTE_CARD_WIDTH_DEFAULT, NOTE_CARD_WIDTH_MIN, NOTE_CARD_WIDTH_MAX)
+
+
+def normalize_note_title_font_size(value):
+    return _clamp_int(value, NOTE_TITLE_FONT_SIZE_DEFAULT, NOTE_TITLE_FONT_SIZE_MIN, NOTE_TITLE_FONT_SIZE_MAX)
+
+
+def normalize_note_preview_chars(value):
+    return _clamp_int(value, NOTE_PREVIEW_CHARS_DEFAULT, NOTE_PREVIEW_CHARS_MIN, NOTE_PREVIEW_CHARS_MAX)
+
+
+def normalize_note_notes_per_page(value):
+    return _clamp_int(value, NOTE_NOTES_PER_PAGE_DEFAULT, NOTE_NOTES_PER_PAGE_MIN, NOTE_NOTES_PER_PAGE_MAX)
+
+
+def _clamp_int(value, default, min_value, max_value):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = default
+    return max(min_value, min(max_value, number))
+
+
 def _utc_now():
-    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

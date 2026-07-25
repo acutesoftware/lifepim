@@ -110,18 +110,39 @@ NOTE_SCHEMA_COLUMNS = {
     "source_note_id": "TEXT",
 }
 
+_NOTES_SCHEMA_READY_CONN_IDS = set()
+
 
 def ensure_notes_schema(conn=None):
     conn = _get_conn() if conn is None else conn
+    conn_id = id(conn)
+    if conn_id in _NOTES_SCHEMA_READY_CONN_IDS:
+        try:
+            table_row = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_notes'"
+            ).fetchone()
+            if table_row:
+                return
+        except Exception:
+            pass
+        _NOTES_SCHEMA_READY_CONN_IDS.discard(conn_id)
     table_row = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_notes'"
     ).fetchone()
     if not table_row:
         return
+    rows = conn.execute("PRAGMA table_info(lp_notes)").fetchall()
+    existing = {row[1].lower() for row in rows}
     for col_name, col_type in NOTE_SCHEMA_COLUMNS.items():
-        add_column_if_missing(conn, "lp_notes", col_name, col_type)
+        if col_name.lower() not in existing:
+            conn.execute(f"ALTER TABLE lp_notes ADD COLUMN {col_name} {col_type}")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_folder_id ON lp_notes(folder_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_project ON lp_notes(project)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_path ON lp_notes(path)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_date_modified ON lp_notes(date_modified)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_rec_extract_date ON lp_notes(rec_extract_date)")
     conn.commit()
+    _NOTES_SCHEMA_READY_CONN_IDS.add(conn_id)
 
 
 def ensure_folder_schema(conn=None):

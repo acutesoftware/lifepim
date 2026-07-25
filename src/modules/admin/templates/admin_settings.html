@@ -176,6 +176,29 @@
         <p class="settings-empty">No Files settings yet.</p>
       {% elif active_settings_tab == 'notes' %}
         <h4>Notes</h4>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="notes">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Note Display</div>
+            <label>
+              Card width characters
+              <input type="number" name="card_width_chars" min="20" max="120" value="{{ note_settings.card_width_chars or 50 }}">
+            </label>
+            <label>
+              Title font size
+              <input type="number" name="title_font_size" min="12" max="32" value="{{ note_settings.title_font_size or 18 }}">
+            </label>
+            <label>
+              Preview characters
+              <input type="number" name="preview_chars" min="20" max="5000" value="{{ note_settings.preview_chars or 300 }}">
+            </label>
+            <label>
+              Notes per page
+              <input type="number" name="notes_per_page" min="5" max="200" value="{{ note_settings.notes_per_page or 50 }}">
+            </label>
+          </div>
+          <button type="submit" name="action" value="save_note_display">Save note display settings</button>
+        </form>
         <form method="post" action="{{ url_for('notes.sync_notes_route') }}" class="settings-form">
           <div class="settings-fieldset">
             <div class="settings-fieldset-title">Sync notes from disk</div>

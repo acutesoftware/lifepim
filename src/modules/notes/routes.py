@@ -12,6 +12,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, make_r
 from flask_login import current_user
 
 from common import data
+from common import note_search_index
+from common import settings as settings_mod
 from utils import importer
 from utils import markdown_utils
 from utils import hex_utils
@@ -31,6 +33,11 @@ WHITESPACE_RE = re.compile(r"\s+")
 NOTE_TITLE_MAX_LEN = 80
 NOTE_FRONT_MATTER_READ_LIMIT = 128 * 1024
 DEFAULT_NOTE_COLOR = "#FFF7CC"
+NOTES_PER_PAGE = 50
+NOTE_CARD_MAX_CHARS = 50
+NOTE_CARD_TITLE_FONT_SIZE = 18
+NOTE_CARD_PREVIEW_CHARS = 300
+NOTE_CARD_DEFAULT_MODE = "grid"
 NOTE_COLOR_HEX_RE = re.compile(r"^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$")
 NOTE_COLOR_NAMES = {
     "yellow": "#ffff93",
@@ -129,6 +136,7 @@ def _note_color_style(value):
 def _apply_note_display_fields(note):
     if note is not None:
         note["color_style"] = _note_color_style(note.get("color"))
+        note["list_color_style"] = note["color_style"] or NOTE_COLOR_NAMES["yellow"]
     return note
 
 
@@ -652,6 +660,35 @@ def _project_scope_ids(project):
     return ids or [project]
 
 
+def _direct_project_condition(scope_ids):
+    placeholders = ", ".join(["lower(?)"] * len(scope_ids))
+    return f"lower(COALESCE(t.project, '')) IN ({placeholders})"
+
+
+def _has_direct_project_notes(scope_ids, folder_path=None):
+    if not scope_ids:
+        return False
+    tbl = get_table_def("notes")
+    if not tbl:
+        return False
+    condition = _direct_project_condition(scope_ids)
+    params = list(scope_ids)
+    if folder_path:
+        condition = f"({condition}) AND lower(rtrim(replace(t.path, '/', '\\'))) = lower(?)"
+        params.append(folder_path)
+    visibility_condition, visibility_params = security.visible_record_condition("t", current_user)
+    condition = f"({condition}) AND {visibility_condition}"
+    params.extend(visibility_params)
+    try:
+        row = data._get_conn().execute(
+            f"SELECT 1 FROM {tbl['name']} t WHERE {condition} LIMIT 1",
+            params,
+        ).fetchone()
+    except Exception:
+        return False
+    return bool(row)
+
+
 def _notes_base_condition(project, folder_path=None):
     params = []
     folder_expr = _note_folder_match_expr()
@@ -675,8 +712,11 @@ def _notes_base_condition(project, folder_path=None):
         )
     elif project:
         scope_ids = _project_scope_ids(project)
-        placeholders = ", ".join(["?"] * len(scope_ids))
-        condition = f"{_derived_project_expr()} IN ({placeholders})"
+        if _has_direct_project_notes(scope_ids, folder_path):
+            condition = _direct_project_condition(scope_ids)
+        else:
+            placeholders = ", ".join(["?"] * len(scope_ids))
+            condition = f"{_derived_project_expr()} IN ({placeholders})"
         params.extend(scope_ids)
     else:
         condition = "1=1"
@@ -714,6 +754,75 @@ def _notes_url_args(project=None, folder_path=None, **extra):
         if value not in (None, "", False):
             args[key] = value
     return args
+
+
+def _normalize_note_card_mode(value):
+    return "preview" if value == "preview" else NOTE_CARD_DEFAULT_MODE
+
+
+def _note_display_settings():
+    try:
+        return settings_mod.get_note_display_settings(data._get_conn())
+    except Exception:
+        return {
+            "card_width_chars": NOTE_CARD_MAX_CHARS,
+            "title_font_size": NOTE_CARD_TITLE_FONT_SIZE,
+            "preview_chars": NOTE_CARD_PREVIEW_CHARS,
+            "notes_per_page": NOTES_PER_PAGE,
+        }
+
+
+def _note_body_text(markdown_text, file_name="", title=""):
+    text = markdown_text or ""
+    lines = text.splitlines(keepends=True)
+    if lines and lines[0].strip() == "---":
+        for idx, line in enumerate(lines[1:], 1):
+            if line.strip() in ("---", "..."):
+                return _without_duplicate_title_heading("".join(lines[idx + 1 :]), file_name, title)
+    return _without_duplicate_title_heading(text, file_name, title)
+
+
+def _preview_text(value, max_chars=NOTE_CARD_PREVIEW_CHARS):
+    value = value or ""
+    max_chars = max(1, int(max_chars or NOTE_CARD_PREVIEW_CHARS))
+    return value if len(value) <= max_chars else value[:max_chars]
+
+
+def _note_preview_from_cached_text(note, cached_text, max_chars=NOTE_CARD_PREVIEW_CHARS):
+    return _preview_text(_note_body_text(cached_text or "", note.get("file_name"), note.get("title")), max_chars)
+
+
+def _prepare_note_card_previews(notes, max_chars=NOTE_CARD_PREVIEW_CHARS, render_html=True):
+    note_ids = [note.get("id") for note in notes or [] if note.get("id")]
+    cached = {}
+    if note_ids:
+        try:
+            conn = data._get_conn()
+            note_search_index.ensure_schema(conn)
+            placeholders = ", ".join(["?"] * len(note_ids))
+            rows = conn.execute(
+                f"SELECT note_id, content_text FROM lp_note_search_index WHERE note_id IN ({placeholders})",
+                note_ids,
+            ).fetchall()
+            cached = {row["note_id"]: row["content_text"] or "" for row in rows}
+        except Exception:
+            cached = {}
+    for note in notes or []:
+        preview = _note_preview_from_cached_text(note, cached.get(note.get("id"), ""), max_chars)
+        note["preview_text"] = preview
+        if render_html:
+            note["preview_html"] = markdown_utils.render_markdown(
+                preview,
+                asset_resolver=lambda asset_name, note_id=note.get("id"): url_for(
+                    "notes.note_asset_route",
+                    note_id=note_id,
+                    asset_path=asset_name,
+                ),
+                allow_html=False,
+            )
+        else:
+            note["preview_html"] = ""
+    return notes
 
 
 def _current_user_notes_root(create_dirs=False):
@@ -856,7 +965,7 @@ def _fetch_note_subfolders(project, folder_path=None):
     return [subfolders[key] for key in sorted(subfolders)]
 
 
-def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None):
+def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=True):
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
@@ -883,7 +992,10 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
     order_by = f"{sort_key} {sort_dir}"
     select_cols = [f"t.{col}" for col in cols]
     select_cols.append("t.rec_extract_date as updated")
-    select_cols.append(f"{_derived_project_expr()} as derived_project")
+    if include_derived:
+        select_cols.append(f"{_derived_project_expr()} as derived_project")
+    else:
+        select_cols.append("NULL as derived_project")
     condition, params = _notes_base_condition(project, folder_path)
     sql = (
         f"SELECT {', '.join(select_cols)} "
@@ -931,6 +1043,7 @@ def _get_note_record(note_id):
 def list_notes_route():
     project = _normalize_project(request.args.get("proj"))
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    note_settings = _note_display_settings()
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
@@ -965,7 +1078,7 @@ def list_notes_route():
     sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
     page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
+    per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
     notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
@@ -1016,6 +1129,7 @@ def list_notes_route():
 def list_notes_table_route():
     project = _normalize_project(request.args.get("proj"))
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    note_settings = _note_display_settings()
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
@@ -1047,7 +1161,7 @@ def list_notes_table_route():
     sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
     sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
     page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
+    per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
     notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
@@ -1098,6 +1212,7 @@ def list_notes_table_route():
 def list_notes_list_route():
     project = _normalize_project(request.args.get("proj"))
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    note_settings = _note_display_settings()
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
@@ -1124,10 +1239,10 @@ def list_notes_list_route():
             last_url=url_for("notes.list_notes_list_route"),
         )
     page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
+    per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter)
+    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
@@ -1169,8 +1284,10 @@ def list_notes_list_route():
 def list_notes_cards_route():
     project = _normalize_project(request.args.get("proj"))
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    note_settings = _note_display_settings()
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
+    card_mode = _normalize_note_card_mode(request.args.get("mode") or request.cookies.get("notes_card_mode"))
     tbl = get_table_def("notes")
     if not tbl:
         return render_template(
@@ -1190,24 +1307,32 @@ def list_notes_cards_route():
             note_subfolders=_fetch_note_subfolders(project, folder_filter),
             total_notes=0,
             note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
+            card_mode=card_mode,
+            note_card_max_chars=note_settings["card_width_chars"],
+            note_card_title_font_size=note_settings["title_font_size"],
             page=1,
             total_pages=1,
             pages=[],
-            first_url=url_for("notes.list_notes_cards_route"),
-            last_url=url_for("notes.list_notes_cards_route"),
+            first_url=url_for("notes.list_notes_cards_route", **_notes_url_args(project, folder_filter, mode=card_mode)),
+            last_url=url_for("notes.list_notes_cards_route", **_notes_url_args(project, folder_filter, mode=card_mode)),
         )
     page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
+    per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter)
+    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    _prepare_note_card_previews(
+        notes,
+        max_chars=note_settings["preview_chars"],
+        render_html=(card_mode == "preview"),
+    )
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "notes.list_notes_cards_route",
-        _notes_url_args(project, folder_filter),
+        _notes_url_args(project, folder_filter, mode=card_mode),
         page,
         total_pages,
     )
@@ -1233,6 +1358,9 @@ def list_notes_cards_route():
         note_subfolders=_fetch_note_subfolders(project, folder_filter),
         total_notes=total,
         note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
+        card_mode=card_mode,
+        note_card_max_chars=note_settings["card_width_chars"],
+        note_card_title_font_size=note_settings["title_font_size"],
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
@@ -1241,6 +1369,7 @@ def list_notes_cards_route():
     )
     )
     resp.set_cookie("notes_view", "cards")
+    resp.set_cookie("notes_card_mode", card_mode)
     return resp
 
 @notes_bp.route('/view/<int:note_id>')
@@ -1418,7 +1547,7 @@ def _update_note_title_content(note_path, old_title, new_title):
         _write_note_file_content(note_path, updated)
 
 
-def _update_note_file_metadata(note_id, note, file_name, folder_path, project=None):
+def _update_note_file_metadata(note_id, note, file_name, folder_path, project=None, content=None):
     tbl = get_table_def("notes")
     if not tbl:
         return False
@@ -1454,6 +1583,16 @@ def _update_note_file_metadata(note_id, note, file_name, folder_path, project=No
     ok = data.update_record(data._get_conn(), tbl["name"], note_id, tbl["col_list"], values)
     if ok:
         _set_note_folder_id(data._get_conn(), tbl["name"], note_id, folder_path)
+        try:
+            note_search_index.upsert_note(
+                note_id,
+                note_path,
+                title=values_map.get("title") or file_name,
+                content=content,
+                conn=data._get_conn(),
+            )
+        except Exception:
+            pass
     return ok
 
 
@@ -1855,6 +1994,7 @@ def edit_note_route(note_id):
                         note,
                         note.get("file_name") or os.path.basename(note_path),
                         _normalize_note_path(note.get("path")) or os.path.dirname(note_path),
+                        content=content,
                     )
                 except OSError:
                     pass
@@ -1941,6 +2081,7 @@ def save_note_route(note_id):
             note,
             note.get("file_name") or os.path.basename(note_path),
             _normalize_note_path(note.get("path")) or os.path.dirname(note_path),
+            content=content,
         )
 
     return jsonify({
@@ -2197,10 +2338,30 @@ def _sync_note_rows(folder_path):
                     values = [values_map.get(col, "") for col in tbl["col_list"]]
                     if data.update_record(conn, tbl["name"], current["id"], tbl["col_list"], values):
                         _set_note_folder_id(conn, tbl["name"], current["id"], root_norm)
+                        try:
+                            note_search_index.upsert_note(
+                                current["id"],
+                                full_path,
+                                title=values_map.get("title") or name,
+                                conn=conn,
+                                commit=False,
+                            )
+                        except Exception:
+                            pass
                         updated += 1
                     else:
                         unchanged += 1
                 else:
+                    try:
+                        note_search_index.upsert_note(
+                            current["id"],
+                            full_path,
+                            title=values_map.get("title") or name,
+                            conn=conn,
+                            commit=False,
+                        )
+                    except Exception:
+                        pass
                     unchanged += 1
             else:
                 values_map = {
@@ -2220,6 +2381,16 @@ def _sync_note_rows(folder_path):
                 record_id = data.add_record(conn, tbl["name"], tbl["col_list"], values)
                 if record_id:
                     _set_note_folder_id(conn, tbl["name"], record_id, root_norm)
+                    try:
+                        note_search_index.upsert_note(
+                            record_id,
+                            full_path,
+                            title=values_map.get("title") or name,
+                            conn=conn,
+                            commit=False,
+                        )
+                    except Exception:
+                        pass
                     inserted += 1
 
     missing = len([key for key in existing.keys() if key not in seen])
@@ -2538,14 +2709,17 @@ def _read_note_file(note_path):
         return ""
 
 
-def _without_duplicate_title_heading(note_text, file_name):
-    title = (file_name or "").strip()
-    if not title:
+def _without_duplicate_title_heading(note_text, file_name, title=""):
+    file_title = (file_name or "").strip()
+    metadata_title = (title or "").strip()
+    if not file_title and not metadata_title:
         return note_text
-    title_stem, _ = os.path.splitext(title)
-    title_values = {title.lower()}
+    title_stem, _ = os.path.splitext(file_title)
+    title_values = {file_title.lower()}
     if title_stem:
         title_values.add(title_stem.lower())
+    if metadata_title:
+        title_values.add(metadata_title.lower())
     lines = note_text.splitlines(keepends=True)
     for idx, line in enumerate(lines):
         stripped = line.strip()

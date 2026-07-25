@@ -31,7 +31,8 @@
 
   <ul style="list-style:none; padding:0; margin:8px 0;" data-notes-context="true">
     {% for n in notes %}
-    <li style="padding:4px 0;">
+    <li class="note-list-row">
+      <span class="note-list-dot" style="background:{{ n.list_color_style }};"></span>
       <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a>
       {% if n.path %}<span>- {{ n.path }}</span>{% endif %}
     </li>

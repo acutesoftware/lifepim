@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import sqlite3
 
@@ -50,6 +50,45 @@ def read_note_text(path: str) -> str:
         return ""
 
 
+def upsert_note(
+    note_id: int,
+    note_path: str,
+    title: str = "",
+    content: str | None = None,
+    conn: sqlite3.Connection | None = None,
+    commit: bool = True,
+) -> bool:
+    conn = ensure_schema(conn)
+    if not note_id or not note_path:
+        return False
+    try:
+        stat = os.stat(note_path)
+    except OSError:
+        return False
+    if content is None:
+        content = read_note_text(note_path)
+    indexed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO lp_note_search_index
+        (note_id, file_path, file_mtime, file_size, title, content_text, indexed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            note_id,
+            note_path,
+            stat.st_mtime,
+            stat.st_size,
+            title or os.path.basename(note_path),
+            content or "",
+            indexed_at,
+        ),
+    )
+    if commit:
+        conn.commit()
+    return True
+
+
 def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
     conn = ensure_schema(conn)
     rows = conn.execute(
@@ -61,7 +100,7 @@ def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
     ).fetchall()
     indexed = missing = skipped = 0
     conn.execute("DELETE FROM lp_note_search_index")
-    indexed_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    indexed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     for row in rows:
         note = dict(row)
         note_path = note_full_path(note)
@@ -101,4 +140,3 @@ def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
         "missing": missing,
         "skipped": skipped,
     }
-
