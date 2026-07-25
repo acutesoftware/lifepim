@@ -3793,6 +3793,7 @@ body.links-resizing {
 .note-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--note-card-width, 50ch)), var(--note-card-width, 50ch)));
+  grid-auto-rows: auto;
   gap: 8px;
   align-items: start;
   margin: 6px 0;
@@ -3817,9 +3818,9 @@ body.freeze-headers .note-card-page .note-card-grid {
 }
 
 .note-card {
-  display: flex;
-  flex-direction: column;
+  display: block;
   min-height: 96px;
+  width: 100%;
   max-width: var(--note-card-width, 50ch);
   box-sizing: border-box;
   border: 1px solid rgba(0, 0, 0, 0.25);
@@ -3827,8 +3828,8 @@ body.freeze-headers .note-card-page .note-card-grid {
   padding: 8px 10px;
   background: var(--note-color, #ffff93);
   color: #111;
-  text-decoration: none;
-  overflow: hidden;
+  overflow: visible;
+  break-inside: avoid;
 }
 
 .note-card:hover,
@@ -3844,28 +3845,30 @@ body.freeze-headers .note-card-page .note-card-grid {
   font-size: var(--note-title-size, 18px);
   font-weight: bold;
   line-height: 1.2;
+  text-decoration: none;
   overflow-wrap: anywhere;
+}
+
+.note-card-title:hover,
+.note-card-title:focus {
+  text-decoration: underline;
 }
 
 .note-card-raw {
   display: block;
-  flex: 1 1 auto;
   color: #222;
   font-family: inherit;
   font-size: 13px;
   line-height: 1.35;
   overflow-wrap: anywhere;
-  overflow: hidden;
   white-space: pre-wrap;
 }
 
 .note-card-markdown {
   display: block;
-  flex: 1 1 auto;
   color: #222;
   font-size: 13px;
   line-height: 1.35;
-  overflow: hidden;
   overflow-wrap: anywhere;
 }
 
@@ -3895,6 +3898,11 @@ body.freeze-headers .note-card-page .note-card-grid {
 .note-card-markdown blockquote,
 .note-card-markdown table {
   margin: 0 0 6px;
+}
+
+.note-card-markdown table,
+.note-card-markdown pre {
+  max-width: 100%;
 }
 
 .note-rendered-content {

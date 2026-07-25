@@ -8,7 +8,7 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   {% endif %}
   {% include "_app_icons.html" %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css', v=static_asset_version|default(0)) }}">
 </head>
 {% set current_proj = request.args.get('proj') %}
 {% if current_proj in ['any', 'All', 'all', 'ALL', 'spacer'] %}
@@ -80,7 +80,8 @@
           {% set is_all = tab_proj in ['any', 'All', 'all', 'ALL'] %}
           {% set is_header = (s.is_header is defined and s.is_header) or tab_proj in ['spacer', ''] %}
           {% set is_active = (current_proj and tab_proj and tab_proj|lower == current_proj|lower) or (not current_proj and is_all) %}
-          {% set side_base_path = request.path if active_tab == 'data' else '/' ~ active_tab %}
+          {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards'] %}
+          {% set side_base_path = request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab %}
           {% if not is_header %}
             <option value="{{ side_base_path }}{% if not is_all %}?proj={{tab_proj}}{% endif %}" {% if is_active %}selected{% endif %}>
               {{ s.label }}
@@ -117,7 +118,8 @@
         {% set tab_proj = (s.proj if s.proj is defined and s.proj else s.id) %}
         {% set is_all = tab_proj in ['any', 'All', 'all', 'ALL'] %}
         {% set is_active = (current_proj and tab_proj and tab_proj|lower == current_proj|lower) or (not current_proj and is_all) %}
-        {% set side_base_path = request.path if active_tab == 'data' else '/' ~ active_tab %}
+        {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards'] %}
+        {% set side_base_path = request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab %}
         <a class="side {% if is_active %}active{% endif %}" href="{{ side_base_path }}{% if tab_proj not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{tab_proj}}{% endif %}">
           <span class="ic">{{s.icon}}</span>
           <span class="lab">{{s.label}}</span>

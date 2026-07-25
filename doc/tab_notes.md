@@ -19,7 +19,7 @@ The note body remains in the `.md` file on disk. Viewing or editing a note reads
 
 Open the Notes tab from the top navigation.
 
-Use the left project/sidebar tabs to filter notes by mapped project folders. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current project folder.
+Use the left project/sidebar tabs to filter notes by saved project metadata. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current project folder.
 
 ### Add Notes
 
@@ -82,6 +82,7 @@ Sync is idempotent:
 - updates existing rows by full file path
 - refreshes `size`, `date_modified`, and `folder_id`
 - preserves existing `lp_notes.project`
+- fills blank `lp_notes.project` from the deepest matching enabled project folder mapping
 - counts missing-on-disk rows but does not delete them
 - ignores duplicate database rows after the first matching full path
 
@@ -181,15 +182,15 @@ Notes currently have two project concepts:
 
 - `lp_notes.project`
   - A stored text column on the note row.
-  - It is set when a new note is created from a selected project, or when folder import is run with a selected `proj`.
-  - It is often blank for migrated/imported notes, because migration normally imports with `Project` blank and relies on folder mapping instead.
+  - It is set when a new note is created from a selected project, when folder import/sync has a selected `proj`, or when note project materialization fills a blank value from folder mappings.
+  - It can still be blank for old migrated/imported notes until materialization or sync has run.
   - It is displayed in the Notes table as `Project`.
 - derived project
   - A runtime value calculated from the note folder.
-  - It is displayed in the Notes table and note view as `Derived` / `Derived Project`.
-  - It is the value that usually explains why sidebar filtering works even when `lp_notes.project` is empty.
+  - It is useful as diagnostic information and as an input to materialization.
+  - It is not the normal list/sidebar filter path because calculating it for every row on every click is too slow.
 
-The derived project is calculated by joining:
+The derived project can be calculated by joining:
 
 ```text
 lp_notes.folder_id -> dim_folder.folder_id -> dim_folder.folder_path
@@ -235,7 +236,7 @@ derived_project:
 proj/dev/lifepim
 ```
 
-The more specific path wins because the query sorts by longest `path_prefix` first.
+The more specific path wins because the mapping is sorted by longest `path_prefix` first. This calculation should happen during sync/materialization, not during every list browse.
 
 ### Sidebar Filtering
 
@@ -251,11 +252,13 @@ The layout turns the selected sidebar entry into a URL query parameter:
 /notes?proj=proj/dev/lifepim
 ```
 
-For Notes, that `proj` value is used as a folder-scope filter. The Notes list does not primarily filter by `lp_notes.project`; it checks whether the note's `dim_folder.folder_path` matches an enabled `lp_project_folders.path_prefix` for that `project_id`.
+For Notes, that `proj` value is used as a metadata filter. The Notes list filters by `lp_notes.project`, not by deriving folder mappings for every row during browsing.
 
-Parent sidebar entries such as `fun` expand to the active projects in that group, such as `fun/games` and `fun/food`. Leaf entries filter by each note's single derived project, so a broad placeholder folder on `fun/sport` does not make Sport show every note under the shared `50-Fun` root.
+This is deliberate. The older folder-derived query was correct but too slow for interactive list/table/card browsing. Project folder mappings are now materialized into `lp_notes.project` during sync and by the note project materialization maintenance action.
 
-`Unmapped` is special. It shows notes whose folder does not match any enabled project folder prefix.
+Parent sidebar entries such as `fun` expand to the active projects in that group, such as `fun/games` and `fun/food`. Leaf entries filter by each note's saved project value, so a broad placeholder folder on `fun/sport` does not make Sport show every note under the shared `50-Fun` root after materialization.
+
+`Unmapped` is special. It shows notes whose saved `lp_notes.project` is blank.
 
 ### Mapping Sources
 
@@ -266,7 +269,7 @@ The current Notes list/create flow uses:
 - `lp_projects`
   - Project metadata: `project_id`, `tab`, `group_name`, `project_name`, status, tags.
 - `lp_project_folders`
-  - The project-to-folder rules used by Notes filtering, derived project, and new-note default folders.
+  - The project-to-folder rules used by note project materialization, derived project display, sync fallback metadata, and new-note default folders.
   - These can be adjusted in the Notes UI when a selected sidebar project has an `lp_projects` row. The `Folders` panel can add, remove, enable/disable, and set default folders.
 
 The older folder-mapping ETL uses:
@@ -314,31 +317,32 @@ The Admin mapping page can display `map_folder_project`, `map_project_folder`, a
 
 ### Why the Project Column Can Be Empty
 
-The `Project` column in the Notes table is the stored `lp_notes.project` value. It is not the derived folder mapping. For imported or migrated notes this can be blank by design, because the import path usually leaves explicit project blank and lets folder mapping derive the project.
+The `Project` column in the Notes table is the stored `lp_notes.project` value. For old imported or migrated notes this can be blank because the old import path often relied on folder-derived filtering.
 
-Editing a note currently edits the markdown body and updates metadata such as size and modified time. It does not provide a project editor. Also, changing only `lp_notes.project` would not change sidebar filtering for Notes, because sidebar filtering is based on `lp_project_folders` and `dim_folder.folder_path`.
+Blank projects should be fixed by materializing folder mappings into `lp_notes.project`, not by restoring expensive per-request folder joins.
 
-### Best Way Forward
+### Materialized Project Metadata
 
-Treat folder-derived project as the authoritative project for file-backed Notes.
+Treat folder-derived project as a sync/materialization input for file-backed Notes.
 
-Recommended fix:
+The fast browsing design is:
 
-1. Rename the Notes table columns so the UI is explicit:
-   - show derived/effective project as `Project`
-   - keep `lp_notes.project` visible as `Stored Project` because new-note creation populates it and it is useful diagnostic metadata
-2. Add an `effective_project` value in the Notes query:
-   - `COALESCE(NULLIF(t.project, ''), derived_project)` if stored project should act as an override
-   - or just `derived_project` if folder location must remain authoritative
-3. Update note view/edit to select and display `derived_project` consistently. The edit route currently fetches the note through `_get_note_record()`, which does not include the derived project query used by list/view.
-4. Add a project/folder editor, not just a text field:
-   - For changing a note's actual project, move the markdown file to the selected project's default folder, then update `lp_notes.path`, `folder_id`, and optionally `lp_notes.project`.
-   - For changing how a whole folder maps, edit `lp_project_folders` or the external `map_project_folder.csv` rule and rebuild/import mappings.
-5. Backfill existing rows only if the stored column is still useful:
-   - set `lp_notes.project = derived_project` for rows where it is blank
-   - keep this as a maintenance operation, because future folder mapping changes can make the stored value stale.
+1. Store project membership on the note row in `lp_notes.project`.
+2. Use `lp_project_folders.path_prefix` to fill blank note project values during sync/materialization.
+3. Filter List/Table/Grid/Preview by indexed `lp_notes.project`.
+4. Read note files only during sync/indexing or when opening one note.
 
-Do not make the current `Project` cell a simple editable text box as the main fix. That would make the displayed stored value look correct while leaving sidebar filters, derived project, and new-note folder behavior unchanged.
+Settings > Notes includes `Materialize note projects`. This fills blank note project metadata from saved project-folder mappings without reading note files.
+
+On Notes access, LifePIM also runs this materialization once per database connection/user so a deploy can repair older blank-project rows without waiting for a full disk sync.
+
+### Materialized Note Color Metadata
+
+Note color is stored on each row in `lp_notes.color`. List, Table, Grid, and Preview views use that saved value; they do not read the markdown file while filtering or paging.
+
+Blank or unrecognized colors display as the default yellow. This is expected for old imported rows where the markdown file has `color:` or `colour:` front matter but the database row was never backfilled.
+
+Settings > Notes includes `Refresh note colors`. This is a gentle maintenance action: it reads markdown front matter once for blank-color note rows, validates the color with the same display parser, and updates only `lp_notes.color`. Existing non-blank colors are left alone by default.
 
 ### Notes Path Aliases
 
@@ -379,4 +383,3 @@ Extract emails : opens a new text window with list of emails from this note
 
 Jump to Line : jumps to line number (-1 means end of file)
 Jump to Heading : opens a new  window with list of clickable Links to headings in this note
-

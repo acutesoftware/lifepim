@@ -40,16 +40,14 @@
          data-notes-context="true"
          style="--note-card-width: {{ note_card_max_chars|default(50) }}ch; --note-title-size: {{ note_card_title_font_size|default(18) }}px;">
       {% for n in notes %}
-        <a class="note-card"
-           href="{{ url_for('notes.view_note_route', note_id=n.id) }}"
-           style="--note-color: {{ n.list_color_style }};">
-          <div class="note-card-title">{{ n.title or n.file_name }}</div>
+        <article class="note-card" style="--note-color: {{ n.list_color_style }};">
+          <a class="note-card-title" href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.title or n.file_name }}</a>
           {% if card_mode == 'preview' %}
             <div class="note-card-markdown note-rendered-content">{{ n.preview_html|safe }}</div>
           {% else %}
             <div class="note-card-raw">{{ n.preview_text }}</div>
           {% endif %}
-        </a>
+        </article>
       {% endfor %}
     </div>
     {% include "widgets/wid_pagination.html" %}

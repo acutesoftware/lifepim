@@ -109,6 +109,14 @@ def _notes_live_folder_path():
     return ""
 
 
+def _static_asset_version(filename):
+    try:
+        path = os.path.join(app.static_folder, filename)
+        return str(int(os.path.getmtime(path)))
+    except Exception:
+        return "0"
+
+
 def _python_source_files():
     src_folder = os.path.dirname(os.path.abspath(__file__))
     files = []
@@ -273,6 +281,7 @@ def inject_layout_settings():
     return {
         "freeze_headers": general_settings.get("freeze_headers", False),
         "mobile_font_size": general_settings.get("mobile_font_size", 14),
+        "static_asset_version": _static_asset_version("lifepim.css"),
     }
 
 

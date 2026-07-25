@@ -215,6 +215,20 @@
         <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
           <input type="hidden" name="tab" value="notes">
           <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Note Project Metadata</div>
+            <div class="settings-action-row">
+              <button type="submit" name="action" value="materialize_note_projects">Materialize note projects</button>
+              <span class="settings-action-note">Fills blank note project metadata from saved project-folder mappings without reading note files.</span>
+            </div>
+          </div>
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Note Color Metadata</div>
+            <div class="settings-action-row">
+              <button type="submit" name="action" value="refresh_note_colors">Refresh note colors</button>
+              <span class="settings-action-note">Reads markdown front matter once and fills blank saved note colors.</span>
+            </div>
+          </div>
+          <div class="settings-fieldset">
             <div class="settings-fieldset-title">Note Content Search</div>
             <p class="settings-empty">Indexed note contents: {{ note_index_count }}</p>
             <div class="settings-action-row">

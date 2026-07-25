@@ -53,11 +53,14 @@ NOTE_COLOR_NAMES = {
     "gray": "#dfe6e9",
     "white": "#f1f2f6",
 }
+_NOTE_PROJECT_MATERIALIZED_KEYS = set()
 
 
 def _ensure_notes_schema(conn=None):
+    conn = data._get_conn() if conn is None else conn
     try:
-        data.ensure_notes_schema(data._get_conn() if conn is None else conn)
+        data.ensure_notes_schema(conn)
+        _ensure_note_projects_materialized(conn)
     except Exception:
         pass
 
@@ -80,15 +83,19 @@ def _strip_front_matter_scalar(value):
     return value
 
 
-def _read_note_front_matter(note_path):
+def _try_read_note_front_matter(note_path):
     if not note_path:
-        return {}
+        return None
     try:
         with open(note_path, "r", encoding="utf-8-sig", errors="replace") as handle:
             text = handle.read(NOTE_FRONT_MATTER_READ_LIMIT)
     except OSError:
-        return {}
+        return None
     return _parse_note_front_matter_text(text)
+
+
+def _read_note_front_matter(note_path):
+    return _try_read_note_front_matter(note_path) or {}
 
 
 def _parse_note_front_matter_text(text):
@@ -661,62 +668,17 @@ def _project_scope_ids(project):
 
 
 def _direct_project_condition(scope_ids):
-    placeholders = ", ".join(["lower(?)"] * len(scope_ids))
-    return f"lower(COALESCE(t.project, '')) IN ({placeholders})"
-
-
-def _has_direct_project_notes(scope_ids, folder_path=None):
-    if not scope_ids:
-        return False
-    tbl = get_table_def("notes")
-    if not tbl:
-        return False
-    condition = _direct_project_condition(scope_ids)
-    params = list(scope_ids)
-    if folder_path:
-        condition = f"({condition}) AND lower(rtrim(replace(t.path, '/', '\\'))) = lower(?)"
-        params.append(folder_path)
-    visibility_condition, visibility_params = security.visible_record_condition("t", current_user)
-    condition = f"({condition}) AND {visibility_condition}"
-    params.extend(visibility_params)
-    try:
-        row = data._get_conn().execute(
-            f"SELECT 1 FROM {tbl['name']} t WHERE {condition} LIMIT 1",
-            params,
-        ).fetchone()
-    except Exception:
-        return False
-    return bool(row)
+    placeholders = ", ".join(["?"] * len(scope_ids))
+    return f"t.project COLLATE NOCASE IN ({placeholders})"
 
 
 def _notes_base_condition(project, folder_path=None):
     params = []
-    folder_expr = _note_folder_match_expr()
-    if not _uses_project_folder_mapping() and project and project.lower() == "unmapped":
+    if project and project.lower() == "unmapped":
         condition = "COALESCE(t.project, '') = ''"
-    elif not _uses_project_folder_mapping() and project:
-        scope_ids = _project_scope_ids(project)
-        placeholders = ", ".join(["?"] * len(scope_ids))
-        condition = f"lower(COALESCE(t.project, '')) IN ({', '.join(['lower(?)'] * len(scope_ids))})"
-        params.extend(scope_ids)
-    elif project and project.lower() == "unmapped":
-        condition = (
-            "NOT EXISTS ("
-            "  SELECT 1 FROM lp_project_folders pf "
-            f"  WHERE {_project_folder_owner_sql('pf')} "
-            "    AND pf.is_enabled = 1 "
-            "    AND pf.folder_role IN ('default','include','archive','output') "
-            f"    AND {folder_expr} IS NOT NULL "
-            f"    AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%'"
-            ")"
-        )
     elif project:
         scope_ids = _project_scope_ids(project)
-        if _has_direct_project_notes(scope_ids, folder_path):
-            condition = _direct_project_condition(scope_ids)
-        else:
-            placeholders = ", ".join(["?"] * len(scope_ids))
-            condition = f"{_derived_project_expr()} IN ({placeholders})"
+        condition = _direct_project_condition(scope_ids)
         params.extend(scope_ids)
     else:
         condition = "1=1"
@@ -730,15 +692,14 @@ def _notes_base_condition(project, folder_path=None):
 
 
 def _count_notes(project, folder_path=None):
+    _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         return 0
     projects_mod.ensure_projects_schema(data._get_conn())
     condition, params = _notes_base_condition(project, folder_path)
     row = data._get_conn().execute(
-        f"SELECT COUNT(1) AS cnt FROM {tbl['name']} t "
-        "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
-        f"WHERE {condition}",
+        f"SELECT COUNT(1) AS cnt FROM {tbl['name']} t WHERE {condition}",
         params,
     ).fetchone()
     return row["cnt"] if row else 0
@@ -937,7 +898,6 @@ def _fetch_note_subfolders(project, folder_path=None):
     sql = (
         f"SELECT DISTINCT rtrim(t.path) AS path "
         f"FROM {tbl['name']} t "
-        "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
         f"WHERE {condition} "
         "AND lower(rtrim(replace(t.path, '/', '\\'))) LIKE lower(?)"
     )
@@ -965,7 +925,7 @@ def _fetch_note_subfolders(project, folder_path=None):
     return [subfolders[key] for key in sorted(subfolders)]
 
 
-def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=True):
+def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=False):
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
@@ -995,12 +955,13 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
     if include_derived:
         select_cols.append(f"{_derived_project_expr()} as derived_project")
     else:
-        select_cols.append("NULL as derived_project")
+        select_cols.append("COALESCE(NULLIF(t.project, ''), '') as derived_project")
     condition, params = _notes_base_condition(project, folder_path)
+    join_sql = "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id " if include_derived else ""
     sql = (
         f"SELECT {', '.join(select_cols)} "
         f"FROM {tbl['name']} t "
-        "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
+        f"{join_sql}"
         f"WHERE {condition} "
         f"ORDER BY {order_by}"
     )
@@ -2249,7 +2210,181 @@ def _note_folder_id_matches(conn, folder_id, folder_path):
     return _normalize_note_path(row["folder_path"]).lower() == _normalize_note_path(folder_path).lower()
 
 
-def _sync_note_rows(folder_path):
+def _sync_project_fallbacks(conn, owner_user_id=None):
+    try:
+        projects_mod.ensure_projects_schema(conn)
+        rows = conn.execute(
+            "SELECT project_id, path_prefix, folder_role, sort_order "
+            "FROM lp_project_folders "
+            "WHERE owner_user_id IS ? "
+            "AND is_enabled = 1 "
+            "AND folder_role IN ('default','include','archive','output')",
+            (owner_user_id,),
+        ).fetchall()
+    except Exception:
+        return []
+    priority = {"default": 0, "include": 1, "output": 2, "archive": 3}
+    fallbacks = []
+    for row in rows:
+        path_prefix = _normalize_note_path(row["path_prefix"])
+        project_id = (row["project_id"] or "").strip()
+        if not path_prefix or not project_id:
+            continue
+        fallbacks.append(
+            {
+                "project_id": project_id,
+                "path_prefix": path_prefix,
+                "folder_role": row["folder_role"] or "",
+                "sort_order": row["sort_order"] or 100,
+            }
+        )
+    fallbacks.sort(
+        key=lambda item: (
+            -len(item["path_prefix"]),
+            priority.get(item["folder_role"], 9),
+            item["sort_order"],
+            item["project_id"],
+        )
+    )
+    return fallbacks
+
+
+def _sync_project_for_path(folder_path, fallbacks):
+    folder_path = _normalize_note_path(folder_path)
+    for item in fallbacks or []:
+        if _path_startswith(folder_path, item["path_prefix"]):
+            return item["project_id"]
+    return ""
+
+
+def _note_owner_filter(owner_user_id, table_columns):
+    if "owner_user_id" not in table_columns:
+        return "", []
+    if owner_user_id is None:
+        return " AND t.owner_user_id IS NULL", []
+    return " AND t.owner_user_id = ?", [owner_user_id]
+
+
+def materialize_note_projects(conn=None, owner_user_id=None, force=False):
+    conn = data._get_conn() if conn is None else conn
+    data.ensure_notes_schema(conn)
+    tbl = get_table_def("notes")
+    if not tbl or not _table_exists(conn, tbl["name"]):
+        return {"scanned": 0, "updated": 0}
+    table_columns = _table_columns(conn, tbl["name"])
+    fallbacks = _sync_project_fallbacks(conn, owner_user_id)
+    if not fallbacks:
+        return {"scanned": 0, "updated": 0}
+    where = ["1=1"]
+    params = []
+    if not force:
+        where.append("COALESCE(t.project, '') = ''")
+    owner_sql, owner_params = _note_owner_filter(owner_user_id, table_columns)
+    if owner_sql:
+        where.append(owner_sql[5:])
+        params.extend(owner_params)
+    has_dim_folder = _table_exists(conn, "dim_folder")
+    folder_select = "df.folder_path" if has_dim_folder else "NULL AS folder_path"
+    folder_join = "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id " if has_dim_folder else ""
+    sql = (
+        f"SELECT t.id, t.path, t.folder_id, t.project, {folder_select} "
+        f"FROM {tbl['name']} t "
+        f"{folder_join}"
+        f"WHERE {' AND '.join(where)}"
+    )
+    rows = conn.execute(sql, params).fetchall()
+    updates = []
+    for row in rows:
+        note_path = _normalize_note_path(row["path"] or row["folder_path"] or "")
+        project_id = _sync_project_for_path(note_path, fallbacks)
+        if project_id and (force or not (row["project"] or "").strip()):
+            updates.append((project_id, row["id"]))
+    if updates:
+        conn.executemany(f"UPDATE {tbl['name']} SET project = ? WHERE id = ?", updates)
+        conn.commit()
+    return {"scanned": len(rows), "updated": len(updates)}
+
+
+def refresh_note_color_metadata(conn=None, owner_user_id=None, only_blank=True):
+    conn = data._get_conn() if conn is None else conn
+    data.ensure_notes_schema(conn)
+    tbl = get_table_def("notes")
+    if not tbl or not _table_exists(conn, tbl["name"]):
+        return {"scanned": 0, "updated": 0, "missing": 0, "no_color": 0, "invalid": 0}
+    table_columns = _table_columns(conn, tbl["name"])
+    if "color" not in table_columns:
+        return {"scanned": 0, "updated": 0, "missing": 0, "no_color": 0, "invalid": 0}
+
+    where = ["COALESCE(t.file_name, '') != ''"]
+    params = []
+    if only_blank:
+        where.append("COALESCE(trim(t.color), '') = ''")
+    owner_sql, owner_params = _note_owner_filter(owner_user_id, table_columns)
+    if owner_sql:
+        where.append(owner_sql[5:])
+        params.extend(owner_params)
+
+    has_dim_folder = _table_exists(conn, "dim_folder") and "folder_id" in table_columns
+    folder_select = "df.folder_path AS folder_path" if has_dim_folder else "NULL AS folder_path"
+    folder_join = "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id " if has_dim_folder else ""
+    rows = conn.execute(
+        f"SELECT t.id, t.file_name, t.path, t.color, {folder_select} "
+        f"FROM {tbl['name']} t "
+        f"{folder_join}"
+        f"WHERE {' AND '.join(where)}",
+        params,
+    ).fetchall()
+
+    updates = []
+    missing = 0
+    no_color = 0
+    invalid = 0
+    for row in rows:
+        file_name = (row["file_name"] or "").strip()
+        folder_path = _normalize_note_path(row["path"] or row["folder_path"] or "")
+        if os.path.isabs(file_name):
+            note_path = file_name
+        elif folder_path and file_name:
+            note_path = os.path.join(folder_path, file_name)
+        else:
+            note_path = folder_path or file_name
+        front_matter = _try_read_note_front_matter(note_path)
+        if front_matter is None:
+            missing += 1
+            continue
+        color = _front_matter_value(front_matter, ("color", "colour")).strip()
+        if not color:
+            no_color += 1
+            continue
+        if not _note_color_style(color):
+            invalid += 1
+            continue
+        if color != (row["color"] or "").strip():
+            updates.append((color, row["id"]))
+
+    if updates:
+        conn.executemany(f"UPDATE {tbl['name']} SET color = ? WHERE id = ?", updates)
+        conn.commit()
+    return {
+        "scanned": len(rows),
+        "updated": len(updates),
+        "missing": missing,
+        "no_color": no_color,
+        "invalid": invalid,
+    }
+
+
+def _ensure_note_projects_materialized(conn):
+    owner_user_id = _current_owner_user_id()
+    key = (id(conn), owner_user_id)
+    if key in _NOTE_PROJECT_MATERIALIZED_KEYS:
+        return {"scanned": 0, "updated": 0}
+    result = materialize_note_projects(conn=conn, owner_user_id=owner_user_id, force=False)
+    _NOTE_PROJECT_MATERIALIZED_KEYS.add(key)
+    return result
+
+
+def _sync_note_rows(folder_path, fallback_project=""):
     _ensure_notes_schema()
     folder_path = _normalize_note_path(folder_path)
     tbl = get_table_def("notes")
@@ -2261,6 +2396,7 @@ def _sync_note_rows(folder_path):
         raise ValueError("Folder not found.")
 
     conn = data._get_conn()
+    project_fallbacks = [] if fallback_project else _sync_project_fallbacks(conn, _current_owner_user_id())
     root_lower = folder_path.rstrip("\\").lower()
     existing = {}
     duplicates = 0
@@ -2301,7 +2437,8 @@ def _sync_note_rows(folder_path):
             scanned += 1
             size = str(stat.st_size)
             date_modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-            metadata = _note_metadata_from_file(full_path, stat=stat)
+            row_project = fallback_project or _sync_project_for_path(root_norm, project_fallbacks)
+            metadata = _note_metadata_from_file(full_path, stat=stat, fallback_project=row_project)
             key = _note_full_path_key(root_norm, name)
             seen.add(key)
             current = existing.get(key)
@@ -2433,7 +2570,7 @@ def sync_project_folder_route(project_folder_id):
     if not folder:
         abort(404)
     try:
-        result = _sync_note_rows(folder.get("path_prefix") or "")
+        result = _sync_note_rows(folder.get("path_prefix") or "", fallback_project=folder.get("project_id") or "")
         msg = _sync_notes_message(result)
     except Exception as exc:
         msg = f"Notes folder sync failed: {exc}"

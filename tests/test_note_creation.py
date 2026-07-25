@@ -41,6 +41,7 @@ def _create_table(conn, tbl):
 
 class TestNoteCreation(unittest.TestCase):
     def setUp(self):
+        notes_routes._NOTE_PROJECT_MATERIALIZED_KEYS.clear()
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
         self._old_conn = data.conn
@@ -58,6 +59,7 @@ class TestNoteCreation(unittest.TestCase):
         try:
             self.tmpdir.cleanup()
         finally:
+            notes_routes._NOTE_PROJECT_MATERIALIZED_KEYS.clear()
             data.conn = self._old_conn
             self.conn.close()
 
@@ -232,6 +234,76 @@ class TestNoteCreation(unittest.TestCase):
 
         self.assertIn(note_id, {note.get("id") for note in notes})
 
+    def test_refresh_note_color_metadata_backfills_blank_color_from_file(self):
+        note_dir = os.path.join(self.tmpdir.name, "color_refresh")
+        os.makedirs(note_dir, exist_ok=True)
+        note_path = os.path.join(note_dir, "red-note.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write(
+                "---\n"
+                "title: Red Note\n"
+                "color: Red\n"
+                "---\n"
+                "Red body\n"
+            )
+        tbl = common_utils.get_table_def("notes")
+        values_map = {
+            "file_name": "red-note.md",
+            "path": notes_routes._normalize_note_path(note_dir),
+            "folder_id": "",
+            "size": str(os.path.getsize(note_path)),
+            "title": "Red Note",
+            "color": "",
+            "date_modified": "2026-07-09 16:38:25",
+            "project": "",
+        }
+        note_id = data.add_record(
+            self.conn,
+            tbl["name"],
+            tbl["col_list"],
+            [values_map.get(col, "") for col in tbl["col_list"]],
+        )
+
+        result = notes_routes.refresh_note_color_metadata(self.conn)
+
+        self.assertEqual(result["scanned"], 1)
+        self.assertEqual(result["updated"], 1)
+        row = self.conn.execute(f"SELECT color FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["color"], "Red")
+        fetched = {note.get("id"): note for note in notes_routes._fetch_notes("unmapped")}
+        self.assertEqual(fetched[note_id]["list_color_style"], notes_routes.NOTE_COLOR_NAMES["red"])
+
+    def test_refresh_note_color_metadata_keeps_existing_color_by_default(self):
+        note_dir = os.path.join(self.tmpdir.name, "color_refresh_existing")
+        os.makedirs(note_dir, exist_ok=True)
+        note_path = os.path.join(note_dir, "red-note.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write("---\ncolor: Red\n---\nRed body\n")
+        tbl = common_utils.get_table_def("notes")
+        values_map = {
+            "file_name": "red-note.md",
+            "path": notes_routes._normalize_note_path(note_dir),
+            "folder_id": "",
+            "size": str(os.path.getsize(note_path)),
+            "title": "Red Note",
+            "color": "Blue",
+            "date_modified": "2026-07-09 16:38:25",
+            "project": "",
+        }
+        note_id = data.add_record(
+            self.conn,
+            tbl["name"],
+            tbl["col_list"],
+            [values_map.get(col, "") for col in tbl["col_list"]],
+        )
+
+        result = notes_routes.refresh_note_color_metadata(self.conn)
+
+        self.assertEqual(result["scanned"], 0)
+        self.assertEqual(result["updated"], 0)
+        row = self.conn.execute(f"SELECT color FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["color"], "Blue")
+
     def test_note_preview_text_uses_mobile_requested_limit(self):
         self.assertEqual(notes_routes.NOTES_PER_PAGE, 50)
         self.assertEqual(notes_routes.NOTE_CARD_MAX_CHARS, 50)
@@ -357,21 +429,21 @@ class TestNoteCreation(unittest.TestCase):
 
         tbl = common_utils.get_table_def("notes")
 
-        def add_note(file_name, folder_path):
+        def add_note(file_name, folder_path, project_id):
             values_map = {
                 "file_name": file_name,
                 "path": folder_path,
                 "folder_id": "",
                 "size": "1",
                 "date_modified": "2026-07-09 16:38:25",
-                "project": "",
+                "project": project_id,
             }
             values = [values_map.get(col, "") for col in tbl["col_list"]]
             return data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
 
-        root_note_id = add_note("fun_root.md", root_dir)
-        games_note_id = add_note("games.md", games_dir)
-        travel_note_id = add_note("travel.md", travel_dir)
+        root_note_id = add_note("fun_root.md", root_dir, "fun.fun.fun")
+        games_note_id = add_note("games.md", games_dir, "fun/games")
+        travel_note_id = add_note("travel.md", travel_dir, "fun/travel")
 
         parent_ids = {n.get("id") for n in notes_routes._fetch_notes("fun")}
         self.assertIn(root_note_id, parent_ids)
@@ -435,6 +507,94 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(result["missing"], 1)
         count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
         self.assertEqual(count, 2)
+
+    def test_sync_note_rows_uses_project_folder_fallback_project(self):
+        notes_dir = os.path.join(self.tmpdir.name, "sync_project")
+        os.makedirs(notes_dir, exist_ok=True)
+        note_path = os.path.join(notes_dir, "project-note.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write("project note")
+
+        result = notes_routes._sync_note_rows(notes_dir, fallback_project="fun/games")
+
+        self.assertEqual(result["inserted"], 1)
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT project FROM {tbl['name']} WHERE file_name = ?", ("project-note.md",)).fetchone()
+        self.assertEqual(row["project"], "fun/games")
+
+    def test_sync_note_rows_uses_project_folder_mapping_fallback(self):
+        notes_root = os.path.join(self.tmpdir.name, "sync_project_root")
+        project_dir = os.path.join(notes_root, "Games")
+        os.makedirs(project_dir, exist_ok=True)
+        note_path = os.path.join(project_dir, "mapped-note.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write("mapped project note")
+        projects_mod.project_upsert(
+            {
+                "project_id": "fun/games",
+                "tab": "FUN",
+                "group_name": "FUN",
+                "project_name": "Games",
+            },
+            conn=self.conn,
+        )
+        projects_mod.project_folder_add(
+            "fun/games",
+            project_dir,
+            folder_role="default",
+            is_write_enabled=1,
+            conn=self.conn,
+        )
+
+        result = notes_routes._sync_note_rows(notes_root)
+
+        self.assertEqual(result["inserted"], 1)
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT project FROM {tbl['name']} WHERE file_name = ?", ("mapped-note.md",)).fetchone()
+        self.assertEqual(row["project"], "fun/games")
+
+    def test_materialize_note_projects_backfills_blank_project_from_mapping(self):
+        project_dir = os.path.join(self.tmpdir.name, "materialize_project", "Games")
+        os.makedirs(project_dir, exist_ok=True)
+        projects_mod.project_upsert(
+            {
+                "project_id": "fun/games",
+                "tab": "FUN",
+                "group_name": "FUN",
+                "project_name": "Games",
+            },
+            conn=self.conn,
+        )
+        projects_mod.project_folder_add(
+            "fun/games",
+            project_dir,
+            folder_role="default",
+            is_write_enabled=1,
+            conn=self.conn,
+        )
+        tbl = common_utils.get_table_def("notes")
+        values_map = {
+            "file_name": "blank-project.md",
+            "path": notes_routes._normalize_note_path(project_dir),
+            "folder_id": "",
+            "size": "1",
+            "date_modified": "2026-07-09 16:38:25",
+            "project": "",
+        }
+        note_id = data.add_record(
+            self.conn,
+            tbl["name"],
+            tbl["col_list"],
+            [values_map.get(col, "") for col in tbl["col_list"]],
+        )
+
+        result = notes_routes.materialize_note_projects(self.conn)
+
+        self.assertEqual(result["updated"], 1)
+        row = self.conn.execute(f"SELECT project FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["project"], "fun/games")
+        filtered_ids = {note.get("id") for note in notes_routes._fetch_notes("fun/games")}
+        self.assertIn(note_id, filtered_ids)
 
     def test_rename_note_updates_file_and_metadata(self):
         note_dir = os.path.join(self.tmpdir.name, "rename_note")

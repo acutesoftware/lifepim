@@ -138,6 +138,7 @@ def ensure_notes_schema(conn=None):
             conn.execute(f"ALTER TABLE lp_notes ADD COLUMN {col_name} {col_type}")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_folder_id ON lp_notes(folder_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_project ON lp_notes(project)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_project_nocase ON lp_notes(project COLLATE NOCASE)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_path ON lp_notes(path)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_date_modified ON lp_notes(date_modified)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_rec_extract_date ON lp_notes(rec_extract_date)")

@@ -323,6 +323,37 @@ def settings_route():
                     conn,
                 )
                 message = "Note display settings saved."
+            elif action == "materialize_note_projects":
+                try:
+                    from modules.notes import routes as notes_routes
+
+                    result = notes_routes.materialize_note_projects(conn=conn, owner_user_id=getattr(current_user, "user_id", None))
+                    message = (
+                        "Materialized note projects: "
+                        f"{result['updated']} updated from {result['scanned']} blank-project rows."
+                    )
+                except Exception as exc:
+                    message = f"Note project materialization failed: {exc}"
+            elif action == "refresh_note_colors":
+                try:
+                    from modules.notes import routes as notes_routes
+
+                    result = notes_routes.refresh_note_color_metadata(conn=conn, owner_user_id=getattr(current_user, "user_id", None))
+                    skipped = []
+                    if result["missing"]:
+                        skipped.append(f"{result['missing']} missing files")
+                    if result["no_color"]:
+                        skipped.append(f"{result['no_color']} without color")
+                    if result["invalid"]:
+                        skipped.append(f"{result['invalid']} invalid colors")
+                    message = (
+                        "Refreshed note colors: "
+                        f"{result['updated']} updated from {result['scanned']} blank-color rows."
+                    )
+                    if skipped:
+                        message += " Skipped " + ", ".join(skipped) + "."
+                except Exception as exc:
+                    message = f"Note color refresh failed: {exc}"
             elif action == "rebuild_note_search_index":
                 try:
                     result = note_search_index.rebuild_index(conn)
