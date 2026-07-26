@@ -409,6 +409,82 @@ class TestNoteCreation(unittest.TestCase):
         self.assertNotIn("title: Markdown View", html)
         self.assertNotIn("color: Blue", html)
 
+    def test_notes_table_view_uses_new_header_and_columns(self):
+        note_dir = os.path.join(self.tmpdir.name, "notes_table_view")
+        self._create_note_record("another table view", note_dir, project="")
+        note_id, _created = self._create_note_record("table view", note_dir, project="")
+        self._create_note_record("zeta table view", note_dir, project="")
+        tbl = common_utils.get_table_def("notes")
+        self.conn.execute(f"UPDATE {tbl['name']} SET color = ? WHERE id = ?", ("Blue", note_id))
+        self.conn.commit()
+
+        with patch.object(notes_routes, "_note_display_settings", return_value={"notes_per_page": 2}):
+            response = self._notes_test_app().test_client().get("/notes/table?sort=title&dir=asc")
+        html = response.get_data(as_text=True)
+        note_row = html.split('data-record-title="table view.md"', 1)[1].split("</tr>", 1)[0]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("View as:", html)
+        self.assertIn("Names only", html)
+        self.assertIn("Sort by:", html)
+        self.assertIn("Filename", html)
+        self.assertIn("Controls", html)
+        self.assertIn("notes-selection-root", html)
+        self.assertNotIn('class="tabular-scroll"', html)
+        self.assertNotIn("notes-list-results", html)
+        self.assertNotIn("notes-list-page", html)
+        self.assertIn('href="/notes/table?sort=title&amp;dir=desc"', html)
+        self.assertIn('href="/notes/table?sort=size&amp;dir=asc"', html)
+        self.assertIn('<option value="title" selected>Title</option>', html)
+        self.assertIn('<option value="asc" selected>Asc</option>', html)
+        self.assertRegex(html, r'</table>\s*<div class="pagination">')
+        self.assertIn('class="note-list-dot"', note_row)
+        self.assertNotIn(">Blue<", note_row)
+        self.assertNotIn("<th>Folder ID</th>", html)
+
+        with patch.object(notes_routes, "_note_display_settings", return_value={"notes_per_page": 10}):
+            desc = self._notes_test_app().test_client().get("/notes/table?sort=title&dir=desc")
+        desc_html = desc.get_data(as_text=True)
+        self.assertLess(
+            desc_html.index('data-record-title="zeta table view.md"'),
+            desc_html.index('data-record-title="table view.md"'),
+        )
+        self.assertLess(
+            desc_html.index('data-record-title="table view.md"'),
+            desc_html.index('data-record-title="another table view.md"'),
+        )
+
+    def test_notes_names_and_preview_views_render(self):
+        note_dir = os.path.join(self.tmpdir.name, "notes_other_views")
+        self._create_note_record("other views", note_dir, project="")
+        client = self._notes_test_app().test_client()
+
+        names = client.get("/notes/names")
+        preview = client.get("/notes/cards?mode=preview")
+
+        self.assertEqual(names.status_code, 200)
+        self.assertIn("note-names-list", names.get_data(as_text=True))
+        self.assertEqual(preview.status_code, 200)
+        preview_html = preview.get_data(as_text=True)
+        self.assertIn("note-card", preview_html)
+        self.assertIn("link-select", preview_html)
+
+    def test_notes_sort_by_size_uses_numeric_order(self):
+        note_dir = os.path.join(self.tmpdir.name, "numeric_size_sort")
+        ids = []
+        for title, size in (("ten", "10"), ("two", "2"), ("bad", "not-a-number")):
+            note_id, _created = self._create_note_record(title, note_dir, project="")
+            ids.append(note_id)
+            tbl = common_utils.get_table_def("notes")
+            self.conn.execute(f"UPDATE {tbl['name']} SET size = ? WHERE id = ?", (size, note_id))
+        self.conn.commit()
+
+        asc = notes_routes._fetch_notes(None, "size", "asc", include_derived=False)
+        desc = notes_routes._fetch_notes(None, "size", "desc", include_derived=False)
+
+        self.assertEqual([note["file_name"] for note in asc[:3]], ["two.md", "ten.md", "bad.md"])
+        self.assertEqual([note["file_name"] for note in desc[:3]], ["ten.md", "two.md", "bad.md"])
+
     def test_note_folder_id_preserves_live_note_path_alias_on_update(self):
         project_id = "pers/health"
         note_dir = r"N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health"

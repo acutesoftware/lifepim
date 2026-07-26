@@ -1,47 +1,20 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div class="note-list-toolbar">
-    <a href="{{ url_for('notes.list_notes_table_route', proj=project, folder=folder_filter) }}">Table</a> |
-    <a href="{{ url_for('notes.list_notes_list_route', proj=project, folder=folder_filter) }}">List</a> |
-    <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter) }}">Card</a> |
-    <span class="note-card-mode-toggle">
-      <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter, mode='grid') }}"
-         class="{% if card_mode == 'grid' %}active{% endif %}">Grid</a>
-      <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter, mode='preview') }}"
-         class="{% if card_mode == 'preview' %}active{% endif %}">Preview</a>
-    </span> |
-    <a href="#" class="new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a> |
-    <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
-    <span class="note-status">{{ total_notes|default(notes|length) }} notes</span>
-  </div>
-  <div class="note-breadcrumb">
-    {% for crumb in note_breadcrumb %}
-      <a href="{{ crumb.url }}">{{ crumb.label }}</a>{% if not loop.last %}<span>&gt;</span>{% endif %}
-    {% endfor %}
-  </div>
-  {% include "widgets/project_folders.html" %}
-
-  {% if note_subfolders %}
-    <div class="note-folder-list" data-collapsible="note-subfolders">
-      <div class="note-folder-title">
-        <span>Folders</span>
-        <button type="button" class="note-folder-toggle" aria-expanded="true">[-]</button>
-      </div>
-      <div class="note-folder-body">
-      {% for folder in note_subfolders %}
-        <a class="note-folder-link" href="{{ folder.url }}">{{ folder.label }}</a>
-      {% endfor %}
-      </div>
-    </div>
-  {% endif %}
+  {% include "_notes_list_header.html" %}
+  {% include "_notes_folder_panel.html" %}
 
   <div class="note-card-page">
-    <div class="note-card-grid note-card-grid-{{ card_mode }}"
+    <div id="notes-selection-root"
+         class="note-card-grid note-card-grid-{{ card_mode }}"
          data-notes-context="true"
+         data-bulk-selection-root="true"
          style="--note-card-width: {{ note_card_max_chars|default(50) }}ch; --note-title-size: {{ note_card_title_font_size|default(18) }}px;">
       {% for n in notes %}
-        <article class="note-card" style="--note-color: {{ n.list_color_style }};">
-          <a class="note-card-title" href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.title or n.file_name }}</a>
+        <article class="note-card link-draggable" style="--note-color: {{ n.list_color_style }};" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
+          <div class="note-card-head">
+            <input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}">
+            <a class="note-card-title" href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.title or n.file_name }}</a>
+          </div>
           {% if card_mode == 'preview' %}
             <div class="note-card-markdown note-rendered-content">{{ n.preview_html|safe }}</div>
           {% else %}
@@ -50,6 +23,6 @@
         </article>
       {% endfor %}
     </div>
-    {% include "widgets/wid_pagination.html" %}
   </div>
+  {% include "widgets/wid_pagination.html" %}
 {% endblock %}

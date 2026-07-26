@@ -378,9 +378,10 @@
       }
 
       try {
-        setCollapsed(localStorage.getItem(storageKey) === "1");
+        const stored = localStorage.getItem(storageKey);
+        setCollapsed(stored === null ? root.dataset.defaultCollapsed === "true" : stored === "1");
       } catch (err) {
-        setCollapsed(false);
+        setCollapsed(root.dataset.defaultCollapsed === "true");
       }
 
       toggle.addEventListener("click", () => {

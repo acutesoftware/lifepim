@@ -1,0 +1,47 @@
+<div class="note-list-header">
+  <div class="note-list-controls">
+    <label for="notes-view-mode">View as:</label>
+    <select id="notes-view-mode" onchange="if (this.value) window.location.href = this.value;">
+      {% for option in view_options %}
+        <option value="{{ option.value }}" {% if option.active %}selected{% endif %}>{{ option.label }}</option>
+      {% endfor %}
+    </select>
+
+    <form method="get" action="{{ url_for(route_name) }}" class="note-sort-form">
+      {% if project %}<input type="hidden" name="proj" value="{{ project }}">{% endif %}
+      {% if folder_filter %}<input type="hidden" name="folder" value="{{ folder_filter }}">{% endif %}
+      {% if card_mode %}<input type="hidden" name="mode" value="{{ card_mode }}">{% endif %}
+      <label for="notes-sort-col">Sort by:</label>
+      <select id="notes-sort-col" name="sort" onchange="this.form.submit()">
+        {% for value, label in sort_options %}
+          <option value="{{ value }}" {% if sort_col == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="dir" aria-label="Sort direction" onchange="this.form.submit()">
+        <option value="asc" {% if sort_dir == 'asc' %}selected{% endif %}>Asc</option>
+        <option value="desc" {% if sort_dir == 'desc' %}selected{% endif %}>Desc</option>
+      </select>
+    </form>
+
+    <a href="#" class="note-button new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a>
+
+    <span class="note-status"><span class="note-total-count">{{ total_notes|default(notes|length) }} Notes</span></span>
+    {% set link_list_type = "note" %}
+    {% set link_list_context_id = "notes_list" %}
+    {% set link_table_id = "notes-selection-root" %}
+    {% include "widgets/links_bulk_toolbar.html" %}
+
+    <select class="note-more-menu" aria-label="More note actions" onchange="if (this.value) window.location.href = this.value; this.selectedIndex = 0;">
+      <option value="">...</option>
+      <option value="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</option>
+    </select>
+  </div>
+
+  {% if note_breadcrumb %}
+    <div class="note-breadcrumb">
+      {% for crumb in note_breadcrumb %}
+        <a href="{{ crumb.url }}">{{ crumb.label }}</a>{% if not loop.last %}<span>&gt;</span>{% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

@@ -3,13 +3,11 @@
   {% include "_notes_list_header.html" %}
   {% include "_notes_folder_panel.html" %}
 
-  <ul class="note-list-items" id="notes-selection-root" data-notes-context="true" data-bulk-selection-root="true">
+  <ul class="note-list-items note-names-list" id="notes-selection-root" data-notes-context="true" data-bulk-selection-root="true">
     {% for n in notes %}
     <li class="note-list-row link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
       <input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}">
-      <span class="note-list-dot" style="background:{{ n.list_color_style }};"></span>
       <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a>
-      {% if n.path %}<span class="note-list-folder">{{ n.path }}</span>{% endif %}
     </li>
     {% endfor %}
   </ul>

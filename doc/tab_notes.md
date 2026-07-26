@@ -21,6 +21,55 @@ Open the Notes tab from the top navigation.
 
 Use the left project/sidebar tabs to filter notes by saved project metadata. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current project folder.
 
+The top header of the Notes page is defined below
+BOLD TITLE : Notes ([project]) - if note project selected it just says 'Notes"
+CONTROLS: (series of buttons and dropdowns as per below)
+  LABEL : "View as : " 
+  DROP DOWN LIST : [ List | Table | Grid | Preview | Names only ]
+  LABEL : "Sort by : "
+  DROP DOWN LIST : [ Title | size | Color | Project | Date Created | Date Modified | Folder]
+  DROP DOWN LIST : [ Asc | Desc]
+  
+  BUTTON : New Note
+  LABEL : shows count of notes and num selected, eg "68 Notes  0 selected"
+  DROP DOWN LIST: disabled until ANY note selected then: 
+        - Link Selected Note to ..  (popup to Links)
+        - Delete Selected notes
+        - Move selected notes to Project (popup list of projects)
+        - Set color of selected notes to ... (popup list of colors)
+
+  DROP DOWN LIST : [...]  shows a triple dot popup menu for other options
+    - option 1 = "Import Folder"
+
+
+
+For the View as list:
+- List : List of notes with circle of color at the start 
+= Table : notes with following columns
+          - Filename
+          - Color
+          - Project
+          - Size
+          - Date Created
+          - Date Modified
+          - Controls (Links) - Edit / Del
+
+
+FOLDERS PANEL
+Have a folders panel, hidden by default showing the list of actual folders when expanded.
+By default we only see a line " Folders [+]"
+
+When expanded - it shows the list of folders that are mapped to this project
+
+MAIN BODY
+The main body shows the notes list as selected - may be a table, list or grid depending on settings.
+List of notes is paginated.
+
+PAGINATION
+If the number of notes to list is too high, pagination occurs and the navigation appears at the end
+
+
+
 ### View a Single Note
 
 Once the user clicks on a note the Note View screen is shown : 

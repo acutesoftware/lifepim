@@ -67,6 +67,30 @@ NOTE_COLOR_OPTIONS = [
     ("White", NOTE_COLOR_NAMES["white"]),
 ]
 NOTE_VIEW_MODES = {"text", "markdown", "hex", "sample", "metadata"}
+NOTE_LIST_SORT_OPTIONS = [
+    ("title", "Title"),
+    ("size", "Size"),
+    ("color", "Color"),
+    ("project", "Project"),
+    ("date_created", "Date Created"),
+    ("date_modified", "Date Modified"),
+    ("folder", "Folder"),
+]
+NOTE_LIST_VIEW_OPTIONS = [
+    ("list", "List"),
+    ("table", "Table"),
+    ("grid", "Grid"),
+    ("preview", "Preview"),
+    ("names", "Names only"),
+]
+NOTE_TABLE_SORT_COLUMNS = [
+    ("filename", "Filename", "title"),
+    ("color", "Color", "color"),
+    ("project", "Project", "project"),
+    ("size", "Size", "size"),
+    ("date_created", "Date Created", "date_created"),
+    ("date_modified", "Date Modified", "date_modified"),
+]
 _NOTE_PROJECT_MATERIALIZED_KEYS = set()
 
 
@@ -832,6 +856,111 @@ def _notes_url_args(project=None, folder_path=None, **extra):
     return args
 
 
+def _normalize_note_list_view(value):
+    value = (value or "").strip().lower()
+    if value == "card":
+        return "grid"
+    if value == "cards":
+        return "grid"
+    if value in {"list", "table", "grid", "preview", "names"}:
+        return value
+    return "table"
+
+
+def _normalize_note_sort_col(value):
+    value = (value or "").strip().lower()
+    aliases = {
+        "file": "title",
+        "file_name": "title",
+        "filename": "title",
+        "path": "folder",
+        "folder_id": "folder",
+        "modified": "date_modified",
+        "created": "date_created",
+    }
+    value = aliases.get(value, value)
+    allowed = {key for key, _label in NOTE_LIST_SORT_OPTIONS}
+    return value if value in allowed else "date_modified"
+
+
+def _normalize_note_sort_dir(value):
+    return "asc" if (value or "").strip().lower() == "asc" else "desc"
+
+
+def _notes_route_for_view(view_mode):
+    view_mode = _normalize_note_list_view(view_mode)
+    if view_mode == "list":
+        return "notes.list_notes_list_route"
+    if view_mode == "names":
+        return "notes.list_notes_names_route"
+    if view_mode in {"grid", "preview"}:
+        return "notes.list_notes_cards_route"
+    return "notes.list_notes_table_route"
+
+
+def _notes_view_url(view_mode, project, folder_filter, sort_col, sort_dir):
+    view_mode = _normalize_note_list_view(view_mode)
+    args = _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir)
+    if view_mode in {"grid", "preview"}:
+        args["mode"] = "preview" if view_mode == "preview" else "grid"
+    return url_for(_notes_route_for_view(view_mode), **args)
+
+
+def _notes_view_options(project, folder_filter, sort_col, sort_dir, active_view):
+    active_view = _normalize_note_list_view(active_view)
+    return [
+        {
+            "value": _notes_view_url(view, project, folder_filter, sort_col, sort_dir),
+            "label": label,
+            "active": view == active_view,
+        }
+        for view, label in NOTE_LIST_VIEW_OPTIONS
+    ]
+
+
+def _notes_table_sort_headers(project, folder_filter, route_name, sort_col, sort_dir, card_mode=None):
+    sort_col = _normalize_note_sort_col(sort_col)
+    sort_dir = _normalize_note_sort_dir(sort_dir)
+    headers = {}
+    for key, label, column in NOTE_TABLE_SORT_COLUMNS:
+        next_dir = "desc" if sort_col == column and sort_dir == "asc" else "asc"
+        args = _notes_url_args(project, folder_filter, sort=column, dir=next_dir)
+        if card_mode:
+            args["mode"] = card_mode
+        headers[key] = {
+            "label": label,
+            "sort_col": column,
+            "active": sort_col == column,
+            "dir": sort_dir if sort_col == column else "",
+            "next_dir": next_dir,
+            "url": url_for(route_name, **args),
+        }
+    return headers
+
+
+def _notes_page_title(project_label):
+    return f"Notes ({project_label})" if project_label else "Notes"
+
+
+def _note_bulk_project_options(active_projects=None):
+    projects = active_projects if active_projects is not None else projects_mod.projects_list_sidebar()
+    return [
+        {
+            "id": project.get("project_id") or "",
+            "label": project.get("project_name") or project.get("project_id") or "",
+        }
+        for project in projects
+        if project.get("project_id")
+    ]
+
+
+def _note_bulk_color_options():
+    return [
+        {"value": label, "label": label, "style": style}
+        for label, style in NOTE_COLOR_OPTIONS
+    ]
+
+
 def _normalize_note_card_mode(value):
     return "preview" if value == "preview" else NOTE_CARD_DEFAULT_MODE
 
@@ -1036,9 +1165,136 @@ def _fetch_note_subfolders(project, folder_path=None):
         subfolders[child.lower()] = {
             "label": child,
             "path": child_path,
-            "url": url_for("notes.list_notes_table_route", **_notes_url_args(folder_path=child_path)),
+            "url": url_for("notes.list_notes_table_route", **_notes_url_args(project, child_path)),
         }
     return [subfolders[key] for key in sorted(subfolders)]
+
+
+def _folder_label(path_value):
+    path_value = _normalize_note_path(path_value)
+    if not path_value:
+        return "Folder"
+    parts = [part for part in path_value.split("\\") if part]
+    if len(parts) >= 2:
+        return "\\".join(parts[-2:])
+    return parts[-1] if parts else path_value
+
+
+def _note_folder_panel_items(project, folder_filter, project_folders, view_mode, sort_col, sort_dir):
+    items = []
+    seen = set()
+
+    def add_item(label, path_value):
+        path_value = _normalize_note_path(path_value)
+        if not path_value:
+            return
+        key = path_value.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        items.append({
+            "label": label or _folder_label(path_value),
+            "path": path_value,
+            "url": _notes_view_url(view_mode, project, path_value, sort_col, sort_dir),
+        })
+
+    if folder_filter:
+        for folder in _fetch_note_subfolders(project, folder_filter):
+            add_item(folder.get("label"), folder.get("path"))
+        return items
+
+    for folder in project_folders or []:
+        if folder.get("is_enabled") in (0, "0", False):
+            continue
+        add_item(_folder_label(folder.get("path_prefix")), folder.get("path_prefix"))
+    if items:
+        return items
+
+    notes_root = _notes_root_path(project)
+    if notes_root:
+        for folder in _fetch_note_subfolders(project, notes_root):
+            add_item(folder.get("label"), folder.get("path"))
+    return items
+
+
+def _sqlite_int_text_expr(value_expr):
+    trimmed = f"trim(COALESCE({value_expr}, ''))"
+    return (
+        f"CASE WHEN {trimmed} != '' AND {trimmed} NOT GLOB '*[^0-9]*' "
+        f"THEN CAST({trimmed} AS INTEGER) ELSE NULL END"
+    )
+
+
+def _notes_list_context(
+    *,
+    project,
+    folder_filter,
+    project_info,
+    project_folders,
+    project_label,
+    total,
+    sort_col,
+    sort_dir,
+    route_name,
+    view_mode,
+    page,
+    total_pages,
+    pages,
+    first_url,
+    last_url,
+    card_mode=None,
+    note_settings=None,
+):
+    active_projects = projects_mod.projects_list_sidebar()
+    view_mode = _normalize_note_list_view(view_mode)
+    sort_col = _normalize_note_sort_col(sort_col)
+    sort_dir = _normalize_note_sort_dir(sort_dir)
+    return {
+        "active_tab": "notes",
+        "tabs": get_tabs(),
+        "side_tabs": get_side_tabs(),
+        "content_title": _notes_page_title(project_label),
+        "content_html": "",
+        "project_info": project_info,
+        "project_folders": project_folders,
+        "project": project,
+        "folder_filter": folder_filter,
+        "note_breadcrumb": _note_folder_breadcrumb(folder_filter, project),
+        "note_folder_panel_items": _note_folder_panel_items(
+            project,
+            folder_filter,
+            project_folders,
+            view_mode,
+            sort_col,
+            sort_dir,
+        ),
+        "total_notes": total,
+        "sort_col": sort_col,
+        "sort_dir": sort_dir,
+        "sort_options": NOTE_LIST_SORT_OPTIONS,
+        "table_sort_headers": _notes_table_sort_headers(
+            project,
+            folder_filter,
+            route_name,
+            sort_col,
+            sort_dir,
+            card_mode,
+        ),
+        "view_options": _notes_view_options(project, folder_filter, sort_col, sort_dir, view_mode),
+        "notes_view_mode": view_mode,
+        "route_name": route_name,
+        "card_mode": card_mode,
+        "note_card_max_chars": (note_settings or {}).get("card_width_chars", NOTE_CARD_MAX_CHARS),
+        "note_card_title_font_size": (note_settings or {}).get("title_font_size", NOTE_CARD_TITLE_FONT_SIZE),
+        "active_projects": active_projects,
+        "bulk_project_options": _note_bulk_project_options(active_projects),
+        "bulk_color_options": _note_bulk_color_options(),
+        "page": page,
+        "total_pages": total_pages,
+        "pages": pages,
+        "first_url": first_url,
+        "last_url": last_url,
+    }
 
 
 def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=False):
@@ -1051,9 +1307,10 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
     order_map = {
         "file_name": "t.file_name",
         "path": "t.path",
+        "folder": "t.path",
         "folder_id": "t.folder_id",
-        "size": "t.size",
-        "title": "t.title",
+        "size": _sqlite_int_text_expr("t.size"),
+        "title": "lower(COALESCE(NULLIF(t.title, ''), t.file_name, ''))",
         "color": "t.color",
         "date_created": "t.date_created",
         "project": "t.project",
@@ -1063,9 +1320,13 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
         "updated": "t.rec_extract_date",
         "derived_project": "derived_project",
     }
-    sort_key = order_map.get(sort_col or "updated", "t.rec_extract_date")
+    sort_col = sort_col or "updated"
+    sort_key = order_map.get(sort_col, "t.rec_extract_date")
     sort_dir = sort_dir or "desc"
-    order_by = f"{sort_key} {sort_dir}"
+    if sort_col == "size":
+        order_by = f"CASE WHEN ({sort_key}) IS NULL THEN 1 ELSE 0 END ASC, ({sort_key}) {sort_dir}"
+    else:
+        order_by = f"{sort_key} {sort_dir}"
     select_cols = [f"t.{col}" for col in cols]
     select_cols.append("t.rec_extract_date as updated")
     if include_derived:
@@ -1124,36 +1385,33 @@ def list_notes_route():
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
+    route_name = "notes.list_notes_table_route"
     if not tbl:
-        return render_template(
-            "notes_list.html",
-            active_tab="notes",
-            tabs=get_tabs(),
-            side_tabs=get_side_tabs(),
-            content_title="Notes",
-            content_html="",
-            notes=[],
-            project_info=project_info,
-            project_folders=project_folders,
+        context = _notes_list_context(
             project=project,
             folder_filter=folder_filter,
-            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-            note_subfolders=_fetch_note_subfolders(project, folder_filter),
-            total_notes=0,
+            project_info=project_info,
+            project_folders=project_folders,
+            project_label=project_label,
+            total=0,
             sort_col="date_modified",
             sort_dir="desc",
-            route_name="notes.list_notes_table_route",
+            route_name=route_name,
+            view_mode="table",
             page=1,
             total_pages=1,
             pages=[],
-            first_url=url_for("notes.list_notes_table_route"),
-            last_url=url_for("notes.list_notes_table_route"),
+            first_url=url_for(route_name),
+            last_url=url_for(route_name),
+            note_settings=note_settings,
         )
+        context["notes"] = []
+        return render_template("notes_list.html", **context)
     view_pref = request.cookies.get("notes_view")
-    if view_pref in ("list", "cards"):
-        return redirect(url_for(f"notes.list_notes_{view_pref}_route", **_notes_url_args(project, folder_filter)))
-    sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
-    sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
+    if view_pref in ("list", "cards", "grid", "preview", "names"):
+        return redirect(_notes_view_url(view_pref, project, folder_filter, request.cookies.get("notes_sort_col") or "date_modified", request.cookies.get("notes_sort_dir") or "desc"))
+    sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
+    sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
@@ -1162,7 +1420,6 @@ def list_notes_route():
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
-    route_name = "notes.list_notes_table_route"
     pagination = build_pagination(
         url_for,
         route_name,
@@ -1170,31 +1427,27 @@ def list_notes_route():
         page,
         total_pages,
     )
-    resp = make_response(
-        render_template(
-        "notes_list.html",
-        active_tab="notes",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project_label or 'All'})",
-        content_html="",
-        notes=notes,
-        project_info=project_info,
-        project_folders=project_folders,
+    context = _notes_list_context(
         project=project,
         folder_filter=folder_filter,
-        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-        note_subfolders=_fetch_note_subfolders(project, folder_filter),
-        total_notes=total,
+        project_info=project_info,
+        project_folders=project_folders,
+        project_label=project_label,
+        total=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
         route_name=route_name,
+        view_mode="table",
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
+        note_settings=note_settings,
     )
+    context["notes"] = notes
+    resp = make_response(
+        render_template("notes_list.html", **context)
     )
     resp.set_cookie("notes_view", "table")
     resp.set_cookie("notes_sort_col", sort_col)
@@ -1210,33 +1463,30 @@ def list_notes_table_route():
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
+    route_name = "notes.list_notes_table_route"
     if not tbl:
-        return render_template(
-            "notes_list.html",
-            active_tab="notes",
-            tabs=get_tabs(),
-            side_tabs=get_side_tabs(),
-            content_title="Notes",
-            content_html="",
-            notes=[],
-            project_info=project_info,
-            project_folders=project_folders,
+        context = _notes_list_context(
             project=project,
             folder_filter=folder_filter,
-            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-            note_subfolders=_fetch_note_subfolders(project, folder_filter),
-            total_notes=0,
+            project_info=project_info,
+            project_folders=project_folders,
+            project_label=project_label,
+            total=0,
             sort_col="date_modified",
             sort_dir="desc",
-            route_name="notes.list_notes_table_route",
+            route_name=route_name,
+            view_mode="table",
             page=1,
             total_pages=1,
             pages=[],
-            first_url=url_for("notes.list_notes_table_route"),
-            last_url=url_for("notes.list_notes_table_route"),
+            first_url=url_for(route_name),
+            last_url=url_for(route_name),
+            note_settings=note_settings,
         )
-    sort_col = request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified"
-    sort_dir = request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc"
+        context["notes"] = []
+        return render_template("notes_list.html", **context)
+    sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
+    sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
@@ -1245,7 +1495,6 @@ def list_notes_table_route():
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
-    route_name = "notes.list_notes_table_route"
     pagination = build_pagination(
         url_for,
         route_name,
@@ -1253,31 +1502,27 @@ def list_notes_table_route():
         page,
         total_pages,
     )
-    resp = make_response(
-        render_template(
-        "notes_list.html",
-        active_tab="notes",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project_label or 'All'})",
-        content_html="",
-        notes=notes,
-        project_info=project_info,
-        project_folders=project_folders,
+    context = _notes_list_context(
         project=project,
         folder_filter=folder_filter,
-        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-        note_subfolders=_fetch_note_subfolders(project, folder_filter),
-        total_notes=total,
+        project_info=project_info,
+        project_folders=project_folders,
+        project_label=project_label,
+        total=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
         route_name=route_name,
+        view_mode="table",
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
+        note_settings=note_settings,
     )
+    context["notes"] = notes
+    resp = make_response(
+        render_template("notes_list.html", **context)
     )
     resp.set_cookie("notes_view", "table")
     resp.set_cookie("notes_sort_col", sort_col)
@@ -1293,67 +1538,143 @@ def list_notes_list_route():
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     tbl = get_table_def("notes")
+    route_name = "notes.list_notes_list_route"
     if not tbl:
-        return render_template(
-            "notes_list_list.html",
-            active_tab="notes",
-            tabs=get_tabs(),
-            side_tabs=get_side_tabs(),
-            content_title="Notes",
-            content_html="",
-            notes=[],
-            project_info=project_info,
-            project_folders=project_folders,
+        context = _notes_list_context(
             project=project,
             folder_filter=folder_filter,
-            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-            note_subfolders=_fetch_note_subfolders(project, folder_filter),
-            total_notes=0,
+            project_info=project_info,
+            project_folders=project_folders,
+            project_label=project_label,
+            total=0,
+            sort_col="date_modified",
+            sort_dir="desc",
+            route_name=route_name,
+            view_mode="list",
             page=1,
             total_pages=1,
             pages=[],
-            first_url=url_for("notes.list_notes_list_route"),
-            last_url=url_for("notes.list_notes_list_route"),
+            first_url=url_for(route_name),
+            last_url=url_for(route_name),
+            note_settings=note_settings,
         )
+        context["notes"] = []
+        return render_template("notes_list_list.html", **context)
+    sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
+    sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
-        "notes.list_notes_list_route",
-        _notes_url_args(project, folder_filter),
+        route_name,
+        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
-    resp = make_response(
-        render_template(
-        "notes_list_list.html",
-        active_tab="notes",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project_label or 'All'})",
-        content_html="",
-        notes=notes,
-        project_info=project_info,
-        project_folders=project_folders,
+    context = _notes_list_context(
         project=project,
         folder_filter=folder_filter,
-        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-        note_subfolders=_fetch_note_subfolders(project, folder_filter),
-        total_notes=total,
+        project_info=project_info,
+        project_folders=project_folders,
+        project_label=project_label,
+        total=total,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        route_name=route_name,
+        view_mode="list",
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
+        note_settings=note_settings,
     )
+    context["notes"] = notes
+    resp = make_response(
+        render_template("notes_list_list.html", **context)
     )
     resp.set_cookie("notes_view", "list")
+    resp.set_cookie("notes_sort_col", sort_col)
+    resp.set_cookie("notes_sort_dir", sort_dir)
+    return resp
+
+
+@notes_bp.route('/names')
+def list_notes_names_route():
+    project = _normalize_project(request.args.get("proj"))
+    folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    note_settings = _note_display_settings()
+    project_info, project_folders = _project_context(project)
+    project_label = project_info["project_name"] if project_info else project
+    tbl = get_table_def("notes")
+    route_name = "notes.list_notes_names_route"
+    if not tbl:
+        context = _notes_list_context(
+            project=project,
+            folder_filter=folder_filter,
+            project_info=project_info,
+            project_folders=project_folders,
+            project_label=project_label,
+            total=0,
+            sort_col="date_modified",
+            sort_dir="desc",
+            route_name=route_name,
+            view_mode="names",
+            page=1,
+            total_pages=1,
+            pages=[],
+            first_url=url_for(route_name),
+            last_url=url_for(route_name),
+            note_settings=note_settings,
+        )
+        context["notes"] = []
+        return render_template("notes_list_names.html", **context)
+    sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
+    sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
+    page = request.args.get("page", type=int) or 1
+    per_page = note_settings["notes_per_page"]
+    total = _count_notes(project, folder_filter)
+    offset = (page - 1) * per_page
+    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    total_pages = page_data["total_pages"]
+    pagination = build_pagination(
+        url_for,
+        route_name,
+        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
+        page,
+        total_pages,
+    )
+    context = _notes_list_context(
+        project=project,
+        folder_filter=folder_filter,
+        project_info=project_info,
+        project_folders=project_folders,
+        project_label=project_label,
+        total=total,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        route_name=route_name,
+        view_mode="names",
+        page=page,
+        total_pages=total_pages,
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
+        note_settings=note_settings,
+    )
+    context["notes"] = notes
+    resp = make_response(render_template("notes_list_names.html", **context))
+    resp.set_cookie("notes_view", "names")
+    resp.set_cookie("notes_sort_col", sort_col)
+    resp.set_cookie("notes_sort_dir", sort_dir)
     return resp
 
 
@@ -1365,39 +1686,40 @@ def list_notes_cards_route():
     project_info, project_folders = _project_context(project)
     project_label = project_info["project_name"] if project_info else project
     card_mode = _normalize_note_card_mode(request.args.get("mode") or request.cookies.get("notes_card_mode"))
+    view_mode = "preview" if card_mode == "preview" else "grid"
+    route_name = "notes.list_notes_cards_route"
     tbl = get_table_def("notes")
     if not tbl:
-        return render_template(
-            "notes_list_cards.html",
-            active_tab="notes",
-            tabs=get_tabs(),
-            side_tabs=get_side_tabs(),
-            content_title="Notes",
-            content_html="",
-            notes=[],
-            card_values=[],
-            project_info=project_info,
-            project_folders=project_folders,
+        context = _notes_list_context(
             project=project,
             folder_filter=folder_filter,
-            note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-            note_subfolders=_fetch_note_subfolders(project, folder_filter),
-            total_notes=0,
-            note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
+            project_info=project_info,
+            project_folders=project_folders,
+            project_label=project_label,
+            total=0,
+            sort_col="date_modified",
+            sort_dir="desc",
+            route_name=route_name,
+            view_mode=view_mode,
             card_mode=card_mode,
-            note_card_max_chars=note_settings["card_width_chars"],
-            note_card_title_font_size=note_settings["title_font_size"],
             page=1,
             total_pages=1,
             pages=[],
-            first_url=url_for("notes.list_notes_cards_route", **_notes_url_args(project, folder_filter, mode=card_mode)),
-            last_url=url_for("notes.list_notes_cards_route", **_notes_url_args(project, folder_filter, mode=card_mode)),
+            first_url=url_for(route_name, **_notes_url_args(project, folder_filter, mode=card_mode)),
+            last_url=url_for(route_name, **_notes_url_args(project, folder_filter, mode=card_mode)),
+            note_settings=note_settings,
         )
+        context["notes"] = []
+        context["card_values"] = []
+        context["note_card_bg"] = cfg.NOTE_CARD_DEF_BG_COL
+        return render_template("notes_list_cards.html", **context)
+    sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
+    sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
     total = _count_notes(project, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
     _prepare_note_card_previews(
         notes,
         max_chars=note_settings["preview_chars"],
@@ -1408,8 +1730,8 @@ def list_notes_cards_route():
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
-        "notes.list_notes_cards_route",
-        _notes_url_args(project, folder_filter, mode=card_mode),
+        route_name,
+        _notes_url_args(project, folder_filter, mode=card_mode, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -1417,36 +1739,35 @@ def list_notes_cards_route():
         [n.get("file_name"), n.get("path"), url_for("notes.view_note_route", note_id=n.get("id"))]
         for n in notes
     ]
-    resp = make_response(
-        render_template(
-        "notes_list_cards.html",
-        active_tab="notes",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Notes ({project_label or 'All'})",
-        content_html="",
-        notes=notes,
-        card_values=card_values,
-        project_info=project_info,
-        project_folders=project_folders,
+    context = _notes_list_context(
         project=project,
         folder_filter=folder_filter,
-        note_breadcrumb=_note_folder_breadcrumb(folder_filter, project),
-        note_subfolders=_fetch_note_subfolders(project, folder_filter),
-        total_notes=total,
-        note_card_bg=cfg.NOTE_CARD_DEF_BG_COL,
+        project_info=project_info,
+        project_folders=project_folders,
+        project_label=project_label,
+        total=total,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        route_name=route_name,
+        view_mode=view_mode,
         card_mode=card_mode,
-        note_card_max_chars=note_settings["card_width_chars"],
-        note_card_title_font_size=note_settings["title_font_size"],
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
+        note_settings=note_settings,
     )
+    context["notes"] = notes
+    context["card_values"] = card_values
+    context["note_card_bg"] = cfg.NOTE_CARD_DEF_BG_COL
+    resp = make_response(
+        render_template("notes_list_cards.html", **context)
     )
-    resp.set_cookie("notes_view", "cards")
+    resp.set_cookie("notes_view", view_mode)
     resp.set_cookie("notes_card_mode", card_mode)
+    resp.set_cookie("notes_sort_col", sort_col)
+    resp.set_cookie("notes_sort_dir", sort_dir)
     return resp
 
 @notes_bp.route('/view/<int:note_id>')
@@ -1914,6 +2235,66 @@ def delete_selected_notes_route():
             errors.append({"note_id": note_id, "error": str(exc)})
     status = 207 if errors and deleted else (403 if errors else 200)
     return jsonify({"deleted": deleted, "deleted_ids": deleted_ids, "errors": errors}), status
+
+
+@notes_bp.route('/api/move-selected', methods=["POST"])
+def move_selected_notes_route():
+    payload = request.get_json(silent=True) or {}
+    project_id = (payload.get("project_id") or "").strip()
+    note_ids = []
+    for raw_id in payload.get("note_ids") or []:
+        try:
+            note_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    note_ids = list(dict.fromkeys(note_ids))
+    if not note_ids:
+        return jsonify({"moved": 0, "moved_ids": [], "errors": []})
+    moved = 0
+    moved_ids = []
+    errors = []
+    for note_id in note_ids:
+        if not security.can_edit_note(note_id, current_user):
+            errors.append({"note_id": note_id, "error": "forbidden"})
+            continue
+        try:
+            _move_note_to_project(note_id, project_id)
+            moved += 1
+            moved_ids.append(note_id)
+        except Exception as exc:
+            errors.append({"note_id": note_id, "error": str(exc)})
+    status = 207 if errors and moved else (403 if errors else 200)
+    return jsonify({"moved": moved, "moved_ids": moved_ids, "errors": errors}), status
+
+
+@notes_bp.route('/api/color-selected', methods=["POST"])
+def color_selected_notes_route():
+    payload = request.get_json(silent=True) or {}
+    color = (payload.get("color") or "").strip()
+    note_ids = []
+    for raw_id in payload.get("note_ids") or []:
+        try:
+            note_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    note_ids = list(dict.fromkeys(note_ids))
+    if not note_ids:
+        return jsonify({"updated": 0, "updated_ids": [], "errors": []})
+    updated = 0
+    updated_ids = []
+    errors = []
+    for note_id in note_ids:
+        if not security.can_edit_note(note_id, current_user):
+            errors.append({"note_id": note_id, "error": "forbidden"})
+            continue
+        try:
+            _set_note_color(note_id, color)
+            updated += 1
+            updated_ids.append(note_id)
+        except Exception as exc:
+            errors.append({"note_id": note_id, "error": str(exc)})
+    status = 207 if errors and updated else (403 if errors else 200)
+    return jsonify({"updated": updated, "updated_ids": updated_ids, "errors": errors}), status
 
 
 @notes_bp.route('/convert-to-howto/<int:note_id>', methods=["POST"])
@@ -2997,11 +3378,17 @@ def _project_context(project_id):
 
 
 def _sort_notes(notes, sort_col, sort_dir):
+    if sort_col == "size":
+        reverse = sort_dir == "desc"
+        keyed = [(note, _parse_size(note.get("size"))) for note in notes]
+        valid = [(note, size) for note, size in keyed if size is not None]
+        invalid = [note for note, size in keyed if size is None]
+        return [note for note, _size in sorted(valid, key=lambda item: item[1], reverse=reverse)] + invalid
     key_map = {
         "file_name": lambda n: (n.get("file_name") or "").lower(),
         "path": lambda n: (n.get("path") or "").lower(),
-        "size": lambda n: _parse_size(n.get("size")),
-        "title": lambda n: (n.get("title") or "").lower(),
+        "size": lambda n: _parse_size(n.get("size")) or 0,
+        "title": lambda n: (n.get("title") or n.get("file_name") or "").lower(),
         "color": lambda n: (n.get("color") or "").lower(),
         "date_created": lambda n: _parse_datetime(n.get("date_created")) or datetime.min,
         "project": lambda n: (n.get("project") or "").lower(),
@@ -3106,8 +3493,9 @@ def _write_note_file_content(note_path, content):
 
 def _parse_size(value):
     if value is None:
-        return 0
+        return None
     try:
-        return int(value)
+        text = str(value).strip()
+        return int(text) if text and text.isdigit() else None
     except (TypeError, ValueError):
-        return 0
+        return None

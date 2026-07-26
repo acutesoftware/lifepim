@@ -1,119 +1,48 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div class="note-list-toolbar">
-    <a href="{{ url_for('notes.list_notes_table_route', proj=project, folder=folder_filter) }}">Table</a> |
-    <a href="{{ url_for('notes.list_notes_list_route', proj=project, folder=folder_filter) }}">List</a> |
-    <a href="{{ url_for('notes.list_notes_cards_route', proj=project, folder=folder_filter) }}">Card</a> |
-    <a href="#" class="new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a> |
-    <a href="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</a>
-    <span class="note-status">{{ total_notes|default(notes|length) }} notes</span>
-    {% set link_list_type = "note" %}
-    {% set link_list_context_id = "notes_list" %}
-    {% set link_table_id = "notes-table" %}
-    {% include "widgets/links_bulk_toolbar.html" %}
-  </div>
-  <div class="note-breadcrumb">
-    {% for crumb in note_breadcrumb %}
-      <a href="{{ crumb.url }}">{{ crumb.label }}</a>{% if not loop.last %}<span>&gt;</span>{% endif %}
-    {% endfor %}
-  </div>
-  {% include "widgets/project_folders.html" %}
-
-{% if note_subfolders %}
-  <div class="note-folder-list" data-collapsible="note-subfolders">
-    <div class="note-folder-title">
-      <span>Folders</span>
-      <button type="button" class="note-folder-toggle" aria-expanded="true">[-]</button>
-    </div>
-    <div class="note-folder-body">
-    {% for folder in note_subfolders %}
-      <a class="note-folder-link" href="{{ folder.url }}">{{ folder.label }}</a>
-    {% endfor %}
-    </div>
-  </div>
-{% endif %}
-
-<div class="tabular-scroll">
-<table border="1" cellpadding="5" id="notes-table" data-notes-context="true">
-  <tr>
-    <th><input type="checkbox" class="link-select-all"></th>
-    {% set dir_file = 'asc' if sort_col != 'file_name' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_path = 'asc' if sort_col != 'path' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_folder_id = 'asc' if sort_col != 'folder_id' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_size = 'asc' if sort_col != 'size' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_title = 'asc' if sort_col != 'title' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_color = 'asc' if sort_col != 'color' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_created = 'asc' if sort_col != 'date_created' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_project = 'asc' if sort_col != 'project' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_derived = 'asc' if sort_col != 'derived_project' or sort_dir == 'desc' else 'desc' %}
-    {% set dir_modified = 'asc' if sort_col != 'date_modified' or sort_dir == 'desc' else 'desc' %}
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='file_name', dir=dir_file) }}">File</a>
-      {% if sort_col == 'file_name' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='path', dir=dir_path) }}">Path</a>
-      {% if sort_col == 'path' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='folder_id', dir=dir_folder_id) }}">Folder ID</a>
-      {% if sort_col == 'folder_id' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='size', dir=dir_size) }}">Size</a>
-      {% if sort_col == 'size' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='title', dir=dir_title) }}">Title</a>
-      {% if sort_col == 'title' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='color', dir=dir_color) }}">Color</a>
-      {% if sort_col == 'color' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='date_created', dir=dir_created) }}">Created</a>
-      {% if sort_col == 'date_created' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='project', dir=dir_project) }}">Project</a>
-      {% if sort_col == 'project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='derived_project', dir=dir_derived) }}">Derived</a>
-      {% if sort_col == 'derived_project' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>
-      <a href="{{ url_for(route_name, proj=project, folder=folder_filter, sort='date_modified', dir=dir_modified) }}">Modified</a>
-      {% if sort_col == 'date_modified' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    <th>Actions</th>
-  </tr>
-  {% for n in notes %}
-  <tr class="link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
-    <td><input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}"></td>
-    <td><a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a></td>
-    <td>{{ n.path }}</td>
-    <td>{{ n.folder_id }}</td>
-    <td>{{ n.size }}</td>
-    <td>{{ n.title or '' }}</td>
-    <td>
-      {% if n.color_style %}
-        <span class="note-color-swatch" style="background:{{ n.color_style }};"></span>
+  {% macro sort_header(key) -%}
+    {% set header = table_sort_headers[key] %}
+    <a class="note-sort-header{% if header.active %} active{% endif %}"
+       href="{{ header.url }}"
+       title="Sort {{ header.label }} {{ header.next_dir|upper }}">
+      <span>{{ header.label }}</span>
+      {% if header.active %}
+        <span class="note-sort-indicator">{{ '^' if header.dir == 'asc' else 'v' }}</span>
       {% endif %}
-      {{ n.color or '' }}
-    </td>
-    <td>{{ n.date_created or '' }}</td>
-    <td>{{ n.project }}</td>
-    <td>{{ n.derived_project }}</td>
-    <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
-    <td>
-      <a href="{{ url_for('notes.edit_note_route', note_id=n.id) }}">Edit</a> |
-      <a href="{{ url_for('notes.delete_note_route', note_id=n.id) }}" onclick="return confirm('Delete note?');">Del</a>
-    </td>
-  </tr>
-  {% endfor %}
-</table>
+    </a>
+  {%- endmacro %}
+
+  {% include "_notes_list_header.html" %}
+  {% include "_notes_folder_panel.html" %}
+
+  <table id="notes-selection-root" class="notes-table" data-notes-context="true" data-bulk-selection-root="true">
+    <tr>
+      <th><input type="checkbox" class="link-select-all" aria-label="Select all notes"></th>
+      <th>{{ sort_header('filename') }}</th>
+      <th>{{ sort_header('color') }}</th>
+      <th>{{ sort_header('project') }}</th>
+      <th>{{ sort_header('size') }}</th>
+      <th>{{ sort_header('date_created') }}</th>
+      <th>{{ sort_header('date_modified') }}</th>
+      <th>Controls</th>
+    </tr>
+    {% for n in notes %}
+    <tr class="link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
+      <td><input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}"></td>
+      <td><a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a></td>
+      <td>
+        <span class="note-list-dot" style="background:{{ n.list_color_style }};"></span>
+      </td>
+      <td>{{ n.project }}</td>
+      <td>{{ n.size }}</td>
+      <td>{{ n.date_created or '' }}</td>
+      <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>
+        <a href="{{ url_for('notes.edit_note_route', note_id=n.id) }}">Edit</a> |
+        <a href="{{ url_for('notes.delete_note_route', note_id=n.id) }}" onclick="return confirm('Delete note?');">Del</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
   {% include "widgets/wid_pagination.html" %}
-</div>
 {% endblock %}

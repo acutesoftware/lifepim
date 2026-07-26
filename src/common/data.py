@@ -122,7 +122,11 @@ def ensure_notes_schema(conn=None):
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_notes'"
             ).fetchone()
             if table_row:
-                return
+                rows = conn.execute("PRAGMA table_info(lp_notes)").fetchall()
+                existing = {row[1].lower() for row in rows}
+                expected = {col.lower() for col in NOTE_SCHEMA_COLUMNS}
+                if expected.issubset(existing):
+                    return
         except Exception:
             pass
         _NOTES_SCHEMA_READY_CONN_IDS.discard(conn_id)

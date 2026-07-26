@@ -1073,11 +1073,11 @@
   }
 
   function getSelectedRecords(row) {
-    const table = row.closest("table");
-    if (!table) {
+    const root = row.closest("[data-bulk-selection-root]") || row.closest("table");
+    if (!root) {
       return [];
     }
-    const selected = qsa("input.link-select:checked", table);
+    const selected = qsa("input.link-select:checked", root);
     if (!selected.length) {
       return [];
     }
@@ -1091,15 +1091,15 @@
   function initBulkToolbars() {
     qsa(".link-bulk-toolbar").forEach((toolbar) => {
       const tableId = toolbar.dataset.tableId;
-      const table = tableId ? document.getElementById(tableId) : toolbar.nextElementSibling;
-      if (!table) {
+      const root = tableId ? document.getElementById(tableId) : toolbar.nextElementSibling;
+      if (!root) {
         return;
       }
       const countEl = qs(".link-bulk-count", toolbar);
       const actionBtn = qs(".link-bulk-open", toolbar);
       const actionSelect = qs(".link-bulk-action", toolbar);
       const updateCount = () => {
-        const selected = qsa("input.link-select:checked", table);
+        const selected = qsa("input.link-select:checked", root);
         countEl.textContent = `${selected.length} selected`;
         if (actionBtn) {
           actionBtn.disabled = selected.length === 0;
@@ -1108,20 +1108,20 @@
           actionSelect.disabled = selected.length === 0;
         }
       };
-      qsa("input.link-select", table).forEach((checkbox) => {
+      qsa("input.link-select", root).forEach((checkbox) => {
         checkbox.addEventListener("change", updateCount);
       });
-      const selectAll = qs("input.link-select-all", table);
+      const selectAll = qs("input.link-select-all", root);
       if (selectAll) {
         selectAll.addEventListener("change", () => {
-          qsa("input.link-select", table).forEach((checkbox) => {
+          qsa("input.link-select", root).forEach((checkbox) => {
             checkbox.checked = selectAll.checked;
           });
           updateCount();
         });
       }
       const selectedRecords = () =>
-        qsa("input.link-select:checked", table).map((checkbox) => ({
+        qsa("input.link-select:checked", root).map((checkbox) => ({
           type: checkbox.dataset.recordType,
           id: checkbox.dataset.recordId,
           title: checkbox.dataset.recordTitle || "",
@@ -1153,9 +1153,9 @@
         postJson("/notes/api/delete-selected", { note_ids: noteIds })
           .then((data) => {
             const deletedIds = new Set((data.deleted_ids || []).map((id) => String(id)));
-            qsa("input.link-select:checked", table).forEach((checkbox) => {
+            qsa("input.link-select:checked", root).forEach((checkbox) => {
               if (deletedIds.has(String(checkbox.dataset.recordId))) {
-                const row = checkbox.closest("tr");
+                const row = checkbox.closest(".link-draggable") || checkbox.closest("tr");
                 if (row) {
                   row.remove();
                 }
@@ -1163,19 +1163,19 @@
                 checkbox.checked = false;
               }
             });
-            qsa("input.link-select", table).forEach((checkbox) => {
+            qsa("input.link-select", root).forEach((checkbox) => {
               checkbox.checked = false;
             });
-            const selectAll = qs("input.link-select-all", table);
+            const selectAll = qs("input.link-select-all", root);
             if (selectAll) {
               selectAll.checked = false;
             }
-            const noteStatus = qs(".note-status");
+            const noteStatus = qs(".note-total-count");
             if (noteStatus && data.deleted) {
               const match = noteStatus.textContent.match(/(\d+)/);
               if (match) {
                 const remaining = Math.max(0, Number(match[1]) - Number(data.deleted || 0));
-                noteStatus.textContent = `${remaining} notes`;
+                noteStatus.textContent = `${remaining} Notes`;
               }
             }
             updateCount();
@@ -1186,6 +1186,69 @@
             }
           })
           .catch(() => showToast({ message: "Couldn't delete selected notes." }));
+      };
+      const parseOptions = (name) => {
+        try {
+          return JSON.parse(toolbar.dataset[name] || "[]");
+        } catch (_) {
+          return [];
+        }
+      };
+      const promptChoice = (message, options, valueKey) => {
+        if (!options.length) {
+          return "";
+        }
+        const lines = options.map((option, idx) => `${idx + 1}. ${option.label || option[valueKey]} (${option[valueKey]})`);
+        const raw = window.prompt(`${message}\n\n${lines.join("\n")}`);
+        if (raw === null) {
+          return "";
+        }
+        const trimmed = raw.trim();
+        const number = parseInt(trimmed, 10);
+        if (Number.isFinite(number) && number >= 1 && number <= options.length) {
+          return options[number - 1][valueKey] || "";
+        }
+        const matched = options.find((option) =>
+          String(option[valueKey] || "").toLowerCase() === trimmed.toLowerCase() ||
+          String(option.label || "").toLowerCase() === trimmed.toLowerCase()
+        );
+        return matched ? matched[valueKey] || "" : trimmed;
+      };
+      const noteIdsFromSelection = () =>
+        selectedRecords().filter((record) => record.type === "note").map((record) => record.id);
+      const moveSelectedNotes = () => {
+        const noteIds = noteIdsFromSelection();
+        if (!noteIds.length) {
+          showToast({ message: "Select one or more notes first." });
+          return;
+        }
+        const projectId = promptChoice("Move selected notes to project:", parseOptions("projectOptions"), "id");
+        if (!projectId) {
+          return;
+        }
+        postJson("/notes/api/move-selected", { note_ids: noteIds, project_id: projectId })
+          .then((data) => {
+            showToast({ message: `Moved ${data.moved || 0} selected note(s).` });
+            window.location.reload();
+          })
+          .catch(() => showToast({ message: "Couldn't move selected notes." }));
+      };
+      const colorSelectedNotes = () => {
+        const noteIds = noteIdsFromSelection();
+        if (!noteIds.length) {
+          showToast({ message: "Select one or more notes first." });
+          return;
+        }
+        const color = promptChoice("Set selected notes to color:", parseOptions("colorOptions"), "value");
+        if (!color) {
+          return;
+        }
+        postJson("/notes/api/color-selected", { note_ids: noteIds, color: color })
+          .then((data) => {
+            showToast({ message: `Updated ${data.updated || 0} selected note color(s).` });
+            window.location.reload();
+          })
+          .catch(() => showToast({ message: "Couldn't update selected note colors." }));
       };
       if (actionBtn) {
         actionBtn.addEventListener("click", openBulkLinkPicker);
@@ -1198,6 +1261,10 @@
             openBulkLinkPicker();
           } else if (action === "delete") {
             deleteSelectedNotes();
+          } else if (action === "move") {
+            moveSelectedNotes();
+          } else if (action === "color") {
+            colorSelectedNotes();
           }
         });
       }
