@@ -86,6 +86,7 @@ NOTE_DISPLAY_DEFAULTS = {
     "notes.display.card_width_chars": ("50", "Notes", "Card width characters"),
     "notes.display.title_font_size": ("18", "Notes", "Title font size"),
     "notes.display.preview_chars": ("300", "Notes", "Preview characters"),
+    "notes.display.sample_lines": ("20", "Notes", "Sample lines"),
     "notes.display.notes_per_page": ("50", "Notes", "Notes per page"),
 }
 
@@ -98,6 +99,9 @@ NOTE_TITLE_FONT_SIZE_MAX = 32
 NOTE_PREVIEW_CHARS_DEFAULT = 300
 NOTE_PREVIEW_CHARS_MIN = 20
 NOTE_PREVIEW_CHARS_MAX = 5000
+NOTE_SAMPLE_LINES_DEFAULT = 20
+NOTE_SAMPLE_LINES_MIN = 1
+NOTE_SAMPLE_LINES_MAX = 200
 NOTE_NOTES_PER_PAGE_DEFAULT = 50
 NOTE_NOTES_PER_PAGE_MIN = 5
 NOTE_NOTES_PER_PAGE_MAX = 200
@@ -254,6 +258,9 @@ def get_note_display_settings(conn=None):
         "preview_chars": normalize_note_preview_chars(
             get_setting("notes.display.preview_chars", str(NOTE_PREVIEW_CHARS_DEFAULT), conn)
         ),
+        "sample_lines": normalize_note_sample_lines(
+            get_setting("notes.display.sample_lines", str(NOTE_SAMPLE_LINES_DEFAULT), conn)
+        ),
         "notes_per_page": normalize_note_notes_per_page(
             get_setting("notes.display.notes_per_page", str(NOTE_NOTES_PER_PAGE_DEFAULT), conn)
         ),
@@ -275,6 +282,10 @@ def save_note_display_settings(values, conn=None):
         "notes.display.preview_chars": (
             str(normalize_note_preview_chars(values.get("preview_chars"))),
             "Preview characters",
+        ),
+        "notes.display.sample_lines": (
+            str(normalize_note_sample_lines(values.get("sample_lines"))),
+            "Sample lines",
         ),
         "notes.display.notes_per_page": (
             str(normalize_note_notes_per_page(values.get("notes_per_page"))),
@@ -434,6 +445,10 @@ def normalize_note_title_font_size(value):
 
 def normalize_note_preview_chars(value):
     return _clamp_int(value, NOTE_PREVIEW_CHARS_DEFAULT, NOTE_PREVIEW_CHARS_MIN, NOTE_PREVIEW_CHARS_MAX)
+
+
+def normalize_note_sample_lines(value):
+    return _clamp_int(value, NOTE_SAMPLE_LINES_DEFAULT, NOTE_SAMPLE_LINES_MIN, NOTE_SAMPLE_LINES_MAX)
 
 
 def normalize_note_notes_per_page(value):

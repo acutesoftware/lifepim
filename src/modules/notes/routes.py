@@ -53,6 +53,20 @@ NOTE_COLOR_NAMES = {
     "gray": "#dfe6e9",
     "white": "#f1f2f6",
 }
+NOTE_COLOR_OPTIONS = [
+    ("Yellow", NOTE_COLOR_NAMES["yellow"]),
+    ("Aqua", NOTE_COLOR_NAMES["aqua"]),
+    ("Blue", NOTE_COLOR_NAMES["blue"]),
+    ("Green", NOTE_COLOR_NAMES["green"]),
+    ("Orange", NOTE_COLOR_NAMES["orange"]),
+    ("Red", NOTE_COLOR_NAMES["red"]),
+    ("Pink", NOTE_COLOR_NAMES["pink"]),
+    ("Purple", NOTE_COLOR_NAMES["purple"]),
+    ("Brown", NOTE_COLOR_NAMES["brown"]),
+    ("Grey", NOTE_COLOR_NAMES["grey"]),
+    ("White", NOTE_COLOR_NAMES["white"]),
+]
+NOTE_VIEW_MODES = {"text", "markdown", "hex", "sample", "metadata"}
 _NOTE_PROJECT_MATERIALIZED_KEYS = set()
 
 
@@ -116,6 +130,51 @@ def _parse_note_front_matter_text(text):
     return values
 
 
+def _front_matter_block_text(text):
+    lines = (text or "").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    for idx, line in enumerate(lines[1:], 1):
+        if line.strip() in ("---", "..."):
+            return "\n".join(lines[: idx + 1])
+    return ""
+
+
+def _front_matter_scalar_text(value):
+    value = str(value or "").strip()
+    if not value:
+        return '""'
+    if value.startswith("#") or any(ch in value for ch in ('"', "'", ":", "\r", "\n")):
+        return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return value
+
+
+def _set_note_front_matter_field(note_path, key, value, aliases=None):
+    aliases = {key.lower(), *{alias.lower() for alias in (aliases or [])}}
+    text = _read_note_file(note_path)
+    value_line = f"{key}: {_front_matter_scalar_text(value)}\n"
+    lines = text.splitlines(keepends=True)
+    if lines and lines[0].strip() == "---":
+        end_idx = None
+        for idx, line in enumerate(lines[1:], 1):
+            if line.strip() in ("---", "..."):
+                end_idx = idx
+                break
+        if end_idx is not None:
+            for idx in range(1, end_idx):
+                if ":" not in lines[idx]:
+                    continue
+                field_name = lines[idx].split(":", 1)[0].strip().lower().replace(" ", "_")
+                if field_name in aliases:
+                    newline = "\r\n" if lines[idx].endswith("\r\n") else "\n"
+                    lines[idx] = value_line.rstrip("\n") + newline
+                    return _write_note_file_content(note_path, "".join(lines))
+            lines.insert(end_idx, value_line)
+            return _write_note_file_content(note_path, "".join(lines))
+    updated = "---\n" + value_line + "---\n\n" + text
+    return _write_note_file_content(note_path, updated)
+
+
 def _front_matter_value(front_matter, keys):
     for key in keys:
         value = front_matter.get(key)
@@ -145,6 +204,62 @@ def _apply_note_display_fields(note):
         note["color_style"] = _note_color_style(note.get("color"))
         note["list_color_style"] = note["color_style"] or NOTE_COLOR_NAMES["yellow"]
     return note
+
+
+def _note_color_options(current_color=""):
+    options = [
+        {"value": label, "label": label, "style": style}
+        for label, style in NOTE_COLOR_OPTIONS
+    ]
+    current = (current_color or "").strip()
+    if current and not any(option["value"].lower() == current.lower() for option in options):
+        current_style = _note_color_style(current)
+        if current_style:
+            options.insert(0, {"value": current, "label": current, "style": current_style})
+    return options
+
+
+def _normalize_note_view_mode(value):
+    value = (value or "").strip().lower()
+    if value in {"md", "rendered"}:
+        value = "markdown"
+    return value if value in NOTE_VIEW_MODES else "markdown"
+
+
+def _sample_note_text(note_text, sample_lines):
+    lines = (note_text or "").splitlines()
+    line_count = len(lines)
+    sample_lines = settings_mod.normalize_note_sample_lines(sample_lines)
+    if line_count <= sample_lines * 2:
+        return note_text or ""
+    omitted = line_count - (sample_lines * 2)
+    sample = lines[:sample_lines]
+    sample.extend(["", f"... {omitted} lines omitted ...", ""])
+    sample.extend(lines[-sample_lines:])
+    return "\n".join(sample)
+
+
+def _note_metadata_rows(note, note_path, file_exists):
+    updated = note.get("updated")
+    if hasattr(updated, "strftime"):
+        updated = updated.strftime("%Y-%m-%d %H:%M")
+    return [
+        ("File", note.get("file_name") or ""),
+        ("Full path", note_path or ""),
+        ("Folder", note.get("path") or ""),
+        ("Folder ID", note.get("folder_id") or ""),
+        ("File exists", "Yes" if file_exists else "No"),
+        ("Size", note.get("size") or ""),
+        ("Title", note.get("title") or ""),
+        ("Color", note.get("color") or ""),
+        ("Date created", note.get("date_created") or ""),
+        ("Date modified", note.get("date_modified") or ""),
+        ("Project", note.get("project") or ""),
+        ("Derived project", note.get("derived_project") or ""),
+        ("Important", note.get("important") or ""),
+        ("Source note ID", note.get("source_note_id") or ""),
+        ("Updated", updated or ""),
+    ]
 
 
 def _note_metadata_from_file(note_path, stat=None, fallback_project=""):
@@ -729,6 +844,7 @@ def _note_display_settings():
             "card_width_chars": NOTE_CARD_MAX_CHARS,
             "title_font_size": NOTE_CARD_TITLE_FONT_SIZE,
             "preview_chars": NOTE_CARD_PREVIEW_CHARS,
+            "sample_lines": settings_mod.NOTE_SAMPLE_LINES_DEFAULT,
             "notes_per_page": NOTES_PER_PAGE,
         }
 
@@ -1337,7 +1453,8 @@ def list_notes_cards_route():
 def view_note_route(note_id):
     if not security.can_view_note(note_id, current_user):
         abort(404)
-    render_mode = request.args.get("format") or "markdown"
+    render_mode = _normalize_note_view_mode(request.args.get("format") or request.args.get("view"))
+    note_settings = _note_display_settings()
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     note = None
@@ -1376,32 +1493,62 @@ def view_note_route(note_id):
             if note_metadata.get(key):
                 note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
+    note_body_text = _note_body_text(note_text, note.get("file_name"), note.get("title"))
+    front_matter_raw = _front_matter_block_text(note_text)
+    front_matter = _parse_note_front_matter_text(note_text) if front_matter_raw else {}
     content_html = ""
     hex_rows = []
+    sample_text = ""
     if render_mode == "markdown":
         def _asset_url(asset_name):
             return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
 
-        display_text = _without_duplicate_title_heading(note_text, note.get("file_name"))
-        content_html = markdown_utils.render_markdown(display_text, asset_resolver=_asset_url)
+        content_html = markdown_utils.render_markdown(note_body_text, asset_resolver=_asset_url)
     elif render_mode == "hex":
         hex_rows = hex_utils.hex_dump(note_text)
+    elif render_mode == "sample":
+        sample_text = _sample_note_text(note_body_text, note_settings["sample_lines"])
+    active_projects = projects_mod.projects_list_sidebar()
+    selected_project = note.get("derived_project") or note.get("project") or ""
+    if selected_project and not any(project.get("project_id") == selected_project for project in active_projects):
+        active_projects.insert(
+            0,
+            {
+                "project_id": selected_project,
+                "project_name": selected_project,
+            },
+        )
     return render_template(
         "note_view.html",
         active_tab="notes",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
         note=note,
-        content_title=note.get("file_name") or "Note",
+        content_title="Notes",
         content_html="",
         render_mode=render_mode,
         content_html_rendered=content_html,
         hex_rows=hex_rows,
         note_text=note_text,
+        note_body_text=note_body_text,
+        sample_text=sample_text,
         file_exists=file_exists,
         note_path=note_path,
         note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_project),
-        active_projects=projects_mod.projects_list_sidebar(),
+        active_projects=active_projects,
+        selected_project=selected_project,
+        color_options=_note_color_options(note.get("color")),
+        view_modes=[
+            ("text", "Text"),
+            ("markdown", "Markdown"),
+            ("hex", "Hex"),
+            ("sample", "Sample"),
+            ("metadata", "Metadata"),
+        ],
+        note_metadata_rows=_note_metadata_rows(note, note_path, file_exists),
+        front_matter_items=list(front_matter.items()),
+        front_matter_raw=front_matter_raw,
+        sample_lines=note_settings["sample_lines"],
         message=request.args.get("message", ""),
     )
 
@@ -1609,6 +1756,25 @@ def _move_note_to_project(note_id, project_id):
     return target_path
 
 
+def _set_note_color(note_id, color):
+    note, _ = _get_note_record(note_id)
+    if not note:
+        raise ValueError("Note not found.")
+    note_path = _build_note_path(note)
+    if not note_path or not os.path.isfile(note_path):
+        raise ValueError("Note file not found.")
+    color = (color or "").strip()
+    allowed = {label.lower() for label, _style in NOTE_COLOR_OPTIONS}
+    if color.lower() not in allowed and not NOTE_COLOR_HEX_RE.match(color):
+        raise ValueError("Select a valid note color.")
+    updated_state = _set_note_front_matter_field(note_path, "color", color, aliases=["colour"])
+    folder_path = _normalize_note_path(note.get("path")) or os.path.dirname(note_path)
+    file_name = note.get("file_name") or os.path.basename(note_path)
+    content = _read_note_file(note_path)
+    _update_note_file_metadata(note_id, note, file_name, folder_path, content=content)
+    return updated_state
+
+
 def _derived_project_for_note_id(note_id):
     tbl = get_table_def("notes")
     if not tbl:
@@ -1673,22 +1839,41 @@ def _open_note_folder(note):
 def rename_note_route(note_id):
     if not security.can_edit_note(note_id, current_user):
         abort(403)
+    render_mode = _normalize_note_view_mode(request.form.get("return_format"))
     try:
         _rename_note(note_id, request.form.get("new_title", ""))
     except Exception as exc:
-        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Rename failed: {exc}"))
-    return redirect(url_for("notes.view_note_route", note_id=note_id))
+        return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode, message=f"Rename failed: {exc}"))
+    return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode))
 
 
 @notes_bp.route('/move/<int:note_id>', methods=["POST"])
 def move_note_route(note_id):
     if not security.can_edit_note(note_id, current_user):
         abort(403)
+    render_mode = _normalize_note_view_mode(request.form.get("return_format"))
     try:
         _move_note_to_project(note_id, request.form.get("project_id", ""))
     except Exception as exc:
-        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Move failed: {exc}"))
-    return redirect(url_for("notes.view_note_route", note_id=note_id))
+        return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode, message=f"Move failed: {exc}"))
+    return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode))
+
+
+@notes_bp.route('/color/<int:note_id>', methods=["POST"])
+def update_note_color_route(note_id):
+    if not security.can_edit_note(note_id, current_user):
+        abort(403)
+    render_mode = _normalize_note_view_mode(request.form.get("return_format"))
+    try:
+        _set_note_color(note_id, request.form.get("color", ""))
+    except Exception as exc:
+        return redirect(url_for(
+            "notes.view_note_route",
+            note_id=note_id,
+            format=render_mode,
+            message=f"Color update failed: {exc}",
+        ))
+    return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode))
 
 
 @notes_bp.route('/archive-delete/<int:note_id>', methods=["POST"])
@@ -1766,14 +1951,15 @@ def convert_note_to_howto_route(note_id):
 def open_note_folder_route(note_id):
     if not security.can_view_note(note_id, current_user):
         abort(403)
+    render_mode = _normalize_note_view_mode(request.form.get("return_format"))
     note, _ = _get_note_record(note_id)
     if not note:
         abort(404)
     try:
         _open_note_folder(note)
     except Exception as exc:
-        return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Open folder failed: {exc}"))
-    return redirect(url_for("notes.view_note_route", note_id=note_id))
+        return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode, message=f"Open folder failed: {exc}"))
+    return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode))
 
 
 @notes_bp.route('/api/new-note-options')

@@ -82,6 +82,7 @@ class TestSettingsSchema(unittest.TestCase):
             self.assertEqual(defaults["card_width_chars"], 50)
             self.assertEqual(defaults["title_font_size"], 18)
             self.assertEqual(defaults["preview_chars"], 300)
+            self.assertEqual(defaults["sample_lines"], 20)
             self.assertEqual(defaults["notes_per_page"], 50)
 
             settings.save_note_display_settings(
@@ -89,6 +90,7 @@ class TestSettingsSchema(unittest.TestCase):
                     "card_width_chars": "75",
                     "title_font_size": "22",
                     "preview_chars": "900",
+                    "sample_lines": "30",
                     "notes_per_page": "80",
                 },
                 conn,
@@ -97,6 +99,7 @@ class TestSettingsSchema(unittest.TestCase):
             self.assertEqual(saved["card_width_chars"], 75)
             self.assertEqual(saved["title_font_size"], 22)
             self.assertEqual(saved["preview_chars"], 900)
+            self.assertEqual(saved["sample_lines"], 30)
             self.assertEqual(saved["notes_per_page"], 80)
 
             settings.save_note_display_settings(
@@ -104,6 +107,7 @@ class TestSettingsSchema(unittest.TestCase):
                     "card_width_chars": "500",
                     "title_font_size": "2",
                     "preview_chars": "bad",
+                    "sample_lines": "0",
                     "notes_per_page": "0",
                 },
                 conn,
@@ -112,6 +116,7 @@ class TestSettingsSchema(unittest.TestCase):
             self.assertEqual(clamped["card_width_chars"], 120)
             self.assertEqual(clamped["title_font_size"], 12)
             self.assertEqual(clamped["preview_chars"], 300)
+            self.assertEqual(clamped["sample_lines"], 1)
             self.assertEqual(clamped["notes_per_page"], 5)
         finally:
             conn.close()

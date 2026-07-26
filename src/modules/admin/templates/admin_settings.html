@@ -193,6 +193,10 @@
               <input type="number" name="preview_chars" min="20" max="5000" value="{{ note_settings.preview_chars or 300 }}">
             </label>
             <label>
+              Sample lines
+              <input type="number" name="sample_lines" min="1" max="200" value="{{ note_settings.sample_lines or 20 }}">
+            </label>
+            <label>
               Notes per page
               <input type="number" name="notes_per_page" min="5" max="200" value="{{ note_settings.notes_per_page or 50 }}">
             </label>

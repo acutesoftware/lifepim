@@ -318,6 +318,7 @@ def settings_route():
                         "card_width_chars": request.form.get("card_width_chars"),
                         "title_font_size": request.form.get("title_font_size"),
                         "preview_chars": request.form.get("preview_chars"),
+                        "sample_lines": request.form.get("sample_lines"),
                         "notes_per_page": request.form.get("notes_per_page"),
                     },
                     conn,

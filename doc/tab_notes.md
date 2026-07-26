@@ -21,6 +21,42 @@ Open the Notes tab from the top navigation.
 
 Use the left project/sidebar tabs to filter notes by saved project metadata. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current project folder.
 
+### View a Single Note
+
+Once the user clicks on a note the Note View screen is shown : 
+
+The top header has the following controls:
+BOLD TITLE :  FileName.md  
+BREADCRUMB FOLDER NAVIGATION : root folder > subfolder > current folder
+CONTROLS : (series of buttons / drop down lists as per below)
+  LABEL : "View as :"
+  DROP DOWN LIST : [ Text | Markdown | Hex | Metadata ]
+  BUTTON : "Edit"
+  BUTTON : "Open Folder"
+  LABEL : Circle of colour (just a colored cicle)
+  DROP DOWN LIST : [List of Colors] - changing this changes the notes color
+  BUTTON : "Rename" (pops up dialog with current file asking for new name)
+  LABEL : "Project :"
+  DROP DOWN LIST : [List of Projects]
+  BUTTON : "Move" (moves Project to currently selected project)
+  BUTTON : Delete this file (asks for congirmation first then moves the file to the trash folder)
+  BUTTON : Convert to HOWTO
+  
+
+For the View as list:
+- Text mode : views the text as simple text file
+- Markdown : views as markdown with addition [img] tags rendered
+- Hex : view hex mode
+- Sample : Show the top 'nn' lines of the file and last 'nn' lines of the file ('nn = number of sample lines that can be set in the Settings > Note section)
+- Markdown : shows the full file metadata and file front matter
+
+
+MAIN BODY
+If the user is choosing to view metadata , then only the metadata and front matter is shown
+
+ Otherwise the content of the note is shown
+
+
 ### Add Notes
 
 New notes can be created from the Notes UI. The app writes a new `.md` file into the selected project's default notes folder and inserts a matching row into `lp_notes`.

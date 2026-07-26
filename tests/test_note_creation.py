@@ -86,6 +86,20 @@ class TestNoteCreation(unittest.TestCase):
         note_id = data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
         return note_id, created
 
+    def _notes_test_app(self):
+        app = Flask(__name__, template_folder=os.path.join(root_folder, "templates"))
+        app.register_blueprint(notes_routes.notes_bp)
+
+        @app.route("/search")
+        def search_route():
+            return ""
+
+        @app.route("/site.webmanifest")
+        def site_webmanifest():
+            return {}
+
+        return app
+
     def test_unmapped_and_filtered_notes_and_search(self):
         unmapped_dir = os.path.join(self.tmpdir.name, "unmapped")
         project_dir = os.path.join(self.tmpdir.name, "project")
@@ -321,6 +335,7 @@ class TestNoteCreation(unittest.TestCase):
                 "card_width_chars": "64",
                 "title_font_size": "20",
                 "preview_chars": "720",
+                "sample_lines": "12",
                 "notes_per_page": "75",
             },
             self.conn,
@@ -331,7 +346,68 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(loaded["card_width_chars"], 64)
         self.assertEqual(loaded["title_font_size"], 20)
         self.assertEqual(loaded["preview_chars"], 720)
+        self.assertEqual(loaded["sample_lines"], 12)
         self.assertEqual(loaded["notes_per_page"], 75)
+
+    def test_note_sample_text_uses_first_and_last_configured_lines(self):
+        note_text = "\n".join(f"line {idx}" for idx in range(1, 11))
+
+        sample = notes_routes._sample_note_text(note_text, 3)
+
+        self.assertIn("line 1\nline 2\nline 3", sample)
+        self.assertIn("... 4 lines omitted ...", sample)
+        self.assertIn("line 8\nline 9\nline 10", sample)
+        self.assertNotIn("line 4", sample)
+
+    def test_note_front_matter_block_is_extracted_for_metadata_view(self):
+        text = "---\ntitle: Meta\ncolor: Blue\n---\n\nBody text"
+
+        self.assertEqual(
+            notes_routes._front_matter_block_text(text),
+            "---\ntitle: Meta\ncolor: Blue\n---",
+        )
+
+    def test_set_note_color_updates_front_matter_and_database(self):
+        note_dir = os.path.join(self.tmpdir.name, "color_update")
+        note_id, created = self._create_note_record("color update", note_dir, project="")
+
+        notes_routes._set_note_color(note_id, "Blue")
+
+        with open(created["full_path"], "r", encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("color: Blue", text)
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT color FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["color"], "Blue")
+
+    def test_note_view_metadata_mode_hides_body_and_shows_front_matter(self):
+        note_dir = os.path.join(self.tmpdir.name, "metadata_view")
+        note_id, created = self._create_note_record("metadata view", note_dir, project="")
+        with open(created["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("---\ntitle: Meta View\ncolor: Blue\n---\n\nBody text")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{note_id}?format=metadata")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Front Matter", html)
+        self.assertIn("Meta View", html)
+        self.assertIn("color", html)
+        self.assertNotIn("Body text", html)
+
+    def test_note_view_markdown_mode_shows_body_without_front_matter(self):
+        note_dir = os.path.join(self.tmpdir.name, "markdown_view")
+        note_id, created = self._create_note_record("markdown view", note_dir, project="")
+        with open(created["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("---\ntitle: Markdown View\ncolor: Blue\n---\n\nBody text")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{note_id}?format=markdown")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Body text", html)
+        self.assertNotIn("title: Markdown View", html)
+        self.assertNotIn("color: Blue", html)
 
     def test_note_folder_id_preserves_live_note_path_alias_on_update(self):
         project_id = "pers/health"

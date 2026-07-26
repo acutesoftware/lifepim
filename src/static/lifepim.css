@@ -3715,6 +3715,158 @@ body.links-resizing {
   align-items: center;
 }
 
+.note-view-header {
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+}
+
+.note-view-title {
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.note-view-breadcrumb {
+  margin: 4px 0;
+}
+
+.note-inline-form {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin: 0;
+}
+
+.note-inline-form label {
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.note-view-toolbar select,
+.note-view-toolbar button,
+.note-button {
+  box-sizing: border-box;
+  height: 24px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background: #f7f7f7;
+  color: #222;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.note-view-toolbar select {
+  padding: 2px 4px;
+  max-width: 220px;
+}
+
+.note-view-toolbar button,
+.note-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.note-view-toolbar button:hover,
+.note-button:hover {
+  background: #e9edf5;
+}
+
+.note-danger-button {
+  border-color: #b85b5b !important;
+  color: #7a1f1f !important;
+}
+
+.note-color-dot {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.note-view-body {
+  min-width: 0;
+}
+
+.note-text-content {
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.note-sample-label {
+  color: #555;
+  font-size: 11px;
+  margin: 6px 0 0;
+}
+
+.note-hex-dump {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(220px, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.note-hex-dump > div {
+  border: 1px solid #ccc;
+  padding: 6px;
+  overflow-x: auto;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.note-metadata-view h4 {
+  margin: 10px 0 5px;
+}
+
+.note-metadata-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+
+.note-metadata-table th {
+  width: 170px;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.note-metadata-table td {
+  overflow-wrap: anywhere;
+}
+
+.note-empty-state,
+.note-file-warning {
+  color: #555;
+}
+
+@media (max-width: 700px) {
+  .note-view-toolbar select {
+    max-width: 170px;
+  }
+
+  .note-hex-dump {
+    grid-template-columns: 1fr;
+  }
+
+  .note-metadata-table th {
+    width: 110px;
+  }
+}
+
 .note-markdown-toolbar {
   display: flex;
   flex-wrap: nowrap;
