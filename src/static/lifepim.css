@@ -818,9 +818,8 @@ body.freeze-headers .content:has(.tabular-scroll) {
 }
 
 body.freeze-headers .content:has(.note-card-page) {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  display: block;
+  overflow: auto;
 }
 
 body.freeze-headers .content:has(.search-audio-layout),
@@ -3791,11 +3790,9 @@ body.links-resizing {
 }
 
 .note-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--note-card-width, 50ch)), var(--note-card-width, 50ch)));
-  grid-auto-rows: auto;
-  gap: 8px;
-  align-items: start;
+  display: block;
+  column-width: var(--note-card-width, 50ch);
+  column-gap: 8px;
   margin: 6px 0;
 }
 
@@ -3805,31 +3802,30 @@ body.links-resizing {
 }
 
 body.freeze-headers .note-card-page {
-  display: flex;
-  flex-direction: column;
   min-height: 0;
 }
 
 body.freeze-headers .note-card-page .note-card-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 4px;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .note-card {
-  display: block;
+  display: inline-block;
+  vertical-align: top;
   min-height: 96px;
   width: 100%;
-  max-width: var(--note-card-width, 50ch);
+  max-width: none;
   box-sizing: border-box;
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 6px;
   padding: 8px 10px;
+  margin: 0 0 8px;
   background: var(--note-color, #ffff93);
   color: #111;
   overflow: visible;
-  break-inside: avoid;
+  break-inside: avoid-column;
+  page-break-inside: avoid;
 }
 
 .note-card:hover,
@@ -3856,6 +3852,8 @@ body.freeze-headers .note-card-page .note-card-grid {
 
 .note-card-raw {
   display: block;
+  max-width: 100%;
+  min-width: 0;
   color: #222;
   font-family: inherit;
   font-size: 13px;
@@ -3866,6 +3864,8 @@ body.freeze-headers .note-card-page .note-card-grid {
 
 .note-card-markdown {
   display: block;
+  max-width: 100%;
+  min-width: 0;
   color: #222;
   font-size: 13px;
   line-height: 1.35;
