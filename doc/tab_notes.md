@@ -124,6 +124,34 @@ Saving a note updates the markdown file on disk. The app also updates the note m
 
 This means edits made through LifePIM keep the database metadata current.
 
+### Converting Notes to HOWTOs
+
+Open a note and click `Convert to HOWTO`.
+
+The app asks for confirmation before converting. If confirmed, LifePIM:
+
+- reads the note's markdown file from disk
+- creates a new row in `lp_howto`
+- uses the note filename without `.md` as the HOWTO title
+- copies the note's saved `lp_notes.project` into `lp_howto.project_id`
+- stores the original note markdown in `lp_howto.markdown_full_content`
+- stores the original note file path in `lp_howto.source_filepath`
+- removes the note row from `lp_notes`
+- opens the new HOWTO view
+
+The conversion does not immediately parse the note into HOWTO parts, tools, steps, or linked child HOWTOs. The new HOWTO is created with:
+
+```text
+parse_status = NOT_PARSED
+parse_message = Converted from Note. Open and Preview to parse.
+```
+
+This is deliberate. Notes are free-form markdown, while HOWTOs are structured blueprints. Automatically parsing an arbitrary note during conversion could create incorrect catalog records or fail on content that was never written as a blueprint.
+
+After conversion, open the HOWTO editor, click `Preview`, review the parsed summary/outcome/parts/tools/steps and diagnostics, then click `Save and Apply` when the markdown is ready to become structured HOW data.
+
+Conversion is a reclassification, not a file delete. The markdown content is preserved in the HOWTO record, and the source file path is retained for traceability.
+
 ### Import Folder
 
 Use:
