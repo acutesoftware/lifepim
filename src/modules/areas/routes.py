@@ -82,6 +82,28 @@ def _sidebar_rows_from_form(form):
     return rows
 
 
+def _new_default_folder_rows(rows):
+    default_rows = []
+    for row in rows:
+        if (row.get("original_area_id") or "").strip():
+            continue
+        if int(row.get("is_header") or 0) or int(row.get("is_system") or 0):
+            continue
+        if (row.get("area_id") or "").strip():
+            default_rows.append(row)
+    return default_rows
+
+
+def _areas_saved_message(created_default_folders=0, folder_errors=None):
+    message = "Areas saved."
+    if created_default_folders:
+        noun = "folder mapping" if created_default_folders == 1 else "folder mappings"
+        message += f" Created {created_default_folders} default {noun}."
+    if folder_errors:
+        message += " Default folder creation failed: " + "; ".join(folder_errors)
+    return message
+
+
 @areas_bp.route("/edit", methods=["GET", "POST"])
 def edit_areas_route():
     security.require_login()
@@ -94,8 +116,26 @@ def edit_areas_route():
                 count = areas_mod.seed_default_areas_for_user(current_user.user_id, replace=True)
                 return redirect(url_for("areas.edit_areas_route", message=f"Reset {count} area rows."))
             rows = _sidebar_rows_from_form(request.form)
+            new_folder_rows = _new_default_folder_rows(rows)
             areas_mod.save_user_sidebar_rows(rows, owner_user_id=current_user.user_id)
-            return redirect(url_for("areas.edit_areas_route", message="Areas saved."))
+            created_default_folders = 0
+            folder_errors = []
+            for row in new_folder_rows:
+                try:
+                    created_default_folders += areas_mod.ensure_default_area_folder_for_area(
+                        row.get("area_id") or "",
+                        area_name=row.get("area_name") or "",
+                        owner_user_id=current_user.user_id,
+                        username=getattr(current_user, "username", ""),
+                    )
+                except Exception as exc:
+                    folder_errors.append(f"{row.get('area_id')}: {exc}")
+            return redirect(
+                url_for(
+                    "areas.edit_areas_route",
+                    message=_areas_saved_message(created_default_folders, folder_errors),
+                )
+            )
         except Exception as exc:
             error = f"Areas were not saved: {exc}"
     rows = areas_mod.areas_side_tabs(owner_user_id=current_user.user_id, seed=True)

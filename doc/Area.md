@@ -39,7 +39,11 @@ If a table has `owner_user_id`, the update is scoped to the current user. The re
 
 Deleting an Area removes it from the sidebar by removing the `lp_areas` row. It does not delete notes, tasks, files, media, HOW rows, or other content. It also does not delete `lp_area_folders` mappings; re-adding the same Area ID will make those mappings visible again. Remove folder mappings from the Notes folder panel when you intend to stop using them.
 
-Adding an Area creates a new sidebar row only. It does not create folders or move existing content. Add folder mappings from the Notes folder panel after creating the Area.
+Adding an Area creates a new sidebar row and, for normal Area rows, a default note folder mapping in `lp_area_folders`. The path is created under the current user's configured notes root using a safe folder name derived from the Area ID, for example `work/business` becomes `work-business`. Header rows do not get folders.
+
+The new mapping is stored as `folder_role = 'default'`, `create_type = 'markdown'`, and `is_write_enabled = 1`. This gives the Note view's Move File action a destination immediately after the Area is saved. Adding an Area still does not move existing content; assign notes to the Area separately, then use Move File when you want the markdown file moved into the Area's default folder.
+
+If the configured notes root is missing or cannot be created, the Area row is still saved and the Edit Areas screen reports the folder creation failure. In that case, fix the user notes root or add a default folder from the Notes folder panel before using Move File for that Area.
 
 ## Direct Database Edits
 

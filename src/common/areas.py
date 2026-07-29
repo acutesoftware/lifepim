@@ -1430,3 +1430,59 @@ def ensure_default_area_folders_for_user(owner_user_id, username=None, conn=None
         )
         created += 1
     return created
+
+
+def ensure_default_area_folder_for_area(
+    area_id,
+    area_name="",
+    owner_user_id=None,
+    username=None,
+    conn=None,
+    create_dirs=True,
+):
+    conn = _get_conn(conn)
+    ensure_areas_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    if owner_user_id is None:
+        raise ValueError("A logged-in user is required.")
+    area_id = (area_id or "").strip()
+    if not area_id:
+        return 0
+    row = area_get(area_id, conn=conn, owner_user_id=owner_user_id)
+    if not row:
+        return 0
+    if int(row.get("is_header") or 0) or int(row.get("is_system") or 0):
+        return 0
+    if area_default_folder_get(area_id, conn=conn, owner_user_id=owner_user_id):
+        return 0
+
+    paths = user_paths.get_or_create_user_paths(
+        conn,
+        owner_user_id,
+        username=username,
+        create_dirs=create_dirs,
+    )
+    notes_root = user_paths.normalize_path(paths.get("notes_root_path") or "")
+    if not notes_root:
+        return 0
+    if create_dirs:
+        for key in ("file_root_path", "notes_root_path", "areas_root_path", "lists_root_path"):
+            path_value = paths.get(key)
+            if path_value:
+                os.makedirs(path_value, exist_ok=True)
+    folder_name = user_paths.safe_area_folder_name(area_id, area_name or row.get("area_name") or "")
+    folder_path = user_paths.normalize_path(os.path.join(notes_root, folder_name))
+    if create_dirs:
+        os.makedirs(folder_path, exist_ok=True)
+    folder_id = area_folder_add(
+        area_id,
+        folder_path,
+        folder_role="default",
+        create_type="markdown",
+        is_write_enabled=1,
+        tags="user_default",
+        notes="Default per-user notes folder",
+        conn=conn,
+        owner_user_id=owner_user_id,
+    )
+    return 1 if folder_id else 0

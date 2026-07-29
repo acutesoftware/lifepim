@@ -243,6 +243,81 @@ class TestAreas(unittest.TestCase):
                 else:
                     os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = old_env
 
+    def test_default_folder_for_new_area_uses_user_notes_root_once(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_env = os.environ.get("LIFEPIM_LAN_USER_ROOT_BASE")
+            os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = tmpdir
+            try:
+                self.conn.execute(
+                    """
+                    CREATE TABLE users (
+                        user_id INTEGER PRIMARY KEY,
+                        username TEXT,
+                        display_name TEXT,
+                        password_hash TEXT,
+                        role TEXT,
+                        is_active INTEGER
+                    )
+                    """
+                )
+                self.conn.execute(
+                    "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
+                    "VALUES (8, 'alice', 'Alice', 'hash', 'user', 1)"
+                )
+                areas.save_user_sidebar_rows(
+                    [
+                        {
+                            "area_id": "make/new-game",
+                            "area_name": "New Game",
+                            "icon": "N",
+                            "group_name": "MAKE",
+                        }
+                    ],
+                    owner_user_id=8,
+                    conn=self.conn,
+                )
+
+                created = areas.ensure_default_area_folder_for_area(
+                    "make/new-game",
+                    area_name="New Game",
+                    owner_user_id=8,
+                    username="alice",
+                    conn=self.conn,
+                    create_dirs=True,
+                )
+                created_again = areas.ensure_default_area_folder_for_area(
+                    "make/new-game",
+                    area_name="New Game",
+                    owner_user_id=8,
+                    username="alice",
+                    conn=self.conn,
+                    create_dirs=True,
+                )
+
+                default_path = areas.area_default_folder_get(
+                    "make/new-game",
+                    owner_user_id=8,
+                    conn=self.conn,
+                )
+                expected_path = os.path.join(tmpdir, "alice", "notes", "make-new-game")
+                self.assertEqual(created, 1)
+                self.assertEqual(created_again, 0)
+                self.assertEqual(default_path.lower(), expected_path.lower())
+                self.assertTrue(os.path.isdir(expected_path))
+                rows = self.conn.execute(
+                    "SELECT folder_role, create_type, is_write_enabled FROM lp_area_folders "
+                    "WHERE owner_user_id = 8 AND area_id = 'make/new-game'"
+                ).fetchall()
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["folder_role"], "default")
+                self.assertEqual(rows[0]["create_type"], "markdown")
+                self.assertEqual(rows[0]["is_write_enabled"], 1)
+            finally:
+                if old_env is None:
+                    os.environ.pop("LIFEPIM_LAN_USER_ROOT_BASE", None)
+                else:
+                    os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = old_env
+
     def test_legacy_area_folders_are_claimed_for_duncan_on_migration(self):
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
