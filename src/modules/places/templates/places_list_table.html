@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('places.list_places_table_route', proj=project) }}">Table</a> |
-    <a href="{{ url_for('places.list_places_map_route', proj=project) }}">Map</a> |
-    <a href="{{ url_for('places.add_place_route', proj=project) }}">Add Place</a>
+    <a href="{{ url_for('places.list_places_table_route', area=area) }}">Table</a> |
+    <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a> |
+    <a href="{{ url_for('places.add_place_route', area=area) }}">Add Place</a>
   </div>
 
 {% set link_list_type = "place" %}
@@ -18,28 +18,28 @@
     {% for col in col_list %}
     {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
     <th>
-      <a href="{{ url_for('places.list_places_table_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      <a href="{{ url_for('places.list_places_table_route', area=area, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
       {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     {% endfor %}
     <th>Actions</th>
   </tr>
   {% for item in items %}
-  <tr onclick="window.location='{{ url_for('places.view_place_route', place_id=item.id, proj=project) }}';" style="cursor:pointer;"
+  <tr onclick="window.location='{{ url_for('places.view_place_route', place_id=item.id, area=area) }}';" style="cursor:pointer;"
       class="link-draggable" data-record-type="place" data-record-id="{{ item.id }}" data-record-title="{{ item.name }}">
     <td onclick="event.stopPropagation();"><input type="checkbox" class="link-select" data-record-type="place" data-record-id="{{ item.id }}" data-record-title="{{ item.name }}"></td>
     {% for col in col_list %}
     <td>
       {% if col == 'name' %}
-      <a href="{{ url_for('places.view_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation();">{{ item[col] }}</a>
+      <a href="{{ url_for('places.view_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation();">{{ item[col] }}</a>
       {% else %}
       {{ item[col] }}
       {% endif %}
     </td>
     {% endfor %}
     <td>
-      <a href="{{ url_for('places.edit_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation();">Edit</a> |
-      <a href="{{ url_for('places.delete_place_route', place_id=item.id, proj=project) }}" onclick="event.stopPropagation(); return confirm('Delete item?');">Del</a>
+      <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation();">Edit</a> |
+      <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation(); return confirm('Delete item?');">Del</a>
       {% if item.map_actions %}
         <span class="places-action-sep">|</span>
         {% for action in item.map_actions %}

@@ -19,7 +19,7 @@ class TestAudioPlayerCurrentList(unittest.TestCase):
         self.conn.execute(
             "CREATE TABLE lp_audio ("
             "id INTEGER PRIMARY KEY, file_name TEXT, path TEXT, folder_id TEXT, file_type TEXT, size TEXT, "
-            "date_modified TEXT, duration TEXT, artist TEXT, album TEXT, song TEXT, project TEXT, "
+            "date_modified TEXT, duration TEXT, artist TEXT, album TEXT, song TEXT, area TEXT, "
             "user_name TEXT, rec_extract_date TEXT)"
         )
         for audio_id, name in [(1, "one.mp3"), (2, "two.mp3"), (3, "three.mp3")]:

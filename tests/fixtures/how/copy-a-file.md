@@ -1,7 +1,7 @@
 ---
 key: copy-a-file
 title: Copy a File
-project: Development
+area: Development
 status: tested
 estimated_minutes: 2
 ---

@@ -14,7 +14,7 @@ from common import config as cfg
 from common import settings as settings_mod
 from common.media_schema import ensure_media_schema
 from common.search import parse_search_terms
-from common.utils import get_side_tabs, get_tabs, paginate_total, build_pagination
+from common.utils import get_side_tabs, get_tabs, paginate_total, build_pagination, request_area_param
 from core import security
 
 
@@ -1273,7 +1273,7 @@ def media_player_route():
         sort_col=sort_key,
         sort_dir="desc",
         limit=limit,
-        project=None,
+        area=None,
     )
 
 
@@ -1304,7 +1304,7 @@ def view_media_route(media_id):
         file_exists=os.path.exists(full_path),
         is_video=_is_video(item),
         view_mode=view_mode,
-        project=request.args.get("proj"),
+        area=request_area_param() or None,
     )
 
 

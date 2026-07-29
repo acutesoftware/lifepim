@@ -266,9 +266,9 @@ def get_table_metadata(conn, tbl):
 ####################################################################
 # ETL Functions
 
-def job_create(conn, proj_id, job_num, job_id, details):
-    sql_tbl = '''INSERT INTO sys_jobs (proj_id, job_num, job_id, details) VALUES (?, ?, ?, ?)'''
-    data = (proj_id, job_num, job_id, details )
+def job_create(conn, area_id, job_num, job_id, details):
+    sql_tbl = '''INSERT INTO sys_jobs (area_id, job_num, job_id, details) VALUES (?, ?, ?, ?)'''
+    data = (area_id, job_num, job_id, details )
     exec_sql(conn, sql_tbl, data)
 
     # now we need to remove all prev steps for this job from job_steps table

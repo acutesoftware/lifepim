@@ -937,13 +937,13 @@ def _relative_note_path(note, root=None):
     return os.path.basename(full_path)
 
 
-def _matching_project_folder_rows(note, owner_user_id):
+def _matching_area_folder_rows(note, owner_user_id):
     conn = data._get_conn()
     try:
         table_names = {
             row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
-        if "lp_project_folders" not in table_names:
+        if "lp_area_folders" not in table_names:
             return []
     except Exception:
         return []
@@ -957,20 +957,20 @@ def _matching_project_folder_rows(note, owner_user_id):
         full_path = notes_routes._normalize_note_path(notes_routes._build_note_path(note))
     except Exception:
         full_path = notes_routes._build_note_path(note)
-    folder_columns = _table_columns(conn, "lp_project_folders")
-    if not {"project_id", "path_prefix"}.issubset(folder_columns):
+    folder_columns = _table_columns(conn, "lp_area_folders")
+    if not {"area_id", "path_prefix"}.issubset(folder_columns):
         return []
-    project_join = ""
-    project_name_expr = "'' AS project_name"
-    if "lp_projects" in table_names:
-        project_columns = _table_columns(conn, "lp_projects")
-        if {"owner_user_id", "project_id", "project_name"}.issubset(project_columns):
-            project_join = (
-                "LEFT JOIN lp_projects p "
+    area_join = ""
+    area_name_expr = "'' AS area_name"
+    if "lp_areas" in table_names:
+        area_columns = _table_columns(conn, "lp_areas")
+        if {"owner_user_id", "area_id", "area_name"}.issubset(area_columns):
+            area_join = (
+                "LEFT JOIN lp_areas p "
                 "ON p.owner_user_id IS pf.owner_user_id "
-                "AND p.project_id = pf.project_id"
+                "AND p.area_id = pf.area_id"
             )
-            project_name_expr = "COALESCE(p.project_name, '') AS project_name"
+            area_name_expr = "COALESCE(p.area_name, '') AS area_name"
     owner_condition = "pf.owner_user_id IS ?" if "owner_user_id" in folder_columns else "? IS NULL"
     enabled_condition = "AND pf.is_enabled = 1" if "is_enabled" in folder_columns else ""
     role_condition = (
@@ -983,10 +983,10 @@ def _matching_project_folder_rows(note, owner_user_id):
         try:
             rows = conn.execute(
                 f"""
-                SELECT pf.project_id, pf.path_prefix, {folder_role_expr} AS folder_role,
-                       {sort_order_expr} AS sort_order, {project_name_expr}
-                FROM lp_project_folders pf
-                {project_join}
+                SELECT pf.area_id, pf.path_prefix, {folder_role_expr} AS folder_role,
+                       {sort_order_expr} AS sort_order, {area_name_expr}
+                FROM lp_area_folders pf
+                {area_join}
                 WHERE {owner_condition}
                   {enabled_condition}
                   {role_condition}
@@ -1015,7 +1015,7 @@ def _matching_project_folder_rows(note, owner_user_id):
     return owner_rows or _rows_for_owner(None)
 
 
-def _project_folder_rows_for_manifest(owner_user_id):
+def _area_folder_rows_for_manifest(owner_user_id):
     conn = data._get_conn()
     try:
         table_names = {
@@ -1023,22 +1023,22 @@ def _project_folder_rows_for_manifest(owner_user_id):
         }
     except Exception:
         return []
-    if "lp_project_folders" not in table_names:
+    if "lp_area_folders" not in table_names:
         return []
-    folder_columns = _table_columns(conn, "lp_project_folders")
-    if not {"project_id", "path_prefix"}.issubset(folder_columns):
+    folder_columns = _table_columns(conn, "lp_area_folders")
+    if not {"area_id", "path_prefix"}.issubset(folder_columns):
         return []
-    project_join = ""
-    project_name_expr = "'' AS project_name"
-    if "lp_projects" in table_names:
-        project_columns = _table_columns(conn, "lp_projects")
-        if {"owner_user_id", "project_id", "project_name"}.issubset(project_columns):
-            project_join = (
-                "LEFT JOIN lp_projects p "
+    area_join = ""
+    area_name_expr = "'' AS area_name"
+    if "lp_areas" in table_names:
+        area_columns = _table_columns(conn, "lp_areas")
+        if {"owner_user_id", "area_id", "area_name"}.issubset(area_columns):
+            area_join = (
+                "LEFT JOIN lp_areas p "
                 "ON p.owner_user_id IS pf.owner_user_id "
-                "AND p.project_id = pf.project_id"
+                "AND p.area_id = pf.area_id"
             )
-            project_name_expr = "COALESCE(p.project_name, '') AS project_name"
+            area_name_expr = "COALESCE(p.area_name, '') AS area_name"
     owner_condition = "pf.owner_user_id IS ?" if "owner_user_id" in folder_columns else "? IS NULL"
     enabled_condition = "AND pf.is_enabled = 1" if "is_enabled" in folder_columns else ""
     role_condition = (
@@ -1053,10 +1053,10 @@ def _project_folder_rows_for_manifest(owner_user_id):
         try:
             fetched = conn.execute(
                 f"""
-                SELECT pf.project_id, pf.path_prefix, {folder_role_expr} AS folder_role,
-                       {sort_order_expr} AS sort_order, {project_name_expr}
-                FROM lp_project_folders pf
-                {project_join}
+                SELECT pf.area_id, pf.path_prefix, {folder_role_expr} AS folder_role,
+                       {sort_order_expr} AS sort_order, {area_name_expr}
+                FROM lp_area_folders pf
+                {area_join}
                 WHERE {owner_condition}
                   {enabled_condition}
                   {role_condition}
@@ -1079,9 +1079,9 @@ def _project_folder_rows_for_manifest(owner_user_id):
     return rows
 
 
-def _matching_project_folder_rows_from_cache(note, owner_user_id, project_folder_rows):
-    if project_folder_rows is None:
-        return _matching_project_folder_rows(note, owner_user_id)
+def _matching_area_folder_rows_from_cache(note, owner_user_id, area_folder_rows):
+    if area_folder_rows is None:
+        return _matching_area_folder_rows(note, owner_user_id)
     try:
         folder_path = notes_routes._normalize_note_path(note.get("path")) or os.path.dirname(notes_routes._build_note_path(note))
     except Exception:
@@ -1096,7 +1096,7 @@ def _matching_project_folder_rows_from_cache(note, owner_user_id, project_folder
 
     def _matches(owner_value):
         matched = []
-        for row in project_folder_rows:
+        for row in area_folder_rows:
             if row.get("_manifest_owner_user_id") != owner_value:
                 continue
             path_prefix = row.get("path_prefix") or ""
@@ -1110,10 +1110,10 @@ def _matching_project_folder_rows_from_cache(note, owner_user_id, project_folder
     return owner_rows or _matches(None)
 
 
-def _derived_project_for_note(note, owner_user_id=None, project_folder_rows=None):
-    fallback = note.get("project") or ""
+def _derived_area_for_note(note, owner_user_id=None, area_folder_rows=None):
+    fallback = note.get("area") or ""
     owner_user_id = owner_user_id if owner_user_id is not None else note.get("owner_user_id")
-    rows = _matching_project_folder_rows_from_cache(note, owner_user_id, project_folder_rows)
+    rows = _matching_area_folder_rows_from_cache(note, owner_user_id, area_folder_rows)
     if not rows:
         return fallback
     best_prefix_len = max(len(row.get("path_prefix") or "") for row in rows)
@@ -1121,25 +1121,25 @@ def _derived_project_for_note(note, owner_user_id=None, project_folder_rows=None
     role_order = {"default": 0, "include": 1, "output": 2, "archive": 3}
 
     def _sort_key(row):
-        project_id = row.get("project_id") or ""
+        area_id = row.get("area_id") or ""
         return (
             -len(row.get("path_prefix") or ""),
             role_order.get(row.get("folder_role") or "", 9),
-            project_id.count("/"),
-            len(project_id),
-            project_id,
+            area_id.count("/"),
+            len(area_id),
+            area_id,
             row.get("path_prefix") or "",
         )
 
     named_child_rows = []
     for row in best_rows:
-        project_id = row.get("project_id") or ""
-        project_name = row.get("project_name") or ""
-        if "/" in project_id and project_name and project_name.lower() in (row.get("full_path") or "").lower():
+        area_id = row.get("area_id") or ""
+        area_name = row.get("area_name") or ""
+        if "/" in area_id and area_name and area_name.lower() in (row.get("full_path") or "").lower():
             named_child_rows.append(row)
     if named_child_rows:
-        return sorted(named_child_rows, key=_sort_key)[0].get("project_id") or fallback
-    return sorted(best_rows, key=_sort_key)[0].get("project_id") or fallback
+        return sorted(named_child_rows, key=_sort_key)[0].get("area_id") or fallback
+    return sorted(best_rows, key=_sort_key)[0].get("area_id") or fallback
 
 
 def _iso_from_state_or_note(state, note):
@@ -1181,7 +1181,7 @@ def _serialize_note_item(
     include_front_matter=True,
     item_uuid=None,
     cached_sha="",
-    project_folder_rows=None,
+    area_folder_rows=None,
 ):
     note_path = note_path_override or notes_routes._build_note_path(note)
     if include_content:
@@ -1215,7 +1215,7 @@ def _serialize_note_item(
     if state and not front_matter_metadata.get("date_created") and state.get("date_created"):
         front_matter_metadata["date_created"] = state.get("date_created") or ""
         front_matter_metadata["created_at"] = state.get("created_at") or _iso_from_note_value(state.get("date_created") or "")
-    derived_project = _derived_project_for_note(note, owner_user_id=user_id, project_folder_rows=project_folder_rows)
+    derived_area = _derived_area_for_note(note, owner_user_id=user_id, area_folder_rows=area_folder_rows)
     item_owner_user_id = _effective_note_owner_user_id(note, user_id=user_id)
     item = {
         "id": item_uuid or _item_uuid_for_note(note["id"], item_owner_user_id),
@@ -1225,13 +1225,13 @@ def _serialize_note_item(
         "sha256": state.get("sha256") if state and state.get("sha256") else (cached_sha or _cached_item_sha("note", note["id"]) or ""),
         "version": _version_from_state(state),
         "modified_at": _iso_from_state_or_note(state, note) or "",
-        "project": derived_project or "",
-        "derived_project": derived_project or "",
+        "area": derived_area or "",
+        "derived_area": derived_area or "",
     }
     item.update(front_matter_metadata)
     item["metadata"] = dict(front_matter_metadata)
-    item["metadata"]["project"] = derived_project or ""
-    item["metadata"]["derived_project"] = derived_project or ""
+    item["metadata"]["area"] = derived_area or ""
+    item["metadata"]["derived_area"] = derived_area or ""
     if include_content:
         item["content"] = content
     return item
@@ -1241,14 +1241,14 @@ def _update_note_metadata(note_id, note, state):
     tbl = _note_table()
     values_map = {col: note.get(col, "") for col in tbl["col_list"]}
     note_path = notes_routes._build_note_path(note)
-    metadata = notes_routes._note_metadata_from_file(note_path, fallback_project=note.get("project") or "")
+    metadata = notes_routes._note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
     if state:
         values_map["size"] = state.get("size", values_map.get("size", ""))
         values_map["date_modified"] = state.get("date_modified", values_map.get("date_modified", ""))
     values_map["title"] = metadata.get("title") or values_map.get("title", "")
     values_map["color"] = metadata.get("color") or values_map.get("color", "")
     values_map["date_created"] = metadata.get("date_created") or values_map.get("date_created", "")
-    values_map["project"] = metadata.get("project") or values_map.get("project", "")
+    values_map["area"] = metadata.get("area") or values_map.get("area", "")
     values_map["important"] = metadata.get("important") or values_map.get("important", "")
     values_map["source_note_id"] = metadata.get("source_note_id") or values_map.get("source_note_id", "")
     values = [values_map.get(col, "") for col in tbl["col_list"]]
@@ -1551,7 +1551,7 @@ def _create_note_from_mobile(payload_item, device):
     attachment_result = _write_payload_attachments(payload_item, note_path)
     front_matter = notes_routes._parse_note_front_matter_text(str(content))
     content_metadata = _metadata_from_front_matter(front_matter)
-    file_metadata = notes_routes._note_metadata_from_file(note_path, fallback_project=payload_item.get("project") or "")
+    file_metadata = notes_routes._note_metadata_from_file(note_path, fallback_area=payload_item.get("area") or "")
 
     tbl = _note_table()
     table_columns = _table_columns(data._get_conn(), tbl["name"])
@@ -1576,7 +1576,7 @@ def _create_note_from_mobile(payload_item, device):
             or ""
         ),
         "date_modified": state.get("date_modified", "") if state else "",
-        "project": payload_item.get("project") or content_metadata.get("project") or file_metadata.get("project") or "",
+        "area": payload_item.get("area") or content_metadata.get("area") or file_metadata.get("area") or "",
         "important": (
             notes_routes._front_matter_bool_text(payload_item.get("important"))
             if payload_item.get("important") is not None
@@ -1825,7 +1825,7 @@ def sync_manifest_route():
         include_front_matter = len(rows) <= int(current_app.config.get("LIFEPIM_POCKET_MANIFEST_FRONT_MATTER_LIMIT", POCKET_MANIFEST_FRONT_MATTER_LIMIT))
     item_uuid_map = _item_uuid_map_for_notes(rows, user_id=device.get("user_id"))
     cached_sha_map = _cached_note_sha_map([note.get("id") for note in rows])
-    project_folder_rows = _project_folder_rows_for_manifest(device.get("user_id"))
+    area_folder_rows = _area_folder_rows_for_manifest(device.get("user_id"))
     for idx, note in enumerate(rows, start=1):
         try:
             note_path = notes_routes._build_note_path(note)
@@ -1846,7 +1846,7 @@ def sync_manifest_route():
                     include_front_matter=include_front_matter,
                     item_uuid=item_uuid_map.get(int(note["id"])),
                     cached_sha=cached_sha_map.get(int(note["id"]), ""),
-                    project_folder_rows=project_folder_rows,
+                    area_folder_rows=area_folder_rows,
                 )
             )
         except Exception as exc:

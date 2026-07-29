@@ -8,7 +8,7 @@
     </select>
 
     <form method="get" action="{{ url_for(route_name) }}" class="note-sort-form">
-      {% if project %}<input type="hidden" name="proj" value="{{ project }}">{% endif %}
+      {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
       {% if folder_filter %}<input type="hidden" name="folder" value="{{ folder_filter }}">{% endif %}
       {% if card_mode %}<input type="hidden" name="mode" value="{{ card_mode }}">{% endif %}
       <label for="notes-sort-col">Sort by:</label>
@@ -23,7 +23,7 @@
       </select>
     </form>
 
-    <a href="#" class="note-button new-note-btn" data-sidebar-label="{{ project or '' }}">New Note</a>
+    <a href="#" class="note-button new-note-btn" data-sidebar-label="{{ area or '' }}">New Note</a>
 
     <span class="note-status"><span class="note-total-count">{{ total_notes|default(notes|length) }} Notes</span></span>
     {% set link_list_type = "note" %}
@@ -33,7 +33,7 @@
 
     <select class="note-more-menu" aria-label="More note actions" onchange="if (this.value) window.location.href = this.value; this.selectedIndex = 0;">
       <option value="">...</option>
-      <option value="{{ url_for('notes.import_notes_folder_route', proj=project) }}">Import Folder</option>
+      <option value="{{ url_for('notes.import_notes_folder_route', area=area) }}">Import Folder</option>
     </select>
   </div>
 

@@ -22,40 +22,40 @@ import config as mod_cfg
 
 all_tables = [
     {'nme':'event',
-     'cols':['id','dateevent_str','timeevent', 'details','event_type', 'proj'],
+     'cols':['id','dateevent_str','timeevent', 'details','event_type', 'area'],
      'imp_cols':['dateevent_str','details'],
      'col_types':['id','Date','Time','Note','Text','List'],
      'search_col':['details','dateevent_str'],
      'url':'calendar',
        'page_function':'page_calendar',
      },
-    {'nme':'note',  #      'cols':['id','title','pinned', 'important', 'content','proj','is_archived','is_private','is_encrypted','due_date', 'color'],
-     'cols':['id','title','pinned', 'important','is_archived', 'color', 'content','proj'], #,'is_encrypted'],
-     'imp_cols':['proj','title','content'],
+    {'nme':'note',  #      'cols':['id','title','pinned', 'important', 'content','area','is_archived','is_private','is_encrypted','due_date', 'color'],
+     'cols':['id','title','pinned', 'important','is_archived', 'color', 'content','area'], #,'is_encrypted'],
+     'imp_cols':['area','title','content'],
      'col_types':['id','Text','Checkbox','Checkbox','Checkbox','Color', 'Note','List'], #'Checkbox'], #,'Checkbox','Checkbox','Checkbox', 'Date', 'Text'],
      'search_col':['title','content'],
      'url':'notes',
      'page_function':'page_notes',
     },
     {'nme':'task',
-    'cols':['id','Title','Pinned', 'Important', 'Notes','proj','Done'],   # , 'due_date'
-    'imp_cols':['proj','title','notes', 'Date'],
+    'cols':['id','Title','Pinned', 'Important', 'Notes','area','Done'],   # , 'due_date'
+    'imp_cols':['area','title','notes', 'Date'],
     'col_types':['id','Text','Checkbox','Checkbox', 'Note','List','Checkbox'],
      'search_col':['title','notes'],
     'url':'tasks',
     'page_function':'page_tasks',
     },
 
-    {'nme':'task_project',
-    'cols':['id','category', 'title','proj'],   # , 'due_date'
+    {'nme':'task_area',
+    'cols':['id','category', 'title','area'],   # , 'due_date'
     'imp_cols':['title'],
     'col_types':['id','Number','Text','List'],
     'search_col':['title'],
-    'url':'projects',
-    'page_function':'page_projects',
+    'url':'areas',
+    'page_function':'page_areas',
     },
     {'nme':'goal',
-    'cols':['id','goal_area','goal_name','proj', 'goal_note'],
+    'cols':['id','goal_area','goal_name','area', 'goal_note'],
     'imp_cols':['goal_area','goal_name','goal_note'],
     'col_types':['id','Text','Text','List','Text'],
      'search_col':['goal_area','goal_name','goal_note'],
@@ -63,7 +63,7 @@ all_tables = [
     'page_function':'page_goals',
     },
     {'nme':'place',
-     'cols':['id','nme','proj'],
+     'cols':['id','nme','area'],
      'imp_cols':['nme'],
      'col_types':['id','List', 'Text'],
      'search_col':[],
@@ -71,7 +71,7 @@ all_tables = [
      'page_function':'page_places',
     },
     {'nme':'money',
-     'cols':['id','nme','proj', 'amount'],
+     'cols':['id','nme','area', 'amount'],
      'imp_cols':['nme'],
      'col_types':['id','List','Text','Number'],
      'search_col':[],
@@ -87,7 +87,7 @@ all_tables = [
      'page_function':'page_badges',
     },
     {'nme':'music',
-     'cols':['id','nme','proj'],
+     'cols':['id','nme','area'],
      'imp_cols':['nme'],
      'col_types':['id','Text','List'],
      'search_col':[],
@@ -95,7 +95,7 @@ all_tables = [
      'page_function':'page_music',
     },
     {'nme':'images',
-     'cols':['id','nme','proj'],
+     'cols':['id','nme','area'],
      'imp_cols':['nme'],
      'col_types':['id','Text','List'],
      'search_col':[],
@@ -103,7 +103,7 @@ all_tables = [
      'page_function':'page_images',
     },
     {'nme':'files',
-     'cols':['id','nme','proj'],
+     'cols':['id','nme','area'],
      'imp_cols':['nme'],
      'col_types':['id','Text','List'],
      'search_col':[],
@@ -111,15 +111,15 @@ all_tables = [
      'page_function':'page_files',
     },
     {'nme':'apps',
-    'cols':['id','proj','app_name','app_desc','app_launch_url', 'app_notes'],
-    'imp_cols':['app_name','app_desc','app_launch_url','app_notes','proj'],
+    'cols':['id','area','app_name','app_desc','app_launch_url', 'app_notes'],
+    'imp_cols':['app_name','app_desc','app_launch_url','app_notes','area'],
     'col_types':['id','List','Text','Text','Text', 'Note'],
      'search_col':['app_name','app_desc','app_launch_url'],
     'url':'apps',
     'page_function':'page_apps',
     },
-    {'nme':'data_tables', #    'cols':['id','table_name','color','proj','num_rows','num_cols', 'table_desc'],
-    'cols':['id','table_name','color','proj', 'table_desc'],
+    {'nme':'data_tables', #    'cols':['id','table_name','color','area','num_rows','num_cols', 'table_desc'],
+    'cols':['id','table_name','color','area', 'table_desc'],
     'imp_cols':['table_name','table_desc'],
     'col_types':['id','Text','Color','List','Text','Text','Text'],
      'search_col':['table_name', 'table_desc'],
@@ -161,10 +161,10 @@ def generate_csv_from_db_config():
 
 
     #-------- SIDETABS -------------
-    fprj = open(op_folder + os.sep + 'd_ref_proj.csv', 'w', encoding='utf-8')  
+    fprj = open(op_folder + os.sep + 'd_ref_area.csv', 'w', encoding='utf-8')  
     fprj.write('id,label,desc,is_fav,is_current\n')    
 
-    proj_list = []
+    area_list = []
     opfile = op_folder + os.sep + 'ui_sidetabs.csv'
     with open(opfile, 'w', encoding='utf-8') as fop:
         fop.write('id,icon,label\n')
@@ -172,10 +172,10 @@ def generate_csv_from_db_config():
             fop.write(lst_to_csv_str([tb['id'] ,tb['icon'], tb['label']]))
             fop.write('\n')
 
-            # also write this data to projects
+            # also write this data to areas
             fprj.write(lst_to_csv_str([tb['id'] , tb['label'], tb['label'].title(), '0', '1']))    
             fprj.write('\n')
-            proj_list.append(tb['label'])
+            area_list.append(tb['label'])
     
     #--------- TABLES -------------
     ftbl = open(op_folder + os.sep + 'sys_tables.csv', 'w', encoding='utf-8')  
@@ -194,9 +194,9 @@ def generate_csv_from_db_config():
         with open(opfile, 'w', encoding='utf-8') as fop:
             fop.write(lst_to_csv_str(table['cols']))
             fop.write('\n')
-            fop.write(get_dummy_data_by_col_types(table['nme'], table['col_types'], proj_list) + '\n')
-            fop.write(get_dummy_data_by_col_types(table['nme'], table['col_types'], proj_list) + '\n')
-            fop.write(get_dummy_data_by_col_types(table['nme'], table['col_types'], proj_list) + '\n')
+            fop.write(get_dummy_data_by_col_types(table['nme'], table['col_types'], area_list) + '\n')
+            fop.write(get_dummy_data_by_col_types(table['nme'], table['col_types'], area_list) + '\n')
+            fop.write(get_dummy_data_by_col_types(table['nme'], table['col_types'], area_list) + '\n')
 
             
             # add the table definition to master table list
@@ -221,7 +221,7 @@ def generate_csv_from_db_config():
     fcol.close()
     fprj.close()
 
-def get_dummy_data_by_col_types(nme, col_types, proj_list):
+def get_dummy_data_by_col_types(nme, col_types, area_list):
     dummy_vals = []
     for ct in col_types:
         if ct == 'id':
@@ -237,7 +237,7 @@ def get_dummy_data_by_col_types(nme, col_types, proj_list):
         elif ct == 'Checkbox':
             dummy_vals.append(random.choice(['1','0']))
         elif ct == 'List':
-            dummy_vals.append(random.choice(proj_list))
+            dummy_vals.append(random.choice(area_list))
         elif ct == 'Number':
             dummy_vals.append(str(random.randint(1,500)))
         elif ct == 'Color':

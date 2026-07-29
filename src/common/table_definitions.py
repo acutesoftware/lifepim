@@ -15,7 +15,7 @@ def_lp_tables = [ # [table_name, description, grain_cols, col_list, cols_INT, co
 
 ]
 
-def_lp_jobs = [ # proj_id, job_num, job_id, details
+def_lp_jobs = [ # area_id, job_num, job_id, details
     ['FL', 1, 'LOAD_RAW_FILELIST', 'Loads raw filelist from CSV'],
     ['FL', 2, 'AGG_FILE_PATHS', 'Creates Path dimension from raw filelist'],
 
@@ -39,7 +39,7 @@ def_lp_job_steps = [ # job_id, job_num, step_num, job_type, details, sql_to_run
     [ 'LOAD_REF', 0, 10, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\sys_lp_cat_widgets.csv', '', 'Widgets', '', ''],
     [ 'LOAD_REF', 0, 11, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\sys_lp_cols.csv', '', 'LifePIM Cols', '', ''],
 
-    [ 'LOAD_REF', 0, 12, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\ref_project.csv', '', 'Projects Ref', '', ''],
+    [ 'LOAD_REF', 0, 12, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\ref_area.csv', '', 'Areas Ref', '', ''],
     [ 'LOAD_REF', 0, 13, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\d_apps.csv', '', 'data - apps', '', ''],
     [ 'LOAD_REF', 0, 14, 'CSV', r'N:\duncan\C\user\dev\src\python\LifePIM_public\data\d_note.csv', '', 'data - notes', '', ''],
 
@@ -113,8 +113,8 @@ def_tables = [ # [table_name, description, grain_cols, col_list, cols_INT, cols_
     ['sys_meta_table_columns', 'Column definitions for database', 'table_name, col_num, col_name', 'table_name, col_name, col_type, description', ['col_num'], [], []],
     ['sys_log', 'Main logfile for database', 'log_date', 'log_date, log_level, details', ['log_level'], [], []],
     ['sys_usage', 'Usage log', 'log_date', 'log_date, details', [], [], []],
-    ['sys_proj', 'Project Details', 'id', 'proj_id, details', [], [], []],
-    ['sys_jobs', 'ETL Job to run', 'proj_id, job_id', 'proj_id, job_num, job_id, details', ['job_num'], [], []],
+    ['sys_area', 'Area Details', 'id', 'area_id, details', [], [], []],
+    ['sys_jobs', 'ETL Job to run', 'area_id, job_id', 'area_id, job_num, job_id, details', ['job_num'], [], []],
     ['sys_job_steps', 'SQL to run for step of a job', 'job_id, step_num', 'job_id, job_num, step_num, job_type, src_tbl, dest_tbl, details, sql_to_run, params', ['step_num', 'job_num'], [], []],
     ['sys_todo', 'Dev notes on things to do, bugs to fix', 'todo_id', 'todo_id, date_added, date_done, tpe, details', [], [], []],
     

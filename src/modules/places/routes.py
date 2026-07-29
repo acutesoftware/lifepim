@@ -5,7 +5,16 @@ from flask import Blueprint, render_template, request, redirect, url_for
 from common import data as db
 from common import config as cfg
 from common import settings as settings_mod
-from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
+from common.utils import (
+    build_form_fields,
+    get_side_tabs,
+    get_table_def,
+    get_tabs,
+    paginate_total,
+    build_pagination,
+    request_area_param,
+    normalize_area_param,
+)
 
 
 places_bp = Blueprint(
@@ -21,19 +30,17 @@ def _get_tbl():
     return get_table_def("places")
 
 
-def _normalize_project(project):
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        return None
-    return project
+def _normalize_area(area):
+    return normalize_area_param(area) or None
 
 
-def _build_condition(project, tbl):
-    if project and "project" in (tbl["col_list"] if tbl else []):
-        return "lower(project) = lower(?)", [project]
+def _build_condition(area, tbl):
+    if area and "area" in (tbl["col_list"] if tbl else []):
+        return "lower(area) = lower(?)", [area]
     return "1=1", []
 
 
-def _fetch_places(project=None, sort_col=None, sort_dir=None, limit=None, offset=None):
+def _fetch_places(area=None, sort_col=None, sort_dir=None, limit=None, offset=None):
     tbl = _get_tbl()
     if not tbl:
         return []
@@ -41,7 +48,7 @@ def _fetch_places(project=None, sort_col=None, sort_dir=None, limit=None, offset
     order_map = {col: f"t.{col}" for col in tbl["col_list"]}
     sort_key = order_map.get(sort_col or "name", "t.name")
     sort_dir = "desc" if (sort_dir or "").lower() == "desc" else "asc"
-    condition, params = _build_condition(project, tbl)
+    condition, params = _build_condition(area, tbl)
     sql = (
         f"SELECT {', '.join([f't.{col}' for col in cols])} "
         f"FROM {tbl['name']} t "
@@ -58,11 +65,11 @@ def _fetch_places(project=None, sort_col=None, sort_dir=None, limit=None, offset
     return [dict(row) for row in rows]
 
 
-def _count_places(project=None):
+def _count_places(area=None):
     tbl = _get_tbl()
     if not tbl:
         return 0
-    condition, params = _build_condition(project, tbl)
+    condition, params = _build_condition(area, tbl)
     row = db._get_conn().execute(
         f"SELECT COUNT(1) as cnt FROM {tbl['name']} t WHERE {condition}",
         params,
@@ -157,14 +164,14 @@ def list_places_route():
 
 @places_bp.route("/table")
 def list_places_table_route():
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     sort_col = request.args.get("sort") or "name"
     sort_dir = request.args.get("dir") or "asc"
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = _count_places(project)
+    total = _count_places(area)
     offset = (page - 1) * per_page
-    items = _fetch_places(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    items = _fetch_places(area, sort_col, sort_dir, limit=per_page, offset=offset)
     _attach_place_map_actions(items)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
@@ -172,7 +179,7 @@ def list_places_table_route():
     pagination = build_pagination(
         url_for,
         "places.list_places_table_route",
-        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        {"area": area, "sort": sort_col, "dir": sort_dir},
         page,
         total_pages,
     )
@@ -183,11 +190,11 @@ def list_places_table_route():
         active_tab="places",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Places ({project or 'All'})",
+        content_title=f"Places ({area or 'All'})",
         content_html="",
         items=items,
         col_list=col_list,
-        project=project,
+        area=area,
         sort_col=sort_col,
         sort_dir=sort_dir,
         page=page,
@@ -200,8 +207,8 @@ def list_places_table_route():
 
 @places_bp.route("/map")
 def list_places_map_route():
-    project = _normalize_project(request.args.get("proj"))
-    items = _fetch_places(project, sort_col="name", sort_dir="asc")
+    area = _normalize_area(request_area_param())
+    items = _fetch_places(area, sort_col="name", sort_dir="asc")
     markers = []
     for item in items:
         lat = _parse_float(item.get("gps_lat"))
@@ -218,7 +225,7 @@ def list_places_map_route():
                 "actions": _build_external_map_links(item, lat, lon),
                 "lat": lat,
                 "lon": lon,
-                "url": url_for("places.view_place_route", place_id=item.get("id"), proj=project),
+                "url": url_for("places.view_place_route", place_id=item.get("id"), area=area),
             }
         )
     return render_template(
@@ -226,18 +233,18 @@ def list_places_map_route():
         active_tab="places",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Places Map ({project or 'All'})",
+        content_title=f"Places Map ({area or 'All'})",
         content_html="",
         items=items,
         markers=markers,
-        project=project,
+        area=area,
         map_names_english=settings_mod.get_general_settings().get("map_names_english", True),
     )
 
 
 @places_bp.route("/view/<int:place_id>")
 def view_place_route(place_id):
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     tbl = _get_tbl()
     item = None
     if tbl:
@@ -245,7 +252,7 @@ def view_place_route(place_id):
         if rows:
             item = dict(rows[0])
     if not item:
-        return redirect(url_for("places.list_places_table_route", proj=project))
+        return redirect(url_for("places.list_places_table_route", area=area))
     item["map_actions"] = _place_map_actions(item)
     return render_template(
         "places_view.html",
@@ -256,18 +263,18 @@ def view_place_route(place_id):
         content_html="",
         item=item,
         col_list=tbl["col_list"] if tbl else [],
-        project=project,
+        area=area,
     )
 
 
 @places_bp.route("/add", methods=["GET", "POST"])
 def add_place_route():
-    project = _normalize_project(request.args.get("proj")) or "General"
+    area = request_area_param("General") or "General"
     tbl = _get_tbl()
     if request.method == "POST" and tbl:
         values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
         db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
-        return redirect(url_for("places.list_places_table_route", proj=project))
+        return redirect(url_for("places.list_places_table_route", area=area))
     fields = _build_fields(tbl["col_list"]) if tbl else []
     return render_template(
         "places_edit.html",
@@ -277,13 +284,13 @@ def add_place_route():
         content_title="Add Place",
         item=None,
         fields=fields,
-        project=project,
+        area=area,
     )
 
 
 @places_bp.route("/edit/<int:place_id>", methods=["GET", "POST"])
 def edit_place_route(place_id):
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     tbl = _get_tbl()
     item = None
     if tbl:
@@ -293,7 +300,7 @@ def edit_place_route(place_id):
     if request.method == "POST" and tbl:
         values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
         db.update_record(db.conn, tbl["name"], place_id, tbl["col_list"], values)
-        return redirect(url_for("places.view_place_route", place_id=place_id, proj=project))
+        return redirect(url_for("places.view_place_route", place_id=place_id, area=area))
     fields = _build_fields(tbl["col_list"]) if tbl else []
     return render_template(
         "places_edit.html",
@@ -303,14 +310,14 @@ def edit_place_route(place_id):
         content_title="Edit Place",
         item=item,
         fields=fields,
-        project=project,
+        area=area,
     )
 
 
 @places_bp.route("/delete/<int:place_id>")
 def delete_place_route(place_id):
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     tbl = _get_tbl()
     if tbl:
         db.delete_record(db.conn, tbl["name"], place_id)
-    return redirect(url_for("places.list_places_table_route", proj=project))
+    return redirect(url_for("places.list_places_table_route", area=area))

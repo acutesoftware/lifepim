@@ -138,7 +138,7 @@ The database already scopes private note rows by user. Production also keeps
 new users' markdown note files under separate per-user roots.
 
 Existing `duncan` paths are intentionally preserved. On migration, legacy
-project-folder rows are claimed for `duncan` rather than rewritten to
+area-folder rows are claimed for `duncan` rather than rewritten to
 `lan_users\duncan`, so the current production note folders keep working.
 
 New users default to:
@@ -147,11 +147,11 @@ New users default to:
 N:\duncan\LifePIM_Data\DATA\lan_users\<username>
 ```
 
-LifePIM creates `notes`, `projects`, and `lists` under that root at user setup.
-Only `duncan` uses the full legacy project list and project-folder mappings by
+LifePIM creates `notes`, `areas`, and `lists` under that root at user setup.
+Only `duncan` uses the full legacy area list and area-folder mappings by
 default. Other users start with an editable `Home`, `Work`, `Family`, and `Fun`
-project list, and new notes are saved directly in the user's `notes` root unless
-a project folder mapping is explicitly added. Sync paths should only ensure the
+area list, and new notes are saved directly in the user's `notes` root unless
+a area folder mapping is explicitly added. Sync paths should only ensure the
 notes folder exists. Media and audio paths remain global.
 
 ## Using https instead of HTTP
@@ -245,7 +245,7 @@ Back up the whole Caddy data directory with LifePIM Desktop:
 C:\Users\xblad\AppData\Roaming\Caddy
 ```
 
-`root.crt` is the public root certificate and may be copied into the Pocket Android project. `root.key` is the private CA key; keep it on the Desktop machine, include it only in private Desktop backups, and never commit it to Git. If this CA is lost or regenerated, existing Pocket builds will no longer trust Desktop and Pocket must be rebuilt with the new public root certificate.
+`root.crt` is the public root certificate and may be copied into the Pocket Android area. `root.key` is the private CA key; keep it on the Desktop machine, include it only in private Desktop backups, and never commit it to Git. If this CA is lost or regenerated, existing Pocket builds will no longer trust Desktop and Pocket must be rebuilt with the new public root certificate.
 
 
 ## Pocket Companion Sync

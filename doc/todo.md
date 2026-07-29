@@ -31,7 +31,7 @@ Generated from a repository review on 2026-06-15.
 - [ ] Convert GET delete routes to POST or DELETE with CSRF protection. Current examples include calendar, notes, tasks, contacts, places, files, apps, audio, data, goals, how, and 3D delete routes.
 - [ ] Validate filesystem paths against configured allowed roots before reading, writing, importing, or serving files. Current import routes accept user-supplied folders/paths, and file-serving routes read paths from the database.
 - [ ] Harden media/audio/note file serving. `send_file` is used for note assets, media files, and audio files; require allowed root checks and deny serving sensitive file types outside the LifePIM data area.
-- [ ] Restrict note writes to project default folders. `api/create-note` does this, but edit/save paths still depend on the stored note path and should be checked before writing.
+- [ ] Restrict note writes to area default folders. `api/create-note` does this, but edit/save paths still depend on the stored note path and should be checked before writing.
 - [ ] Validate dynamic SQL identifiers. Several helpers interpolate table names, column names, and order clauses from metadata; keep these values allowlisted from known table definitions and never accept raw request values.
 - [ ] Review admin undo operations. `src/modules/admin/routes.py` can insert, update, and delete arbitrary `entity_type` values from the user log; restrict to known LifePIM tables and columns.
 - [ ] Add request size limits and upload validation for CSV imports. Imported files should have size limits, extension checks, and temporary-file cleanup.
@@ -41,8 +41,8 @@ Generated from a repository review on 2026-06-15.
 
 - [ ] Update setup and run instructions. `README.md` still mentions `python web_server.py`, while the current entry point appears to be `src/app.py` / `src/RUN_DESKTOP.BAT`.
 - [ ] Replace hardcoded config with environment or profile-based configuration. Include defaults for DB path, data root, upload temp folder, debug flag, port, and external API base URL.
-- [ ] Finish project/tab mapping coverage. Existing notes in `doc/config_layout.md` call out mapping every CSV file and database table to a submenu/project.
-- [ ] Complete the common task/table model from `doc/config_layout.md`: projects, tags, reminders, passwords/vault decision, budgets, expenses, incomes, checklists, recipes, shopping lists, fuel logs, medical info, warranties, licenses, manuals, bookmarks, journals, logs, meetings, and appointments.
+- [ ] Finish area/tab mapping coverage. Existing notes in `doc/config_layout.md` call out mapping every CSV file and database table to a submenu/area.
+- [ ] Complete the common task/table model from `doc/config_layout.md`: areas, tags, reminders, passwords/vault decision, budgets, expenses, incomes, checklists, recipes, shopping lists, fuel logs, medical info, warranties, licenses, manuals, bookmarks, journals, logs, meetings, and appointments.
 - [ ] Standardize CRUD behavior across modules. Some modules have list/table/cards variants and POST actions, while others use simple GET deletes or direct generic data helpers.
 - [ ] Add database migrations instead of ad hoc schema creation. Schema is currently spread across SQL files, `init_database.py`, `common/media_schema.py`, importer setup, and route-level ensure functions.
 - [ ] Tighten importer workflows. Keep dry-run visible, report row-level errors, validate mapping choices, and protect against snapshot/authoritative imports tombstoning too much data.

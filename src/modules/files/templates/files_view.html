@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('files.list_files_route', proj=project) }}">Back to list</a>
+    <a href="{{ url_for('files.list_files_route', area=area) }}">Back to list</a>
   </div>
   <table border="1" cellpadding="5">
     {% for col in col_list %}
@@ -12,8 +12,8 @@
     {% endfor %}
   </table>
   <p>
-    <a href="{{ url_for('files.edit_file_route', item_id=item.id, proj=project) }}">Edit</a> |
-    <a href="{{ url_for('files.delete_file_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    <a href="{{ url_for('files.edit_file_route', item_id=item.id, area=area) }}">Edit</a> |
+    <a href="{{ url_for('files.delete_file_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
   </p>
 
   <h4>Explorer</h4>
@@ -36,7 +36,7 @@
     <div style="flex:1;">
       <h5>Folders</h5>
       <form class="drive-select" method="get">
-        <input type="hidden" name="proj" value="{{ project or '' }}">
+        <input type="hidden" name="area" value="{{ area or '' }}">
         <label for="drive">Drive:</label>
         <select id="drive" name="drive" onchange="this.form.submit()">
           {% for drive in drives %}
@@ -44,11 +44,11 @@
           {% endfor %}
         </select>
       </form>
-      <div id="folder-root" data-base="{{ base_path }}" data-proj="{{ project or '' }}" data-item="{{ item.id }}" data-selected="{{ selected_dir or '' }}">
+      <div id="folder-root" data-base="{{ base_path }}" data-area="{{ area or '' }}" data-item="{{ item.id }}" data-selected="{{ selected_dir or '' }}">
         <div class="node">
           <span class="folder-toggle" data-dir="">[+]</span>
           <a class="folder-link {% if not selected_dir %}folder-selected{% endif %}"
-             href="{{ url_for('files.view_file_route', item_id=item.id, proj=project, drive=selected_drive) }}">
+             href="{{ url_for('files.view_file_route', item_id=item.id, area=area, drive=selected_drive) }}">
             {{ base_path }}
           </a>
           <ul class="folder-tree" data-container=""></ul>
@@ -82,7 +82,7 @@
   <script>
     const folderRoot = document.getElementById('folder-root');
     const basePath = folderRoot.dataset.base;
-    const proj = folderRoot.dataset.proj;
+    const area = folderRoot.dataset.area;
     const itemId = folderRoot.dataset.item;
     const selectedDir = folderRoot.dataset.selected;
     const drive = document.getElementById('drive').value;
@@ -98,7 +98,7 @@
 
       const link = document.createElement('a');
       link.className = 'folder-link';
-      link.href = `/files/view/${itemId}?dir=${encodeURIComponent(node.rel_path)}&drive=${encodeURIComponent(drive)}${proj ? `&proj=${encodeURIComponent(proj)}` : ''}`;
+      link.href = `/files/view/${itemId}?dir=${encodeURIComponent(node.rel_path)}&drive=${encodeURIComponent(drive)}${area ? `&area=${encodeURIComponent(area)}` : ''}`;
       link.textContent = node.name;
       if (node.rel_path === selectedDir) {
         link.classList.add('folder-selected');

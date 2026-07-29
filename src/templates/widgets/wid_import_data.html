@@ -26,8 +26,8 @@
         <select name="map_{{ col }}">
           <option value=""></option>
           <option value="NULL" {% if mappings.get(col) == 'NULL' %}selected{% endif %}>NULL</option>
-          {% if col == 'project' %}
-          <option value="{curr_project_selected}" {% if mappings.get(col) == '{curr_project_selected}' %}selected{% endif %}>Use selected project</option>
+          {% if col == 'area' %}
+          <option value="{curr_area_selected}" {% if mappings.get(col) == '{curr_area_selected}' %}selected{% endif %}>Use selected area</option>
           {% endif %}
           {% for header in csv_headers %}
           <option value="{{ header }}" {% if mappings.get(col) == header %}selected{% endif %}>{{ header }}</option>

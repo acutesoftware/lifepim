@@ -35,7 +35,7 @@ class TestSearchSecurity(unittest.TestCase):
                 folder_id INTEGER,
                 size TEXT,
                 date_modified TEXT,
-                project TEXT,
+                area TEXT,
                 owner_user_id INTEGER,
                 visibility TEXT NOT NULL DEFAULT 'private',
                 show_in_blog INTEGER NOT NULL DEFAULT 0,
@@ -53,15 +53,15 @@ class TestSearchSecurity(unittest.TestCase):
             """
         )
         self.conn.execute(
-            "INSERT INTO lp_notes (id, file_name, path, project, owner_user_id, visibility, is_public) "
+            "INSERT INTO lp_notes (id, file_name, path, area, owner_user_id, visibility, is_public) "
             "VALUES (1, 'user-two-private-leak.md', 'C:\\notes', 'private', 2, 'private', 0)"
         )
         self.conn.execute(
-            "INSERT INTO lp_notes (id, file_name, path, project, owner_user_id, visibility, is_public) "
+            "INSERT INTO lp_notes (id, file_name, path, area, owner_user_id, visibility, is_public) "
             "VALUES (2, 'user-one-visible.md', 'C:\\notes', 'private', 1, 'private', 0)"
         )
         self.conn.execute(
-            "INSERT INTO lp_notes (id, file_name, path, project, owner_user_id, visibility, is_public) "
+            "INSERT INTO lp_notes (id, file_name, path, area, owner_user_id, visibility, is_public) "
             "VALUES (3, 'family-visible.md', 'C:\\notes', 'shared', 2, 'family', 0)"
         )
         self.conn.execute(

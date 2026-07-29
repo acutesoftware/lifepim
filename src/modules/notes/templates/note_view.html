@@ -51,15 +51,16 @@
 
         <form method="post" action="{{ url_for('notes.move_note_route', note_id=note.id) }}" class="note-inline-form">
           <input type="hidden" name="return_format" value="{{ render_mode }}">
-          <label for="note-project-select">Project:</label>
-          <select id="note-project-select" name="project_id">
-            {% for project in active_projects %}
-              <option value="{{ project.project_id }}" {% if project.project_id == selected_project %}selected{% endif %}>
-                {{ project.project_name }} ({{ project.project_id }})
+          <label for="note-area-select">Area:</label>
+          <select id="note-area-select" name="area_id">
+            {% for area in active_areas %}
+              <option value="{{ area.area_id }}" {% if area.area_id == selected_area %}selected{% endif %}>
+                {{ area.area_name }} ({{ area.area_id }})
               </option>
             {% endfor %}
           </select>
-          <button type="submit">Move</button>
+          <button type="submit" name="action" value="assign" title="Update note Area metadata without moving the file">Assign Area</button>
+          <button type="submit" name="action" value="move_file" title="Move the markdown file to the selected Area default folder">Move File</button>
         </form>
 
         <form method="post" action="{{ url_for('notes.convert_note_to_howto_route', note_id=note.id) }}" class="note-inline-form" onsubmit="return confirm('Convert this note to a HOWTO and remove it from Notes?');">

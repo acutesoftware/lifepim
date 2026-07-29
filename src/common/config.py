@@ -31,7 +31,7 @@ LAN_USER_ROOT_BASE = os.getenv(
     r"N:\duncan\LifePIM_Data\DATA\lan_users",
 )
 etl_folders_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv"
-etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv"
+etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_area_folder.csv"
 FILELIST_DB = r"D:\TRANSFER_NAS\filelister\filelist_master.db"
 FILELIST_IMAGE_WHERE = r"WHERE folder_name IN ('Photos', 'Movies', 'TV Shows')"
 FILELIST_AUDIO_WHERE = r"WHERE folder_name = 'Music'"
@@ -61,18 +61,18 @@ print('DB_FILE = ' + DB_FILE)
 #  column name contains 'amount', 'total', 'num_' = NUMBER
 #  
 table_def = [
-	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'folder_id', 'size', 'title', 'color', 'date_created', 'date_modified', 'project', 'important', 'source_note_id']},
-	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'project', 'start_date', 'due_date']},
-	{'name':'lp_calendar_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'project']},
+	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'folder_id', 'size', 'title', 'color', 'date_created', 'date_modified', 'area', 'important', 'source_note_id']},
+	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'area', 'start_date', 'due_date']},
+	{'name':'lp_calendar_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'area']},
 	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['path', 'filename', 'ext', 'media_type', 'size_bytes', 'mtime_utc', 'ctime_utc', 'hash']},
-	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'duration', 'artist', 'album', 'song', 'project']},
-	{'name':'lp_3d', 'route':'3d', 'display_name':'3D', 'col_list':['file_name','path', 'folder_id', 'size', 'date_modified', 'project']},
-	{'name':'lp_apps', 'route':'apps', 'display_name':'Apps', 'col_list':['file_path', 'folder_id', 'title','icon', 'project']},
+	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'duration', 'artist', 'album', 'song', 'area']},
+	{'name':'lp_3d', 'route':'3d', 'display_name':'3D', 'col_list':['file_name','path', 'folder_id', 'size', 'date_modified', 'area']},
+	{'name':'lp_apps', 'route':'apps', 'display_name':'Apps', 'col_list':['file_path', 'folder_id', 'title','icon', 'area']},
 
-	{'name':'lp_goals', 'route':'goals', 'display_name':'Goals', 'col_list':['parent_goal_id', 'title','description', 'goal_date', 'remind_date', 'project']},
-	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'project']},
-	{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'project']},
-	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'folder_id', 'file_type', 'project']},
+	{'name':'lp_goals', 'route':'goals', 'display_name':'Goals', 'col_list':['parent_goal_id', 'title','description', 'goal_date', 'remind_date', 'area']},
+	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'area']},
+	{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'area']},
+	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'folder_id', 'file_type', 'area']},
 	{'name':'lp_places', 'route':'places', 'display_name':'Places', 'col_list':['name','desc', 'address_street', 'suburb', 'postcode', 'state', 'country', 'gps_lat', 'gps_long']},
 
 ]
@@ -278,14 +278,14 @@ PLACES_MAP_EXTERNAL_URLS = [
 # Development server settings
 APP_AUTO_RELOAD = True
 
-# Project list default
-proj_list = ['Dev','Design','Fun','Games','Family','Car',
+# Area list default
+area_list = ['Dev','Design','Fun','Games','Family','Car',
              'Business','Web','Home','Study','Health','Work',
              'RasbPI','AI','Support','Pers']
 
 
 SIDE_TABS_GROUPS = [  # for possible sub folders
-    { 'icon': '*', 'id': 'All', 'sub_list': 'All Projects'},
+    { 'icon': '*', 'id': 'All', 'sub_list': 'All Areas'},
     { 'icon': '🔒', 'id': 'PERS', 'sub_list': 'Pers,Health,Home,Car,Family,Food'},
     { 'icon': '🎉', 'id': 'FUN', 'sub_list': 'games, travel, Music, movies, Books, Hobbies'},
     { 'icon': '💼', 'id': 'WORK', 'sub_list': 'Work,Business,Side Gigs,Commision'},
@@ -293,8 +293,8 @@ SIDE_TABS_GROUPS = [  # for possible sub folders
     { 'icon': '👩🏻‍🎓', 'id': 'LEARN', 'sub_list': 'Study, Skills, Languages, Courses'},
 ]
 
-SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
-    { 'icon': '*', 'id': 'All', 'label': 'All Projects'},
+SIDE_TABS = [  # Tabs down left side of LifePIM - any area goes into one of these groups
+    { 'icon': '*', 'id': 'All', 'label': 'All Areas'},
     { 'icon': '❓', 'id': 'unmapped', 'label': 'Unmapped'},
     { 'icon': '', 'id': 'spacer', 'label': 'PERS'}, 
 
@@ -338,17 +338,17 @@ SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of t
     
     #{ 'icon': '🧰', 'id': 'support', 'label': 'Support'},
     
-    { 'icon': '', 'id': 'proj', 'label': 'PROJECTS'}, 
-    { 'icon': '🗡️', 'id': 'proj/UE5', 'label': 'UE5'}, 
-    #{ 'icon': '🗡️', 'id': 'proj/UE5/sanct', 'label': 'Sanct'}, 
-    #{ 'icon': '🖋️', 'id': 'proj/worldbuild', 'label': 'Worldbuild'}, 
-    { 'icon': '🖋️', 'id': 'proj/worldbuild/alrona', 'label': 'Alrona'}, 
+    { 'icon': '', 'id': 'area', 'label': 'AREAS'}, 
+    { 'icon': '🗡️', 'id': 'area/UE5', 'label': 'UE5'}, 
+    #{ 'icon': '🗡️', 'id': 'area/UE5/sanct', 'label': 'Sanct'}, 
+    #{ 'icon': '🖋️', 'id': 'area/worldbuild', 'label': 'Worldbuild'}, 
+    { 'icon': '🖋️', 'id': 'area/worldbuild/alrona', 'label': 'Alrona'}, 
 
-    { 'icon': '🖥️', 'id': 'proj/dev', 'label': 'Dev'}, 
-    { 'icon': '🕵', 'id': 'proj/dev/ai', 'label': 'AI'}, 
-    { 'icon': '👩🏻‍🎓', 'id': 'proj/dev/lifepim', 'label': 'LifePIM'}, 
-    #{ 'icon': '📻', 'id': 'proj/elec', 'label': 'Electronics'},             
-    { 'icon': '📻', 'id': 'proj/elec/rasbpi', 'label': 'RasbPI'},             
+    { 'icon': '🖥️', 'id': 'area/dev', 'label': 'Dev'}, 
+    { 'icon': '🕵', 'id': 'area/dev/ai', 'label': 'AI'}, 
+    { 'icon': '👩🏻‍🎓', 'id': 'area/dev/lifepim', 'label': 'LifePIM'}, 
+    #{ 'icon': '📻', 'id': 'area/elec', 'label': 'Electronics'},             
+    { 'icon': '📻', 'id': 'area/elec/rasbpi', 'label': 'RasbPI'},             
 
     
 ]
@@ -386,7 +386,7 @@ sub_menus = [
     {'root':'notes', 'name':'List All', 'fn':'fn_notes_list'},
 
     {'root':'notes', 'name':'Meeting Notes', 'fn':'fn_notes_meeting'},
-    {'root':'notes', 'name':'Project Info', 'fn':'fn_notes_proj'},
+    {'root':'notes', 'name':'Area Info', 'fn':'fn_notes_area'},
     
 
     {'root':'tasks', 'name':'Add Task', 'fn':'fn_tasks_add'},
@@ -429,7 +429,7 @@ sub_menus = [
 ]
 
 filters = [
-    ['notes', 'type', ['Idea', 'Meeting Note', 'Project Info', 'Research']],
+    ['notes', 'type', ['Idea', 'Meeting Note', 'Area Info', 'Research']],
     ['tasks', 'status', ['Not Started', 'In Progress', 'Completed', 'Deferred', 'Waiting on someone else']],
     ['tasks', 'priority', ['Low', 'Medium', 'High', 'Urgent']],
     ['calendar', 'type', ['Appointment', 'Event', 'Reminder', 'Logs']],
@@ -447,7 +447,7 @@ filters = [
 ]   
 
 
-project_specific_tables = [
+area_specific_tables = [
     'car_service_records',
     'car_fuel_logs',
     'health_medical_info',
@@ -466,9 +466,9 @@ project_specific_tables = [
     'web_bookmarks',    
     'business_invoices',
     'dev_bugs',
-    'rasbpi_projects',
+    'rasbpi_areas',
     'support_warranties',
-    'ai_projects',
+    'ai_areas',
 ]
 
 

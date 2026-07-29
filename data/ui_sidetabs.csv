@@ -1,5 +1,5 @@
 id,icon,label
-any,*,All Projects
+any,*,All Areas
 spacer,,PERS
 health,💊,Health
 family,👪,Family
@@ -20,10 +20,10 @@ spacer,,WORK
 work/job,💼,Job
 work/business,💼,Business
 work/study,👩🏻‍🎓,Study
-proj,,PROJECTS
-proj/UE5,🗡️,UE5
-proj/worldbuild/alrona,🖋️,Alrona
-proj/dev,🖥️,Dev
-proj/dev/ai,🕵,AI
-proj/dev/lifepim,👩🏻‍🎓,LifePIM
-proj/elec/rasbpi,📻,RasbPI
+area,,AREAS
+area/UE5,🗡️,UE5
+area/worldbuild/alrona,🖋️,Alrona
+area/dev,🖥️,Dev
+area/dev/ai,🕵,AI
+area/dev/lifepim,👩🏻‍🎓,LifePIM
+area/elec/rasbpi,📻,RasbPI

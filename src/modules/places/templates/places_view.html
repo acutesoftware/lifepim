@@ -1,8 +1,8 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('places.list_places_table_route', proj=project) }}">Back to list</a> |
-    <a href="{{ url_for('places.list_places_map_route', proj=project) }}">Map</a>
+    <a href="{{ url_for('places.list_places_table_route', area=area) }}">Back to list</a> |
+    <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a>
   </div>
   <table border="1" cellpadding="5">
     {% for col in col_list %}
@@ -13,8 +13,8 @@
     {% endfor %}
   </table>
   <p>
-    <a href="{{ url_for('places.edit_place_route', place_id=item.id, proj=project) }}">Edit</a> |
-    <a href="{{ url_for('places.delete_place_route', place_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}">Edit</a> |
+    <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
     {% if item.map_actions %}
       {% for action in item.map_actions %}
         | <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer">{{ action.label }}</a>

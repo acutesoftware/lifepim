@@ -94,7 +94,7 @@ class TestAddData(unittest.TestCase):
     def test_04_goals(self):
         tbl = utils.get_table_def("goals")
         self.assertIsNotNone(tbl)
-        projects = ["Work", "Pers", "Dev", ""]
+        areas = ["Work", "Pers", "Dev", ""]
         rows = []
         for _ in range(10):
             rows.append([
@@ -103,7 +103,7 @@ class TestAddData(unittest.TestCase):
                 _rand_text("desc") if random.random() > 0.3 else "",
                 _rand_date(date.today() - timedelta(days=30), date.today()).isoformat() if random.random() > 0.3 else "",
                 "",
-                random.choice(projects),
+                random.choice(areas),
             ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
@@ -113,14 +113,14 @@ class TestAddData(unittest.TestCase):
     def test_05_how(self):
         tbl = utils.get_table_def("how")
         self.assertIsNotNone(tbl)
-        projects = ["Work", "Dev", "Pers", ""]
+        areas = ["Work", "Dev", "Pers", ""]
         rows = []
         for _ in range(10):
             rows.append([
                 "",
                 _rand_text("how"),
                 _rand_text("body") if random.random() > 0.3 else "",
-                random.choice(projects),
+                random.choice(areas),
             ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
@@ -131,8 +131,8 @@ class TestAddData(unittest.TestCase):
         tbl = utils.get_table_def("data")
         self.assertIsNotNone(tbl)
         tables = ["tbl_notes", "tbl_tasks", "tbl_files", "tbl_calendar", ""]
-        projects = ["Work", "Dev", "Pers", ""]
-        fields = ["title,content,project", "title,project", "file_name,path", ""]
+        areas = ["Work", "Dev", "Pers", ""]
+        fields = ["title,content,area", "title,area", "file_name,path", ""]
         rows = []
         for _ in range(10):
             rows.append([
@@ -140,7 +140,7 @@ class TestAddData(unittest.TestCase):
                 _rand_text("desc") if random.random() > 0.2 else "",
                 random.choice(tables),
                 random.choice(fields),
-                random.choice(projects),
+                random.choice(areas),
             ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
@@ -151,14 +151,14 @@ class TestAddData(unittest.TestCase):
         tbl = utils.get_table_def("files")
         self.assertIsNotNone(tbl)
         roots = [r"C:\\", r"C:\\Windows", r"C:\\Users", r"C:\\Temp", ""]
-        projects = ["Work", "Pers", "Dev", ""]
+        areas = ["Work", "Pers", "Dev", ""]
         rows = []
         for _ in range(10):
             rows.append([
                 _rand_text("filelist"),
                 random.choice(roots),
                 random.choice(["Folder", ""]) if random.random() > 0.2 else "",
-                random.choice(projects),
+                random.choice(areas),
             ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))
@@ -173,7 +173,7 @@ class TestAddData(unittest.TestCase):
             r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\beach",
             r"E:\\BK_fangorn\\photo\\travel\\Glenelg\\city",
         ]
-        projects = ["Work", "Pers", "Dev", ""]
+        areas = ["Work", "Pers", "Dev", ""]
         file_types = {
             "video": [".mp4", ".mov"],
             "image": [".jpg", ".png"],
@@ -191,7 +191,7 @@ class TestAddData(unittest.TestCase):
                 _rand_date(date.today() - timedelta(days=365), date.today()).isoformat() if random.random() > 0.2 else "",
                 str(random.randint(320, 4000)) if file_type != "audio" and random.random() > 0.2 else "",
                 str(random.randint(320, 4000)) if file_type != "audio" and random.random() > 0.2 else "",
-                random.choice(projects),
+                random.choice(areas),
             ])
         ids = _insert_rows(tbl, rows)
         self.assertTrue(all(ids))

@@ -1,7 +1,7 @@
 ---
 key: retile-bathroom-walls
 title: Retile Bathroom Walls
-project: Home
+area: Home
 status: outline
 ---
 

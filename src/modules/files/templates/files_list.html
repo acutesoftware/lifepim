@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <a href="{{ url_for('files.add_file_route', proj=project) }}">Add File</a>
+  <a href="{{ url_for('files.add_file_route', area=area) }}">Add File</a>
 
 {% set link_list_type = "file" %}
 {% set link_list_context_id = "files_list" %}
@@ -10,7 +10,7 @@
 {% if col_list %}
   <div style="margin:6px 0;">
     Sorted by: {{ sort_col.replace('_', ' ') }} ({{ sort_dir }}) |
-    <a href="{{ url_for('files.list_files_route', proj=project) }}">Reset sort</a>
+    <a href="{{ url_for('files.list_files_route', area=area) }}">Reset sort</a>
   </div>
 {% endif %}
 
@@ -21,7 +21,7 @@
     {% for col in col_list %}
     {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
     <th>
-      <a href="{{ url_for('files.list_files_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      <a href="{{ url_for('files.list_files_route', area=area, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
       {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     {% endfor %}
@@ -34,9 +34,9 @@
     <td>{{ item[col] }}</td>
     {% endfor %}
     <td>
-      <a href="{{ url_for('files.view_file_route', item_id=item.id, proj=project) }}">View</a> |
-      <a href="{{ url_for('files.edit_file_route', item_id=item.id, proj=project) }}">Edit</a> |
-      <a href="{{ url_for('files.delete_file_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+      <a href="{{ url_for('files.view_file_route', item_id=item.id, area=area) }}">View</a> |
+      <a href="{{ url_for('files.edit_file_route', item_id=item.id, area=area) }}">Edit</a> |
+      <a href="{{ url_for('files.delete_file_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
     </td>
   </tr>
   {% endfor %}

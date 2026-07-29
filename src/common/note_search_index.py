@@ -93,7 +93,7 @@ def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
     conn = ensure_schema(conn)
     rows = conn.execute(
         """
-        SELECT id, file_name, path, size, date_modified, project
+        SELECT id, file_name, path, size, date_modified, area
         FROM lp_notes
         WHERE COALESCE(file_name, '') != ''
         """

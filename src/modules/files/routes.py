@@ -4,7 +4,15 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
-from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
+from common.utils import (
+    build_form_fields,
+    get_side_tabs,
+    get_table_def,
+    get_tabs,
+    paginate_total,
+    build_pagination,
+    request_area_param,
+)
 from common import config as cfg
 
 
@@ -170,9 +178,7 @@ def file_list_route():
 
 @files_bp.route("/")
 def list_files_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     tbl = _get_tbl()
     items = []
     col_list = []
@@ -188,7 +194,7 @@ def list_files_route():
     pagination = build_pagination(
         url_for,
         "files.list_files_route",
-        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        {"area": area, "sort": sort_col, "dir": sort_dir},
         1,
         1,
     )
@@ -201,26 +207,26 @@ def list_files_route():
         order_by = f"{order_key} {sort_dir}"
         cols = ["id"] + col_list
         per_page = cfg.RECS_PER_PAGE
-        total = db.count_mapped_rows(db.conn, tbl["name"], tab=project)
+        total = db.count_mapped_rows(db.conn, tbl["name"], tab=area)
         offset = (page - 1) * per_page
         rows = db.get_mapped_rows(
             db.conn,
             tbl["name"],
             cols,
-            tab=project,
+            tab=area,
             limit=per_page,
             offset=offset,
             order_by=order_by,
         )
         items = [dict(row) for row in rows]
-        content_title = f"{tbl['display_name']} ({project or 'All'})"
+        content_title = f"{tbl['display_name']} ({area or 'All'})"
         page_data = paginate_total(total, page, per_page)
         page = page_data["page"]
         total_pages = page_data["total_pages"]
         pagination = build_pagination(
             url_for,
             "files.list_files_route",
-            {"proj": project, "sort": sort_col, "dir": sort_dir},
+            {"area": area, "sort": sort_col, "dir": sort_dir},
             page,
             total_pages,
         )
@@ -233,7 +239,7 @@ def list_files_route():
         content_html="",
         items=items,
         col_list=col_list,
-        project=project,
+        area=area,
         sort_col=sort_col,
         sort_dir=sort_dir,
         page=page,
@@ -246,12 +252,12 @@ def list_files_route():
 
 @files_bp.route("/view/<int:item_id>")
 def view_file_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     selected_dir = request.args.get("dir") or ""
     drive = _normalize_drive(request.args.get("drive"))
     item = _load_item(item_id)
     if not item:
-        return redirect(url_for("files.list_files_route", proj=project))
+        return redirect(url_for("files.list_files_route", area=area))
     item_path = item.get("path", "") or ""
     if not drive:
         drive = _drive_root(item_path)
@@ -272,7 +278,7 @@ def view_file_route(item_id):
         content_html="",
         item=item,
         col_list=_get_tbl()["col_list"],
-        project=project,
+        area=area,
         file_list=files,
         explorer_error=explorer_error,
         selected_dir=selected_dir,
@@ -284,17 +290,17 @@ def view_file_route(item_id):
 
 @files_bp.route("/add", methods=["GET", "POST"])
 def add_file_route():
-    project = request.args.get("proj") or "General"
+    area = request_area_param("General") or "General"
     tbl = _get_tbl()
     if request.method == "POST" and tbl:
         values = []
         for col in tbl["col_list"]:
-            if col == "project":
-                values.append(request.form.get(col, "").strip() or project)
+            if col == "area":
+                values.append(request_area_param(area, include_form=True) or area)
             else:
                 values.append(request.form.get(col, "").strip())
         db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
-        return redirect(url_for("files.list_files_route", proj=project))
+        return redirect(url_for("files.list_files_route", area=area))
     fields = build_form_fields(tbl["col_list"]) if tbl else []
     return render_template(
         "files_edit.html",
@@ -304,19 +310,19 @@ def add_file_route():
         content_title="Add File",
         item=None,
         fields=fields,
-        project=project,
+        area=area,
     )
 
 
 @files_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
 def edit_file_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     item = _load_item(item_id)
     if request.method == "POST" and tbl:
         values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
         db.update_record(db.conn, tbl["name"], item_id, tbl["col_list"], values)
-        return redirect(url_for("files.view_file_route", item_id=item_id, proj=project))
+        return redirect(url_for("files.view_file_route", item_id=item_id, area=area))
     fields = build_form_fields(tbl["col_list"]) if tbl else []
     return render_template(
         "files_edit.html",
@@ -326,14 +332,14 @@ def edit_file_route(item_id):
         content_title="Edit File",
         item=item,
         fields=fields,
-        project=project,
+        area=area,
     )
 
 
 @files_bp.route("/delete/<int:item_id>")
 def delete_file_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     if tbl:
         db.delete_record(db.conn, tbl["name"], item_id)
-    return redirect(url_for("files.list_files_route", proj=project))
+    return redirect(url_for("files.list_files_route", area=area))

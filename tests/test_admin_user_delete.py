@@ -46,7 +46,7 @@ class TestAdminUserDelete(unittest.TestCase):
                 folder_id INTEGER,
                 size TEXT,
                 date_modified TEXT,
-                project TEXT,
+                area TEXT,
                 owner_user_id INTEGER,
                 user_name TEXT,
                 rec_extract_date TEXT
@@ -132,7 +132,7 @@ class TestNotesBulkDelete(unittest.TestCase):
                 folder_id INTEGER,
                 size TEXT,
                 date_modified TEXT,
-                project TEXT,
+                area TEXT,
                 owner_user_id INTEGER,
                 user_name TEXT,
                 rec_extract_date TEXT

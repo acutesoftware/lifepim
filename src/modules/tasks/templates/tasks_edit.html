@@ -6,8 +6,8 @@
   <form method="POST">
     <label>Title:</label><br>
     <input type="text" name="title" value="{{ task.title if task else '' }}" required><br>
-    <label>Project:</label><br>
-    <input type="text" name="project" value="{{ task.project if task else project }}"><br>
+    <label>Area:</label><br>
+    <input type="text" name="area" value="{{ task.area if task else area }}"><br>
     <label>Start Date:</label><br>
     <input type="date" name="start_date" value="{{ task.start_date if task else '' }}"><br>
     <label>Due Date:</label><br>

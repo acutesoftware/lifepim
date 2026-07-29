@@ -2,14 +2,14 @@
 {% block module_content %}
   {% include "how_nav.html" %}
   <div class="how-toolbar">
-    <a class="data-action" href="{{ url_for('how.add_how_route', proj=project) }}">Add How-to</a>
-    <span>{{ project or "All Projects" }}</span>
+    <a class="data-action" href="{{ url_for('how.add_how_route', area=area) }}">Add How-to</a>
+    <span>{{ area or "All Areas" }}</span>
   </div>
   <div class="tabular-scroll">
     <table>
       <tr>
         <th>Title</th>
-        <th>Project</th>
+        <th>Area</th>
         <th>Status</th>
         <th>Difficulty</th>
         <th>Estimated</th>
@@ -23,8 +23,8 @@
       </tr>
       {% for item in items %}
       <tr>
-        <td><a href="{{ url_for('how.view_how_route', item_id=item.howto_id, proj=project) }}">{{ item.title }}</a></td>
-        <td>{{ item.project_id }}</td>
+        <td><a href="{{ url_for('how.view_how_route', item_id=item.howto_id, area=area) }}">{{ item.title }}</a></td>
+        <td>{{ item.area_id }}</td>
         <td>{{ item.status }}</td>
         <td>{{ item.difficulty }}</td>
         <td>{{ item.estimated_minutes }}</td>
@@ -35,12 +35,12 @@
         <td>{{ item.updated_at }}</td>
         <td>{{ item.source_filepath or "Manual" }}</td>
         <td class="data-actions-cell">
-          <a href="{{ url_for('how.view_how_route', item_id=item.howto_id, proj=project) }}">Open</a>
-          <a href="{{ url_for('how.edit_how_route', item_id=item.howto_id, proj=project) }}">Edit Blueprint</a>
-          <form method="post" action="{{ url_for('how.convert_howto_to_note_route', item_id=item.howto_id, proj=project) }}" onsubmit="return confirm('Convert this HOWTO back to a Note and remove it from HOW?');">
+          <a href="{{ url_for('how.view_how_route', item_id=item.howto_id, area=area) }}">Open</a>
+          <a href="{{ url_for('how.edit_how_route', item_id=item.howto_id, area=area) }}">Edit Blueprint</a>
+          <form method="post" action="{{ url_for('how.convert_howto_to_note_route', item_id=item.howto_id, area=area) }}" onsubmit="return confirm('Convert this HOWTO back to a Note and remove it from HOW?');">
             <button type="submit">Convert to Note</button>
           </form>
-          <form method="post" action="{{ url_for('how.delete_how_route', item_id=item.howto_id, proj=project) }}" onsubmit="return confirm('Delete How-to?');">
+          <form method="post" action="{{ url_for('how.delete_how_route', item_id=item.howto_id, area=area) }}" onsubmit="return confirm('Delete How-to?');">
             <button type="submit">Delete</button>
           </form>
         </td>

@@ -1,7 +1,7 @@
 ---
 key: install-blender
 title: Install Blender
-project: Development
+area: Development
 status: draft
 estimated_minutes: 15
 ---

@@ -11,8 +11,6 @@ import etl_folder_mapping as folder_etl
 
 from . import config as cfg
 from . import if_sqlite as mod_sql
-from common import projects as projects_mod
-
 
 DB_FILE = getattr(cfg, "DB_FILE", getattr(cfg, "db_name", "lifepim.db"))
 if not os.path.isabs(DB_FILE):
@@ -96,6 +94,113 @@ def add_column_if_missing(conn, tbl_name, col_name, col_type):
     conn.execute(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type}")
 
 
+def _quote_ident(identifier):
+    return '"' + str(identifier).replace('"', '""') + '"'
+
+
+def _table_column_names(conn, tbl_name):
+    try:
+        return [row[1] for row in conn.execute(f"PRAGMA table_info({_quote_ident(tbl_name)})").fetchall()]
+    except Exception:
+        return []
+
+
+def _table_exists(conn, tbl_name):
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (tbl_name,),
+    ).fetchone() is not None
+
+
+def _normalize_area_value(value):
+    text = "" if value is None else str(value).strip()
+    if text in {"proj", "project"}:
+        return "area"
+    if text.startswith("proj/"):
+        return "area/" + text[5:]
+    if text.startswith("project/"):
+        return "area/" + text[8:]
+    if text.startswith("proj."):
+        return "area." + text[5:]
+    if text.startswith("project."):
+        return "area." + text[8:]
+    if text == "All Projects":
+        return "All Areas"
+    return value
+
+
+def _normalize_area_values(conn, tbl_name):
+    table_sql = _quote_ident(tbl_name)
+    try:
+        conn.execute(f"UPDATE {table_sql} SET area = 'area' WHERE area = 'proj'")
+        conn.execute(
+            f"UPDATE {table_sql} SET area = 'area/' || substr(area, 6) WHERE area LIKE 'proj/%'"
+        )
+        conn.execute(
+            f"UPDATE {table_sql} SET area = 'area/' || substr(area, 9) WHERE area LIKE 'project/%'"
+        )
+        conn.execute(
+            f"UPDATE {table_sql} SET area = 'area.' || substr(area, 6) WHERE area LIKE 'proj.%'"
+        )
+        conn.execute(
+            f"UPDATE {table_sql} SET area = 'area.' || substr(area, 9) WHERE area LIKE 'project.%'"
+        )
+        conn.execute(f"UPDATE {table_sql} SET area = 'area' WHERE area = 'project'")
+        conn.execute(
+            f"UPDATE {table_sql} SET area = 'All Areas' WHERE area = 'All Projects'"
+        )
+    except Exception:
+        pass
+
+
+def ensure_area_columns(conn=None, table_names=None):
+    conn = _get_conn() if conn is None else conn
+    if table_names is None:
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+        table_names = [row["name"] if isinstance(row, sqlite3.Row) else row[0] for row in rows]
+    for tbl_name in table_names:
+        if not tbl_name or not _table_exists(conn, tbl_name):
+            continue
+        cols = _table_column_names(conn, tbl_name)
+        col_set = set(cols)
+        table_sql = _quote_ident(tbl_name)
+        if "project" in col_set and "area" not in col_set:
+            try:
+                conn.execute(f"ALTER TABLE {table_sql} RENAME COLUMN project TO area")
+                col_set.discard("project")
+                col_set.add("area")
+            except Exception:
+                try:
+                    conn.execute(f"ALTER TABLE {table_sql} ADD COLUMN area TEXT")
+                    conn.execute(f"UPDATE {table_sql} SET area = project WHERE COALESCE(area, '') = ''")
+                    col_set.add("area")
+                except Exception:
+                    pass
+        elif "project" in col_set and "area" in col_set:
+            try:
+                conn.execute(
+                    f"UPDATE {table_sql} SET area = project "
+                    "WHERE COALESCE(area, '') = '' AND COALESCE(project, '') != ''"
+                )
+            except Exception:
+                pass
+        if "area" in col_set:
+            _normalize_area_values(conn, tbl_name)
+    conn.commit()
+
+
+def _normalize_area_write_columns(conn, tbl_name, cols, vals):
+    table_cols = set(_table_column_names(conn, tbl_name))
+    normalized = []
+    for col, val in zip(cols, vals):
+        next_col = "area" if col == "project" and "area" in table_cols else col
+        next_val = _normalize_area_value(val) if next_col == "area" else val
+        normalized.append((next_col, next_val))
+    return normalized, table_cols
+
+
 NOTE_SCHEMA_COLUMNS = {
     "file_name": "TEXT",
     "path": "TEXT",
@@ -105,7 +210,7 @@ NOTE_SCHEMA_COLUMNS = {
     "color": "TEXT",
     "date_created": "TEXT",
     "date_modified": "TEXT",
-    "project": "TEXT",
+    "area": "TEXT",
     "important": "TEXT",
     "source_note_id": "TEXT",
 }
@@ -135,14 +240,15 @@ def ensure_notes_schema(conn=None):
     ).fetchone()
     if not table_row:
         return
+    ensure_area_columns(conn, ["lp_notes"])
     rows = conn.execute("PRAGMA table_info(lp_notes)").fetchall()
     existing = {row[1].lower() for row in rows}
     for col_name, col_type in NOTE_SCHEMA_COLUMNS.items():
         if col_name.lower() not in existing:
             conn.execute(f"ALTER TABLE lp_notes ADD COLUMN {col_name} {col_type}")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_folder_id ON lp_notes(folder_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_project ON lp_notes(project)")
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_project_nocase ON lp_notes(project COLLATE NOCASE)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_area ON lp_notes(area)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_area_nocase ON lp_notes(area COLLATE NOCASE)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_path ON lp_notes(path)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_date_modified ON lp_notes(date_modified)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_rec_extract_date ON lp_notes(rec_extract_date)")
@@ -280,7 +386,7 @@ def _qualify_cols(col_list, table_alias="t"):
     return ", ".join(cols) if cols else "*"
 
 
-def _has_project_col(col_list):
+def _has_area_col(col_list):
     for col in col_list or []:
         col_name = col.strip()
         col_lower = col_name.lower()
@@ -290,12 +396,12 @@ def _has_project_col(col_list):
         if "." in col_name:
             col_name = col_name.split(".")[-1].strip()
             col_lower = col_name.lower()
-        if col_lower == "project":
+        if col_lower == "area":
             return True
     return False
 
 
-def _table_has_project(conn, tbl_name):
+def _table_has_area(conn, tbl_name):
     try:
         rows = conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()
     except Exception:
@@ -306,7 +412,7 @@ def _table_has_project(conn, tbl_name):
             col_names.append(row[1])
         except Exception:
             continue
-    return _has_project_col(col_names)
+    return _has_area_col(col_names)
 
 
 def _current_owner_user_id():
@@ -320,7 +426,7 @@ def _current_owner_user_id():
     return None
 
 
-def _project_folder_owner_sql(alias="pf"):
+def _area_folder_owner_sql(alias="pf"):
     owner_user_id = _current_owner_user_id()
     if owner_user_id is None:
         return f"{alias}.owner_user_id IS NULL"
@@ -334,14 +440,16 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
     order_clause = order_by or "t.id DESC"
     route_name = _route_for_table(tbl_name)
     if route_name in {"notes", "media", "audio", "3d", "files", "apps"}:
-        projects_mod.ensure_projects_schema(conn)
+        from common import areas as areas_mod
+
+        areas_mod.ensure_areas_schema(conn)
         if tab and tab.lower() == "unmapped":
             sql = (
                 f"SELECT {cols} FROM {tbl_name} t "
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE NOT EXISTS ("
-                "  SELECT 1 FROM lp_project_folders pf "
-                f"  WHERE {_project_folder_owner_sql('pf')} "
+                "  SELECT 1 FROM lp_area_folders pf "
+                f"  WHERE {_area_folder_owner_sql('pf')} "
                 "    AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
@@ -354,9 +462,9 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
                 f"SELECT {cols} FROM {tbl_name} t "
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE EXISTS ("
-                "  SELECT 1 FROM lp_project_folders pf "
-                f"  WHERE {_project_folder_owner_sql('pf')} "
-                "    AND pf.project_id = ? AND pf.is_enabled = 1 "
+                "  SELECT 1 FROM lp_area_folders pf "
+                f"  WHERE {_area_folder_owner_sql('pf')} "
+                "    AND pf.area_id = ? AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
                 "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
@@ -368,10 +476,10 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
             sql = f"SELECT {cols} FROM {tbl_name} t ORDER BY {order_clause}"
     else:
         if tab:
-            if _has_project_col(col_list):
+            if _has_area_col(col_list):
                 sql = (
                     f"SELECT {cols} FROM {tbl_name} t "
-                    "WHERE lower(t.project) = lower(?) "
+                    "WHERE lower(t.area) = lower(?) "
                     f"ORDER BY {order_clause}"
                 )
                 params.append(tab)
@@ -394,14 +502,16 @@ def count_mapped_rows(conn, tbl_name, tab=None):
     params = []
     route_name = _route_for_table(tbl_name)
     if route_name in {"notes", "media", "audio", "3d", "files", "apps"}:
-        projects_mod.ensure_projects_schema(conn)
+        from common import areas as areas_mod
+
+        areas_mod.ensure_areas_schema(conn)
         if tab and tab.lower() == "unmapped":
             sql = (
                 f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE NOT EXISTS ("
-                "  SELECT 1 FROM lp_project_folders pf "
-                f"  WHERE {_project_folder_owner_sql('pf')} "
+                "  SELECT 1 FROM lp_area_folders pf "
+                f"  WHERE {_area_folder_owner_sql('pf')} "
                 "    AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
@@ -413,9 +523,9 @@ def count_mapped_rows(conn, tbl_name, tab=None):
                 f"SELECT COUNT(1) as cnt FROM {tbl_name} t "
                 "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
                 "WHERE EXISTS ("
-                "  SELECT 1 FROM lp_project_folders pf "
-                f"  WHERE {_project_folder_owner_sql('pf')} "
-                "    AND pf.project_id = ? AND pf.is_enabled = 1 "
+                "  SELECT 1 FROM lp_area_folders pf "
+                f"  WHERE {_area_folder_owner_sql('pf')} "
+                "    AND pf.area_id = ? AND pf.is_enabled = 1 "
                 "    AND pf.folder_role IN ('default','include','archive','output') "
                 "    AND df.folder_path IS NOT NULL "
                 "    AND lower(df.folder_path) LIKE lower(pf.path_prefix) || '%'"
@@ -426,8 +536,8 @@ def count_mapped_rows(conn, tbl_name, tab=None):
             sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
     else:
         if tab:
-            if _table_has_project(conn, tbl_name):
-                sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t WHERE lower(t.project) = lower(?)"
+            if _table_has_area(conn, tbl_name):
+                sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t WHERE lower(t.area) = lower(?)"
                 params.append(tab)
             else:
                 sql = f"SELECT COUNT(1) as cnt FROM {tbl_name} t"
@@ -452,7 +562,10 @@ def add_record(conn, tbl_name, col_list, value_list):
     conn = _get_conn() if conn is None else conn
     table_cols = None
     try:
-        table_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()}
+        ensure_area_columns(conn, [tbl_name])
+        normalized, table_cols = _normalize_area_write_columns(conn, tbl_name, cols, vals)
+        cols = [col for col, _ in normalized]
+        vals = [val for _, val in normalized]
         if "owner_user_id" in table_cols and "owner_user_id" not in cols:
             from flask_login import current_user
 
@@ -504,7 +617,10 @@ def update_record(conn, tbl_name, record_id, col_list, value_list):
     vals = list(value_list)
     try:
         conn = _get_conn() if conn is None else conn
-        table_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tbl_name})").fetchall()}
+        ensure_area_columns(conn, [tbl_name])
+        normalized, table_cols = _normalize_area_write_columns(conn, tbl_name, cols, vals)
+        cols = [col for col, _ in normalized]
+        vals = [val for _, val in normalized]
         filtered = [(col, val) for col, val in zip(cols, vals) if col in table_cols]
         cols = [col for col, _ in filtered]
         vals = [val for _, val in filtered]

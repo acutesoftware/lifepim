@@ -1,4 +1,4 @@
-﻿
+
 (function () {
   "use strict";
 
@@ -1222,11 +1222,11 @@
           showToast({ message: "Select one or more notes first." });
           return;
         }
-        const projectId = promptChoice("Move selected notes to project:", parseOptions("projectOptions"), "id");
-        if (!projectId) {
+        const areaId = promptChoice("Move selected notes to area:", parseOptions("areaOptions"), "id");
+        if (!areaId) {
           return;
         }
-        postJson("/notes/api/move-selected", { note_ids: noteIds, project_id: projectId })
+        postJson("/notes/api/move-selected", { note_ids: noteIds, area_id: areaId })
           .then((data) => {
             showToast({ message: `Moved ${data.moved || 0} selected note(s).` });
             window.location.reload();

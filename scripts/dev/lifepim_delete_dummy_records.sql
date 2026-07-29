@@ -10,7 +10,7 @@ WHERE title LIKE 'task_%';
 
 DELETE FROM lp_calendar_events
 WHERE title LIKE 'event_%'
-   OR project = 'LoadTest';
+   OR area = 'LoadTest';
 
 -- Calendar stage-2 projected/index rows for deleted manual events.
 DELETE FROM lp_calendar_items

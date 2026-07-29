@@ -319,7 +319,7 @@ def _ensure_audio_table(conn: sqlite3.Connection) -> None:
         "CREATE TABLE IF NOT EXISTS lp_audio ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, "
         "file_name TEXT, path TEXT, folder_id TEXT, file_type TEXT, size TEXT, "
-        "date_modified TEXT, duration TEXT, artist TEXT, album TEXT, song TEXT, project TEXT, "
+        "date_modified TEXT, duration TEXT, artist TEXT, album TEXT, song TEXT, area TEXT, "
         "user_name TEXT, rec_extract_date TEXT)"
     )
     db.add_column_if_missing(conn, "lp_audio", "duration", "TEXT")
@@ -377,7 +377,7 @@ def _insert_audio_batch(conn: sqlite3.Connection, batch: Iterable[tuple]) -> int
         return 0
     cur = conn.executemany(
         "INSERT INTO lp_audio "
-        "(file_name, path, folder_id, file_type, size, date_modified, duration, artist, album, song, project, user_name, rec_extract_date) "
+        "(file_name, path, folder_id, file_type, size, date_modified, duration, artist, album, song, area, user_name, rec_extract_date) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         batch,
     )

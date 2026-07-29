@@ -212,7 +212,7 @@ def _search_table(route_name, terms, columns, view_route, id_param, limit=None):
                 "table": tbl.get("display_name") or route_name.title(),
                 "route": tbl.get("route") or route_name,
                 "id": item.get("id"),
-                "project": item.get("project") or "",
+                "area": item.get("area") or "",
                 "match_field": match_field,
                 "match_value": match_value,
                 "match_snippet": _build_snippet(match_value, terms),
@@ -272,7 +272,7 @@ def _search_media(terms, limit=None):
                 "table": tbl.get("display_name") or "Media",
                 "route": "media",
                 "id": item.get("id"),
-                "project": "",
+                "area": "",
                 "match_field": match_field,
                 "match_value": match_value,
                 "match_snippet": _build_snippet(match_value, terms),
@@ -285,7 +285,7 @@ def _search_media(terms, limit=None):
     return results, has_more
 
 
-def _search_note_content_index(terms, project=None, route=None, limit=None):
+def _search_note_content_index(terms, area=None, route=None, limit=None):
     note_search_index.ensure_schema()
     conn = data._get_conn()
     fetch_limit = int(limit) + 1 if limit else None
@@ -299,7 +299,7 @@ def _search_note_content_index(terms, project=None, route=None, limit=None):
     visibility_clause, visibility_params = _visible_table_condition(conn, "lp_notes", "n")
     params.extend(visibility_params)
     sql = (
-        "SELECT idx.note_id, idx.title, idx.content_text, idx.file_path, n.project "
+        "SELECT idx.note_id, idx.title, idx.content_text, idx.file_path, n.area "
         "FROM lp_note_search_index idx "
         "LEFT JOIN lp_notes n ON n.id = idx.note_id "
         f"WHERE ({where_clause}) AND ({visibility_clause}) "
@@ -322,7 +322,7 @@ def _search_note_content_index(terms, project=None, route=None, limit=None):
                 "table": "Notes",
                 "route": "notes",
                 "id": item.get("note_id"),
-                "project": item.get("project") or "",
+                "area": item.get("area") or "",
                 "match_field": "content",
                 "match_value": snippet,
                 "match_snippet": snippet,
@@ -335,18 +335,18 @@ def _search_note_content_index(terms, project=None, route=None, limit=None):
     return results, has_more
 
 
-def search_note_content(query, project=None, route=None, limit=100):
+def search_note_content(query, area=None, route=None, limit=100):
     terms = parse_search_terms(query)
     if not terms:
         return {"primary": [], "secondary": [], "more": []}
     terms = [term.lower() for term in terms]
-    results, has_more = _search_note_content_index(terms, project=project, route=route, limit=limit)
+    results, has_more = _search_note_content_index(terms, area=area, route=route, limit=limit)
     primary = []
     secondary = []
     for result in results:
-        matches_project = bool(project) and result.get("project") == project
+        matches_area = bool(area) and result.get("area") == area
         matches_route = bool(route) and result.get("route") == route
-        if matches_project or matches_route:
+        if matches_area or matches_route:
             primary.append(result)
         else:
             secondary.append(result)
@@ -393,7 +393,7 @@ def _search_how(terms, limit=None):
         params.extend([like_value] * len(search_cols))
     fetch_limit = int(limit) + 1 if limit else None
     sql = (
-        "SELECT h.howto_id AS id, h.title, h.project_id AS project, h.summary, h.outcome, "
+        "SELECT h.howto_id AS id, h.title, h.area_id AS area, h.summary, h.outcome, "
         "h.markdown_full_content, h.tags FROM lp_howto h "
         f"WHERE {' AND '.join(term_conditions)}"
     )
@@ -414,7 +414,7 @@ def _search_how(terms, limit=None):
                 "table": "How",
                 "route": "how",
                 "id": item.get("id"),
-                "project": item.get("project") or "",
+                "area": item.get("area") or "",
                 "match_field": match_field,
                 "match_value": match_value,
                 "match_snippet": _build_snippet(match_value, terms),
@@ -427,7 +427,7 @@ def _search_how(terms, limit=None):
     return results, has_more
 
 
-def search_all(query, project=None, route=None, primary_limit=100, secondary_limit=20):
+def search_all(query, area=None, route=None, primary_limit=100, secondary_limit=20):
     terms = parse_search_terms(query)
     if not terms:
         return {"primary": [], "secondary": [], "more": []}
@@ -457,9 +457,9 @@ def search_all(query, project=None, route=None, primary_limit=100, secondary_lim
                 }
             )
         for result in route_results:
-            matches_project = bool(project) and result.get("project") == project
+            matches_area = bool(area) and result.get("area") == area
             matches_route = bool(route) and (result.get("route") == route)
-            if matches_project or matches_route:
+            if matches_area or matches_route:
                 primary.append(result)
             else:
                 secondary.append(result)

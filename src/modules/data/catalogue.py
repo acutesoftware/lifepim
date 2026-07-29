@@ -62,7 +62,7 @@ def ensure_schema(connection=None):
             default_schema TEXT,
             root_path TEXT,
             environment TEXT,
-            project TEXT,
+            area TEXT,
             credential_reference TEXT,
             connection_options_json TEXT,
             recursive_scan INTEGER NOT NULL DEFAULT 1,
@@ -96,7 +96,7 @@ def ensure_schema(connection=None):
             database_name TEXT,
             schema_name TEXT,
             parent_path TEXT,
-            project TEXT,
+            area TEXT,
             full_name TEXT,
             full_path TEXT,
             catalogue_level TEXT NOT NULL DEFAULT 'DISCOVERED',
@@ -160,7 +160,7 @@ def ensure_schema(connection=None):
             saved_sql_id INTEGER PRIMARY KEY,
             sql_name TEXT NOT NULL,
             data_source_id INTEGER,
-            project TEXT,
+            area TEXT,
             default_database TEXT,
             default_schema TEXT,
             sql_text TEXT NOT NULL,
@@ -262,22 +262,23 @@ def ensure_schema(connection=None):
         CREATE INDEX IF NOT EXISTS idx_data_task_status ON d_data_task(status);
         """
     )
-    _ensure_column(c, "d_data_source", "project", "TEXT")
-    _ensure_column(c, "d_data_object", "project", "TEXT")
-    _ensure_column(c, "d_data_saved_sql", "project", "TEXT")
+    db.ensure_area_columns(c, ["d_data_source", "d_data_object", "d_data_saved_sql"])
+    _ensure_column(c, "d_data_source", "area", "TEXT")
+    _ensure_column(c, "d_data_object", "area", "TEXT")
+    _ensure_column(c, "d_data_saved_sql", "area", "TEXT")
     c.execute(
         """
         UPDATE d_data_saved_sql
-        SET project = (
-            SELECT s.project FROM d_data_source s
+        SET area = (
+            SELECT s.area FROM d_data_source s
             WHERE s.data_source_id = d_data_saved_sql.data_source_id
         )
-        WHERE COALESCE(project, '') = ''
+        WHERE COALESCE(area, '') = ''
           AND data_source_id IS NOT NULL
           AND EXISTS (
               SELECT 1 FROM d_data_source s
               WHERE s.data_source_id = d_data_saved_sql.data_source_id
-                AND COALESCE(s.project, '') != ''
+                AND COALESCE(s.area, '') != ''
           )
         """
     )
@@ -355,9 +356,9 @@ def source_list(kind=None, filters=None):
     if kind:
         clauses.append("s.source_kind = ?")
         params.append(kind)
-    if filters.get("project"):
-        clauses.append("s.project = ?")
-        params.append(filters["project"])
+    if filters.get("area"):
+        clauses.append("s.area = ?")
+        params.append(filters["area"])
     where = " AND ".join(clauses) if clauses else "1=1"
     items = rows(
         f"""
@@ -422,7 +423,7 @@ def _source_values(form, kind):
         "default_schema": form.get("default_schema", "").strip(),
         "root_path": form.get("root_path", "").strip(),
         "environment": form.get("environment", "").strip(),
-        "project": form.get("project", "").strip(),
+        "area": form.get("area", "").strip(),
         "credential_reference": form.get("credential_reference", "").strip(),
         "connection_options_json": form.get("connection_options_json", "").strip(),
         "recursive_scan": _checked(form, "recursive_scan", default=True),
@@ -483,7 +484,7 @@ def object_list(filters):
         ("object_type", "o.object_type"),
         ("catalogue_level", "o.catalogue_level"),
         ("environment", "s.environment"),
-        ("project", "o.project"),
+        ("area", "o.area"),
         ("profile_status", "o.profile_status"),
         ("quality_status", "o.quality_status"),
     ]:
@@ -499,7 +500,7 @@ def object_list(filters):
     where = " AND ".join(clauses) if clauses else "1=1"
     return rows(
         f"""
-        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment, s.project AS source_project,
+        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment, s.area AS source_area,
                GROUP_CONCAT(DISTINCT t.tag_name) AS tags
         FROM d_data_object o
         JOIN d_data_source s ON s.data_source_id = o.data_source_id
@@ -519,7 +520,7 @@ def object_list(filters):
 def object_get(object_id):
     item = row(
         """
-        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment, s.project AS source_project
+        SELECT o.*, s.source_name, s.source_kind, s.source_type, s.environment, s.area AS source_area
         FROM d_data_object o
         JOIN d_data_source s ON s.data_source_id = o.data_source_id
         WHERE o.data_object_id = ?
@@ -541,7 +542,7 @@ def save_object_metadata(object_id, form):
         """
         UPDATE d_data_object
         SET display_name = ?, catalogue_level = ?, description = ?, purpose = ?, notes = ?,
-            project = ?,
+            area = ?,
             is_favourite = ?, is_canonical = ?, is_sensitive = ?, is_hidden = ?, is_active = ?,
             profile_mode = ?, content_index_mode = ?, refresh_policy = ?, updated_at = ?
         WHERE data_object_id = ?
@@ -552,7 +553,7 @@ def save_object_metadata(object_id, form):
             form.get("description", "").strip(),
             form.get("purpose", "").strip(),
             form.get("notes", "").strip(),
-            form.get("project", "").strip(),
+            form.get("area", "").strip(),
             _checked(form, "is_favourite"),
             _checked(form, "is_canonical"),
             _checked(form, "is_sensitive"),
@@ -598,16 +599,16 @@ def sql_list(filters=None):
     if filters.get("source_id"):
         clauses.append("ss.data_source_id = ?")
         params.append(filters["source_id"])
-    if filters.get("project"):
-        clauses.append("ss.project = ?")
-        params.append(filters["project"])
+    if filters.get("area"):
+        clauses.append("ss.area = ?")
+        params.append(filters["area"])
     if filters.get("favourite") in ("0", "1"):
         clauses.append("ss.is_favourite = ?")
         params.append(int(filters["favourite"]))
     where = " AND ".join(clauses) if clauses else "1=1"
     return rows(
         f"""
-        SELECT ss.*, s.source_name, s.source_type, s.environment, s.project AS source_project,
+        SELECT ss.*, s.source_name, s.source_type, s.environment, s.area AS source_area,
                GROUP_CONCAT(DISTINCT t.tag_name) AS tags
         FROM d_data_saved_sql ss
         LEFT JOIN d_data_source s ON s.data_source_id = ss.data_source_id
@@ -624,7 +625,7 @@ def sql_list(filters=None):
 def sql_get(sql_id):
     item = row(
         """
-        SELECT ss.*, s.source_name, s.source_type, s.environment, s.project AS source_project
+        SELECT ss.*, s.source_name, s.source_type, s.environment, s.area AS source_area
         FROM d_data_saved_sql ss
         LEFT JOIN d_data_source s ON s.data_source_id = ss.data_source_id
         WHERE ss.saved_sql_id = ?
@@ -646,7 +647,7 @@ def save_sql(sql_id, form):
     values = {
         "sql_name": form.get("sql_name", "").strip(),
         "data_source_id": _int_or_none(form.get("data_source_id")),
-        "project": form.get("project", "").strip(),
+        "area": form.get("area", "").strip(),
         "default_database": form.get("default_database", "").strip(),
         "default_schema": form.get("default_schema", "").strip(),
         "sql_text": form.get("sql_text", "").strip(),
@@ -659,9 +660,9 @@ def save_sql(sql_id, form):
         "is_favourite": _checked(form, "is_favourite"),
         "is_active": _checked(form, "is_active", default=True),
     }
-    if not values["project"] and values["data_source_id"]:
+    if not values["area"] and values["data_source_id"]:
         source = source_get(values["data_source_id"])
-        values["project"] = source.get("project", "") if source else ""
+        values["area"] = source.get("area", "") if source else ""
     if sql_id:
         set_clause = ", ".join([f"{key} = ?" for key in values])
         c.execute(
@@ -720,16 +721,16 @@ def tasks(limit=None, filters=None):
     filters = filters or {}
     clauses = []
     params = []
-    if filters.get("project"):
+    if filters.get("area"):
         clauses.append(
-            "(s.project = ? OR o.project = ? OR ss.project = ?)"
+            "(s.area = ? OR o.area = ? OR ss.area = ?)"
         )
-        params.extend([filters["project"]] * 3)
+        params.extend([filters["area"]] * 3)
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     sql = """
-        SELECT t.*, s.source_name, s.project AS source_project,
-               o.object_name, o.project AS object_project,
-               ss.sql_name, ss.project AS sql_project
+        SELECT t.*, s.source_name, s.area AS source_area,
+               o.object_name, o.area AS object_area,
+               ss.sql_name, ss.area AS sql_area
         FROM d_data_task t
         LEFT JOIN d_data_source s ON s.data_source_id = t.data_source_id
         LEFT JOIN d_data_object o ON o.data_object_id = t.data_object_id
@@ -871,7 +872,7 @@ def scan_sqlite_source(source_id):
                 object_type=object_type,
                 database_name=source.get("database_name") or os.path.basename(path),
                 schema_name=source.get("default_schema") or "",
-                project=source.get("project") or "",
+                area=source.get("area") or "",
                 full_name=table_name,
                 full_path="",
                 row_count=row_count,
@@ -972,7 +973,7 @@ def _scan_csv_source(source_id, source, path, stat):
         database_name=source.get("database_name") or os.path.basename(path),
         schema_name="",
         parent_path=os.path.dirname(path),
-        project=source.get("project") or "",
+        area=source.get("area") or "",
         full_name=os.path.basename(path),
         full_path=os.path.abspath(path),
         row_count=row_count,
@@ -998,7 +999,7 @@ def _scan_excel_source(source_id, source, path, stat):
             database_name=source.get("database_name") or os.path.basename(path),
             schema_name="",
             parent_path=os.path.dirname(path),
-            project=source.get("project") or "",
+            area=source.get("area") or "",
             full_name=f"{os.path.basename(path)}::{sheet_name}",
             full_path=os.path.abspath(path),
             row_count=len(frame.index),
@@ -1151,7 +1152,7 @@ def scan_file_source(source_id):
                     database_name="",
                     schema_name="",
                     parent_path=dirpath,
-                    project=source.get("project") or "",
+                    area=source.get("area") or "",
                     full_name=rel_norm,
                     full_path=os.path.abspath(full_path),
                     row_count=None,
@@ -1190,7 +1191,7 @@ def scan_file_source(source_id):
     return task_id
 
 
-def upsert_object(source_id, object_name, object_type, database_name="", schema_name="", parent_path="", project="", full_name="", full_path="", row_count=None, column_count=None, size_bytes=None, source_modified_at=None, source_created_at=None, metadata=None):
+def upsert_object(source_id, object_name, object_type, database_name="", schema_name="", parent_path="", area="", full_name="", full_path="", row_count=None, column_count=None, size_bytes=None, source_modified_at=None, source_created_at=None, metadata=None):
     c = conn()
     ts = now()
     if full_path and object_type == "EXCEL_SHEET":
@@ -1224,7 +1225,7 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
             """
             UPDATE d_data_object
             SET database_name = ?, schema_name = ?, parent_path = ?, full_name = ?, full_path = ?,
-                project = CASE WHEN COALESCE(project, '') = '' THEN ? ELSE project END,
+                area = CASE WHEN COALESCE(area, '') = '' THEN ? ELSE area END,
                 row_count = ?, column_count = ?, size_bytes = ?, last_seen_at = ?,
                 last_scanned_at = ?, source_modified_at = ?, source_created_at = ?,
                 metadata_json = ?, updated_at = ?
@@ -1236,7 +1237,7 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
                 parent_path,
                 full_name,
                 os.path.abspath(full_path) if full_path else "",
-                project,
+                area,
                 row_count,
                 column_count,
                 size_bytes,
@@ -1254,7 +1255,7 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
             """
             INSERT INTO d_data_object(
                 data_source_id, object_name, display_name, object_type, database_name, schema_name,
-                parent_path, project, full_name, full_path, row_count, column_count, size_bytes,
+                parent_path, area, full_name, full_path, row_count, column_count, size_bytes,
                 first_seen_at, last_seen_at, last_scanned_at, source_modified_at,
                 source_created_at, metadata_json, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1267,7 +1268,7 @@ def upsert_object(source_id, object_name, object_type, database_name="", schema_
                 database_name,
                 schema_name,
                 parent_path,
-                project,
+                area,
                 full_name,
                 os.path.abspath(full_path) if full_path else "",
                 row_count,
@@ -1313,20 +1314,20 @@ def upsert_column(object_id, col):
     c.commit()
 
 
-def overview_counts(project=None):
-    source_project = " AND project = ?" if project else ""
-    object_project = " AND project = ?" if project else ""
-    sql_project = " AND project = ?" if project else ""
-    source_params = (project,) if project else ()
-    object_params = (project,) if project else ()
-    sql_params = (project,) if project else ()
+def overview_counts(area=None):
+    source_area = " AND area = ?" if area else ""
+    object_area = " AND area = ?" if area else ""
+    sql_area = " AND area = ?" if area else ""
+    source_params = (area,) if area else ()
+    object_params = (area,) if area else ()
+    sql_params = (area,) if area else ()
     return {
-        "database_sources": scalar(f"SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'DATABASE'{source_project}", source_params),
-        "file_sources": scalar(f"SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'FILE_SOURCE'{source_project}", source_params),
-        "discovered_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'DISCOVERED'{object_project}", object_params),
-        "registered_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'REGISTERED'{object_project}", object_params),
-        "managed_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'MANAGED'{object_project}", object_params),
-        "saved_sql": scalar(f"SELECT COUNT(1) FROM d_data_saved_sql WHERE is_active = 1{sql_project}", sql_params),
+        "database_sources": scalar(f"SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'DATABASE'{source_area}", source_params),
+        "file_sources": scalar(f"SELECT COUNT(1) FROM d_data_source WHERE source_kind = 'FILE_SOURCE'{source_area}", source_params),
+        "discovered_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'DISCOVERED'{object_area}", object_params),
+        "registered_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'REGISTERED'{object_area}", object_params),
+        "managed_objects": scalar(f"SELECT COUNT(1) FROM d_data_object WHERE catalogue_level = 'MANAGED'{object_area}", object_params),
+        "saved_sql": scalar(f"SELECT COUNT(1) FROM d_data_saved_sql WHERE is_active = 1{sql_area}", sql_params),
         "problem_tasks": scalar(
             """
             SELECT COUNT(1)
@@ -1336,8 +1337,8 @@ def overview_counts(project=None):
             LEFT JOIN d_data_saved_sql ss ON ss.saved_sql_id = t.saved_sql_id
             WHERE t.status IN ('FAILED', 'RUNNING', 'QUEUED')
             """
-            + (" AND (s.project = ? OR o.project = ? OR ss.project = ?)" if project else ""),
-            ([project, project, project] if project else []),
+            + (" AND (s.area = ? OR o.area = ? OR ss.area = ?)" if area else ""),
+            ([area, area, area] if area else []),
         ),
         "stale_sources": scalar(
             f"""
@@ -1345,7 +1346,7 @@ def overview_counts(project=None):
             FROM d_data_source
             WHERE is_active = 1
               AND (last_scan_completed_at IS NULL OR last_scan_completed_at < datetime('now', '-30 days'))
-              {source_project}
+              {source_area}
             """,
             source_params,
         ),
@@ -1372,15 +1373,15 @@ def attention_items():
     }
 
 
-def recent_activity(project=None):
-    source_filter = {"project": project} if project else None
-    object_filter = {"project": project} if project else {}
-    sql_filter = {"project": project} if project else {}
+def recent_activity(area=None):
+    source_filter = {"area": area} if area else None
+    object_filter = {"area": area} if area else {}
+    sql_filter = {"area": area} if area else {}
     return {
         "sources": source_list(None, source_filter)[:8],
         "objects": object_list(object_filter)[:8],
         "sql": sql_list(sql_filter)[:8],
-        "tasks": tasks(limit=8, filters={"project": project} if project else None),
+        "tasks": tasks(limit=8, filters={"area": area} if area else None),
     }
 
 

@@ -1,6 +1,6 @@
 <div class="data-header">
   <div class="data-title">DATA</div>
-  {% set data_nav_args = {'proj': current_proj} if current_proj else {} %}
+  {% set data_nav_args = {'area': current_area} if current_area else {} %}
   <nav class="data-nav">
     <a href="{{ url_for('data.overview_route', **data_nav_args) }}" class="{% if request.endpoint == 'data.overview_route' %}active{% endif %}">Overview</a>
     <a href="{{ url_for('data.database_sources_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.database_sources_route', 'data.database_source_detail_route', 'data.database_source_new_route', 'data.database_source_edit_route'] %}active{% endif %}">Databases</a>

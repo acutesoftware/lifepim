@@ -257,8 +257,8 @@ The upload action does not download Desktop changes back to Pocket.
 The manifest read in step 2 also carries Desktop note metadata that Pocket can
 use when matching or importing Desktop-backed notes:
 
-- `project` and `derived_project`: Desktop's derived project value, copied
-  verbatim from the project-folder mapping, for example `work/business`.
+- `area` and `derived_area`: Desktop's derived area value, copied
+  verbatim from the area-folder mapping, for example `work/business`.
 - `date_created`: note creation date from the markdown YAML front matter, or the
   source file creation timestamp when front matter does not provide one.
 - `date_modified`: note modified date from the markdown YAML front matter, with

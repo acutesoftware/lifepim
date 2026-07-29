@@ -11,7 +11,7 @@ The Notes tab lists markdown files that have been imported into the `lp_notes` t
 - `folder_id`
 - `size`
 - `date_modified`
-- `project`
+- `area`
 
 The note body remains in the `.md` file on disk. Viewing or editing a note reads/writes the markdown file directly.
 
@@ -19,15 +19,15 @@ The note body remains in the `.md` file on disk. Viewing or editing a note reads
 
 Open the Notes tab from the top navigation.
 
-Use the left project/sidebar tabs to filter notes by saved project metadata. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current project folder.
+Use the left area/sidebar tabs to filter notes by saved area metadata. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current area folder.
 
 The top header of the Notes page is defined below
-BOLD TITLE : Notes ([project]) - if note project selected it just says 'Notes"
+BOLD TITLE : Notes ([area]) - if note area selected it just says 'Notes"
 CONTROLS: (series of buttons and dropdowns as per below)
   LABEL : "View as : " 
   DROP DOWN LIST : [ List | Table | Grid | Preview | Names only ]
   LABEL : "Sort by : "
-  DROP DOWN LIST : [ Title | size | Color | Project | Date Created | Date Modified | Folder]
+  DROP DOWN LIST : [ Title | size | Color | Area | Date Created | Date Modified | Folder]
   DROP DOWN LIST : [ Asc | Desc]
   
   BUTTON : New Note
@@ -35,7 +35,7 @@ CONTROLS: (series of buttons and dropdowns as per below)
   DROP DOWN LIST: disabled until ANY note selected then: 
         - Link Selected Note to ..  (popup to Links)
         - Delete Selected notes
-        - Move selected notes to Project (popup list of projects)
+        - Move selected notes to Area (popup list of areas)
         - Set color of selected notes to ... (popup list of colors)
 
   DROP DOWN LIST : [...]  shows a triple dot popup menu for other options
@@ -48,7 +48,7 @@ For the View as list:
 = Table : notes with following columns
           - Filename
           - Color
-          - Project
+          - Area
           - Size
           - Date Created
           - Date Modified
@@ -59,7 +59,7 @@ FOLDERS PANEL
 Have a folders panel, hidden by default showing the list of actual folders when expanded.
 By default we only see a line " Folders [+]"
 
-When expanded - it shows the list of folders that are mapped to this project
+When expanded - it shows the list of folders that are mapped to this area
 
 MAIN BODY
 The main body shows the notes list as selected - may be a table, list or grid depending on settings.
@@ -85,9 +85,9 @@ CONTROLS : (series of buttons / drop down lists as per below)
   LABEL : Circle of colour (just a colored cicle)
   DROP DOWN LIST : [List of Colors] - changing this changes the notes color
   BUTTON : "Rename" (pops up dialog with current file asking for new name)
-  LABEL : "Project :"
-  DROP DOWN LIST : [List of Projects]
-  BUTTON : "Move" (moves Project to currently selected project)
+  LABEL : "Area :"
+  DROP DOWN LIST : [List of Areas]
+  BUTTON : "Move" (moves Area to currently selected area)
   BUTTON : Delete this file (asks for congirmation first then moves the file to the trash folder)
   BUTTON : Convert to HOWTO
   
@@ -108,9 +108,9 @@ If the user is choosing to view metadata , then only the metadata and front matt
 
 ### Add Notes
 
-New notes can be created from the Notes UI. The app writes a new `.md` file into the selected project's default notes folder and inserts a matching row into `lp_notes`.
+New notes can be created from the Notes UI. The app writes a new `.md` file into the selected area's default notes folder and inserts a matching row into `lp_notes`.
 
-The project must have a default folder configured before new-note creation can write to the correct place.
+The area must have a default folder configured before new-note creation can write to the correct place.
 
 ### Edit Notes
 
@@ -133,7 +133,7 @@ The app asks for confirmation before converting. If confirmed, LifePIM:
 - reads the note's markdown file from disk
 - creates a new row in `lp_howto`
 - uses the note filename without `.md` as the HOWTO title
-- copies the note's saved `lp_notes.project` into `lp_howto.project_id`
+- copies the note's saved `lp_notes.area` into `lp_howto.area_id`
 - stores the original note markdown in `lp_howto.markdown_full_content`
 - stores the original note file path in `lp_howto.source_filepath`
 - removes the note row from `lp_notes`
@@ -182,10 +182,10 @@ Full notes sync:
 Settings -> Notes -> Sync notes
 ```
 
-Project/folder sync:
+Area/folder sync:
 
 ```text
-Notes -> select project -> Folders panel -> Sync
+Notes -> select area -> Folders panel -> Sync
 ```
 
 Sync is idempotent:
@@ -194,8 +194,8 @@ Sync is idempotent:
 - inserts new files into `lp_notes`
 - updates existing rows by full file path
 - refreshes `size`, `date_modified`, and `folder_id`
-- preserves existing `lp_notes.project`
-- fills blank `lp_notes.project` from the deepest matching enabled project folder mapping
+- preserves existing `lp_notes.area`
+- fills blank `lp_notes.area` from the deepest matching enabled area folder mapping
 - counts missing-on-disk rows but does not delete them
 - ignores duplicate database rows after the first matching full path
 
@@ -222,7 +222,7 @@ Steps:
 1. Back up the SQLite database.
 2. Open `Settings -> Notes`.
 3. Enter the new notes root.
-4. Leave `Project` blank unless every imported note should get one explicit project value.
+4. Leave `Area` blank unless every imported note should get one explicit area value.
 5. Tick `Delete existing notes and note links before importing this folder`.
 6. Click `Migrate notes source`.
 
@@ -236,13 +236,13 @@ Migration deletes:
 
 Migration does not delete markdown files on disk.
 
-Migration also updates project/folder mapping paths for the notes source:
+Migration also updates area/folder mapping paths for the notes source:
 
-- rewrites matching `lp_project_folders.path_prefix` values from the old notes root to the new notes root
-- rewrites matching `map_folder_project.path_prefix` values from the old notes root to the new notes root
-- rebuilds `map_project_folder`
+- rewrites matching `lp_area_folders.path_prefix` values from the old notes root to the new notes root
+- rewrites matching `map_folder_area.path_prefix` values from the old notes root to the new notes root
+- rebuilds `map_area_folder`
 
-This moves project/sidebar filtering away from old mirror paths such as:
+This moves area/sidebar filtering away from old mirror paths such as:
 
 ```text
 E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes
@@ -258,7 +258,7 @@ Links are ID-based. For notes, links point at `lp_notes.id`, so replacing the no
 
 ## Folders
 
-Folders are how Notes connect markdown files to projects and the left-hand project/sidebar tabs.
+Folders are how Notes connect markdown files to areas and the left-hand area/sidebar tabs.
 
 There are three related concepts:
 
@@ -266,12 +266,12 @@ There are three related concepts:
   - The real folder containing the markdown file.
 - `dim_folder`
   - A normalized folder cache. Each imported note gets a `folder_id` pointing here.
-- `lp_project_folders`
-  - Project folder rules. These decide which folders belong to which project/sidebar tab.
+- `lp_area_folders`
+  - Area folder rules. These decide which folders belong to which area/sidebar tab.
 
 When a note is imported or created, LifePIM stores the actual selected notes path and assigns `folder_id`. For notes, the import keeps the selected source path. It does not rewrite `N:\...` back to `E:\BK_fangorn\...`.
 
-Project filtering works by matching a note folder against enabled `lp_project_folders.path_prefix` values. More specific folder prefixes should win over broad parent folders.
+Area filtering works by matching a note folder against enabled `lp_area_folders.path_prefix` values. More specific folder prefixes should win over broad parent folders.
 
 Example:
 
@@ -285,35 +285,35 @@ should map more specifically than:
 N:\duncan\LifePIM_Data\DATA\notes\10-Pers
 ```
 
-The Folders section in Notes is a navigation aid. It shows subfolders for the current notes/project filter so you can drill into the markdown tree.
+The Folders section in Notes is a navigation aid. It shows subfolders for the current notes/area filter so you can drill into the markdown tree.
 
-If folder/project mapping looks wrong after changing source, run `Migrate notes source` rather than plain `Import Folder`, because migration rewrites the mapping prefixes from the old root to the new root.
+If folder/area mapping looks wrong after changing source, run `Migrate notes source` rather than plain `Import Folder`, because migration rewrites the mapping prefixes from the old root to the new root.
 
-## Projects
+## Areas
 
-Notes currently have two project concepts:
+Notes currently have two area concepts:
 
-- `lp_notes.project`
+- `lp_notes.area`
   - A stored text column on the note row.
-  - It is set when a new note is created from a selected project, when folder import/sync has a selected `proj`, or when note project materialization fills a blank value from folder mappings.
+  - It is set when a new note is created from a selected area, when folder import/sync has a selected `area`, or when note area materialization fills a blank value from folder mappings.
   - It can still be blank for old migrated/imported notes until materialization or sync has run.
-  - It is displayed in the Notes table as `Project`.
-- derived project
+  - It is displayed in the Notes table as `Area`.
+- derived area
   - A runtime value calculated from the note folder.
   - It is useful as diagnostic information and as an input to materialization.
   - It is not the normal list/sidebar filter path because calculating it for every row on every click is too slow.
 
-The derived project can be calculated by joining:
+The derived area can be calculated by joining:
 
 ```text
 lp_notes.folder_id -> dim_folder.folder_id -> dim_folder.folder_path
 ```
 
-then finding the enabled `lp_project_folders` row whose `path_prefix` is the best prefix match for that folder:
+then finding the enabled `lp_area_folders` row whose `path_prefix` is the best prefix match for that folder:
 
 ```sql
-SELECT pf.project_id
-FROM lp_project_folders pf
+SELECT pf.area_id
+FROM lp_area_folders pf
 WHERE pf.is_enabled = 1
   AND pf.folder_role IN ('default','include','archive','output')
   AND lower(dim_folder.folder_path) LIKE lower(pf.path_prefix) || '%'
@@ -340,13 +340,13 @@ N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
 dim_folder.folder_path:
 N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
 
-lp_project_folders:
-project_id        path_prefix
-proj/dev          N:\duncan\LifePIM_Data\DATA\notes\40-Dev
-proj/dev/lifepim  N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
+lp_area_folders:
+area_id        path_prefix
+area/dev          N:\duncan\LifePIM_Data\DATA\notes\40-Dev
+area/dev/lifepim  N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
 
-derived_project:
-proj/dev/lifepim
+derived_area:
+area/dev/lifepim
 ```
 
 The more specific path wins because the mapping is sorted by longest `path_prefix` first. This calculation should happen during sync/materialization, not during every list browse.
@@ -356,22 +356,22 @@ The more specific path wins because the mapping is sorted by longest `path_prefi
 The left sidebar is defined in `src/common/config.py` as `SIDE_TABS`. Each entry has an `id`, for example:
 
 ```python
-{ 'id': 'proj/dev/lifepim', 'label': 'LifePIM' }
+{ 'id': 'area/dev/lifepim', 'label': 'LifePIM' }
 ```
 
 The layout turns the selected sidebar entry into a URL query parameter:
 
 ```text
-/notes?proj=proj/dev/lifepim
+/notes?area=area/dev/lifepim
 ```
 
-For Notes, that `proj` value is used as a metadata filter. The Notes list filters by `lp_notes.project`, not by deriving folder mappings for every row during browsing.
+For Notes, that `area` value is used as a metadata filter. The Notes list filters by `lp_notes.area`, not by deriving folder mappings for every row during browsing.
 
-This is deliberate. The older folder-derived query was correct but too slow for interactive list/table/card browsing. Project folder mappings are now materialized into `lp_notes.project` during sync and by the note project materialization maintenance action.
+This is deliberate. The older folder-derived query was correct but too slow for interactive list/table/card browsing. Area folder mappings are now materialized into `lp_notes.area` during sync and by the note area materialization maintenance action.
 
-Parent sidebar entries such as `fun` expand to the active projects in that group, such as `fun/games` and `fun/food`. Leaf entries filter by each note's saved project value, so a broad placeholder folder on `fun/sport` does not make Sport show every note under the shared `50-Fun` root after materialization.
+Parent sidebar entries such as `fun` expand to the active areas in that group, such as `fun/games` and `fun/food`. Leaf entries filter by each note's saved area value, so a broad placeholder folder on `fun/sport` does not make Sport show every note under the shared `50-Fun` root after materialization.
 
-`Unmapped` is special. It shows notes whose saved `lp_notes.project` is blank.
+`Unmapped` is special. It shows notes whose saved `lp_notes.area` is blank.
 
 ### Mapping Sources
 
@@ -379,23 +379,23 @@ There are two related mapping layers.
 
 The current Notes list/create flow uses:
 
-- `lp_projects`
-  - Project metadata: `project_id`, `tab`, `group_name`, `project_name`, status, tags.
-- `lp_project_folders`
-  - The project-to-folder rules used by note project materialization, derived project display, sync fallback metadata, and new-note default folders.
-  - These can be adjusted in the Notes UI when a selected sidebar project has an `lp_projects` row. The `Folders` panel can add, remove, enable/disable, and set default folders.
+- `lp_areas`
+  - Area metadata: `area_id`, `tab`, `group_name`, `area_name`, status, tags.
+- `lp_area_folders`
+  - The area-to-folder rules used by note area materialization, derived area display, sync fallback metadata, and new-note default folders.
+  - These can be adjusted in the Notes UI when a selected sidebar area has an `lp_areas` row. The `Folders` panel can add, remove, enable/disable, and set default folders.
 
 The older folder-mapping ETL uses:
 
-- `map_folder_project`
+- `map_folder_area`
   - Raw mapping rules imported from the external CSV configured by `etl_rules_csv`.
-- `map_project_folder`
+- `map_area_folder`
   - Rebuilt cache that maps `dim_folder.folder_id` to the best matching raw mapping rule.
 
 The external CSV location is configured in `src/common/config.py`:
 
 ```python
-etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv"
+etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_area_folder.csv"
 ```
 
 That CSV expects at least:
@@ -407,7 +407,7 @@ path_prefix, tab, grp
 and can also contain:
 
 ```text
-project, tags, confidence, priority, is_primary, is_enabled, notes
+area, tags, confidence, priority, is_primary, is_enabled, notes
 ```
 
 Run this after changing the CSV:
@@ -424,30 +424,30 @@ cd src
 ..\.venv\Scripts\python.exe init_database.py
 ```
 
-`init_database.py` also imports project/folder rows into `lp_projects` and `lp_project_folders` from the configured rules CSV through `common.projects.import_project_mappings_csv()`.
+`init_database.py` also imports area/folder rows into `lp_areas` and `lp_area_folders` from the configured rules CSV through `common.areas.import_area_mappings_csv()`.
 
-The Admin mapping page can display `map_folder_project`, `map_project_folder`, and `dim_folder`, and can rebuild the old mapping cache. It is not currently an editor for the CSV or for `lp_project_folders`.
+The Admin mapping page can display `map_folder_area`, `map_area_folder`, and `dim_folder`, and can rebuild the old mapping cache. It is not currently an editor for the CSV or for `lp_area_folders`.
 
-### Why the Project Column Can Be Empty
+### Why the Area Column Can Be Empty
 
-The `Project` column in the Notes table is the stored `lp_notes.project` value. For old imported or migrated notes this can be blank because the old import path often relied on folder-derived filtering.
+The `Area` column in the Notes table is the stored `lp_notes.area` value. For old imported or migrated notes this can be blank because the old import path often relied on folder-derived filtering.
 
-Blank projects should be fixed by materializing folder mappings into `lp_notes.project`, not by restoring expensive per-request folder joins.
+Blank areas should be fixed by materializing folder mappings into `lp_notes.area`, not by restoring expensive per-request folder joins.
 
-### Materialized Project Metadata
+### Materialized Area Metadata
 
-Treat folder-derived project as a sync/materialization input for file-backed Notes.
+Treat folder-derived area as a sync/materialization input for file-backed Notes.
 
 The fast browsing design is:
 
-1. Store project membership on the note row in `lp_notes.project`.
-2. Use `lp_project_folders.path_prefix` to fill blank note project values during sync/materialization.
-3. Filter List/Table/Grid/Preview by indexed `lp_notes.project`.
+1. Store area membership on the note row in `lp_notes.area`.
+2. Use `lp_area_folders.path_prefix` to fill blank note area values during sync/materialization.
+3. Filter List/Table/Grid/Preview by indexed `lp_notes.area`.
 4. Read note files only during sync/indexing or when opening one note.
 
-Settings > Notes includes `Materialize note projects`. This fills blank note project metadata from saved project-folder mappings without reading note files.
+Settings > Notes includes `Materialize note areas`. This fills blank note area metadata from saved area-folder mappings without reading note files.
 
-On Notes access, LifePIM also runs this materialization once per database connection/user so a deploy can repair older blank-project rows without waiting for a full disk sync.
+On Notes access, LifePIM also runs this materialization once per database connection/user so a deploy can repair older blank-area rows without waiting for a full disk sync.
 
 ### Materialized Note Color Metadata
 
@@ -459,19 +459,19 @@ Settings > Notes includes `Refresh note colors`. This is a gentle maintenance ac
 
 ### Notes Path Aliases
 
-New notes can be created in the correct `N:\...` folder and have `lp_notes.project` populated, while still showing no derived project if the note's `folder_id` points at an alias path. One observed example:
+New notes can be created in the correct `N:\...` folder and have `lp_notes.area` populated, while still showing no derived area if the note's `folder_id` points at an alias path. One observed example:
 
 ```text
 lp_notes.path:       N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health
-lp_notes.project:    pers/health
+lp_notes.area:    pers/health
 dim_folder row:      E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health
-lp_project_folders:  N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health
-derived_project:     None
+lp_area_folders:  N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health
+derived_area:     None
 ```
 
-This happens when folder-id backfill applies `PATH_ALIASES` to Notes and stores the alias path in `dim_folder`, while the project folder rules use the live `N:\...` path. Derived-project matching then compares `E:\...` to `N:\...` and fails.
+This happens when folder-id backfill applies `PATH_ALIASES` to Notes and stores the alias path in `dim_folder`, while the area folder rules use the live `N:\...` path. Derived-area matching then compares `E:\...` to `N:\...` and fails.
 
-For Notes, `folder_id` now preserves the same live path stored in `lp_notes.path`, and Notes project filtering/derived-project lookup prefers `lp_notes.path` before falling back to `dim_folder.folder_path`. This lets existing stale rows still match the correct project while future note updates stop rewriting the folder to the alias path.
+For Notes, `folder_id` now preserves the same live path stored in `lp_notes.path`, and Notes area filtering/derived-area lookup prefers `lp_notes.path` before falling back to `dim_folder.folder_path`. This lets existing stale rows still match the correct area while future note updates stop rewriting the folder to the alias path.
 
 ## Operational Notes
 

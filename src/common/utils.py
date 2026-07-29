@@ -88,7 +88,7 @@ def _fetch_mapping_tabs():
     try:
         rows = db.get_data(
             db.conn,
-            "map_folder_project",
+            "map_folder_area",
             ["tab"],
             "is_enabled = 1 AND is_primary = 1",
             [],
@@ -107,6 +107,37 @@ def _norm_tab_value(value):
     return "".join(ch for ch in (value or "").lower() if ch.isalnum())
 
 
+def normalize_area_param(value, default=""):
+    text = (value if value is not None else default or "").strip()
+    if text in {"proj", "project"}:
+        text = "area"
+    elif text.startswith("proj/"):
+        text = "area/" + text[5:]
+    elif text.startswith("project/"):
+        text = "area/" + text[8:]
+    elif text.startswith("proj."):
+        text = "area." + text[5:]
+    elif text.startswith("project."):
+        text = "area." + text[8:]
+    elif text == "All Projects":
+        text = "All Areas"
+    return "" if text in ("any", "All", "all", "ALL", "spacer") else text
+
+
+def request_area_param(default="", *, include_form=False, include_id=False):
+    from flask import request
+
+    values = []
+    source = request.values if include_form else request.args
+    if include_id:
+        values.extend([source.get("area_id"), source.get("project_id")])
+    values.extend([source.get("area"), source.get("proj"), source.get("project")])
+    for value in values:
+        if value not in (None, ""):
+            return normalize_area_param(value, default=default)
+    return normalize_area_param(default)
+
+
 def _tab_leaf(value, group_tokens):
     text = (value or "").strip()
     if not text:
@@ -123,9 +154,9 @@ def _tab_leaf(value, group_tokens):
 
 def get_side_tabs():
     try:
-        from common import projects
+        from common import areas
 
-        return projects.projects_side_tabs()
+        return areas.areas_side_tabs()
     except Exception:
         return list(mod_cfg.SIDE_TABS)
 

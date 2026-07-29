@@ -14,7 +14,7 @@
           {% if entry.unresolved_child %}
             <div class="how-linked missing">
               Linked How-to not yet created: {{ entry.unresolved_child }}
-              <form method="post" action="{{ url_for('how.create_child_route', item_id=howto.howto_id, proj=project) }}" class="how-inline-form">
+              <form method="post" action="{{ url_for('how.create_child_route', item_id=howto.howto_id, area=area) }}" class="how-inline-form">
                 <input type="hidden" name="child_key" value="{{ entry.unresolved_child }}">
                 <button type="submit">Create Linked How-to</button>
               </form>
@@ -35,13 +35,13 @@
   {% include "how_nav.html" %}
   {% set howto = detail.howto %}
   <div class="data-detail-actions">
-    <a href="{{ url_for('how.list_how_route', proj=project) }}">Back</a>
-    <a href="{{ url_for('how.edit_how_route', item_id=howto.howto_id, proj=project) }}">Edit Blueprint</a>
+    <a href="{{ url_for('how.list_how_route', area=area) }}">Back</a>
+    <a href="{{ url_for('how.edit_how_route', item_id=howto.howto_id, area=area) }}">Edit Blueprint</a>
   </div>
   <h3>{{ howto.title }}</h3>
   <table>
     <tr><th>Key</th><td>{{ howto.howto_key }}</td></tr>
-    <tr><th>Project</th><td>{{ howto.project_id }}</td></tr>
+    <tr><th>Area</th><td>{{ howto.area_id }}</td></tr>
     <tr><th>Status</th><td>{{ howto.status }}</td></tr>
     <tr><th>Parse</th><td class="how-status-{{ howto.parse_status|lower }}">{{ howto.parse_status }} · {{ howto.parse_message }}</td></tr>
     <tr><th>Source</th><td>{{ howto.source_filepath }}</td></tr>
@@ -76,7 +76,7 @@
   <h4>Used By</h4>
   <ul>
     {% for parent in detail.parents %}
-      <li><a href="{{ url_for('how.view_how_route', item_id=parent.howto_id, proj=project) }}">{{ parent.title }}</a></li>
+      <li><a href="{{ url_for('how.view_how_route', item_id=parent.howto_id, area=area) }}">{{ parent.title }}</a></li>
     {% else %}
       <li>Not used by another How-to.</li>
     {% endfor %}

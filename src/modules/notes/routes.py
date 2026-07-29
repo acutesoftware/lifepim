@@ -17,10 +17,19 @@ from common import settings as settings_mod
 from utils import importer
 from utils import markdown_utils
 from utils import hex_utils
-from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_total, build_pagination, lg_usr
+from common.utils import (
+    get_tabs,
+    get_side_tabs,
+    get_table_def,
+    paginate_total,
+    build_pagination,
+    lg_usr,
+    normalize_area_param as utils_normalize_area_param,
+    request_area_param,
+)
 from common import config as cfg
 import etl_folder_mapping as folder_etl
-from common import projects as projects_mod
+from common import areas as areas_mod
 from common import user_paths
 from core import security
 from modules.how import service as how_service
@@ -71,7 +80,7 @@ NOTE_LIST_SORT_OPTIONS = [
     ("title", "Title"),
     ("size", "Size"),
     ("color", "Color"),
-    ("project", "Project"),
+    ("area", "Area"),
     ("date_created", "Date Created"),
     ("date_modified", "Date Modified"),
     ("folder", "Folder"),
@@ -86,19 +95,19 @@ NOTE_LIST_VIEW_OPTIONS = [
 NOTE_TABLE_SORT_COLUMNS = [
     ("filename", "Filename", "title"),
     ("color", "Color", "color"),
-    ("project", "Project", "project"),
+    ("area", "Area", "area"),
     ("size", "Size", "size"),
     ("date_created", "Date Created", "date_created"),
     ("date_modified", "Date Modified", "date_modified"),
 ]
-_NOTE_PROJECT_MATERIALIZED_KEYS = set()
+_NOTE_AREA_MATERIALIZED_KEYS = set()
 
 
 def _ensure_notes_schema(conn=None):
     conn = data._get_conn() if conn is None else conn
     try:
         data.ensure_notes_schema(conn)
-        _ensure_note_projects_materialized(conn)
+        _ensure_note_areas_materialized(conn)
     except Exception:
         pass
 
@@ -278,15 +287,15 @@ def _note_metadata_rows(note, note_path, file_exists):
         ("Color", note.get("color") or ""),
         ("Date created", note.get("date_created") or ""),
         ("Date modified", note.get("date_modified") or ""),
-        ("Project", note.get("project") or ""),
-        ("Derived project", note.get("derived_project") or ""),
+        ("Area", note.get("area") or ""),
+        ("Derived area", note.get("derived_area") or ""),
         ("Important", note.get("important") or ""),
         ("Source note ID", note.get("source_note_id") or ""),
         ("Updated", updated or ""),
     ]
 
 
-def _note_metadata_from_file(note_path, stat=None, fallback_project=""):
+def _note_metadata_from_file(note_path, stat=None, fallback_area=""):
     file_name = os.path.basename(note_path or "")
     title_from_file, _ = os.path.splitext(file_name)
     front_matter = _read_note_front_matter(note_path)
@@ -306,25 +315,22 @@ def _note_metadata_from_file(note_path, stat=None, fallback_project=""):
     )
     if not date_created and stat is not None:
         date_created = _file_created_at(stat)
-    project = _front_matter_value(front_matter, ("project", "folder", "sidebar_tab")) or fallback_project
-    if project.lower() in {"all", "all notes", "untitled"}:
-        project = ""
+    area = _front_matter_value(front_matter, ("area", "folder", "sidebar_tab")) or fallback_area
+    if area.lower() in {"all", "all notes", "untitled"}:
+        area = ""
     return {
         "title": _front_matter_value(front_matter, ("title", "name")) or title_from_file,
         "color": _front_matter_value(front_matter, ("color", "colour")),
         "date_created": date_created,
         "date_modified": date_modified,
-        "project": project,
+        "area": area,
         "important": _front_matter_bool_text(_front_matter_value(front_matter, ("important", "is_important"))),
         "source_note_id": _front_matter_value(front_matter, ("source_note_id", "lifepim_com_note_id", "note_id")),
     }
 
 
-def _normalize_project_param(project):
-    project = (project or "").strip()
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        return ""
-    return project
+def _normalize_area_param(area):
+    return utils_normalize_area_param(area)
 
 
 def _normalize_note_path(path_value):
@@ -417,8 +423,8 @@ def _table_columns(conn, table_name):
 def _query_write_root_candidates(conn, tab_label):
     if not tab_label:
         return []
-    if _table_exists(conn, "map_project_folder"):
-        columns = _table_columns(conn, "map_project_folder")
+    if _table_exists(conn, "map_area_folder"):
+        columns = _table_columns(conn, "map_area_folder")
         path_col = "path_prefix" if "path_prefix" in columns else None
         if path_col:
             enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
@@ -440,14 +446,14 @@ def _query_write_root_candidates(conn, tab_label):
                 f"{tags_expr} as tags, "
                 f"{conf_expr} as confidence, "
                 f"{notes_expr} as notes "
-                "FROM map_project_folder "
+                "FROM map_area_folder "
                 f"WHERE {' AND '.join(where)} "
                 "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
             )
             rows = conn.execute(sql, params).fetchall()
             return [dict(row) for row in rows]
-    if _table_exists(conn, "map_folder_project"):
-        columns = _table_columns(conn, "map_folder_project")
+    if _table_exists(conn, "map_folder_area"):
+        columns = _table_columns(conn, "map_folder_area")
         if "path_prefix" not in columns or "tab" not in columns:
             return []
         enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
@@ -469,14 +475,14 @@ def _query_write_root_candidates(conn, tab_label):
             f"{tags_expr} as tags, "
             f"{conf_expr} as confidence, "
             f"{notes_expr} as notes "
-            "FROM map_folder_project "
+            "FROM map_folder_area "
             f"WHERE {' AND '.join(where)} "
             "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
         )
         rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
-    if _table_exists(conn, "map_project_folder"):
-        columns = _table_columns(conn, "map_project_folder")
+    if _table_exists(conn, "map_area_folder"):
+        columns = _table_columns(conn, "map_area_folder")
         path_col = "matched_prefix" if "matched_prefix" in columns else None
         if not path_col:
             return []
@@ -499,7 +505,7 @@ def _query_write_root_candidates(conn, tab_label):
             f"{tags_expr} as tags, "
             f"{conf_expr} as confidence, "
             f"{notes_expr} as notes "
-            "FROM map_project_folder "
+            "FROM map_area_folder "
             f"WHERE {' AND '.join(where)} "
             "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
         )
@@ -512,8 +518,8 @@ def _lookup_tab_group(conn, tab_label):
     label = (tab_label or "").strip()
     if not label:
         return ""
-    if _table_exists(conn, "map_folder_project"):
-        columns = _table_columns(conn, "map_folder_project")
+    if _table_exists(conn, "map_folder_area"):
+        columns = _table_columns(conn, "map_folder_area")
         if "grp" in columns and "tab" in columns:
             enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
             where = ["lower(tab) = lower(?)"]
@@ -521,14 +527,14 @@ def _lookup_tab_group(conn, tab_label):
             if enabled_col:
                 where.append(f"{enabled_col} = 1")
             sql = (
-                "SELECT grp FROM map_folder_project "
+                "SELECT grp FROM map_folder_area "
                 f"WHERE {' AND '.join(where)} "
                 "ORDER BY confidence DESC, LENGTH(path_prefix) DESC"
             )
             row = conn.execute(sql, params).fetchone()
             return (row["grp"] or "").strip() if row else ""
-    if _table_exists(conn, "map_project_folder"):
-        columns = _table_columns(conn, "map_project_folder")
+    if _table_exists(conn, "map_area_folder"):
+        columns = _table_columns(conn, "map_area_folder")
         if "grp" in columns and "tab" in columns:
             enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
             where = ["lower(tab) = lower(?)"]
@@ -536,7 +542,7 @@ def _lookup_tab_group(conn, tab_label):
             if enabled_col:
                 where.append(f"{enabled_col} = 1")
             sql = (
-                "SELECT grp FROM map_project_folder "
+                "SELECT grp FROM map_area_folder "
                 f"WHERE {' AND '.join(where)} "
                 "ORDER BY confidence DESC"
             )
@@ -598,21 +604,21 @@ def _select_write_root_candidates(sidebar_label):
             rows = _dedupe_candidates(_query_write_root_candidates(conn, grp))
             if rows:
                 return rows, grp
-    rows = _dedupe_candidates(_query_write_root_candidates(conn, "All Projects"))
+    rows = _dedupe_candidates(_query_write_root_candidates(conn, "All Areas"))
     if rows:
-        return rows, "All Projects"
-    return [], label or parent or "All Projects"
+        return rows, "All Areas"
+    return [], label or parent or "All Areas"
 
 
 def _note_template(title, created_utc, sidebar_label):
     title_value = (title or "").replace("\n", " ").replace("\r", " ").strip()
     escaped_title = title_value.replace('"', '\\"')
-    project_value = (sidebar_label or "").replace("\n", " ").replace("\r", " ").strip()
+    area_value = (sidebar_label or "").replace("\n", " ").replace("\r", " ").strip()
     lines = [
         "---",
         f'title: "{escaped_title}"',
         f"color: {DEFAULT_NOTE_COLOR}",
-        f"project: {project_value}",
+        f"area: {area_value}",
         f"date_created: {created_utc}",
         f"date_modified: {created_utc}",
     ]
@@ -654,10 +660,8 @@ def _create_note_file(folder_path, title, sidebar_label):
     }
 
 
-def _normalize_project(project):
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        return None
-    return project
+def _normalize_area(area):
+    return utils_normalize_area_param(area) or None
 
 
 def _normalize_folder_filter(folder_path):
@@ -693,13 +697,13 @@ def _current_username():
     return ""
 
 
-def _uses_project_folder_mapping():
+def _uses_area_folder_mapping():
     username = _current_username()
     return not username or username.lower() == "duncan"
 
 
-def _project_folder_owner_sql(alias):
-    if not _uses_project_folder_mapping():
+def _area_folder_owner_sql(alias):
+    if not _uses_area_folder_mapping():
         return "1 = 0"
     owner_user_id = _current_owner_user_id()
     if owner_user_id is None:
@@ -707,14 +711,14 @@ def _project_folder_owner_sql(alias):
     return f"{alias}.owner_user_id = {int(owner_user_id)}"
 
 
-def _derived_project_expr():
+def _derived_area_expr():
     folder_expr = _note_folder_match_expr()
     path_expr = _note_path_expr()
     best_prefix_len_expr = (
         "("
         "SELECT MAX(LENGTH(pf_len.path_prefix)) "
-        "FROM lp_project_folders pf_len "
-        f"WHERE {_project_folder_owner_sql('pf_len')} "
+        "FROM lp_area_folders pf_len "
+        f"WHERE {_area_folder_owner_sql('pf_len')} "
         "  AND pf_len.is_enabled = 1 "
         "  AND pf_len.folder_role IN ('default','include','archive','output') "
         f"  AND {folder_expr} IS NOT NULL "
@@ -723,16 +727,16 @@ def _derived_project_expr():
     )
     named_child_expr = (
         "("
-        "SELECT pf.project_id "
-        "FROM lp_project_folders pf "
-        "LEFT JOIN lp_projects p ON p.owner_user_id IS pf.owner_user_id AND p.project_id = pf.project_id "
-        f"WHERE {_project_folder_owner_sql('pf')} "
+        "SELECT pf.area_id "
+        "FROM lp_area_folders pf "
+        "LEFT JOIN lp_areas p ON p.owner_user_id IS pf.owner_user_id AND p.area_id = pf.area_id "
+        f"WHERE {_area_folder_owner_sql('pf')} "
         "  AND pf.is_enabled = 1 "
         "  AND pf.folder_role IN ('default','include','archive','output') "
         f"  AND {folder_expr} IS NOT NULL "
         f"  AND lower({folder_expr}) LIKE lower(pf.path_prefix) || '%' "
-        "  AND instr(pf.project_id, '/') > 0 "
-        f"  AND lower({path_expr}) LIKE '%' || lower(COALESCE(p.project_name, '')) || '%' "
+        "  AND instr(pf.area_id, '/') > 0 "
+        f"  AND lower({path_expr}) LIKE '%' || lower(COALESCE(p.area_name, '')) || '%' "
         f"  AND LENGTH(pf.path_prefix) = {best_prefix_len_expr} "
         "ORDER BY LENGTH(pf.path_prefix) DESC, CASE pf.folder_role "
         "  WHEN 'default' THEN 0 "
@@ -740,16 +744,16 @@ def _derived_project_expr():
         "  WHEN 'output' THEN 2 "
         "  WHEN 'archive' THEN 3 "
         "  ELSE 9 END, pf.sort_order, "
-        "  (LENGTH(pf.project_id) - LENGTH(REPLACE(pf.project_id, '/', ''))) ASC, "
-        "  LENGTH(pf.project_id) ASC, pf.project_id, pf.path_prefix "
+        "  (LENGTH(pf.area_id) - LENGTH(REPLACE(pf.area_id, '/', ''))) ASC, "
+        "  LENGTH(pf.area_id) ASC, pf.area_id, pf.path_prefix "
         "LIMIT 1"
         ")"
     )
     normal_expr = (
         "("
-        "SELECT pf.project_id "
-        "FROM lp_project_folders pf "
-        f"WHERE {_project_folder_owner_sql('pf')} "
+        "SELECT pf.area_id "
+        "FROM lp_area_folders pf "
+        f"WHERE {_area_folder_owner_sql('pf')} "
         "  AND pf.is_enabled = 1 "
         "  AND pf.folder_role IN ('default','include','archive','output') "
         f"  AND {folder_expr} IS NOT NULL "
@@ -760,64 +764,77 @@ def _derived_project_expr():
         "  WHEN 'output' THEN 2 "
         "  WHEN 'archive' THEN 3 "
         "  ELSE 9 END, pf.sort_order, "
-        "  (LENGTH(pf.project_id) - LENGTH(REPLACE(pf.project_id, '/', ''))) ASC, "
-        "  LENGTH(pf.project_id) ASC, pf.project_id, pf.path_prefix "
+        "  (LENGTH(pf.area_id) - LENGTH(REPLACE(pf.area_id, '/', ''))) ASC, "
+        "  LENGTH(pf.area_id) ASC, pf.area_id, pf.path_prefix "
         "LIMIT 1"
         ")"
     )
-    return f"COALESCE({named_child_expr}, {normal_expr}, NULLIF(t.project, ''))"
+    return f"COALESCE({named_child_expr}, {normal_expr}, NULLIF(t.area, ''))"
 
 
-def _project_scope_ids(project):
-    project = (project or "").strip()
-    if not project or project.lower() == "unmapped":
+def _area_scope_ids(area):
+    area = (area or "").strip()
+    if not area or area.lower() == "unmapped":
         return []
     conn = data._get_conn()
-    projects_mod.ensure_projects_schema(conn)
-    project_lower = project.lower()
+    areas_mod.ensure_areas_schema(conn)
+    area_lower = area.lower()
     owner_user_id = _current_owner_user_id()
     ids = []
 
-    exact = projects_mod.project_get(project, conn=conn)
+    exact = areas_mod.area_get(area, conn=conn, owner_user_id=owner_user_id)
     if exact:
         rows = conn.execute(
-            "SELECT project_id FROM lp_projects "
+            "SELECT area_id, area_name FROM lp_areas "
             "WHERE owner_user_id IS ? AND status = 'active' "
-            "AND (lower(project_id) = lower(?) OR lower(project_id) LIKE lower(?) || '/%') "
-            "ORDER BY LENGTH(project_id), project_id",
-            (owner_user_id, project, project),
+            "AND (lower(area_id) = lower(?) OR lower(area_id) LIKE lower(?) || '/%') "
+            "ORDER BY LENGTH(area_id), area_id",
+            (owner_user_id, area, area),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT project_id FROM lp_projects "
+            "SELECT area_id, area_name FROM lp_areas "
             "WHERE owner_user_id IS ? AND status = 'active' "
-            "AND (lower(project_id) LIKE lower(?) || '/%' "
+            "AND (lower(area_id) LIKE lower(?) || '/%' "
+            "     OR lower(area_name) = ? "
             "     OR lower(tab) = ? "
             "     OR lower(group_name) = ? "
-            "     OR lower(project_id) = ?) "
-            "ORDER BY LENGTH(project_id), project_id",
-            (owner_user_id, project, project_lower, project_lower, f"{project_lower}.{project_lower}.{project_lower}"),
+            "     OR lower(area_id) = ?) "
+            "ORDER BY LENGTH(area_id), area_id",
+            (owner_user_id, area, area_lower, area_lower, area_lower, f"{area_lower}.{area_lower}.{area_lower}"),
         ).fetchall()
 
+    seen = {area.lower()}
+    ids.append(area)
     for row in rows:
-        project_id = (row["project_id"] or "").strip()
-        if project_id and project_id not in ids:
-            ids.append(project_id)
-    return ids or [project]
+        area_id = (row["area_id"] or "").strip()
+        if area_id and area_id.lower() not in seen:
+            ids.append(area_id)
+            seen.add(area_id.lower())
+        area_name = (row["area_name"] or "").strip()
+        if area_name and area_name.lower() not in seen:
+            ids.append(area_name)
+            seen.add(area_name.lower())
+    if exact:
+        area_name = (exact.get("area_name") or "").strip()
+        if area_name and area_name.lower() not in seen:
+            ids.append(area_name)
+            seen.add(area_name.lower())
+    return ids or [area]
 
 
-def _direct_project_condition(scope_ids):
+def _direct_area_condition(scope_ids):
     placeholders = ", ".join(["?"] * len(scope_ids))
-    return f"t.project COLLATE NOCASE IN ({placeholders})"
+    return f"t.area COLLATE NOCASE IN ({placeholders})"
 
 
-def _notes_base_condition(project, folder_path=None):
+def _notes_base_condition(area, folder_path=None):
     params = []
-    if project and project.lower() == "unmapped":
-        condition = "COALESCE(t.project, '') = ''"
-    elif project:
-        scope_ids = _project_scope_ids(project)
-        condition = _direct_project_condition(scope_ids)
+    if area and area.lower() == "unmapped":
+        condition = "COALESCE(t.area, '') = ''"
+    elif area:
+        scope_ids = _area_scope_ids(area)
+        condition = _direct_area_condition(scope_ids)
         params.extend(scope_ids)
     else:
         condition = "1=1"
@@ -830,13 +847,13 @@ def _notes_base_condition(project, folder_path=None):
     return condition, params
 
 
-def _count_notes(project, folder_path=None):
+def _count_notes(area, folder_path=None):
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         return 0
-    projects_mod.ensure_projects_schema(data._get_conn())
-    condition, params = _notes_base_condition(project, folder_path)
+    areas_mod.ensure_areas_schema(data._get_conn())
+    condition, params = _notes_base_condition(area, folder_path)
     row = data._get_conn().execute(
         f"SELECT COUNT(1) AS cnt FROM {tbl['name']} t WHERE {condition}",
         params,
@@ -844,10 +861,10 @@ def _count_notes(project, folder_path=None):
     return row["cnt"] if row else 0
 
 
-def _notes_url_args(project=None, folder_path=None, **extra):
+def _notes_url_args(area=None, folder_path=None, **extra):
     args = {}
-    if project:
-        args["proj"] = project
+    if area:
+        args["area"] = area
     if folder_path:
         args["folder"] = folder_path
     for key, value in extra.items():
@@ -898,19 +915,19 @@ def _notes_route_for_view(view_mode):
     return "notes.list_notes_table_route"
 
 
-def _notes_view_url(view_mode, project, folder_filter, sort_col, sort_dir):
+def _notes_view_url(view_mode, area, folder_filter, sort_col, sort_dir):
     view_mode = _normalize_note_list_view(view_mode)
-    args = _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir)
+    args = _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir)
     if view_mode in {"grid", "preview"}:
         args["mode"] = "preview" if view_mode == "preview" else "grid"
     return url_for(_notes_route_for_view(view_mode), **args)
 
 
-def _notes_view_options(project, folder_filter, sort_col, sort_dir, active_view):
+def _notes_view_options(area, folder_filter, sort_col, sort_dir, active_view):
     active_view = _normalize_note_list_view(active_view)
     return [
         {
-            "value": _notes_view_url(view, project, folder_filter, sort_col, sort_dir),
+            "value": _notes_view_url(view, area, folder_filter, sort_col, sort_dir),
             "label": label,
             "active": view == active_view,
         }
@@ -918,13 +935,13 @@ def _notes_view_options(project, folder_filter, sort_col, sort_dir, active_view)
     ]
 
 
-def _notes_table_sort_headers(project, folder_filter, route_name, sort_col, sort_dir, card_mode=None):
+def _notes_table_sort_headers(area, folder_filter, route_name, sort_col, sort_dir, card_mode=None):
     sort_col = _normalize_note_sort_col(sort_col)
     sort_dir = _normalize_note_sort_dir(sort_dir)
     headers = {}
     for key, label, column in NOTE_TABLE_SORT_COLUMNS:
         next_dir = "desc" if sort_col == column and sort_dir == "asc" else "asc"
-        args = _notes_url_args(project, folder_filter, sort=column, dir=next_dir)
+        args = _notes_url_args(area, folder_filter, sort=column, dir=next_dir)
         if card_mode:
             args["mode"] = card_mode
         headers[key] = {
@@ -938,19 +955,19 @@ def _notes_table_sort_headers(project, folder_filter, route_name, sort_col, sort
     return headers
 
 
-def _notes_page_title(project_label):
-    return f"Notes ({project_label})" if project_label else "Notes"
+def _notes_page_title(area_label):
+    return f"Notes ({area_label})" if area_label else "Notes"
 
 
-def _note_bulk_project_options(active_projects=None):
-    projects = active_projects if active_projects is not None else projects_mod.projects_list_sidebar()
+def _note_bulk_area_options(active_areas=None):
+    areas = active_areas if active_areas is not None else areas_mod.areas_list_sidebar()
     return [
         {
-            "id": project.get("project_id") or "",
-            "label": project.get("project_name") or project.get("project_id") or "",
+            "id": area.get("area_id") or "",
+            "label": area.get("area_name") or area.get("area_id") or "",
         }
-        for project in projects
-        if project.get("project_id")
+        for area in areas
+        if area.get("area_id")
     ]
 
 
@@ -1049,12 +1066,12 @@ def _current_user_notes_root(create_dirs=False):
     return ""
 
 
-def _notes_root_path(project=None, *, create_dirs=False):
+def _notes_root_path(area=None, *, create_dirs=False):
     tbl = get_table_def("notes")
     if not tbl:
         return None
-    projects_mod.ensure_projects_schema(data._get_conn())
-    condition, params = _notes_base_condition(project)
+    areas_mod.ensure_areas_schema(data._get_conn())
+    condition, params = _notes_base_condition(area)
     sql = (
         f"SELECT rtrim(t.path) AS path "
         f"FROM {tbl['name']} t "
@@ -1074,10 +1091,10 @@ def _notes_root_path(project=None, *, create_dirs=False):
     return _current_user_notes_root(create_dirs=create_dirs) or None
 
 
-def _note_folder_breadcrumb(folder_path, project=None):
+def _note_folder_breadcrumb(folder_path, area=None):
     folder_path = _normalize_folder_filter(folder_path)
     if not folder_path:
-        root_path = _notes_root_path(project)
+        root_path = _notes_root_path(area)
         if root_path:
             return [
                 {
@@ -1131,15 +1148,15 @@ def _path_prefix_value(folder_path):
     return folder_path + "\\%"
 
 
-def _fetch_note_subfolders(project, folder_path=None):
+def _fetch_note_subfolders(area, folder_path=None):
     folder_path = _normalize_folder_filter(folder_path)
     if not folder_path:
         return []
     tbl = get_table_def("notes")
     if not tbl:
         return []
-    projects_mod.ensure_projects_schema(data._get_conn())
-    condition, params = _notes_base_condition(project)
+    areas_mod.ensure_areas_schema(data._get_conn())
+    condition, params = _notes_base_condition(area)
     sql = (
         f"SELECT DISTINCT rtrim(t.path) AS path "
         f"FROM {tbl['name']} t "
@@ -1165,7 +1182,7 @@ def _fetch_note_subfolders(project, folder_path=None):
         subfolders[child.lower()] = {
             "label": child,
             "path": child_path,
-            "url": url_for("notes.list_notes_table_route", **_notes_url_args(project, child_path)),
+            "url": url_for("notes.list_notes_table_route", **_notes_url_args(area, child_path)),
         }
     return [subfolders[key] for key in sorted(subfolders)]
 
@@ -1180,7 +1197,7 @@ def _folder_label(path_value):
     return parts[-1] if parts else path_value
 
 
-def _note_folder_panel_items(project, folder_filter, project_folders, view_mode, sort_col, sort_dir):
+def _note_folder_panel_items(area, folder_filter, area_folders, view_mode, sort_col, sort_dir):
     items = []
     seen = set()
 
@@ -1195,26 +1212,15 @@ def _note_folder_panel_items(project, folder_filter, project_folders, view_mode,
         items.append({
             "label": label or _folder_label(path_value),
             "path": path_value,
-            "url": _notes_view_url(view_mode, project, path_value, sort_col, sort_dir),
+            "url": _notes_view_url(view_mode, area, path_value, sort_col, sort_dir),
         })
 
     if folder_filter:
-        for folder in _fetch_note_subfolders(project, folder_filter):
+        for folder in _fetch_note_subfolders(area, folder_filter):
             add_item(folder.get("label"), folder.get("path"))
         return items
 
-    for folder in project_folders or []:
-        if folder.get("is_enabled") in (0, "0", False):
-            continue
-        add_item(_folder_label(folder.get("path_prefix")), folder.get("path_prefix"))
-    if items:
-        return items
-
-    notes_root = _notes_root_path(project)
-    if notes_root:
-        for folder in _fetch_note_subfolders(project, notes_root):
-            add_item(folder.get("label"), folder.get("path"))
-    return items
+    return []
 
 
 def _sqlite_int_text_expr(value_expr):
@@ -1227,11 +1233,11 @@ def _sqlite_int_text_expr(value_expr):
 
 def _notes_list_context(
     *,
-    project,
+    area,
     folder_filter,
-    project_info,
-    project_folders,
-    project_label,
+    area_info,
+    area_folders,
+    area_label,
     total,
     sort_col,
     sort_dir,
@@ -1245,7 +1251,7 @@ def _notes_list_context(
     card_mode=None,
     note_settings=None,
 ):
-    active_projects = projects_mod.projects_list_sidebar()
+    active_areas = areas_mod.areas_list_sidebar()
     view_mode = _normalize_note_list_view(view_mode)
     sort_col = _normalize_note_sort_col(sort_col)
     sort_dir = _normalize_note_sort_dir(sort_dir)
@@ -1253,17 +1259,17 @@ def _notes_list_context(
         "active_tab": "notes",
         "tabs": get_tabs(),
         "side_tabs": get_side_tabs(),
-        "content_title": _notes_page_title(project_label),
+        "content_title": _notes_page_title(area_label),
         "content_html": "",
-        "project_info": project_info,
-        "project_folders": project_folders,
-        "project": project,
+        "area_info": area_info,
+        "area_folders": area_folders,
+        "area": area,
         "folder_filter": folder_filter,
-        "note_breadcrumb": _note_folder_breadcrumb(folder_filter, project),
+        "note_breadcrumb": _note_folder_breadcrumb(folder_filter, area),
         "note_folder_panel_items": _note_folder_panel_items(
-            project,
+            area,
             folder_filter,
-            project_folders,
+            area_folders,
             view_mode,
             sort_col,
             sort_dir,
@@ -1273,21 +1279,21 @@ def _notes_list_context(
         "sort_dir": sort_dir,
         "sort_options": NOTE_LIST_SORT_OPTIONS,
         "table_sort_headers": _notes_table_sort_headers(
-            project,
+            area,
             folder_filter,
             route_name,
             sort_col,
             sort_dir,
             card_mode,
         ),
-        "view_options": _notes_view_options(project, folder_filter, sort_col, sort_dir, view_mode),
+        "view_options": _notes_view_options(area, folder_filter, sort_col, sort_dir, view_mode),
         "notes_view_mode": view_mode,
         "route_name": route_name,
         "card_mode": card_mode,
         "note_card_max_chars": (note_settings or {}).get("card_width_chars", NOTE_CARD_MAX_CHARS),
         "note_card_title_font_size": (note_settings or {}).get("title_font_size", NOTE_CARD_TITLE_FONT_SIZE),
-        "active_projects": active_projects,
-        "bulk_project_options": _note_bulk_project_options(active_projects),
+        "active_areas": active_areas,
+        "bulk_area_options": _note_bulk_area_options(active_areas),
         "bulk_color_options": _note_bulk_color_options(),
         "page": page,
         "total_pages": total_pages,
@@ -1297,12 +1303,12 @@ def _notes_list_context(
     }
 
 
-def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=False):
+def _fetch_notes(area, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=False):
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         return []
-    projects_mod.ensure_projects_schema(data._get_conn())
+    areas_mod.ensure_areas_schema(data._get_conn())
     cols = ["id"] + tbl["col_list"]
     order_map = {
         "file_name": "t.file_name",
@@ -1313,12 +1319,12 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
         "title": "lower(COALESCE(NULLIF(t.title, ''), t.file_name, ''))",
         "color": "t.color",
         "date_created": "t.date_created",
-        "project": "t.project",
+        "area": "t.area",
         "important": "t.important",
         "source_note_id": "t.source_note_id",
         "date_modified": "t.date_modified",
         "updated": "t.rec_extract_date",
-        "derived_project": "derived_project",
+        "derived_area": "derived_area",
     }
     sort_col = sort_col or "updated"
     sort_key = order_map.get(sort_col, "t.rec_extract_date")
@@ -1330,10 +1336,10 @@ def _fetch_notes(project, sort_col=None, sort_dir=None, limit=None, offset=None,
     select_cols = [f"t.{col}" for col in cols]
     select_cols.append("t.rec_extract_date as updated")
     if include_derived:
-        select_cols.append(f"{_derived_project_expr()} as derived_project")
+        select_cols.append(f"{_derived_area_expr()} as derived_area")
     else:
-        select_cols.append("COALESCE(NULLIF(t.project, ''), '') as derived_project")
-    condition, params = _notes_base_condition(project, folder_path)
+        select_cols.append("COALESCE(NULLIF(t.area, ''), '') as derived_area")
+    condition, params = _notes_base_condition(area, folder_path)
     join_sql = "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id " if include_derived else ""
     sql = (
         f"SELECT {', '.join(select_cols)} "
@@ -1379,20 +1385,20 @@ def _get_note_record(note_id):
 
 @notes_bp.route('/')
 def list_notes_route():
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
     note_settings = _note_display_settings()
-    project_info, project_folders = _project_context(project)
-    project_label = project_info["project_name"] if project_info else project
+    area_info, area_folders = _area_context(area)
+    area_label = area_info["area_name"] if area_info else area
     tbl = get_table_def("notes")
     route_name = "notes.list_notes_table_route"
     if not tbl:
         context = _notes_list_context(
-            project=project,
+            area=area,
             folder_filter=folder_filter,
-            project_info=project_info,
-            project_folders=project_folders,
-            project_label=project_label,
+            area_info=area_info,
+            area_folders=area_folders,
+            area_label=area_label,
             total=0,
             sort_col="date_modified",
             sort_dir="desc",
@@ -1409,30 +1415,30 @@ def list_notes_route():
         return render_template("notes_list.html", **context)
     view_pref = request.cookies.get("notes_view")
     if view_pref in ("list", "cards", "grid", "preview", "names"):
-        return redirect(_notes_view_url(view_pref, project, folder_filter, request.cookies.get("notes_sort_col") or "date_modified", request.cookies.get("notes_sort_dir") or "desc"))
+        return redirect(_notes_view_url(view_pref, area, folder_filter, request.cookies.get("notes_sort_col") or "date_modified", request.cookies.get("notes_sort_dir") or "desc"))
     sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(project, folder_filter)
+    total = _count_notes(area, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
     context = _notes_list_context(
-        project=project,
+        area=area,
         folder_filter=folder_filter,
-        project_info=project_info,
-        project_folders=project_folders,
-        project_label=project_label,
+        area_info=area_info,
+        area_folders=area_folders,
+        area_label=area_label,
         total=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -1457,20 +1463,20 @@ def list_notes_route():
 
 @notes_bp.route('/table')
 def list_notes_table_route():
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
     note_settings = _note_display_settings()
-    project_info, project_folders = _project_context(project)
-    project_label = project_info["project_name"] if project_info else project
+    area_info, area_folders = _area_context(area)
+    area_label = area_info["area_name"] if area_info else area
     tbl = get_table_def("notes")
     route_name = "notes.list_notes_table_route"
     if not tbl:
         context = _notes_list_context(
-            project=project,
+            area=area,
             folder_filter=folder_filter,
-            project_info=project_info,
-            project_folders=project_folders,
-            project_label=project_label,
+            area_info=area_info,
+            area_folders=area_folders,
+            area_label=area_label,
             total=0,
             sort_col="date_modified",
             sort_dir="desc",
@@ -1489,25 +1495,25 @@ def list_notes_table_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(project, folder_filter)
+    total = _count_notes(area, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
     context = _notes_list_context(
-        project=project,
+        area=area,
         folder_filter=folder_filter,
-        project_info=project_info,
-        project_folders=project_folders,
-        project_label=project_label,
+        area_info=area_info,
+        area_folders=area_folders,
+        area_label=area_label,
         total=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -1532,20 +1538,20 @@ def list_notes_table_route():
 
 @notes_bp.route('/list')
 def list_notes_list_route():
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
     note_settings = _note_display_settings()
-    project_info, project_folders = _project_context(project)
-    project_label = project_info["project_name"] if project_info else project
+    area_info, area_folders = _area_context(area)
+    area_label = area_info["area_name"] if area_info else area
     tbl = get_table_def("notes")
     route_name = "notes.list_notes_list_route"
     if not tbl:
         context = _notes_list_context(
-            project=project,
+            area=area,
             folder_filter=folder_filter,
-            project_info=project_info,
-            project_folders=project_folders,
-            project_label=project_label,
+            area_info=area_info,
+            area_folders=area_folders,
+            area_label=area_label,
             total=0,
             sort_col="date_modified",
             sort_dir="desc",
@@ -1564,25 +1570,25 @@ def list_notes_list_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(project, folder_filter)
+    total = _count_notes(area, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
     context = _notes_list_context(
-        project=project,
+        area=area,
         folder_filter=folder_filter,
-        project_info=project_info,
-        project_folders=project_folders,
-        project_label=project_label,
+        area_info=area_info,
+        area_folders=area_folders,
+        area_label=area_label,
         total=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -1607,20 +1613,20 @@ def list_notes_list_route():
 
 @notes_bp.route('/names')
 def list_notes_names_route():
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
     note_settings = _note_display_settings()
-    project_info, project_folders = _project_context(project)
-    project_label = project_info["project_name"] if project_info else project
+    area_info, area_folders = _area_context(area)
+    area_label = area_info["area_name"] if area_info else area
     tbl = get_table_def("notes")
     route_name = "notes.list_notes_names_route"
     if not tbl:
         context = _notes_list_context(
-            project=project,
+            area=area,
             folder_filter=folder_filter,
-            project_info=project_info,
-            project_folders=project_folders,
-            project_label=project_label,
+            area_info=area_info,
+            area_folders=area_folders,
+            area_label=area_label,
             total=0,
             sort_col="date_modified",
             sort_dir="desc",
@@ -1639,25 +1645,25 @@ def list_notes_names_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(project, folder_filter)
+    total = _count_notes(area, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(project, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
     context = _notes_list_context(
-        project=project,
+        area=area,
         folder_filter=folder_filter,
-        project_info=project_info,
-        project_folders=project_folders,
-        project_label=project_label,
+        area_info=area_info,
+        area_folders=area_folders,
+        area_label=area_label,
         total=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -1680,22 +1686,22 @@ def list_notes_names_route():
 
 @notes_bp.route('/cards')
 def list_notes_cards_route():
-    project = _normalize_project(request.args.get("proj"))
+    area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
     note_settings = _note_display_settings()
-    project_info, project_folders = _project_context(project)
-    project_label = project_info["project_name"] if project_info else project
+    area_info, area_folders = _area_context(area)
+    area_label = area_info["area_name"] if area_info else area
     card_mode = _normalize_note_card_mode(request.args.get("mode") or request.cookies.get("notes_card_mode"))
     view_mode = "preview" if card_mode == "preview" else "grid"
     route_name = "notes.list_notes_cards_route"
     tbl = get_table_def("notes")
     if not tbl:
         context = _notes_list_context(
-            project=project,
+            area=area,
             folder_filter=folder_filter,
-            project_info=project_info,
-            project_folders=project_folders,
-            project_label=project_label,
+            area_info=area_info,
+            area_folders=area_folders,
+            area_label=area_label,
             total=0,
             sort_col="date_modified",
             sort_dir="desc",
@@ -1705,8 +1711,8 @@ def list_notes_cards_route():
             page=1,
             total_pages=1,
             pages=[],
-            first_url=url_for(route_name, **_notes_url_args(project, folder_filter, mode=card_mode)),
-            last_url=url_for(route_name, **_notes_url_args(project, folder_filter, mode=card_mode)),
+            first_url=url_for(route_name, **_notes_url_args(area, folder_filter, mode=card_mode)),
+            last_url=url_for(route_name, **_notes_url_args(area, folder_filter, mode=card_mode)),
             note_settings=note_settings,
         )
         context["notes"] = []
@@ -1717,9 +1723,9 @@ def list_notes_cards_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(project, folder_filter)
+    total = _count_notes(area, folder_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(project, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
     _prepare_note_card_previews(
         notes,
         max_chars=note_settings["preview_chars"],
@@ -1731,7 +1737,7 @@ def list_notes_cards_route():
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(project, folder_filter, mode=card_mode, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, mode=card_mode, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -1740,11 +1746,11 @@ def list_notes_cards_route():
         for n in notes
     ]
     context = _notes_list_context(
-        project=project,
+        area=area,
         folder_filter=folder_filter,
-        project_info=project_info,
-        project_folders=project_folders,
-        project_label=project_label,
+        area_info=area_info,
+        area_folders=area_folders,
+        area_label=area_label,
         total=total,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -1779,11 +1785,11 @@ def view_note_route(note_id):
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     note = None
-    projects_mod.ensure_projects_schema(data._get_conn())
+    areas_mod.ensure_areas_schema(data._get_conn())
     if tbl:
         select_cols = [f"t.{col}" for col in (["id"] + tbl["col_list"])]
         select_cols.append("t.rec_extract_date as updated")
-        select_cols.append(f"{_derived_project_expr()} as derived_project")
+        select_cols.append(f"{_derived_area_expr()} as derived_area")
         sql = (
             f"SELECT {', '.join(select_cols)} "
             f"FROM {tbl['name']} t "
@@ -1800,7 +1806,6 @@ def view_note_route(note_id):
         return redirect(url_for("notes.list_notes_route"))
     note_path = _build_note_path(note)
     note_folder = _normalize_folder_filter(note.get("path"))
-    breadcrumb_project = note.get("derived_project") or note.get("project")
     file_exists = note_path and os.path.isfile(note_path)
     note_text = ""
     if file_exists:
@@ -1809,11 +1814,12 @@ def view_note_route(note_id):
         if note_state:
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
-        note_metadata = _note_metadata_from_file(note_path, fallback_project=note.get("project") or "")
-        for key in ("title", "color", "date_created", "project", "important", "source_note_id"):
+        note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
+        for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
             if note_metadata.get(key):
                 note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
+    breadcrumb_area = note.get("area") or note.get("derived_area")
     note_body_text = _note_body_text(note_text, note.get("file_name"), note.get("title"))
     front_matter_raw = _front_matter_block_text(note_text)
     front_matter = _parse_note_front_matter_text(note_text) if front_matter_raw else {}
@@ -1829,14 +1835,14 @@ def view_note_route(note_id):
         hex_rows = hex_utils.hex_dump(note_text)
     elif render_mode == "sample":
         sample_text = _sample_note_text(note_body_text, note_settings["sample_lines"])
-    active_projects = projects_mod.projects_list_sidebar()
-    selected_project = note.get("derived_project") or note.get("project") or ""
-    if selected_project and not any(project.get("project_id") == selected_project for project in active_projects):
-        active_projects.insert(
+    active_areas = areas_mod.areas_list_sidebar()
+    selected_area = note.get("area") or note.get("derived_area") or ""
+    if selected_area and not any(area.get("area_id") == selected_area for area in active_areas):
+        active_areas.insert(
             0,
             {
-                "project_id": selected_project,
-                "project_name": selected_project,
+                "area_id": selected_area,
+                "area_name": selected_area,
             },
         )
     return render_template(
@@ -1855,9 +1861,9 @@ def view_note_route(note_id):
         sample_text=sample_text,
         file_exists=file_exists,
         note_path=note_path,
-        note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_project),
-        active_projects=active_projects,
-        selected_project=selected_project,
+        note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_area),
+        active_areas=active_areas,
+        selected_area=selected_area,
         color_options=_note_color_options(note.get("color")),
         view_modes=[
             ("text", "Text"),
@@ -1930,8 +1936,8 @@ def _unique_file_path(folder_path, file_name):
         idx += 1
 
 
-def _safe_project_short_name(project_id):
-    raw = (project_id or "note").strip().split("/")[-1].split(".")[-1]
+def _safe_area_short_name(area_id):
+    raw = (area_id or "note").strip().split("/")[-1].split(".")[-1]
     cleaned = INVALID_TITLE_CHARS.sub("", raw)
     cleaned = WHITESPACE_RE.sub("_", cleaned).strip("._ ")
     return cleaned or "note"
@@ -1976,7 +1982,7 @@ def _update_note_title_content(note_path, old_title, new_title):
         _write_note_file_content(note_path, updated)
 
 
-def _update_note_file_metadata(note_id, note, file_name, folder_path, project=None, content=None):
+def _update_note_file_metadata(note_id, note, file_name, folder_path, area=None, content=None):
     tbl = get_table_def("notes")
     if not tbl:
         return False
@@ -1990,7 +1996,7 @@ def _update_note_file_metadata(note_id, note, file_name, folder_path, project=No
         stat = None
         size = note.get("size") or ""
         date_modified = note.get("date_modified") or ""
-    metadata = _note_metadata_from_file(note_path, stat=stat, fallback_project=project or note.get("project") or "")
+    metadata = _note_metadata_from_file(note_path, stat=stat, fallback_area=area or note.get("area") or "")
     values_map = {col: note.get(col, "") for col in tbl["col_list"]}
     values_map.update(
         {
@@ -2001,13 +2007,13 @@ def _update_note_file_metadata(note_id, note, file_name, folder_path, project=No
             "color": metadata.get("color") or values_map.get("color", ""),
             "date_created": metadata.get("date_created") or values_map.get("date_created", ""),
             "date_modified": date_modified,
-            "project": metadata.get("project") or values_map.get("project", ""),
+            "area": metadata.get("area") or values_map.get("area", ""),
             "important": metadata.get("important") or values_map.get("important", ""),
             "source_note_id": metadata.get("source_note_id") or values_map.get("source_note_id", ""),
         }
     )
-    if project is not None:
-        values_map["project"] = project
+    if area is not None:
+        values_map["area"] = area
     values = [values_map.get(col, "") for col in tbl["col_list"]]
     ok = data.update_record(data._get_conn(), tbl["name"], note_id, tbl["col_list"], values)
     if ok:
@@ -2050,19 +2056,19 @@ def _rename_note(note_id, new_title):
     return file_name
 
 
-def _move_note_to_project(note_id, project_id):
+def _move_note_to_area(note_id, area_id):
     note, _ = _get_note_record(note_id)
     if not note:
         raise ValueError("Note not found.")
     note_path = _build_note_path(note)
     if not note_path or not os.path.isfile(note_path):
         raise ValueError("Note file not found.")
-    project_id = (project_id or "").strip()
-    if not project_id:
-        raise ValueError("Project is required.")
-    target_folder = projects_mod.project_default_folder_get(project_id)
+    area_id = (area_id or "").strip()
+    if not area_id:
+        raise ValueError("Area is required.")
+    target_folder = areas_mod.area_default_folder_get(area_id)
     if not target_folder:
-        raise ValueError("Selected project has no default folder.")
+        raise ValueError("Selected area has no default folder.")
     target_folder = _normalize_note_path(target_folder)
     os.makedirs(target_folder, exist_ok=True)
     file_name = note.get("file_name") or os.path.basename(note_path)
@@ -2073,8 +2079,35 @@ def _move_note_to_project(note_id, project_id):
         target_path = _unique_file_path(target_folder, file_name)
         shutil.move(note_path, target_path)
     moved_name = os.path.basename(target_path)
-    _update_note_file_metadata(note_id, note, moved_name, target_folder, project=project_id)
+    _update_note_file_metadata(note_id, note, moved_name, target_folder, area=area_id)
     return target_path
+
+
+def _assign_note_area(note_id, area_id):
+    note, tbl = _get_note_record(note_id)
+    if not note or not tbl:
+        raise ValueError("Note not found.")
+    area_id = utils_normalize_area_param(area_id)
+    if not area_id:
+        raise ValueError("Area is required.")
+    owner_user_id = _current_owner_user_id()
+    if not areas_mod.area_get(area_id, owner_user_id=owner_user_id):
+        raise ValueError("Selected area was not found.")
+
+    note_path = _build_note_path(note)
+    folder_path = _normalize_note_path(note.get("path")) or (os.path.dirname(note_path) if note_path else "")
+    file_name = note.get("file_name") or (os.path.basename(note_path) if note_path else "")
+    content = None
+    if note_path and os.path.isfile(note_path):
+        _set_note_front_matter_field(note_path, "area", area_id, aliases=["folder", "sidebar_tab"])
+        content = _read_note_file(note_path)
+        if folder_path and file_name:
+            return _update_note_file_metadata(note_id, note, file_name, folder_path, area=area_id, content=content)
+
+    values_map = {col: note.get(col, "") for col in tbl["col_list"]}
+    values_map["area"] = area_id
+    values = [values_map.get(col, "") for col in tbl["col_list"]]
+    return data.update_record(data._get_conn(), tbl["name"], note_id, tbl["col_list"], values)
 
 
 def _set_note_color(note_id, color):
@@ -2096,13 +2129,13 @@ def _set_note_color(note_id, color):
     return updated_state
 
 
-def _derived_project_for_note_id(note_id):
+def _derived_area_for_note_id(note_id):
     tbl = get_table_def("notes")
     if not tbl:
         return ""
     try:
         row = data._get_conn().execute(
-            f"SELECT {_derived_project_expr()} AS derived_project "
+            f"SELECT {_derived_area_expr()} AS derived_area "
             f"FROM {tbl['name']} t "
             "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
             "WHERE t.id = ?",
@@ -2110,7 +2143,7 @@ def _derived_project_for_note_id(note_id):
         ).fetchone()
     except Exception:
         return ""
-    return (row["derived_project"] or "") if row else ""
+    return (row["derived_area"] or "") if row else ""
 
 
 def _archive_and_delete_note(note_id):
@@ -2124,13 +2157,13 @@ def _archive_and_delete_note(note_id):
         notes_root = _notes_root_from_path(note_folder) or note_folder
         deleted_folder = os.path.join(notes_root, "deleted")
         os.makedirs(deleted_folder, exist_ok=True)
-        project_id = note.get("project") or _derived_project_for_note_id(note_id)
-        short_project = _safe_project_short_name(project_id)
+        area_id = note.get("area") or _derived_area_for_note_id(note_id)
+        short_area = _safe_area_short_name(area_id)
         stem = _note_title_from_filename(note.get("file_name"))
         safe_stem = INVALID_TITLE_CHARS.sub("", stem)
         safe_stem = WHITESPACE_RE.sub("_", safe_stem).strip("._ ") or "note"
         stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        archive_name = f"{short_project}__{safe_stem}_{stamp}.md"
+        archive_name = f"{short_area}__{safe_stem}_{stamp}.md"
         archived_path = _unique_file_path(deleted_folder, archive_name)
         shutil.move(note_path, archived_path)
     data.delete_record(data._get_conn(), tbl["name"], note_id)
@@ -2173,11 +2206,21 @@ def move_note_route(note_id):
     if not security.can_edit_note(note_id, current_user):
         abort(403)
     render_mode = _normalize_note_view_mode(request.form.get("return_format"))
+    area_id = utils_normalize_area_param(
+        request.form.get("area_id") or request.form.get("project_id") or request.form.get("area") or request.form.get("project") or ""
+    )
+    action = (request.form.get("action") or "assign").strip()
     try:
-        _move_note_to_project(note_id, request.form.get("project_id", ""))
+        if action == "move_file":
+            _move_note_to_area(note_id, area_id)
+            message = "Moved note file to selected Area."
+        else:
+            _assign_note_area(note_id, area_id)
+            message = "Assigned note to selected Area."
     except Exception as exc:
-        return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode, message=f"Move failed: {exc}"))
-    return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode))
+        label = "Move" if action == "move_file" else "Assign"
+        return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode, message=f"{label} failed: {exc}"))
+    return redirect(url_for("notes.view_note_route", note_id=note_id, format=render_mode, message=message))
 
 
 @notes_bp.route('/color/<int:note_id>', methods=["POST"])
@@ -2240,7 +2283,9 @@ def delete_selected_notes_route():
 @notes_bp.route('/api/move-selected', methods=["POST"])
 def move_selected_notes_route():
     payload = request.get_json(silent=True) or {}
-    project_id = (payload.get("project_id") or "").strip()
+    area_id = utils_normalize_area_param(
+        payload.get("area_id") or payload.get("project_id") or payload.get("area") or payload.get("project") or ""
+    )
     note_ids = []
     for raw_id in payload.get("note_ids") or []:
         try:
@@ -2258,7 +2303,7 @@ def move_selected_notes_route():
             errors.append({"note_id": note_id, "error": "forbidden"})
             continue
         try:
-            _move_note_to_project(note_id, project_id)
+            _move_note_to_area(note_id, area_id)
             moved += 1
             moved_ids.append(note_id)
         except Exception as exc:
@@ -2309,14 +2354,14 @@ def convert_note_to_howto_route(note_id):
     if not markdown:
         markdown = ""
     title = os.path.splitext(note.get("file_name") or "")[0] or "Converted Note"
-    project_id = note.get("project") or ""
+    area_id = note.get("area") or ""
     conn = data._get_conn()
     try:
         conn.execute("BEGIN")
         howto_id = how_service.create_howto_from_markdown(
             title,
             markdown,
-            project_id=project_id,
+            area_id=area_id,
             source_filepath=note_path,
             conn=conn,
         )
@@ -2325,7 +2370,7 @@ def convert_note_to_howto_route(note_id):
     except Exception as exc:
         conn.rollback()
         return redirect(url_for("notes.view_note_route", note_id=note_id, message=f"Convert to HOWTO failed: {exc}"))
-    return redirect(url_for("how.view_how_route", item_id=howto_id, proj=project_id))
+    return redirect(url_for("how.view_how_route", item_id=howto_id, area=area_id))
 
 
 @notes_bp.route('/open-folder/<int:note_id>', methods=["POST"])
@@ -2345,71 +2390,73 @@ def open_note_folder_route(note_id):
 
 @notes_bp.route('/api/new-note-options')
 def new_note_options_route():
-    project_id = (request.args.get("project_id") or request.args.get("proj") or "").strip()
-    project = projects_mod.project_get(project_id) if project_id else None
-    if project_id and not project:
-        return jsonify({"error": "Project not found."}), 404
-    folders = projects_mod.project_folders_list(project_id, include_disabled=False)
+    area_id = request_area_param(include_id=True)
+    area = areas_mod.area_get(area_id) if area_id else None
+    if area_id and not area:
+        return jsonify({"error": "Area not found."}), 404
+    folders = areas_mod.area_folders_list(area_id, include_disabled=False)
     default_folder = None
     try:
-        default_path = projects_mod.project_default_folder_get(project_id)
+        default_path = areas_mod.area_default_folder_get(area_id)
         if default_path:
             default_folder = {"path_prefix": default_path}
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 500
-    if not default_folder and not _uses_project_folder_mapping():
+    if not default_folder and not _uses_area_folder_mapping():
         notes_root = _current_user_notes_root(create_dirs=False)
         if notes_root:
             default_folder = {"path_prefix": notes_root, "is_user_notes_root": True}
-    if not default_folder and not project_id:
+    if not default_folder and not area_id:
         notes_root = _current_user_notes_root(create_dirs=False)
         if notes_root:
             default_folder = {"path_prefix": notes_root, "is_user_notes_root": True}
     return jsonify({
-        "project": project,
+        "area": area,
         "default_folder": default_folder,
         "folders": folders,
     })
 
 
-def _note_create_target_folder(project_id, path_prefix=""):
-    project_id = (project_id or "").strip()
+def _note_create_target_folder(area_id, path_prefix=""):
+    area_id = (area_id or "").strip()
     path_prefix = _normalize_note_path(path_prefix)
-    if not project_id or project_id.lower() == "unmapped":
+    if not area_id or area_id.lower() == "unmapped":
         return _current_user_notes_root(create_dirs=True), ""
     owner_user_id = _current_owner_user_id()
-    if not projects_mod.project_get(project_id, owner_user_id=owner_user_id):
-        raise ValueError("Project not found.")
+    if not areas_mod.area_get(area_id, owner_user_id=owner_user_id):
+        raise ValueError("Area not found.")
     try:
-        default_path = projects_mod.project_default_folder_get(project_id, owner_user_id=owner_user_id) or ""
+        default_path = areas_mod.area_default_folder_get(area_id, owner_user_id=owner_user_id) or ""
     except ValueError:
         raise
     if default_path:
         default_path = _normalize_note_path(default_path)
         if path_prefix and path_prefix.lower() != default_path.lower():
-            raise ValueError("Notes can only be created in the default folder for this project.")
-        return default_path, project_id
-    if _uses_project_folder_mapping():
-        raise ValueError("No default folder set for this project.")
-    return _current_user_notes_root(create_dirs=True), project_id
+            raise ValueError("Notes can only be created in the default folder for this area.")
+        return default_path, area_id
+    if _uses_area_folder_mapping():
+        raise ValueError("No default folder set for this area.")
+    return _current_user_notes_root(create_dirs=True), area_id
 
 
 @notes_bp.route('/api/create-note', methods=["POST"])
 def create_note_route():
     payload = request.get_json(silent=True) or {}
-    project_id = (payload.get("project_id") or "").strip()
+    area_id = utils_normalize_area_param(
+        payload.get("area_id") or payload.get("project_id") or payload.get("area") or payload.get("project") or ""
+    )
     title = (payload.get("title") or "").strip()
     path_prefix = (payload.get("path_prefix") or "").strip()
     if not title:
         return jsonify({"error": "Title is required."}), 400
     try:
-        path_prefix, project_id = _note_create_target_folder(project_id, path_prefix)
+        path_prefix, area_id = _note_create_target_folder(area_id, path_prefix)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     if not path_prefix:
         return jsonify({"error": "Folder path is required."}), 400
     try:
-        created = _create_note_file(path_prefix, title, project_id)
+        created = _create_note_file(path_prefix, title, area_id)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except OSError as exc:
@@ -2435,7 +2482,7 @@ def create_note_route():
         size = ""
         stat = None
         date_modified = ""
-    metadata = _note_metadata_from_file(created["full_path"], stat=stat, fallback_project=project_id)
+    metadata = _note_metadata_from_file(created["full_path"], stat=stat, fallback_area=area_id)
 
     values_map = {
         "file_name": created["file_name"],
@@ -2446,7 +2493,7 @@ def create_note_route():
         "color": metadata.get("color") or DEFAULT_NOTE_COLOR,
         "date_created": metadata.get("date_created") or created["created_utc"],
         "date_modified": date_modified,
-        "project": metadata.get("project") or project_id,
+        "area": metadata.get("area") or area_id,
         "important": metadata.get("important") or "",
         "source_note_id": metadata.get("source_note_id") or "",
     }
@@ -2471,19 +2518,19 @@ def create_note_route():
 def add_note_route():
     _ensure_notes_schema()
     tbl = get_table_def("notes")
-    project = request.args.get("proj") or "General"
+    area = request_area_param("General") or "General"
     if request.method == "POST" and tbl:
         form_values = {col: request.form.get(col, "").strip() for col in tbl["col_list"]}
-        if not form_values.get("project"):
-            form_values["project"] = project
+        if not form_values.get("area"):
+            form_values["area"] = area
         note_path = _build_note_path(form_values)
         if note_path and os.path.isfile(note_path):
             try:
                 stat = os.stat(note_path)
             except OSError:
                 stat = None
-            metadata = _note_metadata_from_file(note_path, stat=stat, fallback_project=form_values.get("project") or project)
-            for key in ("title", "color", "date_created", "project", "important", "source_note_id"):
+            metadata = _note_metadata_from_file(note_path, stat=stat, fallback_area=form_values.get("area") or area)
+            for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
                 if not form_values.get(key):
                     form_values[key] = metadata.get(key) or ""
             if not form_values.get("size"):
@@ -2494,7 +2541,7 @@ def add_note_route():
                 ).strftime("%Y-%m-%d %H:%M:%S")
         values = [form_values.get(col, "") for col in tbl["col_list"]]
         data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
-        return redirect(url_for("notes.list_notes_route", proj=project))
+        return redirect(url_for("notes.list_notes_route", area=area))
     return render_template(
         "note_edit.html",
         active_tab="notes",
@@ -2502,7 +2549,7 @@ def add_note_route():
         side_tabs=get_side_tabs(),
         content_title="Add Note",
         note=None,
-        project=project,
+        area=area,
     )
 
 @notes_bp.route('/edit/<int:note_id>', methods=["GET", "POST"])
@@ -2537,13 +2584,13 @@ def edit_note_route(note_id):
         if note_state:
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
-        note_metadata = _note_metadata_from_file(note_path, fallback_project=note.get("project") or "")
-        for key in ("title", "color", "date_created", "project", "important", "source_note_id"):
+        note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
+        for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
             if note_metadata.get(key):
                 note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
     note_folder = _normalize_folder_filter(note.get("path")) if note else ""
-    breadcrumb_project = note.get("derived_project") or note.get("project") if note else None
+    breadcrumb_area = note.get("derived_area") or note.get("area") if note else None
     return render_template(
         "note_edit.html",
         active_tab="notes",
@@ -2554,7 +2601,7 @@ def edit_note_route(note_id):
         file_exists=file_exists,
         note_path=note_path,
         note_state=note_state,
-        note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_project),
+        note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_area),
         content_title=f"Edit: {note.get('file_name')}" if note else "Edit Note",
     )
 
@@ -2633,9 +2680,7 @@ def delete_note_route(note_id):
 
 @notes_bp.route('/import', methods=["GET", "POST"])
 def import_notes_route():
-    project = request.args.get("proj") or ""
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = ""
+    area = request_area_param() or ""
     tbl = get_table_def("notes")
     csv_path = ""
     headers = []
@@ -2654,11 +2699,11 @@ def import_notes_route():
             map_list = []
             for col in tbl["col_list"]:
                 choice = mappings.get(col, "")
-                if choice == "{curr_project_selected}":
-                    choice = project
+                if choice == "{curr_area_selected}":
+                    choice = area
                 map_list.append(choice)
             try:
-                importer.set_token("curr_project_selected", project)
+                importer.set_token("curr_area_selected", area)
                 imported = importer.import_to_table(tbl["name"], csv_path, map_list)
             except Exception as exc:
                 error = str(exc)
@@ -2671,7 +2716,7 @@ def import_notes_route():
         side_tabs=get_side_tabs(),
         content_title="Import Notes",
         content_html="",
-        project=project,
+        area=area,
         table_def=tbl,
         csv_path=csv_path,
         csv_headers=headers,
@@ -2683,7 +2728,7 @@ def import_notes_route():
 
 @notes_bp.route('/import-folder', methods=["GET", "POST"])
 def import_notes_folder_route():
-    project = _normalize_project_param(request.args.get("proj") or "")
+    area = request_area_param() or ""
     tbl = get_table_def("notes")
     imported = None
     error = ""
@@ -2696,7 +2741,7 @@ def import_notes_folder_route():
         elif not tbl:
             error = "Notes table not found."
         else:
-            rows = _collect_note_import_rows(folder_path, project)
+            rows = _collect_note_import_rows(folder_path, area)
             imported = _insert_note_import_rows(tbl, rows)
     return render_template(
         "notes_import_folder.html",
@@ -2705,13 +2750,13 @@ def import_notes_folder_route():
         side_tabs=get_side_tabs(),
         content_title="Import Notes Folder",
         content_html="",
-        project=project,
+        area=area,
         imported=imported,
         error=error,
     )
 
 
-def _collect_note_import_rows(folder_path, project):
+def _collect_note_import_rows(folder_path, area):
     rows = []
     for root, _, files in os.walk(folder_path):
         for name in files:
@@ -2724,7 +2769,7 @@ def _collect_note_import_rows(folder_path, project):
                 stat = os.stat(full_path)
             except OSError:
                 continue
-            metadata = _note_metadata_from_file(full_path, stat=stat, fallback_project=project)
+            metadata = _note_metadata_from_file(full_path, stat=stat, fallback_area=area)
             rows.append(
                 {
                     "file_name": name,
@@ -2734,7 +2779,7 @@ def _collect_note_import_rows(folder_path, project):
                     "color": metadata.get("color") or "",
                     "date_created": metadata.get("date_created") or "",
                     "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                    "project": metadata.get("project") or project,
+                    "area": metadata.get("area") or area,
                     "important": metadata.get("important") or "",
                     "source_note_id": metadata.get("source_note_id") or "",
                 }
@@ -2777,12 +2822,12 @@ def _note_folder_id_matches(conn, folder_id, folder_path):
     return _normalize_note_path(row["folder_path"]).lower() == _normalize_note_path(folder_path).lower()
 
 
-def _sync_project_fallbacks(conn, owner_user_id=None):
+def _sync_area_fallbacks(conn, owner_user_id=None):
     try:
-        projects_mod.ensure_projects_schema(conn)
+        areas_mod.ensure_areas_schema(conn)
         rows = conn.execute(
-            "SELECT project_id, path_prefix, folder_role, sort_order "
-            "FROM lp_project_folders "
+            "SELECT area_id, path_prefix, folder_role, sort_order "
+            "FROM lp_area_folders "
             "WHERE owner_user_id IS ? "
             "AND is_enabled = 1 "
             "AND folder_role IN ('default','include','archive','output')",
@@ -2794,12 +2839,12 @@ def _sync_project_fallbacks(conn, owner_user_id=None):
     fallbacks = []
     for row in rows:
         path_prefix = _normalize_note_path(row["path_prefix"])
-        project_id = (row["project_id"] or "").strip()
-        if not path_prefix or not project_id:
+        area_id = (row["area_id"] or "").strip()
+        if not path_prefix or not area_id:
             continue
         fallbacks.append(
             {
-                "project_id": project_id,
+                "area_id": area_id,
                 "path_prefix": path_prefix,
                 "folder_role": row["folder_role"] or "",
                 "sort_order": row["sort_order"] or 100,
@@ -2810,17 +2855,17 @@ def _sync_project_fallbacks(conn, owner_user_id=None):
             -len(item["path_prefix"]),
             priority.get(item["folder_role"], 9),
             item["sort_order"],
-            item["project_id"],
+            item["area_id"],
         )
     )
     return fallbacks
 
 
-def _sync_project_for_path(folder_path, fallbacks):
+def _sync_area_for_path(folder_path, fallbacks):
     folder_path = _normalize_note_path(folder_path)
     for item in fallbacks or []:
         if _path_startswith(folder_path, item["path_prefix"]):
-            return item["project_id"]
+            return item["area_id"]
     return ""
 
 
@@ -2832,20 +2877,20 @@ def _note_owner_filter(owner_user_id, table_columns):
     return " AND t.owner_user_id = ?", [owner_user_id]
 
 
-def materialize_note_projects(conn=None, owner_user_id=None, force=False):
+def materialize_note_areas(conn=None, owner_user_id=None, force=False):
     conn = data._get_conn() if conn is None else conn
     data.ensure_notes_schema(conn)
     tbl = get_table_def("notes")
     if not tbl or not _table_exists(conn, tbl["name"]):
         return {"scanned": 0, "updated": 0}
     table_columns = _table_columns(conn, tbl["name"])
-    fallbacks = _sync_project_fallbacks(conn, owner_user_id)
+    fallbacks = _sync_area_fallbacks(conn, owner_user_id)
     if not fallbacks:
         return {"scanned": 0, "updated": 0}
     where = ["1=1"]
     params = []
     if not force:
-        where.append("COALESCE(t.project, '') = ''")
+        where.append("COALESCE(t.area, '') = ''")
     owner_sql, owner_params = _note_owner_filter(owner_user_id, table_columns)
     if owner_sql:
         where.append(owner_sql[5:])
@@ -2854,7 +2899,7 @@ def materialize_note_projects(conn=None, owner_user_id=None, force=False):
     folder_select = "df.folder_path" if has_dim_folder else "NULL AS folder_path"
     folder_join = "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id " if has_dim_folder else ""
     sql = (
-        f"SELECT t.id, t.path, t.folder_id, t.project, {folder_select} "
+        f"SELECT t.id, t.path, t.folder_id, t.area, {folder_select} "
         f"FROM {tbl['name']} t "
         f"{folder_join}"
         f"WHERE {' AND '.join(where)}"
@@ -2863,11 +2908,11 @@ def materialize_note_projects(conn=None, owner_user_id=None, force=False):
     updates = []
     for row in rows:
         note_path = _normalize_note_path(row["path"] or row["folder_path"] or "")
-        project_id = _sync_project_for_path(note_path, fallbacks)
-        if project_id and (force or not (row["project"] or "").strip()):
-            updates.append((project_id, row["id"]))
+        area_id = _sync_area_for_path(note_path, fallbacks)
+        if area_id and (force or not (row["area"] or "").strip()):
+            updates.append((area_id, row["id"]))
     if updates:
-        conn.executemany(f"UPDATE {tbl['name']} SET project = ? WHERE id = ?", updates)
+        conn.executemany(f"UPDATE {tbl['name']} SET area = ? WHERE id = ?", updates)
         conn.commit()
     return {"scanned": len(rows), "updated": len(updates)}
 
@@ -2941,17 +2986,17 @@ def refresh_note_color_metadata(conn=None, owner_user_id=None, only_blank=True):
     }
 
 
-def _ensure_note_projects_materialized(conn):
+def _ensure_note_areas_materialized(conn):
     owner_user_id = _current_owner_user_id()
     key = (id(conn), owner_user_id)
-    if key in _NOTE_PROJECT_MATERIALIZED_KEYS:
+    if key in _NOTE_AREA_MATERIALIZED_KEYS:
         return {"scanned": 0, "updated": 0}
-    result = materialize_note_projects(conn=conn, owner_user_id=owner_user_id, force=False)
-    _NOTE_PROJECT_MATERIALIZED_KEYS.add(key)
+    result = materialize_note_areas(conn=conn, owner_user_id=owner_user_id, force=False)
+    _NOTE_AREA_MATERIALIZED_KEYS.add(key)
     return result
 
 
-def _sync_note_rows(folder_path, fallback_project=""):
+def _sync_note_rows(folder_path, fallback_area=""):
     _ensure_notes_schema()
     folder_path = _normalize_note_path(folder_path)
     tbl = get_table_def("notes")
@@ -2963,7 +3008,7 @@ def _sync_note_rows(folder_path, fallback_project=""):
         raise ValueError("Folder not found.")
 
     conn = data._get_conn()
-    project_fallbacks = [] if fallback_project else _sync_project_fallbacks(conn, _current_owner_user_id())
+    area_fallbacks = [] if fallback_area else _sync_area_fallbacks(conn, _current_owner_user_id())
     root_lower = folder_path.rstrip("\\").lower()
     existing = {}
     duplicates = 0
@@ -3004,8 +3049,8 @@ def _sync_note_rows(folder_path, fallback_project=""):
             scanned += 1
             size = str(stat.st_size)
             date_modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-            row_project = fallback_project or _sync_project_for_path(root_norm, project_fallbacks)
-            metadata = _note_metadata_from_file(full_path, stat=stat, fallback_project=row_project)
+            row_area = fallback_area or _sync_area_for_path(root_norm, area_fallbacks)
+            metadata = _note_metadata_from_file(full_path, stat=stat, fallback_area=row_area)
             key = _note_full_path_key(root_norm, name)
             seen.add(key)
             current = existing.get(key)
@@ -3020,7 +3065,7 @@ def _sync_note_rows(folder_path, fallback_project=""):
                         "color": metadata.get("color") or current.get("color", ""),
                         "date_created": metadata.get("date_created") or current.get("date_created", ""),
                         "date_modified": date_modified,
-                        "project": metadata.get("project") or current.get("project", ""),
+                        "area": metadata.get("area") or current.get("area", ""),
                         "important": metadata.get("important") or current.get("important", ""),
                         "source_note_id": metadata.get("source_note_id") or current.get("source_note_id", ""),
                     }
@@ -3033,7 +3078,7 @@ def _sync_note_rows(folder_path, fallback_project=""):
                     or str(current.get("color") or "") != str(values_map.get("color") or "")
                     or str(current.get("date_created") or "") != str(values_map.get("date_created") or "")
                     or str(current.get("date_modified") or "") != date_modified
-                    or str(current.get("project") or "") != str(values_map.get("project") or "")
+                    or str(current.get("area") or "") != str(values_map.get("area") or "")
                     or str(current.get("important") or "") != str(values_map.get("important") or "")
                     or str(current.get("source_note_id") or "") != str(values_map.get("source_note_id") or "")
                     or not _note_folder_id_matches(conn, current.get("folder_id"), root_norm)
@@ -3077,7 +3122,7 @@ def _sync_note_rows(folder_path, fallback_project=""):
                     "color": metadata.get("color") or "",
                     "date_created": metadata.get("date_created") or "",
                     "date_modified": date_modified,
-                    "project": metadata.get("project") or "",
+                    "area": metadata.get("area") or "",
                     "important": metadata.get("important") or "",
                     "source_note_id": metadata.get("source_note_id") or "",
                 }
@@ -3131,17 +3176,17 @@ def sync_notes_route():
     return redirect(url_for("admin.settings_route", tab="notes", message=msg))
 
 
-@notes_bp.route('/sync-folder/<int:project_folder_id>', methods=["POST"])
-def sync_project_folder_route(project_folder_id):
-    folder = projects_mod.project_folder_get(project_folder_id)
+@notes_bp.route('/sync-folder/<int:area_folder_id>', methods=["POST"])
+def sync_area_folder_route(area_folder_id):
+    folder = areas_mod.area_folder_get(area_folder_id)
     if not folder:
         abort(404)
     try:
-        result = _sync_note_rows(folder.get("path_prefix") or "", fallback_project=folder.get("project_id") or "")
+        result = _sync_note_rows(folder.get("path_prefix") or "", fallback_area=folder.get("area_id") or "")
         msg = _sync_notes_message(result)
     except Exception as exc:
         msg = f"Notes folder sync failed: {exc}"
-    next_url = request.form.get("next") or url_for("notes.list_notes_route", proj=folder.get("project_id"))
+    next_url = request.form.get("next") or url_for("notes.list_notes_route", area=folder.get("area_id"))
     sep = "&" if "?" in next_url else "?"
     return redirect(f"{next_url}{sep}{urlencode({'message': msg})}")
 
@@ -3211,13 +3256,13 @@ def _current_note_roots(conn, tbl_name):
     return sorted(roots)
 
 
-def _rewrite_lp_project_folder_paths(conn, old_root, new_root):
-    if not _table_exists(conn, "lp_project_folders"):
+def _rewrite_lp_area_folder_paths(conn, old_root, new_root):
+    if not _table_exists(conn, "lp_area_folders"):
         return 0
     updated = 0
     rows = conn.execute(
-        "SELECT project_folder_id, project_id, path_prefix FROM lp_project_folders "
-        f"WHERE {_project_folder_owner_sql('lp_project_folders')} "
+        "SELECT area_folder_id, area_id, path_prefix FROM lp_area_folders "
+        f"WHERE {_area_folder_owner_sql('lp_area_folders')} "
         "AND (lower(path_prefix) = lower(?) OR lower(path_prefix) LIKE lower(?))",
         (_normalize_note_path(old_root), _normalize_note_path(old_root) + "\\%"),
     ).fetchall()
@@ -3227,31 +3272,31 @@ def _rewrite_lp_project_folder_paths(conn, old_root, new_root):
             continue
         try:
             conn.execute(
-                "UPDATE lp_project_folders SET path_prefix = ?, updated_utc = ? WHERE project_folder_id = ?",
-                (next_path, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), row["project_folder_id"]),
+                "UPDATE lp_area_folders SET path_prefix = ?, updated_utc = ? WHERE area_folder_id = ?",
+                (next_path, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), row["area_folder_id"]),
             )
             updated += 1
         except Exception:
             conflict = conn.execute(
-                "SELECT project_folder_id FROM lp_project_folders "
-                f"WHERE {_project_folder_owner_sql('lp_project_folders')} AND project_id = ? AND path_prefix = ?",
-                (row["project_id"], next_path),
+                "SELECT area_folder_id FROM lp_area_folders "
+                f"WHERE {_area_folder_owner_sql('lp_area_folders')} AND area_id = ? AND path_prefix = ?",
+                (row["area_id"], next_path),
             ).fetchone()
             if conflict:
                 conn.execute(
-                    "DELETE FROM lp_project_folders WHERE project_folder_id = ?",
-                    (row["project_folder_id"],),
+                    "DELETE FROM lp_area_folders WHERE area_folder_id = ?",
+                    (row["area_folder_id"],),
                 )
                 updated += 1
     return updated
 
 
-def _rewrite_map_folder_project_paths(conn, old_root, new_root):
-    if not _table_exists(conn, "map_folder_project"):
+def _rewrite_map_folder_area_paths(conn, old_root, new_root):
+    if not _table_exists(conn, "map_folder_area"):
         return 0
     updated = 0
     rows = conn.execute(
-        "SELECT map_id, path_prefix, tab, grp, project, is_primary FROM map_folder_project "
+        "SELECT map_id, path_prefix, tab, grp, area, is_primary FROM map_folder_area "
         "WHERE lower(path_prefix) = lower(?) OR lower(path_prefix) LIKE lower(?)",
         (_normalize_note_path(old_root), _normalize_note_path(old_root) + "\\%"),
     ).fetchall()
@@ -3261,18 +3306,18 @@ def _rewrite_map_folder_project_paths(conn, old_root, new_root):
             continue
         try:
             conn.execute(
-                "UPDATE map_folder_project SET path_prefix = ? WHERE map_id = ?",
+                "UPDATE map_folder_area SET path_prefix = ? WHERE map_id = ?",
                 (next_path, row["map_id"]),
             )
             updated += 1
         except Exception:
             conflict = conn.execute(
-                "SELECT map_id FROM map_folder_project "
-                "WHERE path_prefix = ? AND tab = ? AND grp = ? AND project = ? AND is_primary = ?",
-                (next_path, row["tab"], row["grp"], row["project"], row["is_primary"]),
+                "SELECT map_id FROM map_folder_area "
+                "WHERE path_prefix = ? AND tab = ? AND grp = ? AND area = ? AND is_primary = ?",
+                (next_path, row["tab"], row["grp"], row["area"], row["is_primary"]),
             ).fetchone()
             if conflict:
-                conn.execute("DELETE FROM map_folder_project WHERE map_id = ?", (row["map_id"],))
+                conn.execute("DELETE FROM map_folder_area WHERE map_id = ?", (row["map_id"],))
                 updated += 1
     return updated
 
@@ -3290,10 +3335,10 @@ def _migrate_notes_mapping_roots(conn, new_root, old_roots):
         if alias_notes_root.lower() != new_root.lower():
             candidate_roots.add(alias_notes_root)
     for old_root in sorted(candidate_roots, key=len, reverse=True):
-        rewritten += _rewrite_lp_project_folder_paths(conn, old_root, new_root)
-        rewritten += _rewrite_map_folder_project_paths(conn, old_root, new_root)
+        rewritten += _rewrite_lp_area_folder_paths(conn, old_root, new_root)
+        rewritten += _rewrite_map_folder_area_paths(conn, old_root, new_root)
     try:
-        rewritten += folder_etl.rebuild_map_project_folder(conn)
+        rewritten += folder_etl.rebuild_map_area_folder(conn)
     except Exception:
         pass
     return rewritten
@@ -3303,7 +3348,7 @@ def _migrate_notes_mapping_roots(conn, new_root, old_roots):
 def migrate_notes_source_route():
     folder_path = request.form.get("notes_folder", "").strip()
     folder_path = _normalize_note_path(folder_path)
-    project = _normalize_project_param(request.form.get("project", ""))
+    area = request_area_param(include_form=True)
     confirmed = request.form.get("confirm_migrate") == "1"
     tbl = get_table_def("notes")
     if not confirmed:
@@ -3315,7 +3360,7 @@ def migrate_notes_source_route():
     elif not tbl:
         msg = "Migration not run: notes table not found."
     else:
-        rows = _collect_note_import_rows(folder_path, project)
+        rows = _collect_note_import_rows(folder_path, area)
         if not rows:
             msg = "Migration not run: no markdown files found in the selected folder."
         else:
@@ -3338,7 +3383,7 @@ def migrate_notes_source_route():
                 context_id=folder_path,
                 extra={
                     "folder_path": folder_path,
-                    "project": project,
+                    "area": area,
                     "notes_deleted": notes_deleted,
                     "note_links_deleted": links_deleted,
                     "notes_imported": imported,
@@ -3367,14 +3412,42 @@ def _parse_datetime(value):
     return None
 
 
-def _project_context(project_id):
-    if not project_id or project_id.lower() == "unmapped":
+def _resolve_area_for_context(area_id):
+    area_id = (area_id or "").strip()
+    if not area_id:
+        return None
+    owner_user_id = _current_owner_user_id()
+    area = areas_mod.area_get(area_id, owner_user_id=owner_user_id)
+    if area:
+        return area
+    conn = data._get_conn()
+    areas_mod.ensure_areas_schema(conn)
+    row = conn.execute(
+        "SELECT owner_user_id, area_id, icon, tab, group_name, area_name, "
+        "is_header, is_system, status, tags, "
+        "sort_order, pinned, notes, created_utc, updated_utc "
+        "FROM lp_areas "
+        "WHERE owner_user_id IS ? AND status = 'active' AND is_header = 0 "
+        "AND (lower(area_id) = lower(?) OR lower(area_name) = lower(?)) "
+        "ORDER BY CASE WHEN lower(area_id) = lower(?) THEN 0 ELSE 1 END, LENGTH(area_id), area_id "
+        "LIMIT 1",
+        (owner_user_id, area_id, area_id, area_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _area_context(area_id):
+    if not area_id or area_id.lower() == "unmapped":
         return None, []
-    project = projects_mod.project_get(project_id)
-    if not project:
+    area = _resolve_area_for_context(area_id)
+    if not area:
         return None, []
-    folders = projects_mod.project_folders_list(project_id, include_disabled=True)
-    return project, folders
+    folders = areas_mod.area_folders_list(
+        area["area_id"],
+        include_disabled=True,
+        owner_user_id=area.get("owner_user_id"),
+    )
+    return area, folders
 
 
 def _sort_notes(notes, sort_col, sort_dir):
@@ -3391,7 +3464,7 @@ def _sort_notes(notes, sort_col, sort_dir):
         "title": lambda n: (n.get("title") or n.get("file_name") or "").lower(),
         "color": lambda n: (n.get("color") or "").lower(),
         "date_created": lambda n: _parse_datetime(n.get("date_created")) or datetime.min,
-        "project": lambda n: (n.get("project") or "").lower(),
+        "area": lambda n: (n.get("area") or "").lower(),
         "important": lambda n: (n.get("important") or "").lower(),
         "date_modified": lambda n: n.get("date_modified_dt") or datetime.min,
         "updated": lambda n: n.get("updated") or datetime.min,

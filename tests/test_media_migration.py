@@ -187,7 +187,7 @@ class TestMediaMigration(unittest.TestCase):
             "CREATE TABLE lp_audio ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, file_name TEXT, path TEXT, folder_id TEXT, "
             "file_type TEXT, size TEXT, date_modified TEXT, artist TEXT, album TEXT, song TEXT, "
-            "project TEXT, user_name TEXT, rec_extract_date TEXT)"
+            "area TEXT, user_name TEXT, rec_extract_date TEXT)"
         )
         conn.execute("CREATE TABLE lp_audio_playlist_items (playlist_item_id INTEGER PRIMARY KEY, audio_id INTEGER)")
         return conn

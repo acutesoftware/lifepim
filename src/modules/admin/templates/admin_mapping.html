@@ -24,8 +24,8 @@
       <div style="margin-bottom:8px;">
         <strong>DB:</strong> {{ db_file }}
         {% if counts %}
-          <span style="margin-left:8px;">map_folder_project={{ counts.map_folder_project }}</span>
-          <span style="margin-left:8px;">map_project_folder={{ counts.map_project_folder }}</span>
+          <span style="margin-left:8px;">map_folder_area={{ counts.map_folder_area }}</span>
+          <span style="margin-left:8px;">map_area_folder={{ counts.map_area_folder }}</span>
           <span style="margin-left:8px;">dim_folder={{ counts.dim_folder }}</span>
         {% endif %}
       </div>
@@ -49,14 +49,14 @@
         <p class="settings-empty">Total records: {{ rules_total }}</p>
 
         <div class="tabular-scroll admin-list-scroll">
-          <h4>Mapping rules (map_folder_project)</h4>
+          <h4>Mapping rules (map_folder_area)</h4>
           <table border="1" cellpadding="5">
             <tr>
               <th>map_id</th>
               <th>path_prefix</th>
               <th>tab</th>
               <th>grp</th>
-              <th>project</th>
+              <th>area</th>
               <th>tags</th>
               <th>confidence</th>
               <th>priority</th>
@@ -69,7 +69,7 @@
               <td>{{ row.path_prefix }}</td>
               <td>{{ row.tab }}</td>
               <td>{{ row.grp }}</td>
-              <td>{{ row.project }}</td>
+              <td>{{ row.area }}</td>
               <td>{{ row.tags }}</td>
               <td>{{ row.confidence }}</td>
               <td>{{ row.priority }}</td>
@@ -124,8 +124,8 @@
                 <input type="text" name="notes_folder" placeholder="N:\duncan\LifePIM_Data\DATA\notes" value="{{ notes_sync_root }}">
               </label>
               <label>
-                Project
-                <input type="text" name="project" placeholder="Leave blank for derived project mapping">
+                Area
+                <input type="text" name="area" placeholder="Leave blank for derived area mapping">
               </label>
               <label>
                 <input type="checkbox" name="confirm_migrate" value="1">

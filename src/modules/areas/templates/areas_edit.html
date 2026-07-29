@@ -1,0 +1,176 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% if message %}
+    <div class="settings-message">{{ message }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="settings-message settings-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="settings-shell settings-shell-single">
+    <section class="settings-panel">
+      <h4>Areas</h4>
+      <form method="post" action="{{ url_for('areas.edit_areas_route') }}" class="settings-form settings-form-wide areas-edit-form">
+        <div class="tabular-scroll">
+          <table class="settings-table">
+            <thead>
+              <tr>
+                <th>Actions</th>
+                <th>Type</th>
+                <th>Group</th>
+                <th>Area ID</th>
+                <th>Label</th>
+                <th>Icon</th>
+              </tr>
+            </thead>
+            <tbody id="areasEditRows">
+              {% for row in area_rows %}
+              <tr>
+                <td class="areas-row-actions">
+                  <input type="hidden" name="original_area_id" value="{{ row.id }}">
+                  <input type="hidden" name="delete_area" value="0">
+                  <button type="button" class="areas-move-up" title="Move up">Up</button>
+                  <button type="button" class="areas-move-down" title="Move down">Down</button>
+                  <button type="button" class="areas-delete-row" {% if row.is_system %}disabled title="System areas cannot be deleted"{% else %}title="Delete this area row"{% endif %}>Delete</button>
+                </td>
+                <td>
+                  <select name="row_type" {% if row.is_system %}disabled{% endif %}>
+                    <option value="area" {% if not row.is_header %}selected{% endif %}>Area</option>
+                    <option value="header" {% if row.is_header %}selected{% endif %}>Header</option>
+                  </select>
+                  <input type="hidden" name="row_type" value="{{ 'header' if row.is_header else 'area' }}" {% if not row.is_system %}disabled{% endif %}>
+                  <input type="hidden" name="is_system" value="{{ row.is_system or 0 }}">
+                </td>
+                <td><input type="text" name="group_name" value="{{ row.group_name or row.label }}"></td>
+                <td><input type="text" name="area_id" value="{{ row.id }}" {% if row.is_system %}readonly{% endif %}></td>
+                <td><input type="text" name="area_name" value="{{ row.label }}"></td>
+                <td><input type="text" name="icon" value="{{ row.icon }}"></td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <td class="areas-row-actions">
+                  <input type="hidden" name="original_area_id" value="">
+                  <input type="hidden" name="delete_area" value="0">
+                  <button type="button" class="areas-move-up" title="Move up">Up</button>
+                  <button type="button" class="areas-move-down" title="Move down">Down</button>
+                  <button type="button" class="areas-delete-row" title="Delete this area row">Delete</button>
+                </td>
+                <td>
+                  <select name="row_type">
+                    <option value="area">Area</option>
+                    <option value="header">Header</option>
+                  </select>
+                  <input type="hidden" name="is_system" value="0">
+                </td>
+                <td><input type="text" name="group_name" placeholder="WORK"></td>
+                <td><input type="text" name="area_id" placeholder="work/job"></td>
+                <td><input type="text" name="area_name" placeholder="Job"></td>
+                <td><input type="text" name="icon" placeholder="*"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="settings-action-row">
+          <button type="button" id="areasAddRow">Add area row</button>
+          <button type="submit" name="action" value="save">Save areas</button>
+          <button type="submit" name="action" value="reset" onclick="return confirm('Reset your area list to the default?');">Reset to default</button>
+        </div>
+        <div class="areas-storage-note">
+          <h4>Storage</h4>
+          <dl>
+            <dt>Database</dt>
+            <dd><code>{{ db_file }}</code></dd>
+            <dt>Tables</dt>
+            <dd><code>{{ area_tables|join('</code>, <code>')|safe }}</code></dd>
+            <dt>Schema SQL</dt>
+            <dd><code>{{ schema_sql_file }}</code></dd>
+            <dt>Runtime schema source</dt>
+            <dd><code>{{ schema_source_file }}</code></dd>
+            <dt>Documentation</dt>
+            <dd><code>{{ area_doc_file }}</code></dd>
+          </dl>
+          <p>
+            Use this screen for normal edits. Direct database edits should only be made after stopping LifePIM and backing up the database.
+            Area ID renames saved here update exact stored references and folder mappings; label, group, icon, and ordering changes only affect navigation.
+            Deleting an Area removes it from the sidebar but does not delete notes, tasks, files, or mapped folders.
+          </p>
+        </div>
+      </form>
+    </section>
+  </div>
+  <template id="areasRowTemplate">
+    <tr>
+      <td class="areas-row-actions">
+        <input type="hidden" name="original_area_id" value="">
+        <input type="hidden" name="delete_area" value="0">
+        <button type="button" class="areas-move-up" title="Move up">Up</button>
+        <button type="button" class="areas-move-down" title="Move down">Down</button>
+        <button type="button" class="areas-delete-row" title="Delete this area row">Delete</button>
+      </td>
+      <td>
+        <select name="row_type">
+          <option value="area">Area</option>
+          <option value="header">Header</option>
+        </select>
+        <input type="hidden" name="is_system" value="0">
+      </td>
+      <td><input type="text" name="group_name" placeholder="WORK"></td>
+      <td><input type="text" name="area_id" placeholder="work/job"></td>
+      <td><input type="text" name="area_name" placeholder="Job"></td>
+      <td><input type="text" name="icon" placeholder="*"></td>
+    </tr>
+  </template>
+  <script>
+    (function () {
+      const rows = document.getElementById("areasEditRows");
+      const addButton = document.getElementById("areasAddRow");
+      const template = document.getElementById("areasRowTemplate");
+      if (!rows || !addButton || !template) {
+        return;
+      }
+
+      function editableRows() {
+        return Array.from(rows.querySelectorAll("tr")).filter((row) => row.style.display !== "none");
+      }
+
+      function moveRow(row, direction) {
+        const visibleRows = editableRows();
+        const idx = visibleRows.indexOf(row);
+        if (idx < 0) {
+          return;
+        }
+        if (direction < 0 && idx > 0) {
+          rows.insertBefore(row, visibleRows[idx - 1]);
+        } else if (direction > 0 && idx < visibleRows.length - 1) {
+          rows.insertBefore(visibleRows[idx + 1], row);
+        }
+      }
+
+      rows.addEventListener("click", function (event) {
+        const button = event.target.closest("button");
+        if (!button) {
+          return;
+        }
+        const row = button.closest("tr");
+        if (!row) {
+          return;
+        }
+        if (button.classList.contains("areas-move-up")) {
+          moveRow(row, -1);
+        } else if (button.classList.contains("areas-move-down")) {
+          moveRow(row, 1);
+        } else if (button.classList.contains("areas-delete-row") && !button.disabled) {
+          const marker = row.querySelector('input[name="delete_area"]');
+          if (marker) {
+            marker.value = "1";
+          }
+          row.style.display = "none";
+        }
+      });
+
+      addButton.addEventListener("click", function () {
+        rows.appendChild(template.content.firstElementChild.cloneNode(true));
+      });
+    })();
+  </script>
+{% endblock %}

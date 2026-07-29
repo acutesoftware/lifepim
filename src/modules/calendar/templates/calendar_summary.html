@@ -2,13 +2,13 @@
 {% block module_content %}
 <div class="calendar-controls">
   <div class="calendar-views">
-    <a href="{{ url_for('calendar.month_view_route', year=today.year, month=today.month, proj=project) }}">Monthly</a> |
-    <a href="{{ url_for('calendar.week_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
-    <a href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
-    <a href="{{ url_for('calendar.year_view_route', year=today.year, proj=project) }}">Yearly</a> |
-    <a href="{{ url_for('calendar.list_view_route', proj=project) }}">Agenda</a> |
-    <a href="{{ url_for('calendar.event_list_route', proj=project, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">List</a> |
-    <a href="{{ url_for('calendar.summary_view_route', proj=project) }}">Summary</a>
+    <a href="{{ url_for('calendar.month_view_route', year=today.year, month=today.month, area=area) }}">Monthly</a> |
+    <a href="{{ url_for('calendar.week_view_route', date=today.strftime('%Y-%m-%d'), area=area) }}">Weekly</a> |
+    <a href="{{ url_for('calendar.day_view_route', date=today.strftime('%Y-%m-%d'), area=area) }}">Daily</a> |
+    <a href="{{ url_for('calendar.year_view_route', year=today.year, area=area) }}">Yearly</a> |
+    <a href="{{ url_for('calendar.list_view_route', area=area) }}">Agenda</a> |
+    <a href="{{ url_for('calendar.event_list_route', area=area, show_events=day_source_params.show_events, show_files=day_source_params.show_files, show_usage=day_source_params.show_usage, sources=day_source_params.sources) }}">List</a> |
+    <a href="{{ url_for('calendar.summary_view_route', area=area) }}">Summary</a>
   </div>
   {% include "widgets/wid_calendar_jump.html" %}
   {% include "widgets/wid_calendar_source_box.html" %}
@@ -35,7 +35,7 @@
     </ul>
 
     <h4>Next 7 Days</h4>
-    <p><a href="{{ url_for('calendar.list_view_route', proj=project, from=today.strftime('%Y-%m-%d')) }}">{{ next_7_items|length }} items</a></p>
+    <p><a href="{{ url_for('calendar.list_view_route', area=area, from=today.strftime('%Y-%m-%d')) }}">{{ next_7_items|length }} items</a></p>
 
     <h4>Next 30 Days</h4>
     <p>{{ next_30_items|length }} items</p>

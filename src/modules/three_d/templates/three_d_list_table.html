@@ -1,10 +1,10 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('three_d.list_3d_table_route', proj=project) }}">Table</a> |
-    <a href="{{ url_for('three_d.list_3d_list_route', proj=project) }}">List</a> |
-    <a href="{{ url_for('three_d.list_3d_cards_route', proj=project) }}">Cards</a> |
-    <a href="{{ url_for('three_d.import_3d_route', proj=project) }}">Add .blend</a>
+    <a href="{{ url_for('three_d.list_3d_table_route', area=area) }}">Table</a> |
+    <a href="{{ url_for('three_d.list_3d_list_route', area=area) }}">List</a> |
+    <a href="{{ url_for('three_d.list_3d_cards_route', area=area) }}">Cards</a> |
+    <a href="{{ url_for('three_d.import_3d_route', area=area) }}">Add .blend</a>
   </div>
 
 <div class="tabular-scroll">
@@ -13,7 +13,7 @@
     {% for col in col_list %}
     {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
     <th>
-      <a href="{{ url_for('three_d.list_3d_table_route', proj=project, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+      <a href="{{ url_for('three_d.list_3d_table_route', area=area, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
       {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     {% endfor %}
@@ -24,15 +24,15 @@
     {% for col in col_list %}
     <td>
       {% if col == 'file_name' %}
-      <a href="{{ url_for('three_d.view_3d_route', item_id=item.id, proj=project) }}">{{ item[col] }}</a>
+      <a href="{{ url_for('three_d.view_3d_route', item_id=item.id, area=area) }}">{{ item[col] }}</a>
       {% else %}
       {{ item[col] }}
       {% endif %}
     </td>
     {% endfor %}
     <td>
-      <a href="{{ url_for('three_d.edit_3d_route', item_id=item.id, proj=project) }}">Edit</a> |
-      <a href="{{ url_for('three_d.delete_3d_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+      <a href="{{ url_for('three_d.edit_3d_route', item_id=item.id, area=area) }}">Edit</a> |
+      <a href="{{ url_for('three_d.delete_3d_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
     </td>
   </tr>
   {% endfor %}

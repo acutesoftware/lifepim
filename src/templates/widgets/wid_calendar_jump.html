@@ -2,8 +2,8 @@
 <dialog class="calendar-jump-dialog" data-calendar-jump-dialog>
   <form method="post" action="{{ url_for('calendar.jump_route') }}" data-calendar-jump-form>
     <input type="hidden" name="view" value="{{ jump_current_view }}">
-    {% if jump_project %}
-      <input type="hidden" name="proj" value="{{ jump_project }}">
+    {% if jump_area %}
+      <input type="hidden" name="area" value="{{ jump_area }}">
     {% endif %}
     {% for name, value in jump_day_source_params.items() %}
       <input type="hidden" name="{{ name }}" value="{{ value }}">

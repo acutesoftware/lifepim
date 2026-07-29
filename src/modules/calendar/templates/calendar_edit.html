@@ -100,11 +100,11 @@
       <option value="{{ status }}" {% if event and event.status == status %}selected{% endif %}>{{ status }}</option>
     {% endfor %}
   </select><br>
-  {% set selected_project = event.project if event else default_project %}
-  <label>Project:</label><br>
-  <select name="project">
-    {% for option in project_options %}
-      <option value="{{ option.value }}" {% if option.value == selected_project %}selected{% endif %}>{{ option.label }}</option>
+  {% set selected_area = event.area if event else default_area %}
+  <label>Area:</label><br>
+  <select name="area">
+    {% for option in area_options %}
+      <option value="{{ option.value }}" {% if option.value == selected_area %}selected{% endif %}>{{ option.label }}</option>
     {% endfor %}
   </select><br>
   <label>Details:</label><br>

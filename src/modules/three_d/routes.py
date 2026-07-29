@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, url_for
 from flask import redirect
 
 from common import data as db
-from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
+from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination, request_area_param
 from common import config as cfg
 from common import config as cfg
 
@@ -23,7 +23,7 @@ def _get_tbl():
     return get_table_def("3d")
 
 
-def _fetch_items(project=None, sort_col=None, sort_dir=None, limit=None, offset=None):
+def _fetch_items(area=None, sort_col=None, sort_dir=None, limit=None, offset=None):
     tbl = _get_tbl()
     if not tbl:
         return []
@@ -33,7 +33,7 @@ def _fetch_items(project=None, sort_col=None, sort_dir=None, limit=None, offset=
         "path": "t.path",
         "size": "t.size",
         "date_modified": "t.date_modified",
-        "project": "t.project",
+        "area": "t.area",
     }
     sort_key = order_map.get(sort_col or "file_name", "t.file_name")
     sort_dir = sort_dir or "asc"
@@ -42,7 +42,7 @@ def _fetch_items(project=None, sort_col=None, sort_dir=None, limit=None, offset=
         db.conn,
         tbl["name"],
         cols,
-        tab=project,
+        tab=area,
         limit=limit,
         offset=offset,
         order_by=order_by,
@@ -62,23 +62,21 @@ def list_3d_route():
 
 @three_d_bp.route("/table")
 def list_3d_table_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     sort_col = request.args.get("sort") or "file_name"
     sort_dir = request.args.get("dir") or "asc"
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
     offset = (page - 1) * per_page
-    items = _fetch_items(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    items = _fetch_items(area, sort_col, sort_dir, limit=per_page, offset=offset)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "three_d.list_3d_table_route",
-        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        {"area": area, "sort": sort_col, "dir": sort_dir},
         page,
         total_pages,
     )
@@ -89,11 +87,11 @@ def list_3d_table_route():
         active_tab="3d",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"3D ({project or 'All'})",
+        content_title=f"3D ({area or 'All'})",
         content_html="",
         items=items,
         col_list=col_list,
-        project=project,
+        area=area,
         sort_col=sort_col,
         sort_dir=sort_dir,
         page=page,
@@ -106,21 +104,19 @@ def list_3d_table_route():
 
 @three_d_bp.route("/list")
 def list_3d_list_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
     offset = (page - 1) * per_page
-    items = _fetch_items(project, limit=per_page, offset=offset)
+    items = _fetch_items(area, limit=per_page, offset=offset)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "three_d.list_3d_list_route",
-        {"proj": project},
+        {"area": area},
         page,
         total_pages,
     )
@@ -129,10 +125,10 @@ def list_3d_list_route():
         active_tab="3d",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"3D ({project or 'All'})",
+        content_title=f"3D ({area or 'All'})",
         content_html="",
         items=items,
-        project=project,
+        area=area,
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
@@ -143,21 +139,19 @@ def list_3d_list_route():
 
 @three_d_bp.route("/cards")
 def list_3d_cards_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
     offset = (page - 1) * per_page
-    items = _fetch_items(project, limit=per_page, offset=offset)
+    items = _fetch_items(area, limit=per_page, offset=offset)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "three_d.list_3d_cards_route",
-        {"proj": project},
+        {"area": area},
         page,
         total_pages,
     )
@@ -167,11 +161,11 @@ def list_3d_cards_route():
         active_tab="3d",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"3D ({project or 'All'})",
+        content_title=f"3D ({area or 'All'})",
         content_html="",
         items=items,
         card_values=card_values,
-        project=project,
+        area=area,
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
@@ -182,7 +176,7 @@ def list_3d_cards_route():
 
 @three_d_bp.route("/view/<int:item_id>")
 def view_3d_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     item = None
     if tbl:
@@ -199,13 +193,13 @@ def view_3d_route(item_id):
         content_title=item.get("file_name", "3D"),
         content_html="",
         item=item,
-        project=project,
+        area=area,
     )
 
 
 @three_d_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
 def edit_3d_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     item = None
     if tbl:
@@ -215,7 +209,7 @@ def edit_3d_route(item_id):
     if request.method == "POST" and tbl:
         values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
         db.update_record(db.conn, tbl["name"], item_id, tbl["col_list"], values)
-        return redirect(url_for("three_d.view_3d_route", item_id=item_id, proj=project))
+        return redirect(url_for("three_d.view_3d_route", item_id=item_id, area=area))
     return render_template(
         "three_d_edit.html",
         active_tab="3d",
@@ -224,25 +218,23 @@ def edit_3d_route(item_id):
         content_title="Edit 3D",
         content_html="",
         item=item,
-        project=project,
+        area=area,
         col_list=tbl["col_list"] if tbl else [],
     )
 
 
 @three_d_bp.route("/delete/<int:item_id>")
 def delete_3d_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     if tbl:
         db.delete_record(db.conn, tbl["name"], item_id)
-    return redirect(url_for("three_d.list_3d_table_route", proj=project))
+    return redirect(url_for("three_d.list_3d_table_route", area=area))
 
 
 @three_d_bp.route("/import", methods=["GET", "POST"])
 def import_3d_route():
-    project = request.args.get("proj") or ""
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = ""
+    area = request_area_param() or ""
     tbl = _get_tbl()
     imported = None
     error = ""
@@ -269,7 +261,7 @@ def import_3d_route():
                         root,
                         size,
                         date_modified,
-                        project,
+                        area,
                     ]
                     record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
                     if record_id:
@@ -282,7 +274,7 @@ def import_3d_route():
         side_tabs=get_side_tabs(),
         content_title="Import .blend Folder",
         content_html="",
-        project=project,
+        area=area,
         imported=imported,
         error=error,
     )

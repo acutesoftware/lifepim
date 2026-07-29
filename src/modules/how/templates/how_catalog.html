@@ -4,26 +4,26 @@
   {% if message %}
     <div class="how-diagnostic warning">{{ message }}</div>
   {% endif %}
-  {% set form_action = url_for('how.catalog_add_route', kind=kind, proj=project) %}
+  {% set form_action = url_for('how.catalog_add_route', kind=kind, area=area) %}
   {% if edit_item %}
     {% if kind == "tools" %}
-      {% set form_action = url_for('how.catalog_edit_route', kind=kind, item_id=edit_item.tool_id, proj=project) %}
+      {% set form_action = url_for('how.catalog_edit_route', kind=kind, item_id=edit_item.tool_id, area=area) %}
     {% elif kind == "parts" %}
-      {% set form_action = url_for('how.catalog_edit_route', kind=kind, item_id=edit_item.part_id, proj=project) %}
+      {% set form_action = url_for('how.catalog_edit_route', kind=kind, item_id=edit_item.part_id, area=area) %}
     {% endif %}
   {% endif %}
   <form method="post" action="{{ form_action }}" class="how-catalog-form">
     {% if kind in ["tools", "parts"] %}
-      <label class="how-catalog-project">
-        <span>Project:</span>
-        <select name="project_id" title="Project">
-          {% for opt in project_options %}
-            <option value="{{ opt.project_id }}" {% if opt.selected %}selected{% endif %}>{{ opt.label }}</option>
+      <label class="how-catalog-area">
+        <span>Area:</span>
+        <select name="area_id" title="Area">
+          {% for opt in area_options %}
+            <option value="{{ opt.area_id }}" {% if opt.selected %}selected{% endif %}>{{ opt.label }}</option>
           {% endfor %}
         </select>
       </label>
     {% else %}
-      <input type="hidden" name="project_id" value="{{ edit_item.project_id if edit_item else project }}">
+      <input type="hidden" name="area_id" value="{{ edit_item.area_id if edit_item else area }}">
     {% endif %}
     {% if kind == "tools" %}
       <input name="tool_key" placeholder="tool-key" value="{{ edit_item.tool_key if edit_item else '' }}">
@@ -50,32 +50,32 @@
     {% endif %}
     <button type="submit">{{ "Save" if edit_item else "Add " ~ kind[:-1]|title }}</button>
     {% if edit_item %}
-      <a href="{{ url_for('how.catalog_route', kind=kind, proj=project) }}">Cancel</a>
+      <a href="{{ url_for('how.catalog_route', kind=kind, area=area) }}">Cancel</a>
     {% endif %}
   </form>
   <div class="tabular-scroll">
     <table>
       {% if kind == "tools" %}
-        <tr><th>Name</th><th>Key</th><th>Project</th><th>Description</th><th>Used By</th><th>Updated</th><th>Actions</th></tr>
+        <tr><th>Name</th><th>Key</th><th>Area</th><th>Description</th><th>Used By</th><th>Updated</th><th>Actions</th></tr>
         {% for item in items %}
           <tr>
-            <td>{{ item.tool_name }}</td><td>{{ item.tool_key }}</td><td>{{ item.project_id }}</td><td>{{ item.description }}</td><td>{{ item.used_by_count }}</td><td>{{ item.updated_at }}</td>
+            <td>{{ item.tool_name }}</td><td>{{ item.tool_key }}</td><td>{{ item.area_id }}</td><td>{{ item.description }}</td><td>{{ item.used_by_count }}</td><td>{{ item.updated_at }}</td>
             <td class="data-actions-cell">
-              <a href="{{ url_for('how.catalog_edit_route', kind=kind, item_id=item.tool_id, proj=project) }}">Edit</a>
-              <form method="post" action="{{ url_for('how.catalog_delete_route', kind=kind, item_id=item.tool_id, proj=project) }}" onsubmit="return confirm('Delete this Tool?');">
+              <a href="{{ url_for('how.catalog_edit_route', kind=kind, item_id=item.tool_id, area=area) }}">Edit</a>
+              <form method="post" action="{{ url_for('how.catalog_delete_route', kind=kind, item_id=item.tool_id, area=area) }}" onsubmit="return confirm('Delete this Tool?');">
                 <button type="submit">Delete</button>
               </form>
             </td>
           </tr>
         {% endfor %}
       {% elif kind == "parts" %}
-        <tr><th>Name</th><th>Key</th><th>Project</th><th>Unit</th><th>Description</th><th>Used By</th><th>Updated</th><th>Actions</th></tr>
+        <tr><th>Name</th><th>Key</th><th>Area</th><th>Unit</th><th>Description</th><th>Used By</th><th>Updated</th><th>Actions</th></tr>
         {% for item in items %}
           <tr>
-            <td>{{ item.part_name }}</td><td>{{ item.part_key }}</td><td>{{ item.project_id }}</td><td>{{ item.default_unit }}</td><td>{{ item.description }}</td><td>{{ item.used_by_count }}</td><td>{{ item.updated_at }}</td>
+            <td>{{ item.part_name }}</td><td>{{ item.part_key }}</td><td>{{ item.area_id }}</td><td>{{ item.default_unit }}</td><td>{{ item.description }}</td><td>{{ item.used_by_count }}</td><td>{{ item.updated_at }}</td>
             <td class="data-actions-cell">
-              <a href="{{ url_for('how.catalog_edit_route', kind=kind, item_id=item.part_id, proj=project) }}">Edit</a>
-              <form method="post" action="{{ url_for('how.catalog_delete_route', kind=kind, item_id=item.part_id, proj=project) }}" onsubmit="return confirm('Delete this Part?');">
+              <a href="{{ url_for('how.catalog_edit_route', kind=kind, item_id=item.part_id, area=area) }}">Edit</a>
+              <form method="post" action="{{ url_for('how.catalog_delete_route', kind=kind, item_id=item.part_id, area=area) }}" onsubmit="return confirm('Delete this Part?');">
                 <button type="submit">Delete</button>
               </form>
             </td>

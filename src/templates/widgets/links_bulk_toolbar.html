@@ -2,7 +2,7 @@
      data-list-type="{{ link_list_type }}"
      data-context-id="{{ link_list_context_id }}"
      data-table-id="{{ link_table_id }}"
-     {% if bulk_project_options is defined %}data-project-options='{{ bulk_project_options|tojson }}'{% endif %}
+     {% if bulk_area_options is defined %}data-area-options='{{ bulk_area_options|tojson }}'{% endif %}
      {% if bulk_color_options is defined %}data-color-options='{{ bulk_color_options|tojson }}'{% endif %}>
   <span class="link-bulk-count">0 selected</span>
   <select class="link-bulk-action" aria-label="Selected" disabled>
@@ -10,7 +10,7 @@
     {% if link_list_type == "note" %}
       <option value="link">Link Selected Note to ...</option>
       <option value="delete">Delete Selected notes</option>
-      <option value="move">Move selected notes to Project</option>
+      <option value="move">Move selected notes to Area</option>
       <option value="color">Set color of selected notes to ...</option>
     {% else %}
       <option value="link">Link selected records to ...</option>

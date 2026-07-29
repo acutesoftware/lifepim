@@ -5,15 +5,23 @@ import time
 
 from datetime import date, datetime
 
-from flask import Flask, g, jsonify, render_template, request, send_from_directory, url_for
+from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from common.utils import get_tabs, get_side_tabs, get_table_def, format_duration_friendly, format_duration_label
+from common.utils import (
+    get_tabs,
+    get_side_tabs,
+    get_table_def,
+    format_duration_friendly,
+    format_duration_label,
+    normalize_area_param,
+    request_area_param,
+)
 import common.config as mod_cfg
 from common import data as db
 from common import search as search_mod
-from common import projects as projects_mod
+from common import areas as areas_mod
 from common import settings as settings_mod
 from common.network_log import log_network
 from core.security import configure_security
@@ -154,7 +162,9 @@ app.config["LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES"] = int(os.getenv("LIFEPIM_POC
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.jinja_env.filters["duration_friendly"] = format_duration_friendly
 app.jinja_env.filters["duration_label"] = format_duration_label
-projects_mod.ensure_projects_schema(db._get_conn())
+app.jinja_env.filters["area_param"] = normalize_area_param
+areas_mod.ensure_areas_schema(db._get_conn())
+db.ensure_area_columns(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
 db.ensure_notes_schema(db._get_conn())
 ensure_how_schema(db._get_conn())
@@ -247,7 +257,7 @@ from modules.contacts.routes import contacts_bp
 from modules.tasks.tasks import tasks_bp
 from modules.admin.routes import admin_bp
 from modules.links.routes import links_bp
-from modules.projects.routes import projects_bp
+from modules.areas.routes import areas_bp
 from modules.pocket_api.routes import pocket_api_bp
 
 _dbg("Registering blueprints")
@@ -269,7 +279,7 @@ app.register_blueprint(contacts_bp, url_prefix="/contacts")
 app.register_blueprint(tasks_bp, url_prefix="/tasks")
 app.register_blueprint(admin_bp, url_prefix="/admin")
 app.register_blueprint(links_bp, url_prefix="/links")
-app.register_blueprint(projects_bp, url_prefix="/projects")
+app.register_blueprint(areas_bp, url_prefix="/areas")
 app.register_blueprint(pocket_api_bp)
 configure_security(app)
 _dbg("Blueprints registered")
@@ -368,12 +378,16 @@ def index():
     )
 
 
+@app.route("/home")
+def home_alias():
+    query = request.query_string.decode("utf-8", errors="replace")
+    return redirect("/" + (f"?{query}" if query else ""))
+
+
 @app.route("/search")
 def search_route():
     query = (request.args.get("q") or "").strip()
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     route = request.args.get("route") or "home"
     scope = (request.args.get("scope") or "metadata").strip().lower()
     if scope in {"titles", "all"}:
@@ -387,19 +401,19 @@ def search_route():
     if route not in tab_ids:
         route = "home"
     if scope == "note_content":
-        results = search_mod.search_note_content(query, project=project, route=route)
+        results = search_mod.search_note_content(query, area=area, route=route)
     else:
-        results = search_mod.search_all(query, project=project, route=route)
+        results = search_mod.search_all(query, area=area, route=route)
     for item in results["primary"] + results["secondary"]:
         params = {item["id_param"]: item["id"]}
-        if project:
-            params["proj"] = project
+        if area:
+            params["area"] = area
         item["url"] = url_for(item["view_route"], **params)
     more_results_links = []
     for item in results.get("more", []):
         args = {"q": query, "route": item["route"], "scope": scope}
-        if project:
-            args["proj"] = project
+        if area:
+            args["area"] = area
         more_results_links.append(
             {
                 "table": item["table"],
@@ -430,7 +444,7 @@ def search_route():
         audio_playlists = audio_routes._list_playlists(conn)
         if route == "audio" and query:
             audio_search_items = audio_routes._fetch_audio_search(
-                project,
+                area,
                 query,
                 sort_col=sort_col,
                 sort_dir=sort_dir,
@@ -452,8 +466,8 @@ def search_route():
     search_all_areas_url = ""
     if query and route in tab_ids and route != "home":
         all_areas_args = {"q": query, "route": "home", "scope": scope}
-        if project:
-            all_areas_args["proj"] = project
+        if area:
+            all_areas_args["area"] = area
         search_all_areas_url = url_for("search_route", **all_areas_args)
     return render_template(
         "search_results.html",
@@ -463,7 +477,7 @@ def search_route():
         content_title="Search",
         content_html="",
         query=query,
-        project=project,
+        area=area,
         route=route,
         total_results=total_results,
         search_all_areas_url=search_all_areas_url,
@@ -564,7 +578,7 @@ for _, modname, _ in pkgutil.iter_modules(['modules']):
         
 
 SIDE_TABS = [
- { 'icon': '*', 'id': 'any', 'label': 'All Projects'},
+ { 'icon': '*', 'id': 'any', 'label': 'All Areas'},
  { 'icon': '🔒', 'id': 'pers', 'label': 'Personal'},
  { 'icon': '💊', 'id': 'health', 'label': 'Health'},
  { 'icon': '👪', 'id': 'family', 'label': 'Family'},

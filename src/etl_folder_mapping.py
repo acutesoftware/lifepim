@@ -84,16 +84,16 @@ CREATE TABLE IF NOT EXISTS dim_folder (
   FOREIGN KEY(replaced_by_folder_id) REFERENCES dim_folder(folder_id)
 );
 
-DROP TABLE IF EXISTS map_folder_project;
+DROP TABLE IF EXISTS map_folder_area;
 
-CREATE TABLE IF NOT EXISTS map_folder_project (
+CREATE TABLE IF NOT EXISTS map_folder_area (
   map_id       INTEGER PRIMARY KEY AUTOINCREMENT,
   path_prefix  TEXT NOT NULL,
   tab          TEXT NOT NULL,
   grp          TEXT NOT NULL,
 
-  -- IMPORTANT: project is NOT NULL, blank means "no project"
-  project      TEXT NOT NULL DEFAULT '',
+  -- IMPORTANT: area is NOT NULL, blank means "no area"
+  area      TEXT NOT NULL DEFAULT '',
 
   tags         TEXT NOT NULL DEFAULT '',
   confidence   REAL NOT NULL DEFAULT 1.0 CHECK (confidence >= 0.0 AND confidence <= 1.0),
@@ -105,32 +105,32 @@ CREATE TABLE IF NOT EXISTS map_folder_project (
   updated_at   TEXT NULL
 );
 
--- Unique rule identity (project blank is valid)
+-- Unique rule identity (area blank is valid)
 CREATE UNIQUE INDEX IF NOT EXISTS ux_mfp_rule
-ON map_folder_project(path_prefix, tab, grp, project, is_primary);
+ON map_folder_area(path_prefix, tab, grp, area, is_primary);
 
-CREATE INDEX IF NOT EXISTS ix_mfp_prefix ON map_folder_project(path_prefix);
-CREATE INDEX IF NOT EXISTS ix_mfp_tab ON map_folder_project(tab);
-CREATE INDEX IF NOT EXISTS ix_mfp_project ON map_folder_project(project);
+CREATE INDEX IF NOT EXISTS ix_mfp_prefix ON map_folder_area(path_prefix);
+CREATE INDEX IF NOT EXISTS ix_mfp_tab ON map_folder_area(tab);
+CREATE INDEX IF NOT EXISTS ix_mfp_area ON map_folder_area(area);
 
-CREATE TRIGGER IF NOT EXISTS trg_map_folder_project_updated
-AFTER UPDATE ON map_folder_project
+CREATE TRIGGER IF NOT EXISTS trg_map_folder_area_updated
+AFTER UPDATE ON map_folder_area
 FOR EACH ROW
 BEGIN
-  UPDATE map_folder_project
+  UPDATE map_folder_area
   SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
   WHERE map_id = NEW.map_id;
 END;
 
-DROP TABLE IF EXISTS map_project_folder;
+DROP TABLE IF EXISTS map_area_folder;
 
-CREATE TABLE IF NOT EXISTS map_project_folder (
+CREATE TABLE IF NOT EXISTS map_area_folder (
   folder_id       INTEGER NOT NULL,
   tab             TEXT NOT NULL,
   grp             TEXT NOT NULL,
 
-  -- IMPORTANT: project is NOT NULL, blank means "no project"
-  project         TEXT NOT NULL DEFAULT '',
+  -- IMPORTANT: area is NOT NULL, blank means "no area"
+  area         TEXT NOT NULL DEFAULT '',
 
   tags            TEXT NOT NULL DEFAULT '',
   confidence      REAL NOT NULL DEFAULT 1.0 CHECK (confidence >= 0.0 AND confidence <= 1.0),
@@ -141,17 +141,17 @@ CREATE TABLE IF NOT EXISTS map_project_folder (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
 
   -- No COALESCE needed
-  PRIMARY KEY (folder_id, tab, grp, project, is_primary),
+  PRIMARY KEY (folder_id, tab, grp, area, is_primary),
 
   FOREIGN KEY(folder_id) REFERENCES dim_folder(folder_id),
-  FOREIGN KEY(rule_map_id) REFERENCES map_folder_project(map_id)
+  FOREIGN KEY(rule_map_id) REFERENCES map_folder_area(map_id)
 );
 
-CREATE INDEX IF NOT EXISTS ix_mpf_folder ON map_project_folder(folder_id);
-CREATE INDEX IF NOT EXISTS ix_mpf_tab ON map_project_folder(tab);
-CREATE INDEX IF NOT EXISTS ix_mpf_grp ON map_project_folder(grp);
-CREATE INDEX IF NOT EXISTS ix_mpf_project ON map_project_folder(project);
-CREATE INDEX IF NOT EXISTS ix_mpf_rule ON map_project_folder(rule_map_id);
+CREATE INDEX IF NOT EXISTS ix_mpf_folder ON map_area_folder(folder_id);
+CREATE INDEX IF NOT EXISTS ix_mpf_tab ON map_area_folder(tab);
+CREATE INDEX IF NOT EXISTS ix_mpf_grp ON map_area_folder(grp);
+CREATE INDEX IF NOT EXISTS ix_mpf_area ON map_area_folder(area);
+CREATE INDEX IF NOT EXISTS ix_mpf_rule ON map_area_folder(rule_map_id);
 
 """
 DDL_CREATE = _strip_drop_tables(DDL_RESET)
@@ -184,15 +184,15 @@ def load_folder_list_csv(conn: sqlite3.Connection, folder_list_csv: str, col: st
     return n
 
 
-def load_map_folder_project_csv(conn: sqlite3.Connection, rules_csv: str, clear_first: bool = True) -> int:
+def load_map_folder_area_csv(conn: sqlite3.Connection, rules_csv: str, clear_first: bool = True) -> int:
     """
     Expects columns (at minimum):
       path_prefix, tab, group OR grp
     Optional:
-      project, tags, confidence, priority, is_primary, is_enabled, notes
+      area, tags, confidence, priority, is_primary, is_enabled, notes
     """
     if clear_first:
-        conn.execute("DELETE FROM map_folder_project")
+        conn.execute("DELETE FROM map_folder_area")
 
     n = 0
     with open(rules_csv, "r", encoding="utf-8-sig", newline="") as f:
@@ -207,7 +207,7 @@ def load_map_folder_project_csv(conn: sqlite3.Connection, rules_csv: str, clear_
             path_prefix = norm_path(get_text(row, "path_prefix"))
             tab = clean_tab_label(get_text(row, "tab"))
             grp = get_text(row, "grp") or get_text(row, "group")
-            project = get_text(row, "project")
+            area = get_text(row, "area")
             tags = get_text(row, "tags", "")
             confidence = get_float(row, "confidence", 1.0)
             priority = get_int(row, "priority", 0)
@@ -221,32 +221,32 @@ def load_map_folder_project_csv(conn: sqlite3.Connection, rules_csv: str, clear_
 
             conn.execute(
                 """
-                INSERT OR REPLACE INTO map_folder_project
-                (path_prefix, tab, grp, project, tags, confidence, priority, is_primary, notes, is_enabled)
+                INSERT OR REPLACE INTO map_folder_area
+                (path_prefix, tab, grp, area, tags, confidence, priority, is_primary, notes, is_enabled)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (path_prefix, tab, grp, project, tags, confidence, priority, is_primary, notes, is_enabled),
+                (path_prefix, tab, grp, area, tags, confidence, priority, is_primary, notes, is_enabled),
             )
             n += 1
     return n
 
 
-def rebuild_map_project_folder(conn: sqlite3.Connection, only_active_folders: bool = False) -> int:
-    conn.execute("DELETE FROM map_project_folder")
+def rebuild_map_area_folder(conn: sqlite3.Connection, only_active_folders: bool = False) -> int:
+    conn.execute("DELETE FROM map_area_folder")
 
     where_active = "WHERE f.is_active = 1" if only_active_folders else ""
 
     cur = conn.execute(
         f"""
-        INSERT INTO map_project_folder (
-            folder_id, tab, grp, project, tags, confidence,
+        INSERT INTO map_area_folder (
+            folder_id, tab, grp, area, tags, confidence,
             matched_prefix, rule_map_id, is_primary, is_enabled, updated_at
         )
         SELECT
             f.folder_id,
             r.tab,
             r.grp,
-            COALESCE(r.project, ''),
+            COALESCE(r.area, ''),
             r.tags,
             r.confidence,
             r.path_prefix,
@@ -255,10 +255,10 @@ def rebuild_map_project_folder(conn: sqlite3.Connection, only_active_folders: bo
             r.is_enabled,
             strftime('%Y-%m-%dT%H:%M:%fZ','now')
         FROM dim_folder f
-        JOIN map_folder_project r
+        JOIN map_folder_area r
           ON r.map_id = (
                 SELECT r2.map_id
-                FROM map_folder_project r2
+                FROM map_folder_area r2
                 WHERE r2.is_enabled = 1
                   AND r2.is_primary = 1
                   AND lower(f.folder_path) LIKE lower(r2.path_prefix) || '%'
@@ -421,13 +421,13 @@ def folder_id_stats(conn: sqlite3.Connection) -> Dict[str, int]:
 # Main
 # ----------------------------
 def main():
-    ap = argparse.ArgumentParser(description="LifePIM folder mapping ETL (dim_folder + map_folder_project + map_project_folder).")
+    ap = argparse.ArgumentParser(description="LifePIM folder mapping ETL (dim_folder + map_folder_area + map_area_folder).")
     ap.add_argument("--db", required=True, help="SQLite DB file path (e.g., lifepim.db)")
     ap.add_argument("--folders_csv", required=True, help="CSV containing folders. Must have column 'folder_path' by default.")
     ap.add_argument("--folders_col", default="folder_path", help="Column name in folders_csv for folder paths (default: folder_path)")
     ap.add_argument("--rules_csv", required=True, help="CSV mapping rules (path_prefix, tab, grp/group, ...)")
-    ap.add_argument("--no_clear_rules", action="store_true", help="Do not clear map_folder_project before insert (default clears)")
-    ap.add_argument("--only_active", action="store_true", help="Only map active folders when building map_project_folder")
+    ap.add_argument("--no_clear_rules", action="store_true", help="Do not clear map_folder_area before insert (default clears)")
+    ap.add_argument("--only_active", action="store_true", help="Only map active folders when building map_area_folder")
     args = ap.parse_args()
 
     os.makedirs(os.path.dirname(os.path.abspath(args.db)), exist_ok=True)
@@ -439,9 +439,9 @@ def main():
 
         conn.execute("BEGIN")
         n_folders = load_folder_list_csv(conn, args.folders_csv, col=args.folders_col)
-        n_rules = load_map_folder_project_csv(conn, args.rules_csv, clear_first=(not args.no_clear_rules))
+        n_rules = load_map_folder_area_csv(conn, args.rules_csv, clear_first=(not args.no_clear_rules))
         n_backfilled = backfill_folder_ids(conn)
-        n_mapped = rebuild_map_project_folder(conn, only_active_folders=args.only_active)
+        n_mapped = rebuild_map_area_folder(conn, only_active_folders=args.only_active)
         conn.commit()
 
         try:

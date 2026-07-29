@@ -6,7 +6,7 @@
     ('audio', 'Audio'),
     ('files', 'Files'),
     ('notes', 'Notes'),
-    ('projects', 'Edit Projects'),
+    ('areas', 'Edit Areas'),
     ('config', 'Config'),
     ('general', 'General')
   ] %}
@@ -18,8 +18,8 @@
   <div class="settings-shell">
     <nav class="settings-tabs" aria-label="Settings sections">
       {% for tab_id, tab_label in settings_tabs %}
-        {% if tab_id == 'projects' %}
-        <a href="{{ url_for('projects.edit_projects_route') }}">{{ tab_label }}</a>
+        {% if tab_id == 'areas' %}
+        <a href="{{ url_for('areas.edit_areas_route') }}">{{ tab_label }}</a>
         {% else %}
         <a class="{% if active_settings_tab == tab_id %}active{% endif %}" href="{{ url_for('admin.settings_route', tab=tab_id) }}">
           {{ tab_label }}
@@ -219,10 +219,10 @@
         <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
           <input type="hidden" name="tab" value="notes">
           <div class="settings-fieldset">
-            <div class="settings-fieldset-title">Note Project Metadata</div>
+            <div class="settings-fieldset-title">Note Area Metadata</div>
             <div class="settings-action-row">
-              <button type="submit" name="action" value="materialize_note_projects">Materialize note projects</button>
-              <span class="settings-action-note">Fills blank note project metadata from saved project-folder mappings without reading note files.</span>
+              <button type="submit" name="action" value="materialize_note_areas">Materialize note areas</button>
+              <span class="settings-action-note">Fills blank note area metadata from saved area-folder mappings without reading note files.</span>
             </div>
           </div>
           <div class="settings-fieldset">

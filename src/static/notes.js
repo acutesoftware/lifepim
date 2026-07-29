@@ -6,7 +6,7 @@
     modal: null,
     backdrop: null,
     titleEl: null,
-    projectEl: null,
+    areaEl: null,
     writeRootEl: null,
     optionsEl: null,
     cancelBtn: null,
@@ -44,7 +44,7 @@
     return Boolean(target.isContentEditable);
   }
 
-  function getProjectId(explicitId) {
+  function getAreaId(explicitId) {
     const explicit = (explicitId || "").trim();
     if (explicit) {
       return explicit;
@@ -66,14 +66,14 @@
     return trimmed;
   }
 
-  async function fetchProjectInfo(projectId) {
-    const pid = (projectId || "").trim();
+  async function fetchAreaInfo(areaId) {
+    const pid = (areaId || "").trim();
     if (OPTIONS_CACHE.has(pid)) {
       return OPTIONS_CACHE.get(pid);
     }
     const params = new URLSearchParams();
     if (pid) {
-      params.set("project_id", pid);
+      params.set("area_id", pid);
     }
     const request = fetch(`/notes/api/new-note-options?${params.toString()}`)
       .then(async (resp) => {
@@ -104,8 +104,8 @@
     return data;
   }
 
-  async function setDefaultFolder(projectFolderId) {
-    const resp = await fetch(`/projects/api/folders/${projectFolderId}/set-default`, {
+  async function setDefaultFolder(areaFolderId) {
+    const resp = await fetch(`/areas/api/folders/${areaFolderId}/set-default`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -117,12 +117,12 @@
     return data;
   }
 
-  async function addDefaultFolder(projectId, pathPrefix) {
-    const resp = await fetch("/projects/api/folders", {
+  async function addDefaultFolder(areaId, pathPrefix) {
+    const resp = await fetch("/areas/api/folders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        project_id: projectId,
+        area_id: areaId,
         path_prefix: pathPrefix,
         folder_role: "default",
       }),
@@ -192,16 +192,16 @@
     highlightOption(0);
   }
 
-  function openModal(options, title, projectId, resolvedLabel) {
+  function openModal(options, title, areaId, resolvedLabel) {
     if (!STATE.modal || !STATE.backdrop) {
       return;
     }
     STATE.options = options.slice(0, MAX_OPTIONS);
     STATE.pendingTitle = title;
-    STATE.pendingSidebar = projectId;
+    STATE.pendingSidebar = areaId;
     STATE.titleEl.textContent = `Title: ${title}`;
-    if (STATE.projectEl) {
-      STATE.projectEl.textContent = `Project: ${projectId}`;
+    if (STATE.areaEl) {
+      STATE.areaEl.textContent = `Area: ${areaId}`;
     }
     if (STATE.writeRootEl) {
       STATE.writeRootEl.textContent = resolvedLabel ? `Choose default folder` : "";
@@ -234,12 +234,12 @@
     }
     STATE.creating = true;
     try {
-      if (option.project_folder_id) {
-        await setDefaultFolder(option.project_folder_id);
+      if (option.area_folder_id) {
+        await setDefaultFolder(option.area_folder_id);
       }
       const result = await createNote({
         title: STATE.pendingTitle,
-        project_id: STATE.pendingSidebar,
+        area_id: STATE.pendingSidebar,
         path_prefix: option.path_prefix,
       });
       closeModal();
@@ -261,14 +261,14 @@
     if (!activeTabIsNotes()) {
       return;
     }
-    const projectId = getProjectId(sidebarLabel);
+    const areaId = getAreaId(sidebarLabel);
     const title = promptForTitle(defaultTitle);
     if (!title) {
       return;
     }
     let data;
     try {
-      data = await fetchProjectInfo(projectId);
+      data = await fetchAreaInfo(areaId);
     } catch (err) {
       alert(err.message || "Unable to fetch note folders.");
       return;
@@ -279,7 +279,7 @@
       try {
         const result = await createNote({
           title: title,
-          project_id: projectId,
+          area_id: areaId,
           path_prefix: defaultFolder,
         });
         if (result.open_url) {
@@ -295,10 +295,10 @@
       return;
     }
     if (folders.length) {
-      openModal(folders, title, projectId, "choose");
+      openModal(folders, title, areaId, "choose");
       return;
     }
-    if (!projectId) {
+    if (!areaId) {
       alert("No notes root is configured for this user.");
       return;
     }
@@ -307,10 +307,10 @@
       return;
     }
     try {
-      await addDefaultFolder(projectId, newPath);
+      await addDefaultFolder(areaId, newPath);
       const result = await createNote({
         title: title,
-        project_id: projectId,
+        area_id: areaId,
       });
       if (result.open_url) {
         window.location.href = result.open_url;
@@ -328,7 +328,7 @@
     STATE.modal = qs("#note-modal");
     STATE.backdrop = qs("#note-modal-backdrop");
     STATE.titleEl = qs("#note-modal-title");
-    STATE.projectEl = qs("#note-modal-project");
+    STATE.areaEl = qs("#note-modal-area");
     STATE.writeRootEl = qs("#note-modal-write-root");
     STATE.optionsEl = qs("#note-modal-options");
     STATE.cancelBtn = qs("#note-modal-cancel");
@@ -473,9 +473,9 @@
     initHotkey();
     initContextMenu();
     if (activeTabIsNotes()) {
-      const projectId = getProjectId();
-      if (projectId) {
-        fetchProjectInfo(projectId).catch(() => {});
+      const areaId = getAreaId();
+      if (areaId) {
+        fetchAreaInfo(areaId).catch(() => {});
       }
     }
     window.create_new_note = create_new_note;

@@ -13,6 +13,7 @@
   {%- endmacro %}
 
   {% include "_notes_list_header.html" %}
+  {% include "widgets/area_folders.html" %}
   {% include "_notes_folder_panel.html" %}
 
   <table id="notes-selection-root" class="notes-table" data-notes-context="true" data-bulk-selection-root="true">
@@ -20,7 +21,7 @@
       <th><input type="checkbox" class="link-select-all" aria-label="Select all notes"></th>
       <th>{{ sort_header('filename') }}</th>
       <th>{{ sort_header('color') }}</th>
-      <th>{{ sort_header('project') }}</th>
+      <th>{{ sort_header('area') }}</th>
       <th>{{ sort_header('size') }}</th>
       <th>{{ sort_header('date_created') }}</th>
       <th>{{ sort_header('date_modified') }}</th>
@@ -33,7 +34,7 @@
       <td>
         <span class="note-list-dot" style="background:{{ n.list_color_style }};"></span>
       </td>
-      <td>{{ n.project }}</td>
+      <td>{{ n.area }}</td>
       <td>{{ n.size }}</td>
       <td>{{ n.date_created or '' }}</td>
       <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>

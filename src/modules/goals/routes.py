@@ -1,7 +1,15 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
-from common.utils import build_form_fields, get_side_tabs, get_table_def, get_tabs, paginate_items, build_pagination
+from common.utils import (
+    build_form_fields,
+    get_side_tabs,
+    get_table_def,
+    get_tabs,
+    paginate_items,
+    build_pagination,
+    request_area_param,
+)
 from common import config as cfg
 
 
@@ -30,9 +38,7 @@ def _load_item(item_id):
 
 @goals_bp.route("/")
 def list_goals_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     tbl = _get_tbl()
     items = []
     col_list = []
@@ -42,12 +48,12 @@ def list_goals_route():
         cols = ["id"] + col_list
         condition = "1=1"
         params = []
-        if project and "project" in col_list:
-            condition = "lower(project) = lower(?)"
-            params = [project]
+        if area and "area" in col_list:
+            condition = "lower(area) = lower(?)"
+            params = [area]
         rows = db.get_data(db.conn, tbl["name"], cols, condition, params)
         items = [dict(row) for row in rows]
-        content_title = f"{tbl['display_name']} ({project or 'All'})"
+        content_title = f"{tbl['display_name']} ({area or 'All'})"
     page = request.args.get("page", type=int) or 1
     page_data = paginate_items(items, page, cfg.RECS_PER_PAGE)
     items = page_data["items"]
@@ -56,7 +62,7 @@ def list_goals_route():
     pagination = build_pagination(
         url_for,
         "goals.list_goals_route",
-        {"proj": project},
+        {"area": area},
         page,
         total_pages,
     )
@@ -69,7 +75,7 @@ def list_goals_route():
         content_html="",
         items=items,
         col_list=col_list,
-        project=project,
+        area=area,
         page=page,
         total_pages=total_pages,
         pages=pagination["pages"],
@@ -80,10 +86,10 @@ def list_goals_route():
 
 @goals_bp.route("/view/<int:item_id>")
 def view_goal_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     item = _load_item(item_id)
     if not item:
-        return redirect(url_for("goals.list_goals_route", proj=project))
+        return redirect(url_for("goals.list_goals_route", area=area))
     return render_template(
         "goals_view.html",
         active_tab="goals",
@@ -93,23 +99,23 @@ def view_goal_route(item_id):
         content_html="",
         item=item,
         col_list=_get_tbl()["col_list"],
-        project=project,
+        area=area,
     )
 
 
 @goals_bp.route("/add", methods=["GET", "POST"])
 def add_goal_route():
-    project = request.args.get("proj") or "General"
+    area = request_area_param("General") or "General"
     tbl = _get_tbl()
     if request.method == "POST" and tbl:
         values = []
         for col in tbl["col_list"]:
-            if col == "project":
-                values.append(request.form.get(col, "").strip() or project)
+            if col == "area":
+                values.append(request_area_param(area, include_form=True) or area)
             else:
                 values.append(request.form.get(col, "").strip())
         db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
-        return redirect(url_for("goals.list_goals_route", proj=project))
+        return redirect(url_for("goals.list_goals_route", area=area))
     fields = build_form_fields(tbl["col_list"]) if tbl else []
     return render_template(
         "goals_edit.html",
@@ -119,19 +125,19 @@ def add_goal_route():
         content_title="Add Goal",
         item=None,
         fields=fields,
-        project=project,
+        area=area,
     )
 
 
 @goals_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
 def edit_goal_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     item = _load_item(item_id)
     if request.method == "POST" and tbl:
         values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
         db.update_record(db.conn, tbl["name"], item_id, tbl["col_list"], values)
-        return redirect(url_for("goals.view_goal_route", item_id=item_id, proj=project))
+        return redirect(url_for("goals.view_goal_route", item_id=item_id, area=area))
     fields = build_form_fields(tbl["col_list"]) if tbl else []
     return render_template(
         "goals_edit.html",
@@ -141,14 +147,14 @@ def edit_goal_route(item_id):
         content_title="Edit Goal",
         item=item,
         fields=fields,
-        project=project,
+        area=area,
     )
 
 
 @goals_bp.route("/delete/<int:item_id>")
 def delete_goal_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     if tbl:
         db.delete_record(db.conn, tbl["name"], item_id)
-    return redirect(url_for("goals.list_goals_route", proj=project))
+    return redirect(url_for("goals.list_goals_route", area=area))

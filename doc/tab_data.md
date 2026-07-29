@@ -13,13 +13,13 @@ The Data tab is the catalogue for database sources, file-backed data sources, di
 
 The old generic `lp_data` legacy tab has been removed from the Data navigation and route code. Data catalogue records now live in the `d_data_*` tables managed by `src/modules/data/catalogue.py`.
 
-## Projects
+## Areas
 
-Data sources and data objects both have a `project` metadata field.
+Data sources and data objects both have a `area` metadata field.
 
-Project values are selected from the same project/sidebar list used by the left-hand main menu. The stored value is the project id, such as `health`, `fun/games`, or `proj/dev/lifepim`.
+Area values are selected from the same area/sidebar list used by the left-hand main menu. The stored value is the area id, such as `health`, `fun/games`, or `area/dev/lifepim`.
 
-Project selection is available on:
+Area selection is available on:
 
 - Add/edit database source.
 - Add/edit file source.
@@ -29,18 +29,18 @@ Project selection is available on:
 - Saved SQL add/edit.
 - Saved SQL search/filter.
 
-The left-hand project sidebar filters the current Data subtab instead of resetting to the Data overview. For example, if the current page is Saved SQL and `family` is selected from the sidebar, the URL remains on Saved SQL and adds `?proj=family`.
+The left-hand area sidebar filters the current Data subtab instead of resetting to the Data overview. For example, if the current page is Saved SQL and `family` is selected from the sidebar, the URL remains on Saved SQL and adds `?area=family`.
 
-Project filtering applies to:
+Area filtering applies to:
 
 - database source lists.
 - file source lists.
 - object lists.
 - saved SQL lists.
-- task lists where a task is linked to a source, object, or saved SQL with that project.
+- task lists where a task is linked to a source, object, or saved SQL with that area.
 - overview counts and recent activity.
 
-When a source is scanned, new objects inherit the source project. Existing objects keep their manually selected project; if an existing object has no project, a later scan can fill it from the source.
+When a source is scanned, new objects inherit the source area. Existing objects keep their manually selected area; if an existing object has no area, a later scan can fill it from the source.
 
 ## Source Lists
 
@@ -50,7 +50,7 @@ Database and file source lists show:
 - Type
 - Host or path
 - Database
-- Project
+- Area
 - Environment
 - Object count
 - Last scanned
@@ -58,11 +58,11 @@ Database and file source lists show:
 - Tags
 - Actions
 
-Source detail pages also show Project in the summary.
+Source detail pages also show Area in the summary.
 
 ## Object Lists
 
-Object lists show Project immediately after Schema/folder. Level is shown after Last seen.
+Object lists show Area immediately after Schema/folder. Level is shown after Last seen.
 
 The standard object list columns are:
 
@@ -71,7 +71,7 @@ The standard object list columns are:
 - Type
 - Source
 - Schema/folder
-- Project
+- Area
 - Rows
 - Columns
 - Size
@@ -86,11 +86,11 @@ The same ordering is used for source-detail object lists and Saved SQL related-o
 
 ## Saved SQL
 
-Saved SQL records have a `project` metadata field stored on `d_data_saved_sql`.
+Saved SQL records have a `area` metadata field stored on `d_data_saved_sql`.
 
-When a Saved SQL row is linked to a source and no project is selected, the source project is used as the default. Otherwise, choose the project explicitly from the Saved SQL form.
+When a Saved SQL row is linked to a source and no area is selected, the source area is used as the default. Otherwise, choose the area explicitly from the Saved SQL form.
 
-The Saved SQL list shows Project immediately after Name so SQL snippets can be scanned by project before target source, purpose, tags, and run status.
+The Saved SQL list shows Area immediately after Name so SQL snippets can be scanned by area before target source, purpose, tags, and run status.
 
 ## Row Counts
 

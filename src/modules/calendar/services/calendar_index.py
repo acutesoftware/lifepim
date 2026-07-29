@@ -21,7 +21,7 @@ EVENT_COLUMNS = {
     "blocks_time": "INTEGER NOT NULL DEFAULT 0",
     "event_type": "TEXT NOT NULL DEFAULT 'event'",
     "category": "TEXT",
-    "project": "TEXT NOT NULL DEFAULT 'General'",
+    "area": "TEXT NOT NULL DEFAULT 'General'",
     "status": "TEXT NOT NULL DEFAULT 'active'",
     "color": "TEXT",
     "text_color": "TEXT",
@@ -123,7 +123,7 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
             blocks_time INTEGER NOT NULL DEFAULT 0,
             event_type TEXT,
             category TEXT,
-            project TEXT,
+            area TEXT,
             status TEXT NOT NULL DEFAULT 'active',
             color TEXT,
             text_color TEXT,
@@ -163,13 +163,14 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
     )
     for col, col_type in EVENT_COLUMNS.items():
         _add_column_if_missing(conn, "lp_calendar_events", col, col_type)
+    db.ensure_area_columns(conn, ["lp_calendar_events", "lp_calendar_items"])
     conn.executescript(
         """
         CREATE INDEX IF NOT EXISTS idx_calendar_items_start_date ON lp_calendar_items(start_date);
         CREATE INDEX IF NOT EXISTS idx_calendar_items_end_date ON lp_calendar_items(end_date);
         CREATE INDEX IF NOT EXISTS idx_calendar_items_date_range ON lp_calendar_items(start_date, end_date);
         CREATE INDEX IF NOT EXISTS idx_calendar_items_source_date ON lp_calendar_items(source_key, start_date);
-        CREATE INDEX IF NOT EXISTS idx_calendar_items_project_date ON lp_calendar_items(project, start_date);
+        CREATE INDEX IF NOT EXISTS idx_calendar_items_area_date ON lp_calendar_items(area, start_date);
         CREATE INDEX IF NOT EXISTS idx_calendar_items_type_date ON lp_calendar_items(event_type, start_date);
         CREATE INDEX IF NOT EXISTS idx_calendar_items_status_date ON lp_calendar_items(status, start_date);
         CREATE INDEX IF NOT EXISTS idx_calendar_items_source_record ON lp_calendar_items(source_key, source_record_id);
@@ -233,7 +234,7 @@ def seed_calendar_sources(conn: sqlite3.Connection | None = None) -> None:
 def migrate_existing_calendar_events(conn: sqlite3.Connection | None = None) -> None:
     conn = db._get_conn() if conn is None else conn
     rows = conn.execute(
-        "SELECT id, event_date, start_date, start_time, end_date, end_time, all_day, project, source, created_at "
+        "SELECT id, event_date, start_date, start_time, end_date, end_time, all_day, area, source, created_at "
         "FROM lp_calendar_events"
     ).fetchall()
     now = _now()
@@ -254,8 +255,8 @@ def migrate_existing_calendar_events(conn: sqlite3.Connection | None = None) -> 
             updates["end_time"] = start_time
         if values.get("all_day") is None:
             updates["all_day"] = all_day
-        if not values.get("project"):
-            updates["project"] = "General"
+        if not values.get("area"):
+            updates["area"] = "General"
         if not values.get("source"):
             updates["source"] = "manual"
         if not values.get("created_at"):
@@ -412,7 +413,7 @@ def fetch_calendar_items_for_days(
     start_date: date | str,
     end_date: date | str,
     sources: Iterable[str] | None = None,
-    project: str | None = None,
+    area: str | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> list[dict]:
     conn = db._get_conn() if conn is None else conn
@@ -431,15 +432,15 @@ def fetch_calendar_items_for_days(
     if source_list:
         where.append("ci.source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
         params.extend(source_list)
-    if project:
-        if project.lower() == "unmapped":
-            where.append("(COALESCE(ci.project, '') = '' OR lower(ci.project) = lower(?))")
-            params.append(project)
+    if area:
+        if area.lower() == "unmapped":
+            where.append("(COALESCE(ci.area, '') = '' OR lower(ci.area) = lower(?))")
+            params.append(area)
         else:
             where.append(
-                "(lower(COALESCE(ci.project, '')) = lower(?) OR lower(COALESCE(ci.project, '')) LIKE lower(?) || '/%')"
+                "(lower(COALESCE(ci.area, '')) = lower(?) OR lower(COALESCE(ci.area, '')) LIKE lower(?) || '/%')"
             )
-            params.extend([project, project])
+            params.extend([area, area])
     rows = conn.execute(
         """
         SELECT ci.*, cid.item_date, cid.day_number, cid.total_days, cid.is_first_day, cid.is_last_day,
@@ -568,7 +569,7 @@ def normalize_event_values(values: dict) -> dict:
         "blocks_time": 1 if values.get("blocks_time") in (True, "1", "on", "yes", 1) else 0,
         "event_type": values.get("event_type") or "event",
         "category": values.get("category") or None,
-        "project": (values.get("project") if values.get("project") is not None else "General").strip(),
+        "area": (values.get("area") if values.get("area") is not None else "General").strip(),
         "status": values.get("status") or "active",
         "color": values.get("color") or None,
         "text_color": values.get("text_color") or None,
@@ -741,7 +742,7 @@ def _refresh_holidays(conn: sqlite3.Connection, source_key: str, result: Refresh
                 "blocks_time": 0,
                 "event_type": "holiday",
                 "category": jurisdiction,
-                "project": "General",
+                "area": "General",
                 "status": "active",
                 "source": source_key,
             }
@@ -808,7 +809,7 @@ def _upsert_item(
         "blocks_time": _int(event.get("blocks_time"), 0),
         "event_type": event.get("event_type") or "event",
         "category": event.get("category"),
-        "project": event.get("project") if event.get("project") is not None else "General",
+        "area": event.get("area") if event.get("area") is not None else "General",
         "status": event.get("status") or "active",
         "color": event.get("color"),
         "text_color": event.get("text_color"),
@@ -841,7 +842,7 @@ def _upsert_item(
             blocks_time = excluded.blocks_time,
             event_type = excluded.event_type,
             category = excluded.category,
-            project = excluded.project,
+            area = excluded.area,
             status = excluded.status,
             color = excluded.color,
             text_color = excluded.text_color,

@@ -1,7 +1,7 @@
 ---
 key: cycle-a
 title: Cycle A
-project: Home
+area: Home
 status: draft
 ---
 

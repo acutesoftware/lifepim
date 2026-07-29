@@ -1,15 +1,15 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div class="calendar-controls">
-    <a class="calendar-add-main" href="{{ url_for('data.database_sources_route', proj=current_proj) if current_proj else url_for('data.database_sources_route') }}">Back to Data</a>
+    <a class="calendar-add-main" href="{{ url_for('data.database_sources_route', area=current_area) if current_area else url_for('data.database_sources_route') }}">Back to Data</a>
   </div>
 
   <form method="POST">
-    <label>Project:</label><br>
-    <select name="project">
+    <label>Area:</label><br>
+    <select name="area">
       <option value="">None</option>
-      {% for option in project_options %}
-      <option value="{{ option.id }}" {% if project == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
+      {% for option in area_options %}
+      <option value="{{ option.id }}" {% if area == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
       {% endfor %}
     </select><br><br>
     <label>SQLite DB File Paths (one per line):</label><br>
@@ -18,7 +18,7 @@
     <hr>
     <label>SQLite DB Folder:</label><br>
     <input type="text" name="db_folder" placeholder="C:\path\to\folder"><br><br>
-    <button type="submit" formaction="{{ url_for('data.import_data_db_folder_route', proj=project) }}">Import Folder</button>
+    <button type="submit" formaction="{{ url_for('data.import_data_db_folder_route', area=area) }}">Import Folder</button>
     {% if error %}
       <p>{{ error }}</p>
     {% endif %}

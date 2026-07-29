@@ -43,7 +43,7 @@ class TestPocketApi(unittest.TestCase):
                 folder_id INTEGER,
                 size TEXT,
                 date_modified TEXT,
-                project TEXT,
+                area TEXT,
                 owner_user_id INTEGER,
                 visibility TEXT NOT NULL DEFAULT 'private',
                 is_public INTEGER NOT NULL DEFAULT 0,
@@ -84,7 +84,7 @@ class TestPocketApi(unittest.TestCase):
             data.conn = self._old_conn
             self.conn.close()
 
-    def _add_note(self, file_name="Shopping.md", content="# Shopping\n\n- [ ] Milk\n", owner_user_id=3, folder_path=None, project="pers"):
+    def _add_note(self, file_name="Shopping.md", content="# Shopping\n\n- [ ] Milk\n", owner_user_id=3, folder_path=None, area="pers"):
         folder_path = folder_path or self.tmpdir.name
         os.makedirs(folder_path, exist_ok=True)
         full_path = os.path.join(folder_path, file_name)
@@ -98,7 +98,7 @@ class TestPocketApi(unittest.TestCase):
             "folder_id": "",
             "size": str(stat.st_size),
             "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-            "project": project,
+            "area": area,
             "owner_user_id": owner_user_id,
             "visibility": "private",
             "is_public": 0,
@@ -289,8 +289,8 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["relative_path"], "Shopping.md")
         self.assertEqual(item["kind"], "NOTE")
         self.assertEqual(item["ownership"], "DESKTOP_MASTER")
-        self.assertEqual(item["project"], "pers")
-        self.assertEqual(item["derived_project"], "pers")
+        self.assertEqual(item["area"], "pers")
+        self.assertEqual(item["derived_area"], "pers")
         note_stat = os.stat(os.path.join(self.tmpdir.name, "Shopping.md"))
         expected_created = datetime.fromtimestamp(note_stat.st_ctime).strftime("%Y-%m-%d %H:%M:%S")
         expected_modified = datetime.fromtimestamp(note_stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
@@ -300,7 +300,7 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["color"], "")
         self.assertEqual(item["title"], "")
         self.assertEqual(item["source_note_id"], "")
-        self.assertEqual(item["metadata"]["project"], "pers")
+        self.assertEqual(item["metadata"]["area"], "pers")
 
         item_resp = self.client.get(f"/api/pocket/v1/items/{item['id']}", headers=headers)
         self.assertEqual(item_resp.status_code, 200)
@@ -322,17 +322,17 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item_payload["metadata"]["date_created"], expected_created)
 
     def test_manifest_and_item_download_include_note_metadata(self):
-        project_dir = os.path.join(self.tmpdir.name, "notes", "20-Biz", "22-Acute", "22-7-Support")
+        area_dir = os.path.join(self.tmpdir.name, "notes", "20-Biz", "22-Acute", "22-7-Support")
         self.conn.executescript(
             """
-            CREATE TABLE lp_projects (
+            CREATE TABLE lp_areas (
                 owner_user_id INTEGER,
-                project_id TEXT,
-                project_name TEXT
+                area_id TEXT,
+                area_name TEXT
             );
-            CREATE TABLE lp_project_folders (
+            CREATE TABLE lp_area_folders (
                 owner_user_id INTEGER,
-                project_id TEXT,
+                area_id TEXT,
                 path_prefix TEXT,
                 folder_role TEXT,
                 is_enabled INTEGER,
@@ -341,19 +341,19 @@ class TestPocketApi(unittest.TestCase):
             """
         )
         self.conn.execute(
-            "INSERT INTO lp_projects(owner_user_id, project_id, project_name) VALUES (3, 'work/business', 'Business')"
+            "INSERT INTO lp_areas(owner_user_id, area_id, area_name) VALUES (3, 'work/business', 'Business')"
         )
         self.conn.execute(
             """
-            INSERT INTO lp_project_folders(owner_user_id, project_id, path_prefix, folder_role, is_enabled, sort_order)
+            INSERT INTO lp_area_folders(owner_user_id, area_id, path_prefix, folder_role, is_enabled, sort_order)
             VALUES (3, 'work/business', ?, 'default', 1, 10)
             """,
-            (project_dir,),
+            (area_dir,),
         )
         self._add_note(
             file_name="start_a_bug_database.md",
-            folder_path=project_dir,
-            project="stale/project",
+            folder_path=area_dir,
+            area="stale/area",
             content=(
                 "---\n"
                 "tags:\n"
@@ -378,8 +378,8 @@ class TestPocketApi(unittest.TestCase):
         item_payload = self.client.get(f"/api/pocket/v1/items/{manifest_item['id']}", headers=headers).get_json()
 
         for payload in (manifest_item, item_payload):
-            self.assertEqual(payload["project"], "work/business")
-            self.assertEqual(payload["derived_project"], "work/business")
+            self.assertEqual(payload["area"], "work/business")
+            self.assertEqual(payload["derived_area"], "work/business")
             self.assertEqual(payload["title"], "start a bug database")
             self.assertEqual(payload["source_note_id"], "1234")
             self.assertEqual(payload["metadata"]["note_id"], "1234")
@@ -387,7 +387,7 @@ class TestPocketApi(unittest.TestCase):
             self.assertEqual(payload["date_modified"], "2019-07-27 12:02:43")
             self.assertTrue(payload["important"])
             self.assertEqual(payload["color"], "red")
-            self.assertEqual(payload["metadata"]["project"], "work/business")
+            self.assertEqual(payload["metadata"]["area"], "work/business")
 
     def test_manifest_skips_one_note_when_metadata_serialization_fails(self):
         self._add_note(file_name="bad.md", content="bad")
@@ -617,7 +617,7 @@ class TestPocketApi(unittest.TestCase):
                     "---\n"
                     "title: Metadata phone note\n"
                     "color: Purple\n"
-                    "project: phone/project\n"
+                    "area: phone/area\n"
                     "date_created: 2026-07-01 08:30:00\n"
                     "date_modified: 2026-07-02 09:45:00\n"
                     "important: true\n"
@@ -630,13 +630,13 @@ class TestPocketApi(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 200)
         row = self.conn.execute(
-            "SELECT title, color, date_created, project, important, source_note_id FROM lp_notes WHERE file_name = ?",
+            "SELECT title, color, date_created, area, important, source_note_id FROM lp_notes WHERE file_name = ?",
             ("metadata phone note.md",),
         ).fetchone()
         self.assertEqual(row["title"], "Metadata phone note")
         self.assertEqual(row["color"], "Purple")
         self.assertEqual(row["date_created"], "2026-07-01 08:30:00")
-        self.assertEqual(row["project"], "phone/project")
+        self.assertEqual(row["area"], "phone/area")
         self.assertEqual(row["important"], "true")
         self.assertEqual(row["source_note_id"], "9876")
 
@@ -655,7 +655,7 @@ class TestPocketApi(unittest.TestCase):
                     "---\n"
                     "title: Updated from phone\n"
                     "color: Aqua\n"
-                    "project: updated/project\n"
+                    "area: updated/area\n"
                     "date_created: 2026-06-15 07:00:00\n"
                     "important: yes\n"
                     "note_id: 5432\n"
@@ -667,13 +667,13 @@ class TestPocketApi(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 200)
         row = self.conn.execute(
-            "SELECT title, color, date_created, project, important, source_note_id FROM lp_notes WHERE file_name = ?",
+            "SELECT title, color, date_created, area, important, source_note_id FROM lp_notes WHERE file_name = ?",
             ("existing.md",),
         ).fetchone()
         self.assertEqual(row["title"], "Updated from phone")
         self.assertEqual(row["color"], "Aqua")
         self.assertEqual(row["date_created"], "2026-06-15 07:00:00")
-        self.assertEqual(row["project"], "updated/project")
+        self.assertEqual(row["area"], "updated/area")
         self.assertEqual(row["important"], "true")
         self.assertEqual(row["source_note_id"], "5432")
 

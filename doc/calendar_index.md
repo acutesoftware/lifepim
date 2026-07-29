@@ -95,7 +95,7 @@ Invalid legacy dates are left unprojected rather than crashing migration.
 
 ## Troubleshooting
 
-If in doubt - check Project filters!
+If in doubt - check Area filters!
 
 Check Settings -> Calendar for source status, last refresh time, row count, and
 message. If views look stale, rebuild the affected source first, then rebuild

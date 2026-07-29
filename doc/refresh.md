@@ -102,13 +102,13 @@ ETL_MAP_FOLDERS.BAT
 Inputs currently configured in `src/common/config.py`:
 
 - `E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv`
-- `E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_project_folder.csv`
+- `E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_area_folder.csv`
 
 Tables updated:
 
 - `dim_folder`
-- `map_folder_project`
-- `map_project_folder`
+- `map_folder_area`
+- `map_area_folder`
 - `folder_id` on supported file-backed tables
 
 ## Per-Tab Refresh Notes

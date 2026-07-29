@@ -1,7 +1,7 @@
 ---
 key: turn-off-bathroom-water
 title: Turn Off Bathroom Water
-project: Home
+area: Home
 status: draft
 ---
 

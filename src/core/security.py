@@ -182,13 +182,13 @@ def ensure_security_schema(conn=None):
     user_paths.ensure_user_path_columns(conn)
     user_paths.backfill_duncan_user_paths(conn)
     try:
-        from common import projects as projects_mod
+        from common import areas as areas_mod
 
         rows = conn.execute(
             "SELECT user_id FROM users WHERE lower(username) = 'duncan'"
         ).fetchall()
         for row in rows:
-            projects_mod.claim_legacy_project_folders_for_user(row["user_id"], conn=conn)
+            areas_mod.claim_legacy_area_folders_for_user(row["user_id"], conn=conn)
     except Exception:
         pass
     conn.execute(
@@ -740,12 +740,12 @@ def create_user(username, display_name, password, role="user", is_active=True, f
         conn.execute(f"ROLLBACK TO {savepoint}")
         conn.execute(f"RELEASE {savepoint}")
         raise
-    from common import projects as projects_mod
+    from common import areas as areas_mod
 
     if preserve_existing_paths:
-        projects_mod.claim_legacy_project_folders_for_user(user_id, conn=conn)
+        areas_mod.claim_legacy_area_folders_for_user(user_id, conn=conn)
     else:
-        projects_mod.seed_default_projects_for_user(user_id, conn=conn, replace=False)
+        areas_mod.seed_default_areas_for_user(user_id, conn=conn, replace=False)
     return user_id
 
 

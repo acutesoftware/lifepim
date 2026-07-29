@@ -108,7 +108,7 @@ def build_screen(root):
 
 Toolbar - swoitches between main modes
 
-Folders - filters data based on project. Initially this was the folder string in Lifepim.com but on the desktop version it is the subfolder
+Folders - filters data based on area. Initially this was the folder string in Lifepim.com but on the desktop version it is the subfolder
 
 Top Left
 - Calendar

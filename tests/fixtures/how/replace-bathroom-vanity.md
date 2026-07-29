@@ -1,7 +1,7 @@
 ---
 key: replace-bathroom-vanity
 title: Replace Bathroom Vanity
-project: Home
+area: Home
 status: draft
 ---
 

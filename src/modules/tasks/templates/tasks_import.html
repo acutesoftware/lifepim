@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div class="calendar-controls">
-    <a class="calendar-add-main" href="{{ url_for('tasks.list_tasks_route', proj=project) }}">Back to Tasks</a>
+    <a class="calendar-add-main" href="{{ url_for('tasks.list_tasks_route', area=area) }}">Back to Tasks</a>
   </div>
 
   {% include "widgets/wid_import_data.html" %}

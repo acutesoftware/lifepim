@@ -1,20 +1,20 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('media.media_explorer_route', focus_id=item.media_id, view='all', proj=project) }}">Back to Media</a>
+    <a href="{{ url_for('media.media_explorer_route', focus_id=item.media_id, view='all', area=area) }}">Back to Media</a>
   </div>
   <div class="media-view-toggle">
     View:
     {% if view_mode == 'full' %}
       <strong>Full</strong>
     {% else %}
-      <a href="{{ url_for('media.view_media_route', media_id=item.media_id, proj=project, view='full') }}">Full</a>
+      <a href="{{ url_for('media.view_media_route', media_id=item.media_id, area=area, view='full') }}">Full</a>
     {% endif %}
     |
     {% if view_mode == 'normal' %}
       <strong>Normal</strong>
     {% else %}
-      <a href="{{ url_for('media.view_media_route', media_id=item.media_id, proj=project, view='normal') }}">Normal</a>
+      <a href="{{ url_for('media.view_media_route', media_id=item.media_id, area=area, view='normal') }}">Normal</a>
     {% endif %}
   </div>
   <table border="1" cellpadding="5">

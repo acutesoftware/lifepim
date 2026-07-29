@@ -1,21 +1,21 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('media.list_media_table_route', proj=project) }}">Table</a> |
-    <a href="{{ url_for('media.list_media_list_route', proj=project) }}">List</a> |
-    <a href="{{ url_for('media.list_media_grid_route', proj=project) }}">Grid</a> |
-    <a href="{{ url_for('media.import_media_route', proj=project) }}">Add Media</a> |
-    <a href="{{ url_for('media.media_player_route', proj=project) }}" onclick="window.open(this.href, 'media_player', 'width=520,height=620,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
+    <a href="{{ url_for('media.list_media_table_route', area=area) }}">Table</a> |
+    <a href="{{ url_for('media.list_media_list_route', area=area) }}">List</a> |
+    <a href="{{ url_for('media.list_media_grid_route', area=area) }}">Grid</a> |
+    <a href="{{ url_for('media.import_media_route', area=area) }}">Add Media</a> |
+    <a href="{{ url_for('media.media_player_route', area=area) }}" onclick="window.open(this.href, 'media_player', 'width=520,height=620,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
   </div>
 
   <ul style="list-style:none; padding:0; margin:8px 0;">
     {% for item in items %}
     <li style="padding:4px 0;">
-      <a href="{{ url_for('media.view_media_route', item_id=item.id, proj=project) }}">{{ item.file_name }}</a>
+      <a href="{{ url_for('media.view_media_route', item_id=item.id, area=area) }}">{{ item.file_name }}</a>
       <span>
-        <a href="{{ url_for('media.media_player_route', proj=project, id=item.id) }}" onclick="window.open(this.href, 'media_player', 'width=520,height=620,menubar=no,toolbar=no,location=no,status=no'); return false;">Play</a> |
-        <a href="{{ url_for('media.edit_media_route', item_id=item.id, proj=project) }}">Edit</a> |
-        <a href="{{ url_for('media.delete_media_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+        <a href="{{ url_for('media.media_player_route', area=area, id=item.id) }}" onclick="window.open(this.href, 'media_player', 'width=520,height=620,menubar=no,toolbar=no,location=no,status=no'); return false;">Play</a> |
+        <a href="{{ url_for('media.edit_media_route', item_id=item.id, area=area) }}">Edit</a> |
+        <a href="{{ url_for('media.delete_media_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
       </span>
     </li>
     {% endfor %}

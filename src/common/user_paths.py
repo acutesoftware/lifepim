@@ -7,7 +7,7 @@ from common import config as cfg
 USER_PATH_COLUMNS = {
     "file_root_path": "TEXT",
     "notes_root_path": "TEXT",
-    "projects_root_path": "TEXT",
+    "areas_root_path": "TEXT",
     "lists_root_path": "TEXT",
 }
 
@@ -44,6 +44,12 @@ def ensure_user_path_columns(conn):
     for column_name, column_type in USER_PATH_COLUMNS.items():
         if column_name not in columns:
             conn.execute(f"ALTER TABLE users ADD COLUMN {column_name} {column_type}")
+            columns.add(column_name)
+    if "projects_root_path" in columns and "areas_root_path" in columns:
+        conn.execute(
+            "UPDATE users SET areas_root_path = projects_root_path "
+            "WHERE COALESCE(areas_root_path, '') = '' AND COALESCE(projects_root_path, '') != ''"
+        )
 
 
 def safe_path_segment(value, default="user"):
@@ -53,13 +59,13 @@ def safe_path_segment(value, default="user"):
     return text or default
 
 
-def safe_project_folder_name(project_id, project_name=""):
-    text = (project_id or project_name or "project").strip()
+def safe_area_folder_name(area_id, area_name=""):
+    text = (area_id or area_name or "area").strip()
     text = text.replace("\\", "/").replace("/", "-").replace(".", "-")
     text = _INVALID_SEGMENT_CHARS.sub("-", text)
     text = re.sub(r"[^A-Za-z0-9._ -]+", "-", text)
     text = re.sub(r"[-\s]+", "-", text).strip(" .-_")
-    return text or "project"
+    return text or "area"
 
 
 def default_lan_user_root_base():
@@ -79,7 +85,7 @@ def paths_from_root(root_path):
     return {
         "file_root_path": root,
         "notes_root_path": normalize_path(os.path.join(root, "notes")),
-        "projects_root_path": normalize_path(os.path.join(root, "projects")),
+        "areas_root_path": normalize_path(os.path.join(root, "areas")),
         "lists_root_path": normalize_path(os.path.join(root, "lists")),
     }
 
@@ -143,7 +149,7 @@ def legacy_paths_for_user(conn, user_id=None):
         return {
             "file_root_path": root,
             "notes_root_path": notes_root,
-            "projects_root_path": normalize_path(os.path.join(root, "projects")),
+            "areas_root_path": normalize_path(os.path.join(root, "areas")),
             "lists_root_path": normalize_path(os.path.join(root, "lists")),
         }
     data_root = normalize_path(getattr(cfg, "data_folder", ""))
@@ -197,13 +203,13 @@ def initialize_user_paths(
     set_clause = [
         "file_root_path = ?",
         "notes_root_path = ?",
-        "projects_root_path = ?",
+        "areas_root_path = ?",
         "lists_root_path = ?",
     ]
     values = [
         paths.get("file_root_path") or "",
         paths.get("notes_root_path") or "",
-        paths.get("projects_root_path") or "",
+        paths.get("areas_root_path") or "",
         paths.get("lists_root_path") or "",
     ]
     if "modified_at" in columns:
@@ -228,13 +234,13 @@ def set_user_paths(conn, user_id, paths, *, create_dirs=False):
     set_clause = [
         "file_root_path = ?",
         "notes_root_path = ?",
-        "projects_root_path = ?",
+        "areas_root_path = ?",
         "lists_root_path = ?",
     ]
     values = [
         normalized.get("file_root_path") or "",
         normalized.get("notes_root_path") or "",
-        normalized.get("projects_root_path") or "",
+        normalized.get("areas_root_path") or "",
         normalized.get("lists_root_path") or "",
     ]
     if "modified_at" in columns:
@@ -269,7 +275,7 @@ def get_or_create_user_paths(conn, user_id, username=None, *, create_dirs=False)
 def backfill_duncan_user_paths(conn):
     ensure_user_path_columns(conn)
     rows = conn.execute(
-        "SELECT user_id, username, file_root_path, notes_root_path, projects_root_path, lists_root_path "
+        "SELECT user_id, username, file_root_path, notes_root_path, areas_root_path, lists_root_path "
         "FROM users WHERE lower(username) = 'duncan'"
     ).fetchall()
     for row in rows:

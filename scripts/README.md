@@ -6,7 +6,7 @@ This folder has scripts and processes to help end users collect data
 for importing to LifePIM
 
 This repositority has the latest working versions - some have been copied from
-other projects (AIKIF, rawdata) and customised for lifepim.
+other areas (AIKIF, rawdata) and customised for lifepim.
 
 
 ## Local Data Collection Scripts

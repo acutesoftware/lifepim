@@ -2,9 +2,9 @@
 {% block module_content %}
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <div>
-    <a href="{{ url_for('places.list_places_table_route', proj=project) }}">Table</a> |
-    <a href="{{ url_for('places.list_places_map_route', proj=project) }}">Map</a> |
-    <a href="{{ url_for('places.add_place_route', proj=project) }}">Add Place</a>
+    <a href="{{ url_for('places.list_places_table_route', area=area) }}">Table</a> |
+    <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a> |
+    <a href="{{ url_for('places.add_place_route', area=area) }}">Add Place</a>
   </div>
 
   {% if markers %}
@@ -16,7 +16,7 @@
   <ul>
     {% for item in items %}
     <li>
-      <a href="{{ url_for('places.view_place_route', place_id=item.id, proj=project) }}">{{ item.name or 'Place' }}</a>
+      <a href="{{ url_for('places.view_place_route', place_id=item.id, area=area) }}">{{ item.name or 'Place' }}</a>
       {% if item.address_street or item.suburb or item.state %}
         - {{ item.address_street }} {{ item.suburb }} {{ item.state }}
       {% endif %}

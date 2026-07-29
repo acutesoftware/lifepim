@@ -46,15 +46,15 @@ For example:
   layout.
 - Searching from Home searches across areas without a tab-specific priority.
 
-## Project Filtering
+## Area Filtering
 
-If you are already filtered to a project, search keeps that project context.
+If you are already filtered to a area, search keeps that area context.
 
-Project matches should come first. Results are treated as current-context
-matches when they match the selected project or the current tab. Other matches
+Area matches should come first. Results are treated as current-context
+matches when they match the selected area or the current tab. Other matches
 are still shown, but lower down.
 
-This means a search while viewing a project should surface that project's
+This means a search while viewing a area should surface that area's
 records before unrelated records.
 
 ## More Matches

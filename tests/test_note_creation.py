@@ -18,7 +18,7 @@ from common import note_search_index
 from common import settings
 from common import search
 from common import utils as common_utils
-from common import projects as projects_mod
+from common import areas as areas_mod
 from modules.notes import routes as notes_routes
 from modules.admin import routes as admin_routes
 
@@ -41,7 +41,7 @@ def _create_table(conn, tbl):
 
 class TestNoteCreation(unittest.TestCase):
     def setUp(self):
-        notes_routes._NOTE_PROJECT_MATERIALIZED_KEYS.clear()
+        notes_routes._NOTE_AREA_MATERIALIZED_KEYS.clear()
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
         self._old_conn = data.conn
@@ -49,7 +49,7 @@ class TestNoteCreation(unittest.TestCase):
         for tbl in cfg.table_def:
             _create_table(self.conn, tbl)
         data.ensure_folder_schema(self.conn)
-        projects_mod.ensure_projects_schema(self.conn)
+        areas_mod.ensure_areas_schema(self.conn)
         common_utils.ensure_user_log_schema(self.conn)
         tmp_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
         os.makedirs(tmp_root, exist_ok=True)
@@ -59,12 +59,12 @@ class TestNoteCreation(unittest.TestCase):
         try:
             self.tmpdir.cleanup()
         finally:
-            notes_routes._NOTE_PROJECT_MATERIALIZED_KEYS.clear()
+            notes_routes._NOTE_AREA_MATERIALIZED_KEYS.clear()
             data.conn = self._old_conn
             self.conn.close()
 
-    def _create_note_record(self, title, folder_path, project=""):
-        created = notes_routes._create_note_file(folder_path, title, project)
+    def _create_note_record(self, title, folder_path, area=""):
+        created = notes_routes._create_note_file(folder_path, title, area)
         full_path = created["full_path"]
         size = ""
         date_modified = ""
@@ -80,7 +80,7 @@ class TestNoteCreation(unittest.TestCase):
             "folder_id": "",
             "size": size,
             "date_modified": date_modified,
-            "project": project,
+            "area": area,
         }
         values = [values_map.get(col, "") for col in tbl["col_list"]]
         note_id = data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
@@ -102,36 +102,36 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_unmapped_and_filtered_notes_and_search(self):
         unmapped_dir = os.path.join(self.tmpdir.name, "unmapped")
-        project_dir = os.path.join(self.tmpdir.name, "project")
+        area_dir = os.path.join(self.tmpdir.name, "area")
 
-        note1_id, note1 = self._create_note_record("note_creation_test_unmapped", unmapped_dir, project="")
+        note1_id, note1 = self._create_note_record("note_creation_test_unmapped", unmapped_dir, area="")
 
-        project_id = "proj.test"
-        projects_mod.project_upsert(
+        area_id = "area.test"
+        areas_mod.area_upsert(
             {
-                "project_id": project_id,
+                "area_id": area_id,
                 "tab": "TEST",
                 "group_name": "Test",
-                "project_name": "Test Project",
+                "area_name": "Test Area",
             },
             conn=self.conn,
         )
-        projects_mod.project_folder_add(
-            project_id,
-            project_dir,
+        areas_mod.area_folder_add(
+            area_id,
+            area_dir,
             folder_role="default",
             is_write_enabled=1,
             conn=self.conn,
         )
 
-        note2_id, note2 = self._create_note_record("note_creation_test_filtered", project_dir, project=project_id)
+        note2_id, note2 = self._create_note_record("note_creation_test_filtered", area_dir, area=area_id)
 
         unmapped_notes = notes_routes._fetch_notes("unmapped")
         unmapped_ids = {n.get("id") for n in unmapped_notes}
         self.assertIn(note1_id, unmapped_ids)
         self.assertNotIn(note2_id, unmapped_ids)
 
-        filtered_notes = notes_routes._fetch_notes(project_id)
+        filtered_notes = notes_routes._fetch_notes(area_id)
         filtered_ids = {n.get("id") for n in filtered_notes}
         self.assertIn(note2_id, filtered_ids)
 
@@ -143,6 +143,33 @@ class TestNoteCreation(unittest.TestCase):
         }
         self.assertIn(note1.get("file_name"), note_titles)
         self.assertIn(note2.get("file_name"), note_titles)
+
+    def test_notes_area_context_resolves_display_name_to_mapped_folders(self):
+        area_dir = os.path.join(self.tmpdir.name, "ue5")
+        areas_mod.area_upsert(
+            {
+                "area_id": "area/UE5",
+                "tab": "AREAS",
+                "group_name": "AREAS",
+                "area_name": "UE5",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add(
+            "area/UE5",
+            area_dir,
+            folder_role="default",
+            conn=self.conn,
+        )
+
+        area_info, folders = notes_routes._area_context("UE5")
+        scope_ids = notes_routes._area_scope_ids("UE5")
+
+        self.assertEqual(area_info["area_id"], "area/UE5")
+        self.assertEqual(len(folders), 1)
+        self.assertEqual(folders[0]["path_prefix"], os.path.abspath(area_dir))
+        self.assertIn("UE5", scope_ids)
+        self.assertIn("area/UE5", scope_ids)
 
     def test_note_card_preview_uses_body_color_and_markdown(self):
         note_dir = os.path.join(self.tmpdir.name, "card_preview")
@@ -238,7 +265,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_fetch_notes_does_not_read_front_matter(self):
         note_dir = os.path.join(self.tmpdir.name, "metadata_only")
-        note_id, _ = self._create_note_record("metadata_only", note_dir, project="")
+        note_id, _ = self._create_note_record("metadata_only", note_dir, area="")
 
         with patch(
             "modules.notes.routes._read_note_front_matter",
@@ -269,7 +296,7 @@ class TestNoteCreation(unittest.TestCase):
             "title": "Red Note",
             "color": "",
             "date_modified": "2026-07-09 16:38:25",
-            "project": "",
+            "area": "",
         }
         note_id = data.add_record(
             self.conn,
@@ -302,7 +329,7 @@ class TestNoteCreation(unittest.TestCase):
             "title": "Red Note",
             "color": "Blue",
             "date_modified": "2026-07-09 16:38:25",
-            "project": "",
+            "area": "",
         }
         note_id = data.add_record(
             self.conn,
@@ -369,7 +396,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_set_note_color_updates_front_matter_and_database(self):
         note_dir = os.path.join(self.tmpdir.name, "color_update")
-        note_id, created = self._create_note_record("color update", note_dir, project="")
+        note_id, created = self._create_note_record("color update", note_dir, area="")
 
         notes_routes._set_note_color(note_id, "Blue")
 
@@ -382,7 +409,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_note_view_metadata_mode_hides_body_and_shows_front_matter(self):
         note_dir = os.path.join(self.tmpdir.name, "metadata_view")
-        note_id, created = self._create_note_record("metadata view", note_dir, project="")
+        note_id, created = self._create_note_record("metadata view", note_dir, area="")
         with open(created["full_path"], "w", encoding="utf-8") as handle:
             handle.write("---\ntitle: Meta View\ncolor: Blue\n---\n\nBody text")
 
@@ -397,7 +424,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_note_view_markdown_mode_shows_body_without_front_matter(self):
         note_dir = os.path.join(self.tmpdir.name, "markdown_view")
-        note_id, created = self._create_note_record("markdown view", note_dir, project="")
+        note_id, created = self._create_note_record("markdown view", note_dir, area="")
         with open(created["full_path"], "w", encoding="utf-8") as handle:
             handle.write("---\ntitle: Markdown View\ncolor: Blue\n---\n\nBody text")
 
@@ -411,9 +438,9 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_notes_table_view_uses_new_header_and_columns(self):
         note_dir = os.path.join(self.tmpdir.name, "notes_table_view")
-        self._create_note_record("another table view", note_dir, project="")
-        note_id, _created = self._create_note_record("table view", note_dir, project="")
-        self._create_note_record("zeta table view", note_dir, project="")
+        self._create_note_record("another table view", note_dir, area="")
+        note_id, _created = self._create_note_record("table view", note_dir, area="")
+        self._create_note_record("zeta table view", note_dir, area="")
         tbl = common_utils.get_table_def("notes")
         self.conn.execute(f"UPDATE {tbl['name']} SET color = ? WHERE id = ?", ("Blue", note_id))
         self.conn.commit()
@@ -456,7 +483,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_notes_names_and_preview_views_render(self):
         note_dir = os.path.join(self.tmpdir.name, "notes_other_views")
-        self._create_note_record("other views", note_dir, project="")
+        self._create_note_record("other views", note_dir, area="")
         client = self._notes_test_app().test_client()
 
         names = client.get("/notes/names")
@@ -473,7 +500,7 @@ class TestNoteCreation(unittest.TestCase):
         note_dir = os.path.join(self.tmpdir.name, "numeric_size_sort")
         ids = []
         for title, size in (("ten", "10"), ("two", "2"), ("bad", "not-a-number")):
-            note_id, _created = self._create_note_record(title, note_dir, project="")
+            note_id, _created = self._create_note_record(title, note_dir, area="")
             ids.append(note_id)
             tbl = common_utils.get_table_def("notes")
             self.conn.execute(f"UPDATE {tbl['name']} SET size = ? WHERE id = ?", (size, note_id))
@@ -486,19 +513,19 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual([note["file_name"] for note in desc[:3]], ["ten.md", "two.md", "bad.md"])
 
     def test_note_folder_id_preserves_live_note_path_alias_on_update(self):
-        project_id = "pers/health"
+        area_id = "pers/health"
         note_dir = r"N:\duncan\LifePIM_Data\DATA\notes\10-Pers\12-Health"
-        projects_mod.project_upsert(
+        areas_mod.area_upsert(
             {
-                "project_id": project_id,
+                "area_id": area_id,
                 "tab": "PERS",
                 "group_name": "PERS",
-                "project_name": "Health",
+                "area_name": "Health",
             },
             conn=self.conn,
         )
-        projects_mod.project_folder_add(
-            project_id,
+        areas_mod.area_folder_add(
+            area_id,
             note_dir,
             folder_role="default",
             is_write_enabled=1,
@@ -512,7 +539,7 @@ class TestNoteCreation(unittest.TestCase):
             "folder_id": "",
             "size": "160",
             "date_modified": "2026-07-09 16:38:25",
-            "project": project_id,
+            "area": area_id,
         }
         values = [values_map.get(col, "") for col in tbl["col_list"]]
         note_id = data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
@@ -527,11 +554,11 @@ class TestNoteCreation(unittest.TestCase):
         self.conn.execute("UPDATE lp_notes SET folder_id = ? WHERE id = ?", (alias_folder_id, note_id))
         self.conn.commit()
 
-        stale_filtered_notes = notes_routes._fetch_notes(project_id)
+        stale_filtered_notes = notes_routes._fetch_notes(area_id)
         stale_filtered_ids = {n.get("id") for n in stale_filtered_notes}
         self.assertIn(note_id, stale_filtered_ids)
-        stale_derived = {n.get("id"): n.get("derived_project") for n in stale_filtered_notes}
-        self.assertEqual(stale_derived[note_id], project_id)
+        stale_derived = {n.get("id"): n.get("derived_area") for n in stale_filtered_notes}
+        self.assertEqual(stale_derived[note_id], area_id)
 
         values_map["size"] = "161"
         values = [values_map.get(col, "") for col in tbl["col_list"]]
@@ -545,34 +572,34 @@ class TestNoteCreation(unittest.TestCase):
         ).fetchone()
         self.assertEqual(row["folder_path"], note_dir)
 
-        filtered_notes = notes_routes._fetch_notes(project_id)
+        filtered_notes = notes_routes._fetch_notes(area_id)
         filtered_ids = {n.get("id") for n in filtered_notes}
         self.assertIn(note_id, filtered_ids)
-        derived = {n.get("id"): n.get("derived_project") for n in filtered_notes}
-        self.assertEqual(derived[note_id], project_id)
+        derived = {n.get("id"): n.get("derived_area") for n in filtered_notes}
+        self.assertEqual(derived[note_id], area_id)
 
-    def test_parent_project_includes_children_without_broad_leaf_leakage(self):
+    def test_parent_area_includes_children_without_broad_leaf_leakage(self):
         root_dir = r"N:\duncan\LifePIM_Data\DATA\notes\50-Fun"
         games_dir = root_dir + r"\51-Games"
         travel_dir = root_dir + r"\56-Travel"
-        projects = [
+        areas = [
             ("fun.fun.fun", "FUN", "FUN", "Fun", root_dir),
             ("fun/games", "FUN", "FUN", "Games", games_dir),
             ("fun/sport", "FUN", "FUN", "Sport", root_dir),
             ("fun/travel", "FUN", "FUN", "Travel", root_dir),
         ]
-        for project_id, tab, group_name, project_name, folder_path in projects:
-            projects_mod.project_upsert(
+        for area_id, tab, group_name, area_name, folder_path in areas:
+            areas_mod.area_upsert(
                 {
-                    "project_id": project_id,
+                    "area_id": area_id,
                     "tab": tab,
                     "group_name": group_name,
-                    "project_name": project_name,
+                    "area_name": area_name,
                 },
                 conn=self.conn,
             )
-            projects_mod.project_folder_add(
-                project_id,
+            areas_mod.area_folder_add(
+                area_id,
                 folder_path,
                 folder_role="default",
                 is_write_enabled=1,
@@ -581,14 +608,14 @@ class TestNoteCreation(unittest.TestCase):
 
         tbl = common_utils.get_table_def("notes")
 
-        def add_note(file_name, folder_path, project_id):
+        def add_note(file_name, folder_path, area_id):
             values_map = {
                 "file_name": file_name,
                 "path": folder_path,
                 "folder_id": "",
                 "size": "1",
                 "date_modified": "2026-07-09 16:38:25",
-                "project": project_id,
+                "area": area_id,
             }
             values = [values_map.get(col, "") for col in tbl["col_list"]]
             return data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
@@ -660,39 +687,39 @@ class TestNoteCreation(unittest.TestCase):
         count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
         self.assertEqual(count, 2)
 
-    def test_sync_note_rows_uses_project_folder_fallback_project(self):
-        notes_dir = os.path.join(self.tmpdir.name, "sync_project")
+    def test_sync_note_rows_uses_area_folder_fallback_area(self):
+        notes_dir = os.path.join(self.tmpdir.name, "sync_area")
         os.makedirs(notes_dir, exist_ok=True)
-        note_path = os.path.join(notes_dir, "project-note.md")
+        note_path = os.path.join(notes_dir, "area-note.md")
         with open(note_path, "w", encoding="utf-8") as handle:
-            handle.write("project note")
+            handle.write("area note")
 
-        result = notes_routes._sync_note_rows(notes_dir, fallback_project="fun/games")
+        result = notes_routes._sync_note_rows(notes_dir, fallback_area="fun/games")
 
         self.assertEqual(result["inserted"], 1)
         tbl = common_utils.get_table_def("notes")
-        row = self.conn.execute(f"SELECT project FROM {tbl['name']} WHERE file_name = ?", ("project-note.md",)).fetchone()
-        self.assertEqual(row["project"], "fun/games")
+        row = self.conn.execute(f"SELECT area FROM {tbl['name']} WHERE file_name = ?", ("area-note.md",)).fetchone()
+        self.assertEqual(row["area"], "fun/games")
 
-    def test_sync_note_rows_uses_project_folder_mapping_fallback(self):
-        notes_root = os.path.join(self.tmpdir.name, "sync_project_root")
-        project_dir = os.path.join(notes_root, "Games")
-        os.makedirs(project_dir, exist_ok=True)
-        note_path = os.path.join(project_dir, "mapped-note.md")
+    def test_sync_note_rows_uses_area_folder_mapping_fallback(self):
+        notes_root = os.path.join(self.tmpdir.name, "sync_area_root")
+        area_dir = os.path.join(notes_root, "Games")
+        os.makedirs(area_dir, exist_ok=True)
+        note_path = os.path.join(area_dir, "mapped-note.md")
         with open(note_path, "w", encoding="utf-8") as handle:
-            handle.write("mapped project note")
-        projects_mod.project_upsert(
+            handle.write("mapped area note")
+        areas_mod.area_upsert(
             {
-                "project_id": "fun/games",
+                "area_id": "fun/games",
                 "tab": "FUN",
                 "group_name": "FUN",
-                "project_name": "Games",
+                "area_name": "Games",
             },
             conn=self.conn,
         )
-        projects_mod.project_folder_add(
+        areas_mod.area_folder_add(
             "fun/games",
-            project_dir,
+            area_dir,
             folder_role="default",
             is_write_enabled=1,
             conn=self.conn,
@@ -702,36 +729,36 @@ class TestNoteCreation(unittest.TestCase):
 
         self.assertEqual(result["inserted"], 1)
         tbl = common_utils.get_table_def("notes")
-        row = self.conn.execute(f"SELECT project FROM {tbl['name']} WHERE file_name = ?", ("mapped-note.md",)).fetchone()
-        self.assertEqual(row["project"], "fun/games")
+        row = self.conn.execute(f"SELECT area FROM {tbl['name']} WHERE file_name = ?", ("mapped-note.md",)).fetchone()
+        self.assertEqual(row["area"], "fun/games")
 
-    def test_materialize_note_projects_backfills_blank_project_from_mapping(self):
-        project_dir = os.path.join(self.tmpdir.name, "materialize_project", "Games")
-        os.makedirs(project_dir, exist_ok=True)
-        projects_mod.project_upsert(
+    def test_materialize_note_areas_backfills_blank_area_from_mapping(self):
+        area_dir = os.path.join(self.tmpdir.name, "materialize_area", "Games")
+        os.makedirs(area_dir, exist_ok=True)
+        areas_mod.area_upsert(
             {
-                "project_id": "fun/games",
+                "area_id": "fun/games",
                 "tab": "FUN",
                 "group_name": "FUN",
-                "project_name": "Games",
+                "area_name": "Games",
             },
             conn=self.conn,
         )
-        projects_mod.project_folder_add(
+        areas_mod.area_folder_add(
             "fun/games",
-            project_dir,
+            area_dir,
             folder_role="default",
             is_write_enabled=1,
             conn=self.conn,
         )
         tbl = common_utils.get_table_def("notes")
         values_map = {
-            "file_name": "blank-project.md",
-            "path": notes_routes._normalize_note_path(project_dir),
+            "file_name": "blank-area.md",
+            "path": notes_routes._normalize_note_path(area_dir),
             "folder_id": "",
             "size": "1",
             "date_modified": "2026-07-09 16:38:25",
-            "project": "",
+            "area": "",
         }
         note_id = data.add_record(
             self.conn,
@@ -740,17 +767,17 @@ class TestNoteCreation(unittest.TestCase):
             [values_map.get(col, "") for col in tbl["col_list"]],
         )
 
-        result = notes_routes.materialize_note_projects(self.conn)
+        result = notes_routes.materialize_note_areas(self.conn)
 
         self.assertEqual(result["updated"], 1)
-        row = self.conn.execute(f"SELECT project FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
-        self.assertEqual(row["project"], "fun/games")
+        row = self.conn.execute(f"SELECT area FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["area"], "fun/games")
         filtered_ids = {note.get("id") for note in notes_routes._fetch_notes("fun/games")}
         self.assertIn(note_id, filtered_ids)
 
     def test_rename_note_updates_file_and_metadata(self):
         note_dir = os.path.join(self.tmpdir.name, "rename_note")
-        note_id, created = self._create_note_record("old title", note_dir, project="pers/health")
+        note_id, created = self._create_note_record("old title", note_dir, area="pers/health")
 
         new_file_name = notes_routes._rename_note(note_id, "new title")
         self.assertEqual(new_file_name, "new title.md")
@@ -767,42 +794,71 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn('title: "new title"', text)
         self.assertIn("# new title", text)
 
-    def test_move_note_updates_project_folder_and_metadata(self):
+    def test_move_note_updates_area_folder_and_metadata(self):
         source_dir = os.path.join(self.tmpdir.name, "move_source")
         target_dir = os.path.join(self.tmpdir.name, "move_target")
-        project_id = "fun/games"
-        projects_mod.project_upsert(
+        area_id = "fun/games"
+        areas_mod.area_upsert(
             {
-                "project_id": project_id,
+                "area_id": area_id,
                 "tab": "FUN",
                 "group_name": "FUN",
-                "project_name": "Games",
+                "area_name": "Games",
             },
             conn=self.conn,
         )
-        projects_mod.project_folder_add(
-            project_id,
+        areas_mod.area_folder_add(
+            area_id,
             target_dir,
             folder_role="default",
             is_write_enabled=1,
             conn=self.conn,
         )
-        note_id, created = self._create_note_record("move me", source_dir, project="")
+        note_id, created = self._create_note_record("move me", source_dir, area="")
 
-        moved_path = notes_routes._move_note_to_project(note_id, project_id)
+        moved_path = notes_routes._move_note_to_area(note_id, area_id)
         self.assertFalse(os.path.exists(created["full_path"]))
         self.assertTrue(os.path.exists(moved_path))
         self.assertEqual(os.path.dirname(moved_path), notes_routes._normalize_note_path(target_dir))
 
         tbl = common_utils.get_table_def("notes")
-        row = self.conn.execute(f"SELECT file_name, path, project FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        row = self.conn.execute(f"SELECT file_name, path, area FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
         self.assertEqual(row["file_name"], os.path.basename(moved_path))
         self.assertEqual(row["path"], notes_routes._normalize_note_path(target_dir))
-        self.assertEqual(row["project"], project_id)
+        self.assertEqual(row["area"], area_id)
+
+    def test_assign_note_area_updates_metadata_without_folder_mapping(self):
+        note_dir = os.path.join(self.tmpdir.name, "assign_source")
+        area_id = "make/new"
+        areas_mod.area_upsert(
+            {
+                "area_id": area_id,
+                "tab": "MAKE",
+                "group_name": "MAKE",
+                "area_name": "New",
+            },
+            conn=self.conn,
+        )
+        note_id, created = self._create_note_record("assign me", note_dir, area="")
+
+        ok = notes_routes._assign_note_area(note_id, area_id)
+
+        self.assertTrue(ok)
+        self.assertTrue(os.path.exists(created["full_path"]))
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT file_name, path, area FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["file_name"], "assign me.md")
+        self.assertEqual(row["path"], notes_routes._normalize_note_path(note_dir))
+        self.assertEqual(row["area"], area_id)
+        with open(created["full_path"], "r", encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("area: make/new", text)
+        filtered_ids = {note.get("id") for note in notes_routes._fetch_notes(area_id)}
+        self.assertIn(note_id, filtered_ids)
 
     def test_archive_delete_moves_file_and_removes_db_row(self):
         note_dir = os.path.join(self.tmpdir.name, "delete_note")
-        note_id, created = self._create_note_record("delete me", note_dir, project="fun/games")
+        note_id, created = self._create_note_record("delete me", note_dir, area="fun/games")
 
         archived_path = notes_routes._archive_and_delete_note(note_id)
         self.assertFalse(os.path.exists(created["full_path"]))
@@ -816,7 +872,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_delete_note_removes_from_unmapped(self):
         unmapped_dir = os.path.join(self.tmpdir.name, "unmapped_delete")
-        note_id, _ = self._create_note_record("note_creation_test_delete", unmapped_dir, project="")
+        note_id, _ = self._create_note_record("note_creation_test_delete", unmapped_dir, area="")
 
         tbl = common_utils.get_table_def("notes")
         data.delete_record(self.conn, tbl["name"], note_id)
@@ -827,7 +883,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_undo_restores_deleted_note(self):
         unmapped_dir = os.path.join(self.tmpdir.name, "unmapped_undo")
-        note_id, _ = self._create_note_record("note_creation_test_undo", unmapped_dir, project="")
+        note_id, _ = self._create_note_record("note_creation_test_undo", unmapped_dir, area="")
 
         tbl = common_utils.get_table_def("notes")
         data.delete_record(self.conn, tbl["name"], note_id)
@@ -849,7 +905,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_autosave_rejects_stale_note_file(self):
         note_dir = os.path.join(self.tmpdir.name, "stale_save")
-        note_id, created = self._create_note_record("note_creation_test_stale", note_dir, project="")
+        note_id, created = self._create_note_record("note_creation_test_stale", note_dir, area="")
         full_path = created["full_path"]
         loaded_state = notes_routes._note_file_state(full_path)
         self.assertIsNotNone(loaded_state)
@@ -877,7 +933,7 @@ class TestNoteCreation(unittest.TestCase):
 
     def test_autosave_allows_timestamp_only_change(self):
         note_dir = os.path.join(self.tmpdir.name, "timestamp_only_save")
-        note_id, created = self._create_note_record("note_creation_test_timestamp", note_dir, project="")
+        note_id, created = self._create_note_record("note_creation_test_timestamp", note_dir, area="")
         full_path = created["full_path"]
         loaded_state = notes_routes._note_file_state(full_path)
         self.assertIsNotNone(loaded_state)

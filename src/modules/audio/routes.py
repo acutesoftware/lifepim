@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, url_for, send_file, abort, redirect
 
 from common import data as db
-from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination
+from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination, request_area_param
 from common import config as cfg
 from common import settings as settings_mod
 
@@ -208,7 +208,7 @@ def _get_tbl():
     return get_table_def("audio")
 
 
-def _fetch_audio(project=None, sort_col=None, sort_dir=None, limit=None, offset=None):
+def _fetch_audio(area=None, sort_col=None, sort_dir=None, limit=None, offset=None):
     _ensure_audio_table_schema()
     tbl = _get_tbl()
     if not tbl:
@@ -224,7 +224,7 @@ def _fetch_audio(project=None, sort_col=None, sort_dir=None, limit=None, offset=
         "artist": "t.artist",
         "album": "t.album",
         "song": "t.song",
-        "project": "t.project",
+        "area": "t.area",
     }
     sort_key = order_map.get(sort_col or "file_name", "t.file_name")
     sort_dir = sort_dir or "asc"
@@ -233,7 +233,7 @@ def _fetch_audio(project=None, sort_col=None, sort_dir=None, limit=None, offset=
         db.conn,
         tbl["name"],
         cols,
-        tab=project,
+        tab=area,
         limit=limit,
         offset=offset,
         order_by=order_by,
@@ -282,9 +282,9 @@ def _audio_item_matches_terms(item, terms):
     return all(any(term in value for value in values) for term in terms)
 
 
-def _fetch_audio_search(project=None, query=None, sort_col=None, sort_dir=None, limit=None, offset=None):
+def _fetch_audio_search(area=None, query=None, sort_col=None, sort_dir=None, limit=None, offset=None):
     terms = [term.lower() for term in (query or "").strip().split() if term]
-    items = _fetch_audio(project, sort_col, sort_dir, limit=None, offset=None)
+    items = _fetch_audio(area, sort_col, sort_dir, limit=None, offset=None)
     filtered = [item for item in items if _audio_item_matches_terms(item, terms)]
     if offset:
         filtered = filtered[int(offset):]
@@ -305,23 +305,21 @@ def list_audio_route():
 
 @audio_bp.route("/table")
 def list_audio_table_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     sort_col = request.args.get("sort") or "file_name"
     sort_dir = request.args.get("dir") or "asc"
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
     offset = (page - 1) * per_page
-    items = _fetch_audio(project, sort_col, sort_dir, limit=per_page, offset=offset)
+    items = _fetch_audio(area, sort_col, sort_dir, limit=per_page, offset=offset)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "audio.list_audio_table_route",
-        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        {"area": area, "sort": sort_col, "dir": sort_dir},
         page,
         total_pages,
     )
@@ -335,11 +333,11 @@ def list_audio_table_route():
         active_tab="audio",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Audio ({project or 'All'})",
+        content_title=f"Audio ({area or 'All'})",
         content_html="",
         items=items,
         col_list=col_list,
-        project=project,
+        area=area,
         playlists=playlists,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -353,21 +351,19 @@ def list_audio_table_route():
 
 @audio_bp.route("/list")
 def list_audio_list_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param() or None
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=project)
+    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
     offset = (page - 1) * per_page
-    items = _fetch_audio(project, limit=per_page, offset=offset)
+    items = _fetch_audio(area, limit=per_page, offset=offset)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "audio.list_audio_list_route",
-        {"proj": project},
+        {"area": area},
         page,
         total_pages,
     )
@@ -379,10 +375,10 @@ def list_audio_list_route():
         active_tab="audio",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Audio ({project or 'All'})",
+        content_title=f"Audio ({area or 'All'})",
         content_html="",
         items=items,
-        project=project,
+        area=area,
         playlists=playlists,
         page=page,
         total_pages=total_pages,
@@ -394,9 +390,7 @@ def list_audio_list_route():
 
 @audio_bp.route("/player", methods=["GET", "POST"])
 def audio_player_route():
-    project = request.values.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = request_area_param(include_form=True) or None
     sort_col = request.values.get("sort") or "file_name"
     sort_dir = request.values.get("dir") or "asc"
     limit = request.values.get("limit", type=int) or 200
@@ -414,9 +408,9 @@ def audio_player_route():
             playlist_name = playlist.get("name")
             items = _fetch_playlist_items(conn, playlist_id)
         else:
-            items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
+            items = _fetch_audio(area, sort_col, sort_dir, limit=limit, offset=0)
     else:
-        items = _fetch_audio(project, sort_col, sort_dir, limit=limit, offset=0)
+        items = _fetch_audio(area, sort_col, sort_dir, limit=limit, offset=0)
     audio_settings = settings_mod.get_audio_settings(db._get_conn())
     tracks = []
     for item in items:
@@ -434,7 +428,7 @@ def audio_player_route():
     return render_template(
         "audio_player.html",
         tracks=tracks,
-        project=project,
+        area=area,
         start_id=start_id,
         sort_col=sort_col,
         sort_dir=sort_dir,
@@ -448,10 +442,10 @@ def audio_player_route():
 
 @audio_bp.route("/playlists/create", methods=["POST"])
 def create_playlist_route():
-    project = request.args.get("proj")
+    area = request_area_param() or None
     name = (request.form.get("playlist_name") or "").strip()
     if not name:
-        return redirect(url_for("audio.list_audio_list_route", proj=project))
+        return redirect(url_for("audio.list_audio_list_route", area=area))
     conn = _ensure_playlist_schema()
     now = _utc_now()
     try:
@@ -464,12 +458,12 @@ def create_playlist_route():
         conn.commit()
     except sqlite3.IntegrityError:
         pass
-    return redirect(url_for("audio.list_audio_list_route", proj=project))
+    return redirect(url_for("audio.list_audio_list_route", area=area))
 
 
 @audio_bp.route("/playlists/add", methods=["POST"])
 def add_playlist_items_route():
-    project = request.args.get("proj")
+    area = request_area_param() or None
     playlist_id = request.form.get("playlist_id", type=int)
     item_ids = []
     for val in request.form.getlist("item_id"):
@@ -480,11 +474,11 @@ def add_playlist_items_route():
         except (TypeError, ValueError):
             continue
     if not playlist_id or not item_ids:
-        return redirect(url_for("audio.list_audio_list_route", proj=project))
+        return redirect(url_for("audio.list_audio_list_route", area=area))
     conn = _ensure_playlist_schema()
     playlist = _get_playlist(conn, playlist_id)
     if not playlist:
-        return redirect(url_for("audio.list_audio_list_route", proj=project))
+        return redirect(url_for("audio.list_audio_list_route", area=area))
     row = conn.execute(
         "SELECT COALESCE(MAX(sort_order), 0) AS max_sort "
         "FROM lp_audio_playlist_items WHERE playlist_id = ?",
@@ -500,17 +494,17 @@ def add_playlist_items_route():
         )
         sort_order += 1
     conn.commit()
-    return redirect(url_for("audio.list_audio_list_route", proj=project))
+    return redirect(url_for("audio.list_audio_list_route", area=area))
 
 
 @audio_bp.route("/playlists/<int:playlist_id>")
 def view_playlist_route(playlist_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     conn = _ensure_playlist_schema()
     _ensure_default_playlist(conn)
     playlist = _get_playlist(conn, playlist_id)
     if not playlist:
-        return redirect(url_for("audio.list_audio_list_route", proj=project))
+        return redirect(url_for("audio.list_audio_list_route", area=area))
     items = _fetch_playlist_items(conn, playlist_id)
     player_url = url_for("audio.audio_player_route", playlist_id=playlist_id)
     return render_template(
@@ -522,38 +516,36 @@ def view_playlist_route(playlist_id):
         content_html="",
         playlist=playlist,
         items=items,
-        project=project,
+        area=area,
         player_url=player_url,
     )
 
 
 @audio_bp.route("/playlists/<int:playlist_id>/delete", methods=["POST"])
 def delete_playlist_route(playlist_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     conn = _ensure_playlist_schema()
     conn.execute("DELETE FROM lp_audio_playlist_items WHERE playlist_id = ?", (playlist_id,))
     conn.execute("DELETE FROM lp_audio_playlists WHERE playlist_id = ?", (playlist_id,))
     conn.commit()
-    return redirect(url_for("audio.list_audio_list_route", proj=project))
+    return redirect(url_for("audio.list_audio_list_route", area=area))
 
 
 @audio_bp.route("/playlists/<int:playlist_id>/remove/<int:audio_id>", methods=["POST"])
 def remove_playlist_item_route(playlist_id, audio_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     conn = _ensure_playlist_schema()
     conn.execute(
         "DELETE FROM lp_audio_playlist_items WHERE playlist_id = ? AND audio_id = ?",
         (playlist_id, audio_id),
     )
     conn.commit()
-    return redirect(url_for("audio.view_playlist_route", playlist_id=playlist_id, proj=project))
+    return redirect(url_for("audio.view_playlist_route", playlist_id=playlist_id, area=area))
 
 
 @audio_bp.route("/import", methods=["GET", "POST"])
 def import_audio_route():
-    project = request.args.get("proj") or ""
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = ""
+    area = request_area_param() or ""
     _ensure_audio_table_schema()
     tbl = _get_tbl()
     imported = None
@@ -584,7 +576,7 @@ def import_audio_route():
                         "",
                         "",
                         "",
-                        project,
+                        area,
                     ]
                     record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
                     if record_id:
@@ -597,7 +589,7 @@ def import_audio_route():
         side_tabs=get_side_tabs(),
         content_title="Import Audio Folder",
         content_html="",
-        project=project,
+        area=area,
         imported=imported,
         error=error,
     )
@@ -605,7 +597,7 @@ def import_audio_route():
 
 @audio_bp.route("/view/<int:item_id>")
 def view_audio_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     _ensure_audio_table_schema()
     tbl = _get_tbl()
     item = None
@@ -625,7 +617,7 @@ def view_audio_route(item_id):
         content_title=item.get("file_name", "Audio"),
         content_html="",
         item=item,
-        project=project,
+        area=area,
         audio_url=audio_url,
         file_exists=os.path.exists(full_path),
     )
@@ -633,7 +625,7 @@ def view_audio_route(item_id):
 
 @audio_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
 def edit_audio_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     _ensure_audio_table_schema()
     tbl = _get_tbl()
     item = None
@@ -644,7 +636,7 @@ def edit_audio_route(item_id):
     if request.method == "POST" and tbl:
         values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
         db.update_record(db.conn, tbl["name"], item_id, tbl["col_list"], values)
-        return redirect(url_for("audio.view_audio_route", item_id=item_id, proj=project))
+        return redirect(url_for("audio.view_audio_route", item_id=item_id, area=area))
     return render_template(
         "audio_edit.html",
         active_tab="audio",
@@ -653,18 +645,18 @@ def edit_audio_route(item_id):
         content_title="Edit Audio",
         content_html="",
         item=item,
-        project=project,
+        area=area,
         col_list=tbl["col_list"] if tbl else [],
     )
 
 
 @audio_bp.route("/delete/<int:item_id>")
 def delete_audio_route(item_id):
-    project = request.args.get("proj")
+    area = request_area_param() or None
     tbl = _get_tbl()
     if tbl:
         db.delete_record(db.conn, tbl["name"], item_id)
-    return redirect(url_for("audio.list_audio_table_route", proj=project))
+    return redirect(url_for("audio.list_audio_table_route", area=area))
 
 
 @audio_bp.route("/file/<int:item_id>")

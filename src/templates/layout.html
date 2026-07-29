@@ -10,20 +10,36 @@
   {% include "_app_icons.html" %}
   <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css', v=static_asset_version|default(0)) }}">
 </head>
-{% set current_proj = request.args.get('proj') %}
-{% if current_proj in ['any', 'All', 'all', 'ALL', 'spacer'] %}
-  {% set current_proj = None %}
+{% set current_area = request.args.get('area') or request.args.get('proj') or request.args.get('project') %}
+{% if current_area in ['proj', 'project'] %}
+  {% set current_area = 'area' %}
+{% elif current_area and current_area.startswith('proj/') %}
+  {% set current_area = 'area/' ~ current_area[5:] %}
+{% elif current_area and current_area.startswith('project/') %}
+  {% set current_area = 'area/' ~ current_area[8:] %}
+{% elif current_area and current_area.startswith('proj.') %}
+  {% set current_area = 'area.' ~ current_area[5:] %}
+{% elif current_area and current_area.startswith('project.') %}
+  {% set current_area = 'area.' ~ current_area[8:] %}
+{% elif current_area == 'All Projects' %}
+  {% set current_area = 'All Areas' %}
 {% endif %}
-{% set sidebar_label = current_proj or 'All Projects' %}
-<body class="{% if freeze_headers %}freeze-headers{% endif %}" style="--mobile-font-size: {{ mobile_font_size or 14 }}px;" data-active-tab="{{ active_tab }}" data-sidebar-label="{{ sidebar_label }}" data-sidebar-id="{{ current_proj or '' }}">
+{% if current_area in ['any', 'All', 'all', 'ALL', 'spacer'] %}
+  {% set current_area = '' %}
+{% endif %}
+{% if current_area in ['any', 'All', 'all', 'ALL', 'spacer'] %}
+  {% set current_area = None %}
+{% endif %}
+{% set sidebar_label = current_area or 'All Areas' %}
+<body class="{% if freeze_headers %}freeze-headers{% endif %}" style="--mobile-font-size: {{ mobile_font_size or 14 }}px;" data-active-tab="{{ active_tab }}" data-sidebar-label="{{ sidebar_label }}" data-sidebar-id="{{ current_area or '' }}">
   <div class="topbar">
     <!-- Hamburger dropdown menu -->
     <div class="menu-wrapper">
       <button class="menu-btn" id="menuToggle">☰</button>
       <div class="dropdown-menu" id="menuDropdown">
-        <a href="#" id="showSidebar">Show project list</a>
-        <a href="#" id="hideSidebar">Hide project list</a>
-        <a href="/projects/edit">Edit projects</a>
+        <a href="#" id="showSidebar">Show area list</a>
+        <a href="#" id="hideSidebar">Hide area list</a>
+        <a href="/areas/edit">Edit areas</a>
         <div class="menu-spacer"></div>
         <a href="/admin/settings">Settings</a>
         <a href="/help">Help</a>
@@ -52,7 +68,7 @@
       {% endfor %}
       {% for t in tabs %}
         {% set tab_href = '/' if t.id == 'home' else '/' ~ t.id %}
-        <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="{{ tab_href }}{% if current_proj %}?proj={{ current_proj }}{% endif %}" title="{{t.desc}}">
+        <a class="top-tab-item {% if t.id==active_tab %}active{% endif %}" href="{{ tab_href }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}" title="{{t.desc}}">
           <span class="ic">{{t.icon}}</span><span class="lab">{{t.label}}</span>
         </a>
       {% endfor %}
@@ -61,29 +77,29 @@
       <select id="mobileTabSelect" class="mobile-nav-select" aria-label="Section">
         {% if notes_tab.item %}
           {% set tab_href = '/notes' %}
-          <option value="{{ tab_href }}{% if current_proj %}?proj={{ current_proj }}{% endif %}" {% if active_tab == 'notes' %}selected{% endif %}>
+          <option value="{{ tab_href }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}" {% if active_tab == 'notes' %}selected{% endif %}>
             {{ notes_tab.item.label }}
           </option>
         {% endif %}
         {% for t in tabs %}
           {% if t.id != 'notes' %}
             {% set tab_href = '/' if t.id == 'home' else '/' ~ t.id %}
-            <option value="{{ tab_href }}{% if current_proj %}?proj={{ current_proj }}{% endif %}" {% if t.id == active_tab %}selected{% endif %}>
+            <option value="{{ tab_href }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}" {% if t.id == active_tab %}selected{% endif %}>
               {{ t.label }}
             </option>
           {% endif %}
         {% endfor %}
       </select>
-      <select id="mobileProjectSelect" class="mobile-nav-select" aria-label="Project">
+      <select id="mobileAreaSelect" class="mobile-nav-select" aria-label="Area">
         {% for s in side_tabs %}
-          {% set tab_proj = (s.proj if s.proj is defined and s.proj else s.id) %}
-          {% set is_all = tab_proj in ['any', 'All', 'all', 'ALL'] %}
-          {% set is_header = (s.is_header is defined and s.is_header) or tab_proj in ['spacer', ''] %}
-          {% set is_active = (current_proj and tab_proj and tab_proj|lower == current_proj|lower) or (not current_proj and is_all) %}
+          {% set tab_area = (s.area if s.area is defined and s.area else s.id) %}
+          {% set is_all = tab_area in ['any', 'All', 'all', 'ALL'] %}
+          {% set is_header = (s.is_header is defined and s.is_header) or tab_area in ['spacer', ''] %}
+          {% set is_active = (current_area and tab_area and tab_area|lower == current_area|lower) or (not current_area and is_all) %}
           {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names'] %}
-          {% set side_base_path = request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab %}
+          {% set side_base_path = '/' if active_tab == 'home' else (request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab) %}
           {% if not is_header %}
-            <option value="{{ side_base_path }}{% if not is_all %}?proj={{tab_proj}}{% endif %}" {% if is_active %}selected{% endif %}>
+            <option value="{{ side_base_path }}{% if not is_all %}?area={{tab_area|urlencode}}{% endif %}" {% if is_active %}selected{% endif %}>
               {{ s.label }}
             </option>
           {% endif %}
@@ -93,7 +109,7 @@
     {% set search_scope = request.args.get('scope', 'metadata') %}
     <form class="search-form" action="{{ url_for('search_route') }}" method="get">
       <input type="text" name="q" value="{{ request.args.get('q', '') }}" placeholder="Search">
-      <input type="hidden" name="proj" value="{{ current_proj or '' }}">
+      <input type="hidden" name="area" value="{{ current_area or '' }}">
       <input type="hidden" name="route" value="{{ active_tab }}">
       {% if active_tab == 'media' %}
         {% for key in ['view', 'view_mode', 'sort', 'group', 'media_type', 'folder', 'year', 'album_id', 'event_id', 'smart_view_id'] %}
@@ -115,12 +131,12 @@
   <div class="container">
     <aside class="side-tabs" id="sidebar">
       {% for s in side_tabs %}
-        {% set tab_proj = (s.proj if s.proj is defined and s.proj else s.id) %}
-        {% set is_all = tab_proj in ['any', 'All', 'all', 'ALL'] %}
-        {% set is_active = (current_proj and tab_proj and tab_proj|lower == current_proj|lower) or (not current_proj and is_all) %}
+        {% set tab_area = (s.area if s.area is defined and s.area else s.id) %}
+        {% set is_all = tab_area in ['any', 'All', 'all', 'ALL'] %}
+        {% set is_active = (current_area and tab_area and tab_area|lower == current_area|lower) or (not current_area and is_all) %}
         {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names'] %}
-        {% set side_base_path = request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab %}
-        <a class="side {% if is_active %}active{% endif %}" href="{{ side_base_path }}{% if tab_proj not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?proj={{tab_proj}}{% endif %}">
+        {% set side_base_path = '/' if active_tab == 'home' else (request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab) %}
+        <a class="side {% if is_active %}active{% endif %}" href="{{ side_base_path }}{% if tab_area not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?area={{tab_area|urlencode}}{% endif %}">
           <span class="ic">{{s.icon}}</span>
           <span class="lab">{{s.label}}</span>
         </a>
@@ -199,8 +215,8 @@
     });
 
     const mobileTabSelect = document.getElementById('mobileTabSelect');
-    const mobileProjectSelect = document.getElementById('mobileProjectSelect');
-    [mobileTabSelect, mobileProjectSelect].forEach((selectEl) => {
+    const mobileAreaSelect = document.getElementById('mobileAreaSelect');
+    [mobileTabSelect, mobileAreaSelect].forEach((selectEl) => {
       if (!selectEl) {
         return;
       }

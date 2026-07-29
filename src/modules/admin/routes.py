@@ -27,17 +27,17 @@ admin_bp = Blueprint(
 
 
 _REBUILD_SQL = """
-DELETE FROM map_project_folder;
+DELETE FROM map_area_folder;
 
-INSERT INTO map_project_folder (
-  folder_id, tab, grp, project, tags, confidence,
+INSERT INTO map_area_folder (
+  folder_id, tab, grp, area, tags, confidence,
   matched_prefix, rule_map_id, is_primary, is_enabled, updated_at
 )
 SELECT
   f.folder_id,
   r.tab,
   r.grp,
-  COALESCE(r.project,''),
+  COALESCE(r.area,''),
   r.tags,
   r.confidence,
   r.path_prefix,
@@ -46,10 +46,10 @@ SELECT
   r.is_enabled,
   strftime('%Y-%m-%dT%H:%M:%fZ','now')
 FROM dim_folder f
-JOIN map_folder_project r
+JOIN map_folder_area r
   ON r.map_id = (
       SELECT r2.map_id
-      FROM map_folder_project r2
+      FROM map_folder_area r2
       WHERE r2.is_enabled=1
         AND r2.is_primary=1
         AND lower(f.folder_path) LIKE lower(r2.path_prefix) || '%'
@@ -125,17 +125,17 @@ def admin_mapping_route():
     page_data = paginate_total(0, 1, per_page)
     pagination = build_pagination(url_for, "admin.admin_mapping_route", {"tab": active_admin_tab}, 1, 1)
     try:
-        counts["map_folder_project"] = conn.execute("SELECT COUNT(1) FROM map_folder_project").fetchone()[0]
-        counts["map_project_folder"] = conn.execute("SELECT COUNT(1) FROM map_project_folder").fetchone()[0]
+        counts["map_folder_area"] = conn.execute("SELECT COUNT(1) FROM map_folder_area").fetchone()[0]
+        counts["map_area_folder"] = conn.execute("SELECT COUNT(1) FROM map_area_folder").fetchone()[0]
         counts["dim_folder"] = conn.execute("SELECT COUNT(1) FROM dim_folder").fetchone()[0]
         if active_admin_tab == "folder_mapping":
-            rules_total = counts["map_folder_project"]
+            rules_total = counts["map_folder_area"]
             page_data = paginate_total(rules_total, page, per_page)
             offset = (page_data["page"] - 1) * per_page
             rules = conn.execute(
                 """
-                SELECT map_id, path_prefix, tab, grp, project, tags, confidence, priority, is_primary, is_enabled
-                FROM map_folder_project
+                SELECT map_id, path_prefix, tab, grp, area, tags, confidence, priority, is_primary, is_enabled
+                FROM map_folder_area
                 ORDER BY tab, grp, path_prefix
                 LIMIT ? OFFSET ?
                 """,
@@ -153,7 +153,7 @@ def admin_mapping_route():
                 """
                 SELECT COUNT(1)
                 FROM dim_folder f
-                LEFT JOIN map_project_folder mpf
+                LEFT JOIN map_area_folder mpf
                   ON mpf.folder_id = f.folder_id
                  AND mpf.is_primary = 1
                  AND mpf.is_enabled = 1
@@ -166,7 +166,7 @@ def admin_mapping_route():
                 """
                 SELECT f.folder_id, f.folder_path, f.is_active, f.last_seen_at
                 FROM dim_folder f
-                LEFT JOIN map_project_folder mpf
+                LEFT JOIN map_area_folder mpf
                   ON mpf.folder_id = f.folder_id
                  AND mpf.is_primary = 1
                  AND mpf.is_enabled = 1
@@ -324,17 +324,17 @@ def settings_route():
                     conn,
                 )
                 message = "Note display settings saved."
-            elif action == "materialize_note_projects":
+            elif action == "materialize_note_areas":
                 try:
                     from modules.notes import routes as notes_routes
 
-                    result = notes_routes.materialize_note_projects(conn=conn, owner_user_id=getattr(current_user, "user_id", None))
+                    result = notes_routes.materialize_note_areas(conn=conn, owner_user_id=getattr(current_user, "user_id", None))
                     message = (
-                        "Materialized note projects: "
-                        f"{result['updated']} updated from {result['scanned']} blank-project rows."
+                        "Materialized note areas: "
+                        f"{result['updated']} updated from {result['scanned']} blank-area rows."
                     )
                 except Exception as exc:
-                    message = f"Note project materialization failed: {exc}"
+                    message = f"Note area materialization failed: {exc}"
             elif action == "refresh_note_colors":
                 try:
                     from modules.notes import routes as notes_routes
@@ -805,8 +805,8 @@ def _delete_user_and_owned_notes(conn, user_id):
                 note_ids,
             )
     _delete_by_column_if_exists(conn, "lp_notes", "owner_user_id", user_id)
-    _delete_by_column_if_exists(conn, "lp_project_folders", "owner_user_id", user_id)
-    _delete_by_column_if_exists(conn, "lp_projects", "owner_user_id", user_id)
+    _delete_by_column_if_exists(conn, "lp_area_folders", "owner_user_id", user_id)
+    _delete_by_column_if_exists(conn, "lp_areas", "owner_user_id", user_id)
     _delete_by_column_if_exists(conn, "pocket_user_settings", "user_id", user_id)
     _delete_by_column_if_exists(conn, "pocket_pairing_codes", "user_id", user_id)
     _delete_by_column_if_exists(conn, "pocket_devices", "user_id", user_id)
@@ -852,10 +852,10 @@ def _default_or_submitted_user_paths(username):
             or "",
             username,
         ),
-        "projects_root_path": _resolve_username_segment(
-            request.form.get("projects_root_path", "").strip()
-            or derived.get("projects_root_path")
-            or defaults.get("projects_root_path")
+        "areas_root_path": _resolve_username_segment(
+            request.form.get("areas_root_path", "").strip()
+            or derived.get("areas_root_path")
+            or defaults.get("areas_root_path")
             or "",
             username,
         ),

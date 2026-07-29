@@ -6,7 +6,7 @@ import os, sys, sqlite3, subprocess
 import etl_folder_mapping as folder_etl
 import common.config as cfg
 from common import data as db
-from common import projects as projects_mod
+from common import areas as areas_mod
 from common.media_schema import ensure_media_schema
 from common.settings import ensure_settings_schema
 from lifepim.importer.schema import ensure_import_schema
@@ -17,7 +17,7 @@ def main():
     reset_database(cfg.DB_FILE)
     _run_load_testing_if_enabled()
     _run_folder_mapping()
-    _run_projects_import()
+    _run_areas_import()
     print(f"Initialized database at {cfg.DB_FILE}")
 
 
@@ -38,7 +38,8 @@ def reset_database(db_file):
             continue
         create_table(db_conn, tbl)
     db_conn.executescript(folder_etl.DDL_RESET)
-    projects_mod.ensure_projects_schema(db_conn)
+    areas_mod.ensure_areas_schema(db_conn)
+    db.ensure_area_columns(db_conn)
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_contacts.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_links.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))
@@ -54,7 +55,7 @@ def reset_database(db_file):
 
 
 def create_table(db_conn, tbl):
-    # {'name':'lp_notes', 'display_name':'Notes', 'col_list':['file_name','path','size','date_modified','project']},
+    # {'name':'lp_notes', 'display_name':'Notes', 'col_list':['file_name','path','size','date_modified','area']},
     # also include standard columns
     col_defs = []
     for col in tbl["col_list"]:
@@ -132,29 +133,29 @@ def _run_folder_mapping():
     )
 
 
-def _run_projects_import():
+def _run_areas_import():
     rules_csv = getattr(cfg, "etl_rules_csv", "")
     if not rules_csv or not os.path.exists(rules_csv):
-        print(f"Project rules CSV not found: {rules_csv}")
+        print(f"Area rules CSV not found: {rules_csv}")
         return
-    print("Importing projects + project folders...")
+    print("Importing areas + area folders...")
     try:
-        projects_mod.import_project_mappings_csv(rules_csv)
-        updated = projects_mod.assign_defaults_if_missing()
+        areas_mod.import_area_mappings_csv(rules_csv)
+        updated = areas_mod.assign_defaults_if_missing()
         if updated:
-            print(f"Assigned default folders for {updated} projects.")
-        issues = projects_mod.diagnose_projects()
+            print(f"Assigned default folders for {updated} areas.")
+        issues = areas_mod.diagnose_areas()
         missing = issues.get("missing_default") or []
         if missing:
-            print(f"Projects missing default folder: {len(missing)}")
+            print(f"Areas missing default folder: {len(missing)}")
         disabled = issues.get("disabled_default") or []
         if disabled:
-            print(f"Projects with disabled default folder: {len(disabled)}")
+            print(f"Areas with disabled default folder: {len(disabled)}")
         multi = issues.get("multiple_default") or []
         if multi:
-            print(f"Projects with multiple default folders: {len(multi)}")
+            print(f"Areas with multiple default folders: {len(multi)}")
     except Exception as exc:
-        print(f"Project import failed: {exc}")
+        print(f"Area import failed: {exc}")
 
 
 if __name__ == "__main__":

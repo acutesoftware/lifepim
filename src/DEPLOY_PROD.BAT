@@ -6,10 +6,13 @@ set "PROD_DIR=C:\apps\LifePIM_Prod"
 set "PROD_SRC=%PROD_DIR%\src"
 set "PYTHON_EXE=%PROD_DIR%\.venv\Scripts\python.exe"
 set "LIFEPIM_PORT=9741"
+set "PROD_LOG_DIR=%PROD_DIR%\logs"
+set "PROD_START_LOG=%PROD_LOG_DIR%\run_desktop_last.log"
 
 echo Deploying LifePIM to %PROD_DIR%
 
 if not exist "%PROD_DIR%" mkdir "%PROD_DIR%"
+if not exist "%PROD_LOG_DIR%" mkdir "%PROD_LOG_DIR%"
 
 if not exist "%ROOT_DIR%\src\app.py" (
   echo ERROR: Source tree not found at %ROOT_DIR%
@@ -29,6 +32,11 @@ if errorlevel 8 exit /b %ERRORLEVEL%
 robocopy "%ROOT_DIR%\scripts" "%PROD_DIR%\scripts" /MIR /FFT /R:2 /W:2 ^
   /XD "__pycache__" ".pytest_cache"
 if errorlevel 8 exit /b %ERRORLEVEL%
+
+if exist "%ROOT_DIR%\doc" (
+  robocopy "%ROOT_DIR%\doc" "%PROD_DIR%\doc" /MIR /FFT /R:2 /W:2 >nul
+  if errorlevel 8 exit /b %ERRORLEVEL%
+)
 
 copy /Y "%ROOT_DIR%\requirements.txt" "%PROD_DIR%\requirements.txt" >nul
 if errorlevel 1 exit /b %ERRORLEVEL%
@@ -62,12 +70,21 @@ if exist "C:\apps\caddy\Caddyfile" (
 )
 
 echo Starting production LifePIM.
-start "LifePIM Desktop" /MIN "%PROD_DIR%\RUN_DESKTOP.BAT"
+start "LifePIM Desktop" /MIN cmd /d /c call "%PROD_DIR%\RUN_DESKTOP.BAT" ^> "%PROD_START_LOG%" 2^>^&1
 
 echo Waiting for health check.
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$deadline = (Get-Date).AddSeconds(20); do { try { $r = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:%LIFEPIM_PORT%/api/pocket/v1/health' -TimeoutSec 2; if ($r.StatusCode -eq 200) { Write-Host 'Health check OK:' $r.Content; exit 0 } } catch { Start-Sleep -Seconds 1 } } while ((Get-Date) -lt $deadline); Write-Host 'ERROR: Health check failed on http://127.0.0.1:%LIFEPIM_PORT%/api/pocket/v1/health'; exit 1"
-if errorlevel 1 exit /b %ERRORLEVEL%
+if errorlevel 1 (
+  echo.
+  echo Startup log tail from %PROD_START_LOG%:
+  if exist "%PROD_START_LOG%" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -LiteralPath $env:PROD_START_LOG -Tail 80"
+  ) else (
+    echo Startup log was not created.
+  )
+  exit /b 1
+)
 
 echo Deploy complete. Production is listening on port %LIFEPIM_PORT%.
 exit /b 0

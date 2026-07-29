@@ -2,7 +2,7 @@
 
 LifePIM Desktop is a local-first personal information manager for notes, tasks,
 calendar events, files, media, audio, places, contacts, money records, and
-related project data.
+related area data.
 
 The current desktop app is a Flask web application that runs on your PC and
 uses a local SQLite database. The current entry point is `src/app.py`; on
@@ -26,9 +26,9 @@ Working at a high level:
   `https://192.168.1.99` via Caddy, with Waitress kept loopback-only
 - Overview dashboard with recent notes, tasks, and calendar context
 - Top-level modules for Calendar, Goals, Tasks, How, Notes, Data, Files, Media,
-  Audio, 3D, Money, People, Places, Apps, Admin, Links, and Projects
+  Audio, 3D, Money, People, Places, Apps, Admin, Links, and Areas
 - SQLite-backed data access for the current desktop database
-- Notes, calendar, media, audio, files, contacts, money, links, projects, and
+- Notes, calendar, media, audio, files, contacts, money, links, areas, and
   settings routes/templates are present
 - Search across LifePIM areas, with optional note-content search
 - Media browsing and event clustering, audio playlist/player views, calendar
@@ -146,7 +146,7 @@ cd src
 
 `init_database.py` deletes the configured `DB_FILE` if it exists, recreates the
 base schema, applies module schemas, runs the current test/sample loaders, and
-refreshes folder/project mapping data. Do not run it against a database you want
+refreshes folder/area mapping data. Do not run it against a database you want
 to preserve.
 
 More operational detail is in [doc/deploy.md](doc/deploy.md).
@@ -166,7 +166,7 @@ The companion setup requires:
   supported for normal use.
 - Pocket built with the public Caddy local root certificate for this Desktop
   installation. The private Caddy CA key stays on the Desktop machine and must
-  not be copied into the mobile project or committed.
+  not be copied into the mobile area or committed.
 - A logged-in Desktop user creating a one-time Pocket pairing code under
   Trusted devices. Pocket registration uses that code plus the device identity,
   then sends `Authorization: Bearer <device_token>` and
@@ -188,7 +188,7 @@ mobile overwrite. More detail is in [doc/network.md](doc/network.md).
 ## Per-User File Roots
 
 Notes are user-owned in the database and new note files are also separated by
-user on disk. Existing `duncan` note and project-folder settings are preserved
+user on disk. Existing `duncan` note and area-folder settings are preserved
 so the production desktop login continues using the current folders.
 
 New users get a default root under:
@@ -201,14 +201,14 @@ LifePIM creates these subfolders for new users:
 
 ```text
 notes
-projects
+areas
 lists
 ```
 
-Only the `duncan` account uses the full legacy project list and project-folder
+Only the `duncan` account uses the full legacy area list and area-folder
 mapping by default. Other users start with an editable `Home`, `Work`, `Family`,
-and `Fun` project list, and new notes go into that user's `notes` root unless a
-project folder mapping is explicitly added. Media and audio remain global.
+and `Fun` area list, and new notes go into that user's `notes` root unless a
+area folder mapping is explicitly added. Media and audio remain global.
 
 ## Tests
 

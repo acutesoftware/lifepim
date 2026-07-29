@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 {% block module_content %}
   {% include "_notes_list_header.html" %}
+  {% include "widgets/area_folders.html" %}
   {% include "_notes_folder_panel.html" %}
 
   <ul class="note-list-items" id="notes-selection-root" data-notes-context="true" data-bulk-selection-root="true">

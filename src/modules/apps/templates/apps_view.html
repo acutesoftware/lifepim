@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('apps.list_apps_table_route', proj=project) }}">Back to Apps</a> |
-    <a href="{{ url_for('apps.launch_app_route', item_id=item.id, proj=project) }}" target="_blank" rel="noopener noreferrer">Launch</a> |
-    <a href="{{ url_for('apps.edit_app_route', item_id=item.id, proj=project) }}">Edit</a>
+    <a href="{{ url_for('apps.list_apps_table_route', area=area) }}">Back to Apps</a> |
+    <a href="{{ url_for('apps.launch_app_route', item_id=item.id, area=area) }}" target="_blank" rel="noopener noreferrer">Launch</a> |
+    <a href="{{ url_for('apps.edit_app_route', item_id=item.id, area=area) }}">Edit</a>
   </div>
   {% if launch_error %}
   <p class="apps-launch-error">{{ launch_error }}</p>

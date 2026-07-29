@@ -66,7 +66,7 @@ These are the main data tables for each top tab. Some tabs also use helper table
 ### Calendar
 
 - Table: `lp_calendar_events`
-- Columns: `id`, `title`, `content`, `event_date`, `remind_date`, `project`, `user_name`, `rec_extract_date`
+- Columns: `id`, `title`, `content`, `event_date`, `remind_date`, `area`, `user_name`, `rec_extract_date`
 - Routes/templates: `src/modules/calendar/routes.py`, `src/modules/calendar/templates/`
 - Calendar view settings are stored in `sys_settings`:
   - `calendar.view.events`
@@ -79,33 +79,33 @@ These are the main data tables for each top tab. Some tabs also use helper table
 ### Goals
 
 - Table: `lp_goals`
-- Columns: `id`, `parent_goal_id`, `title`, `description`, `goal_date`, `remind_date`, `project`, `user_name`, `rec_extract_date`
+- Columns: `id`, `parent_goal_id`, `title`, `description`, `goal_date`, `remind_date`, `area`, `user_name`, `rec_extract_date`
 
 ### Tasks
 
 - Table: `lp_tasks`
-- Columns: `id`, `title`, `content`, `project`, `start_date`, `due_date`, `user_name`, `rec_extract_date`
+- Columns: `id`, `title`, `content`, `area`, `start_date`, `due_date`, `user_name`, `rec_extract_date`
 
 ### How
 
 - Table: `lp_how`
-- Columns: `id`, `parent_how_id`, `title`, `description`, `project`, `user_name`, `rec_extract_date`
+- Columns: `id`, `parent_how_id`, `title`, `description`, `area`, `user_name`, `rec_extract_date`
 
 ### Notes
 
 - Table: `lp_notes`
-- Columns: `id`, `file_name`, `path`, `folder_id`, `size`, `date_modified`, `project`, `user_name`, `rec_extract_date`
-- Notes can also use project folder tables for default write locations.
+- Columns: `id`, `file_name`, `path`, `folder_id`, `size`, `date_modified`, `area`, `user_name`, `rec_extract_date`
+- Notes can also use area folder tables for default write locations.
 
 ### Data
 
 - Table: `lp_data`
-- Columns: `id`, `name`, `description`, `tbl_name`, `col_list`, `project`, `user_name`, `rec_extract_date`
+- Columns: `id`, `name`, `description`, `tbl_name`, `col_list`, `area`, `user_name`, `rec_extract_date`
 
 ### Files
 
 - Table: `lp_files`
-- Base columns: `id`, `filelist_name`, `path`, `folder_id`, `file_type`, `project`, `user_name`, `rec_extract_date`
+- Base columns: `id`, `filelist_name`, `path`, `folder_id`, `file_type`, `area`, `user_name`, `rec_extract_date`
 - Importer-added columns may include: `entity_id`, `size`, `mtime_utc`, `sha256`, `source_system`, `source_uid`, `imported_run_id`, `imported_utc`, `is_deleted`, `deleted_utc`
 
 ### Media
@@ -126,7 +126,7 @@ These are the main data tables for each top tab. Some tabs also use helper table
 ### Audio
 
 - Table: `lp_audio`
-- Columns: `id`, `file_name`, `path`, `folder_id`, `file_type`, `size`, `date_modified`, `artist`, `album`, `song`, `project`, `user_name`, `rec_extract_date`
+- Columns: `id`, `file_name`, `path`, `folder_id`, `file_type`, `size`, `date_modified`, `artist`, `album`, `song`, `area`, `user_name`, `rec_extract_date`
 - Helper tables:
   - `lp_audio_playlists`
   - `lp_audio_playlist_items`
@@ -134,7 +134,7 @@ These are the main data tables for each top tab. Some tabs also use helper table
 ### 3D
 
 - Table: `lp_3d`
-- Columns: `id`, `file_name`, `path`, `folder_id`, `size`, `date_modified`, `project`, `user_name`, `rec_extract_date`
+- Columns: `id`, `file_name`, `path`, `folder_id`, `size`, `date_modified`, `area`, `user_name`, `rec_extract_date`
 
 ### Money
 
@@ -159,15 +159,15 @@ These are the main data tables for each top tab. Some tabs also use helper table
 ### Apps
 
 - Table: `lp_apps`
-- Columns: `id`, `file_path`, `folder_id`, `title`, `icon`, `project`, `user_name`, `rec_extract_date`
+- Columns: `id`, `file_path`, `folder_id`, `title`, `icon`, `area`, `user_name`, `rec_extract_date`
 
 ### Admin
 
 - Main route: `/admin/`
 - Folder mapping tables:
   - `dim_folder`
-  - `map_folder_project`
-  - `map_project_folder`
+  - `map_folder_area`
+  - `map_area_folder`
 - User history table: `sys_user_log`
 - Settings table: `sys_settings`
 

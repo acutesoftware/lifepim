@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <a href="{{ url_for('goals.add_goal_route', proj=project) }}">Add Goal</a>
+  <a href="{{ url_for('goals.add_goal_route', area=area) }}">Add Goal</a>
 
 <div class="tabular-scroll">
 <table border="1" cellpadding="5">
@@ -16,9 +16,9 @@
     <td>{{ item[col] }}</td>
     {% endfor %}
     <td>
-      <a href="{{ url_for('goals.view_goal_route', item_id=item.id, proj=project) }}">View</a> |
-      <a href="{{ url_for('goals.edit_goal_route', item_id=item.id, proj=project) }}">Edit</a> |
-      <a href="{{ url_for('goals.delete_goal_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+      <a href="{{ url_for('goals.view_goal_route', item_id=item.id, area=area) }}">View</a> |
+      <a href="{{ url_for('goals.edit_goal_route', item_id=item.id, area=area) }}">Edit</a> |
+      <a href="{{ url_for('goals.delete_goal_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
     </td>
   </tr>
   {% endfor %}

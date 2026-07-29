@@ -133,6 +133,40 @@ Done.
         self.assertEqual(parsed.steps[2].child_howto_ref, "retile-bathroom-walls")
 
 
+class TestHowSchemaMigration(unittest.TestCase):
+    def test_existing_rows_normalize_legacy_area_ids(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            ensure_how_schema(conn)
+            now = utc_now()
+            conn.execute(
+                "INSERT INTO lp_howto (title, area_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                ("Legacy HOW", "proj/home", now, now),
+            )
+            conn.execute(
+                "INSERT INTO lp_howto_parts (part_name, area_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                ("Filter", "project/garage", now, now),
+            )
+            conn.execute(
+                "INSERT INTO lp_howto_tools_needed (tool_name, area_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                ("Wrench", "proj.tools", now, now),
+            )
+            conn.execute(
+                "INSERT INTO lp_howto_steps (instruction, area_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                ("Tighten the fitting.", "project.steps", now, now),
+            )
+
+            ensure_how_schema(conn)
+
+            self.assertEqual(conn.execute("SELECT area_id FROM lp_howto").fetchone()["area_id"], "area/home")
+            self.assertEqual(conn.execute("SELECT area_id FROM lp_howto_parts").fetchone()["area_id"], "area/garage")
+            self.assertEqual(conn.execute("SELECT area_id FROM lp_howto_tools_needed").fetchone()["area_id"], "area.tools")
+            self.assertEqual(conn.execute("SELECT area_id FROM lp_howto_steps").fetchone()["area_id"], "area.steps")
+        finally:
+            conn.close()
+
+
 class TestHowDatabaseAndTree(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
@@ -144,7 +178,7 @@ class TestHowDatabaseAndTree(unittest.TestCase):
         )
         self.conn.execute(
             "CREATE TABLE lp_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, file_name TEXT, path TEXT, folder_id INTEGER, "
-            "size TEXT, date_modified TEXT, project TEXT, owner_user_id INTEGER, visibility TEXT NOT NULL DEFAULT 'private', "
+            "size TEXT, date_modified TEXT, area TEXT, owner_user_id INTEGER, visibility TEXT NOT NULL DEFAULT 'private', "
             "show_in_blog INTEGER NOT NULL DEFAULT 0, is_public INTEGER NOT NULL DEFAULT 0, user_name TEXT, rec_extract_date TEXT)"
         )
         self.tmp = tempfile.TemporaryDirectory()
@@ -350,13 +384,13 @@ Original HOW markdown.
         howto_id = create_howto_from_markdown(
             "Existing Note",
             markdown,
-            project_id="proj/dev",
+            area_id="area/dev",
             source_filepath=self._path("Existing Note.md"),
             conn=self.conn,
         )
         row = self.conn.execute("SELECT * FROM lp_howto WHERE howto_id = ?", (howto_id,)).fetchone()
         self.assertEqual(row["title"], "Existing Note")
-        self.assertEqual(row["project_id"], "proj/dev")
+        self.assertEqual(row["area_id"], "area/dev")
         self.assertEqual(row["markdown_full_content"], markdown)
         self.assertEqual(row["parse_status"], "NOT_PARSED")
         self.assertEqual(self.conn.execute("SELECT COUNT(1) FROM lp_howto_step_links").fetchone()[0], 0)
@@ -374,7 +408,7 @@ Original HOW markdown.
             "tools",
             {
                 "tool_key": "hammer",
-                "project_id": "",
+                "area_id": "",
                 "tool_name": "Framing Hammer",
                 "description": "Updated",
                 "notes": "manual",

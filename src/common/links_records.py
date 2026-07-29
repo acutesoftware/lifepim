@@ -116,14 +116,14 @@ def _search_tasks(terms, limit):
     tbl = get_table_def("tasks")
     if not tbl:
         return []
-    cols = ["id", "title", "content", "due_date", "project"]
+    cols = ["id", "title", "content", "due_date", "area"]
     rows = _search_table(tbl["name"], cols, ["title", "content"], terms, limit)
     return [
         _summary_from_values(
             "task",
             row["id"],
             row.get("title"),
-            row.get("due_date") or row.get("project"),
+            row.get("due_date") or row.get("area"),
         )
         for row in rows
     ]
@@ -133,14 +133,14 @@ def _search_events(terms, limit):
     tbl = get_table_def("calendar")
     if not tbl:
         return []
-    cols = ["id", "title", "content", "event_date", "project"]
+    cols = ["id", "title", "content", "event_date", "area"]
     rows = _search_table(tbl["name"], cols, ["title", "content"], terms, limit)
     return [
         _summary_from_values(
             "event",
             row["id"],
             row.get("title"),
-            row.get("event_date") or row.get("project"),
+            row.get("event_date") or row.get("area"),
         )
         for row in rows
     ]
@@ -150,14 +150,14 @@ def _search_files(terms, limit):
     tbl = get_table_def("files")
     if not tbl:
         return []
-    cols = ["id", "filelist_name", "path", "project"]
+    cols = ["id", "filelist_name", "path", "area"]
     rows = _search_table(tbl["name"], cols, ["filelist_name", "path"], terms, limit)
     return [
         _summary_from_values(
             "file",
             row["id"],
             row.get("filelist_name"),
-            row.get("path") or row.get("project"),
+            row.get("path") or row.get("area"),
         )
         for row in rows
     ]
@@ -213,9 +213,9 @@ def _summary_fields(type_id, row):
     if type_id == "note":
         return row.get("file_name"), row.get("path")
     if type_id == "task":
-        return row.get("title"), row.get("due_date") or row.get("project")
+        return row.get("title"), row.get("due_date") or row.get("area")
     if type_id == "event":
-        return row.get("title"), row.get("event_date") or row.get("project")
+        return row.get("title"), row.get("event_date") or row.get("area")
     if type_id == "file":
         return row.get("filelist_name"), row.get("path")
     if type_id == "place":

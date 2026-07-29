@@ -15,7 +15,7 @@ from common import utils
 from common.media_schema import ensure_media_schema
 
 
-PROJECT_LOAD_TEST = "LoadTest"
+AREA_LOAD_TEST = "LoadTest"
 LOAD_CORE_RECORDS_ENV = "LIFEPIM_LOAD_CORE_RECORDS"
 
 test_type = 'FULL'
@@ -97,7 +97,7 @@ def _add_record(tbl, values_map):
     return data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
 
 
-def load_notes(folder_path=FOLDER_NOTES, project=PROJECT_LOAD_TEST):
+def load_notes(folder_path=FOLDER_NOTES, area=AREA_LOAD_TEST):
     tbl = _get_tbl("notes")
     count = 0
     print('Notes folder = ' + str(folder_path))
@@ -108,7 +108,7 @@ def load_notes(folder_path=FOLDER_NOTES, project=PROJECT_LOAD_TEST):
             "path": os.path.dirname(full_path),
             "size": str(info.st_size),
             "date_modified": datetime.fromtimestamp(info.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -116,7 +116,7 @@ def load_notes(folder_path=FOLDER_NOTES, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_tasks(folder_path=FOLDER_TASKS, project=PROJECT_LOAD_TEST):
+def load_tasks(folder_path=FOLDER_TASKS, area=AREA_LOAD_TEST):
     tbl = _get_tbl("tasks")
     count = 0
     for full_path in _iter_files(folder_path):
@@ -125,7 +125,7 @@ def load_tasks(folder_path=FOLDER_TASKS, project=PROJECT_LOAD_TEST):
         values_map = {
             "title": title,
             "content": full_path,
-            "project": project,
+            "area": area,
             "start_date": datetime.fromtimestamp(info.st_mtime).strftime("%Y-%m-%d"),
             "due_date": "",
         }
@@ -135,7 +135,7 @@ def load_tasks(folder_path=FOLDER_TASKS, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_events(folder_path=FOLDER_EVENTS, project=PROJECT_LOAD_TEST):
+def load_events(folder_path=FOLDER_EVENTS, area=AREA_LOAD_TEST):
     tbl = _get_tbl("calendar")
     count = 0
     for full_path in _iter_files(folder_path):
@@ -147,7 +147,7 @@ def load_events(folder_path=FOLDER_EVENTS, project=PROJECT_LOAD_TEST):
             "content": full_path,
             "event_date": event_date,
             "remind_date": "",
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -155,7 +155,7 @@ def load_events(folder_path=FOLDER_EVENTS, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_goals(folder_path=FOLDER_GOALS, project=PROJECT_LOAD_TEST):
+def load_goals(folder_path=FOLDER_GOALS, area=AREA_LOAD_TEST):
     tbl = _get_tbl("goals")
     count = 0
     for full_path in _iter_files(folder_path):
@@ -167,7 +167,7 @@ def load_goals(folder_path=FOLDER_GOALS, project=PROJECT_LOAD_TEST):
             "description": full_path,
             "goal_date": datetime.fromtimestamp(info.st_mtime).strftime("%Y-%m-%d"),
             "remind_date": "",
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -175,7 +175,7 @@ def load_goals(folder_path=FOLDER_GOALS, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_how(folder_path=FOLDER_HOW, project=PROJECT_LOAD_TEST):
+def load_how(folder_path=FOLDER_HOW, area=AREA_LOAD_TEST):
     tbl = _get_tbl("how")
     count = 0
     for full_path in _iter_files(folder_path):
@@ -184,7 +184,7 @@ def load_how(folder_path=FOLDER_HOW, project=PROJECT_LOAD_TEST):
             "parent_how_id": "",
             "title": title,
             "description": full_path,
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -192,7 +192,7 @@ def load_how(folder_path=FOLDER_HOW, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_data(folder_path=FOLDER_DATA, project=PROJECT_LOAD_TEST):
+def load_data(folder_path=FOLDER_DATA, area=AREA_LOAD_TEST):
     tbl = _get_tbl("data")
     count = 0
     for full_path in _iter_files(folder_path, extensions=(".db",)):
@@ -202,7 +202,7 @@ def load_data(folder_path=FOLDER_DATA, project=PROJECT_LOAD_TEST):
             "description": "SQLite database",
             "tbl_name": full_path,
             "col_list": "",
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -210,7 +210,7 @@ def load_data(folder_path=FOLDER_DATA, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_files(folder_path=FOLDER_FILES, project=PROJECT_LOAD_TEST):
+def load_files(folder_path=FOLDER_FILES, area=AREA_LOAD_TEST):
     tbl = _get_tbl("files")
     count = 0
     for full_path in _iter_dirs(folder_path):
@@ -218,7 +218,7 @@ def load_files(folder_path=FOLDER_FILES, project=PROJECT_LOAD_TEST):
             "filelist_name": os.path.basename(full_path),
             "path": full_path,
             "file_type": "Folder",
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -279,7 +279,7 @@ def load_media(folder_path=FOLDER_MEDIA):
     return count
 
 
-def load_audio(folder_path=FOLDER_AUDIO, project=PROJECT_LOAD_TEST):
+def load_audio(folder_path=FOLDER_AUDIO, area=AREA_LOAD_TEST):
     tbl = _get_tbl("audio")
     count = 0
     for full_path in _iter_files(folder_path):
@@ -294,7 +294,7 @@ def load_audio(folder_path=FOLDER_AUDIO, project=PROJECT_LOAD_TEST):
             "artist": "",
             "album": "",
             "song": "",
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -302,7 +302,7 @@ def load_audio(folder_path=FOLDER_AUDIO, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_3d(folder_path=FOLDER_3D, project=PROJECT_LOAD_TEST):
+def load_3d(folder_path=FOLDER_3D, area=AREA_LOAD_TEST):
     tbl = _get_tbl("3d")
     count = 0
     for full_path in _iter_files(folder_path, extensions=(".blend",)):
@@ -312,7 +312,7 @@ def load_3d(folder_path=FOLDER_3D, project=PROJECT_LOAD_TEST):
             "path": os.path.dirname(full_path),
             "size": str(info.st_size),
             "date_modified": datetime.fromtimestamp(info.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1
@@ -320,7 +320,7 @@ def load_3d(folder_path=FOLDER_3D, project=PROJECT_LOAD_TEST):
     return count
 
 
-def load_apps(folder_path=FOLDER_APPS, project=PROJECT_LOAD_TEST):
+def load_apps(folder_path=FOLDER_APPS, area=AREA_LOAD_TEST):
     tbl = _get_tbl("apps")
     count = 0
     for full_path in _iter_files(folder_path, extensions=(".exe",)):
@@ -329,7 +329,7 @@ def load_apps(folder_path=FOLDER_APPS, project=PROJECT_LOAD_TEST):
             "file_path": full_path,
             "title": title,
             "icon": "",
-            "project": project,
+            "area": area,
         }
         if _add_record(tbl, values_map):
             count += 1

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS lp_howto (
     howto_id              INTEGER PRIMARY KEY,
     howto_key             TEXT UNIQUE,
     title                 TEXT NOT NULL,
-    project_id            TEXT,
+    area_id            TEXT,
     summary               TEXT,
     outcome               TEXT,
     check_content         TEXT,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS lp_howto (
     updated_at            TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS ix_lp_howto_project ON lp_howto(project_id);
+CREATE INDEX IF NOT EXISTS ix_lp_howto_area ON lp_howto(area_id);
 CREATE INDEX IF NOT EXISTS ix_lp_howto_status ON lp_howto(status);
 CREATE INDEX IF NOT EXISTS ix_lp_howto_parse_status ON lp_howto(parse_status);
 CREATE INDEX IF NOT EXISTS ix_lp_howto_updated ON lp_howto(updated_at);
@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS ix_lp_howto_updated ON lp_howto(updated_at);
 CREATE TABLE IF NOT EXISTS lp_howto_parts (
     part_id          INTEGER PRIMARY KEY,
     part_key         TEXT UNIQUE,
-    project_id       TEXT,
+    area_id       TEXT,
     part_name        TEXT NOT NULL,
     default_unit     TEXT,
     description      TEXT,
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS lp_howto_part_links (
 CREATE TABLE IF NOT EXISTS lp_howto_tools_needed (
     tool_id          INTEGER PRIMARY KEY,
     tool_key         TEXT UNIQUE,
-    project_id       TEXT,
+    area_id       TEXT,
     tool_name        TEXT NOT NULL,
     description      TEXT,
     notes            TEXT,
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS lp_howto_tool_links (
 CREATE TABLE IF NOT EXISTS lp_howto_steps (
     step_id              INTEGER PRIMARY KEY,
     step_key             TEXT UNIQUE,
-    project_id           TEXT,
+    area_id           TEXT,
     step_type            TEXT NOT NULL DEFAULT 'instruction',
     step_title           TEXT,
     instruction          TEXT NOT NULL,
@@ -141,7 +141,66 @@ def utc_now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+HOW_AREA_ID_TABLES = (
+    "lp_howto",
+    "lp_howto_parts",
+    "lp_howto_tools_needed",
+    "lp_howto_steps",
+)
+
+
+def _table_columns(conn, table_name):
+    try:
+        return {row["name"] if hasattr(row, "keys") else row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    except Exception:
+        return set()
+
+
+def _normalize_area_id(value):
+    text = "" if value is None else str(value).strip()
+    if text in {"proj", "project"}:
+        return "area"
+    if text.startswith("proj/"):
+        return "area/" + text[5:]
+    if text.startswith("project/"):
+        return "area/" + text[8:]
+    if text.startswith("proj."):
+        return "area." + text[5:]
+    if text.startswith("project."):
+        return "area." + text[8:]
+    return text
+
+
+def _migrate_how_area_columns(conn):
+    for table_name in HOW_AREA_ID_TABLES:
+        columns = _table_columns(conn, table_name)
+        if not columns:
+            continue
+        if "project_id" in columns and "area_id" not in columns:
+            conn.execute(f"ALTER TABLE {table_name} RENAME COLUMN project_id TO area_id")
+            columns.discard("project_id")
+            columns.add("area_id")
+        elif "project_id" in columns and "area_id" in columns:
+            conn.execute(
+                f"UPDATE {table_name} SET area_id = project_id "
+                "WHERE COALESCE(area_id, '') = '' AND COALESCE(project_id, '') != ''"
+            )
+        if "area_id" in columns:
+            rows = conn.execute(f"SELECT rowid AS migration_rowid, area_id FROM {table_name}").fetchall()
+            for row in rows:
+                rowid = row["migration_rowid"] if hasattr(row, "keys") else row[0]
+                area_id = row["area_id"] if hasattr(row, "keys") else row[1]
+                next_area_id = _normalize_area_id(area_id)
+                if next_area_id != (area_id or ""):
+                    conn.execute(
+                        f"UPDATE {table_name} SET area_id = ? WHERE rowid = ?",
+                        (next_area_id, rowid),
+                    )
+
+
 def ensure_how_schema(conn):
     conn.execute("PRAGMA foreign_keys = ON")
+    _migrate_how_area_columns(conn)
     conn.executescript(HOW_SCHEMA_SQL)
+    _migrate_how_area_columns(conn)
     conn.commit()

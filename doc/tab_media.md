@@ -296,4 +296,4 @@ WHERE folder_name = 'Music'
 | `fl_audio.artist` | `lp_audio.artist` | Audio tag. |
 | `fl_audio.album` | `lp_audio.album` | Audio tag. |
 | `fl_audio.title` | `lp_audio.song` | Falls back to filename without extension. |
-| fixed blank | `lp_audio.project` | Project is currently left blank. |
+| fixed blank | `lp_audio.area` | Area is currently left blank. |

@@ -12,7 +12,7 @@ from common import data
 tmp_dir = os.path.join(cfg.user_folder, 'tmp_imports')
 
 TOKEN_VALUES = {
-    "curr_project_selected": "",
+    "curr_area_selected": "",
 }
 
 

@@ -1,7 +1,7 @@
 ---
 key: make-duncans-coffee
 title: Make Duncan's Coffee
-project: Cooking
+area: Cooking
 status: verified
 tags:
 - coffee

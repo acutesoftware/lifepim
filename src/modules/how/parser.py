@@ -5,8 +5,8 @@ import re
 KNOWN_METADATA = {
     "key",
     "title",
-    "project_id",
-    "project",
+    "area_id",
+    "area",
     "status",
     "tags",
     "estimated_minutes",

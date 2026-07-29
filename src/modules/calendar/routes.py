@@ -5,9 +5,9 @@ from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data
-from common import projects as projects_mod
+from common import areas as areas_mod
 from common import settings as settings_mod
-from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination
+from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination, request_area_param
 import common.config as cfg
 from utils import importer
 from modules.calendar.services import calendar_index
@@ -59,14 +59,22 @@ def _parse_date_param(date_str):
         return None
 
 
-def _calendar_jump_context(current_view, selected_date, project=None, day_source_params=None):
+def _request_area(default=""):
+    return request_area_param(default) or None
+
+
+def _request_area_form(default=""):
+    return request_area_param(default, include_form=True) or None
+
+
+def _calendar_jump_context(current_view, selected_date, area=None, day_source_params=None):
     current_year = date.today().year
     return {
         "jump_current_view": current_view,
         "jump_selected_date": selected_date,
         "jump_years": list(range(current_year - 20, current_year + 6)),
         "jump_months": [(month, cal.month_name[month]) for month in range(1, 13)],
-        "jump_project": project,
+        "jump_area": area,
         "jump_day_source_params": day_source_params or {},
     }
 
@@ -79,32 +87,32 @@ def _ensure_calendar_index():
     calendar_index.ensure_calendar_schema(data.conn)
 
 
-def _fetch_events(project=None, start_date=None, end_date=None, source_keys=None):
+def _fetch_events(area=None, start_date=None, end_date=None, source_keys=None):
     _ensure_calendar_index()
     if start_date and end_date:
         return calendar_index.fetch_calendar_items_for_days(
             start_date,
             end_date,
             sources=source_keys,
-            project=project,
+            area=area,
             conn=data.conn,
         )
-    return _fetch_agenda_items(project=project, source_keys=source_keys)
+    return _fetch_agenda_items(area=area, source_keys=source_keys)
 
 
-def _append_project_filter(where, params, column, project):
-    if not project or project in ("any", "All", "all", "ALL", "spacer"):
+def _append_area_filter(where, params, column, area):
+    if not area or area in ("any", "All", "all", "ALL", "spacer"):
         return
-    if project.lower() == "unmapped":
+    if area.lower() == "unmapped":
         where.append(f"(COALESCE({column}, '') = '' OR lower({column}) = lower(?))")
-        params.append(project)
+        params.append(area)
         return
     where.append(f"(lower(COALESCE({column}, '')) = lower(?) OR lower(COALESCE({column}, '')) LIKE lower(?) || '/%')")
-    params.extend([project, project])
+    params.extend([area, area])
 
 
 def _fetch_agenda_items(
-    project=None,
+    area=None,
     source_keys=None,
     start_date=None,
     end_date=None,
@@ -117,7 +125,7 @@ def _fetch_agenda_items(
     _ensure_calendar_index()
     params = []
     where = ["ci.is_visible = 1", "cs.enabled = 1"]
-    _append_project_filter(where, params, "ci.project", project)
+    _append_area_filter(where, params, "ci.area", area)
     source_list = [s for s in (source_keys or []) if s]
     if source_list:
         where.append("ci.source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
@@ -273,13 +281,13 @@ def _source_hidden_fields(**values):
     return [{"name": key, "value": value} for key, value in values.items() if value not in (None, "")]
 
 
-def _project_options(conn):
-    options = [{"value": "", "label": "No project / Unmapped"}]
+def _area_options(conn):
+    options = [{"value": "", "label": "No area / Unmapped"}]
     seen = {""}
     try:
-        for row in projects_mod.projects_list_sidebar(conn=conn):
-            value = (row.get("project_id") or "").strip()
-            label = (row.get("project_name") or value).strip()
+        for row in areas_mod.areas_list_sidebar(conn=conn):
+            value = (row.get("area_id") or "").strip()
+            label = (row.get("area_name") or value).strip()
             if value and value not in seen:
                 options.append({"value": value, "label": label})
                 seen.add(value)
@@ -294,12 +302,12 @@ def _project_options(conn):
         seen.add(value)
     try:
         rows = conn.execute(
-            "SELECT DISTINCT project FROM lp_calendar_events WHERE COALESCE(project, '') != '' ORDER BY lower(project)"
+            "SELECT DISTINCT area FROM lp_calendar_events WHERE COALESCE(area, '') != '' ORDER BY lower(area)"
         ).fetchall()
     except Exception:
         rows = []
     for row in rows:
-        value = (row["project"] or "").strip()
+        value = (row["area"] or "").strip()
         if value and value not in seen:
             options.append({"value": value, "label": value})
             seen.add(value)
@@ -320,18 +328,18 @@ def _default_list_dates():
     return start, end
 
 
-def _project_label(project, conn):
-    if not project:
+def _area_label(area, conn):
+    if not area:
         return ""
-    project_lower = project.lower()
-    for option in _project_options(conn):
-        if option["value"].lower() == project_lower:
+    area_lower = area.lower()
+    for option in _area_options(conn):
+        if option["value"].lower() == area_lower:
             return option["label"]
-    return project
+    return area
 
 
-def _calendar_title(base, project):
-    label = _project_label(project, data.conn)
+def _calendar_title(base, area):
+    label = _area_label(area, data.conn)
     return f"{base} - {label}" if label else base
 
 
@@ -614,7 +622,7 @@ def _read_csv_headers(csv_file_name):
 @calendar_bp.route("/jump", methods=["POST"])
 def jump_route():
     current_view = request.form.get("view") or "day"
-    project = request.form.get("proj") or None
+    area = _request_area_form()
     try:
         target = date(
             int(request.form.get("year", "")),
@@ -624,7 +632,7 @@ def jump_route():
     except (TypeError, ValueError):
         target = date.today()
 
-    params = {"proj": project}
+    params = {"area": area}
     for key in ("show_events", "show_files", "show_usage", "sources"):
         value = request.form.get(key)
         if key == "sources" and value:
@@ -653,9 +661,7 @@ def month_view_route():
     today = date.today()
     year = request.args.get("year", type=int) or today.year
     month = request.args.get("month", type=int) or today.month
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = _request_area()
     day_sources, day_source_params = _parse_day_sources(request.args)
     source_keys = day_sources["selected"]
     media_settings = _calendar_media_settings(data.conn)
@@ -667,7 +673,7 @@ def month_view_route():
         next_month = 1
         next_year += 1
     end_day = date(next_year, next_month, 1)
-    events = _fetch_events(project=project, start_date=first_day, end_date=end_day, source_keys=source_keys)
+    events = _fetch_events(area=area, start_date=first_day, end_date=end_day, source_keys=source_keys)
     events_by_day = {}
     for event in events:
         try:
@@ -691,7 +697,7 @@ def month_view_route():
         active_tab="calendar",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=_calendar_title(f"{cal.month_name[month]} {year}", project),
+        content_title=_calendar_title(f"{cal.month_name[month]} {year}", area),
         content_html="",
         view_date=first_day,
         month_weeks=month_weeks,
@@ -707,16 +713,16 @@ def month_view_route():
         prev_month=prev_month,
         next_year=next_year,
         next_month=next_month,
-        project=project,
+        area=area,
         day_sources=day_sources,
         day_source_params=day_source_params,
         calendar_thumbnail_limit=media_settings["thumbnail_limit"],
         calendar_thumbnail_class=media_settings["thumbnail_class"],
         source_action_url=url_for("calendar.month_view_route"),
-        source_hidden_fields=_source_hidden_fields(year=year, month=month, proj=project),
+        source_hidden_fields=_source_hidden_fields(year=year, month=month, area=area),
         list_from=first_day,
         list_to=end_day - timedelta(days=1),
-        **_calendar_jump_context("month", first_day, project, day_source_params),
+        **_calendar_jump_context("month", first_day, area, day_source_params),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
         col_bg_day=cfg.CAL_COL_BG_DAY,
@@ -729,16 +735,14 @@ def month_view_route():
 def week_view_route():
     today = date.today()
     date_param = request.args.get("date")
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = _request_area()
     day_sources, day_source_params = _parse_day_sources(request.args)
     source_keys = day_sources["selected"]
     media_settings = _calendar_media_settings(data.conn)
     anchor = _parse_date_param(date_param) or today
     week_start = anchor - timedelta(days=anchor.weekday())
     week_end = week_start + timedelta(days=7)
-    events = _fetch_events(project=project, start_date=week_start, end_date=week_end, source_keys=source_keys)
+    events = _fetch_events(area=area, start_date=week_start, end_date=week_end, source_keys=source_keys)
     events_by_day = {}
     for event in events:
         try:
@@ -773,7 +777,7 @@ def week_view_route():
         active_tab="calendar",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=_calendar_title(f"Week of {week_start.strftime('%Y-%m-%d')}", project),
+        content_title=_calendar_title(f"Week of {week_start.strftime('%Y-%m-%d')}", area),
         content_html="",
         view_date=anchor,
         week_days=week_days,
@@ -784,16 +788,16 @@ def week_view_route():
         media_by_day=media_by_day,
         prev_week=prev_week,
         next_week=next_week,
-        project=project,
+        area=area,
         day_sources=day_sources,
         day_source_params=day_source_params,
         calendar_thumbnail_limit=media_settings["thumbnail_limit"],
         calendar_thumbnail_class=media_settings["thumbnail_class"],
         source_action_url=url_for("calendar.week_view_route"),
-        source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
+        source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), area=area),
         list_from=week_start,
         list_to=week_end - timedelta(days=1),
-        **_calendar_jump_context("week", anchor, project, day_source_params),
+        **_calendar_jump_context("week", anchor, area, day_source_params),
         today=date.today(),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
@@ -811,15 +815,13 @@ def week_view_route():
 def day_view_route():
     today = date.today()
     date_param = request.args.get("date")
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = _request_area()
     day_sources, day_source_params = _parse_day_sources(request.args)
     source_keys = day_sources["selected"]
     media_settings = _calendar_media_settings(data.conn)
     anchor = _parse_date_param(date_param) or today
     next_day = anchor + timedelta(days=1)
-    events = _fetch_events(project=project, start_date=anchor, end_date=next_day, source_keys=source_keys)
+    events = _fetch_events(area=area, start_date=anchor, end_date=next_day, source_keys=source_keys)
     events = sorted(events, key=lambda e: (e.get("time", ""), e.get("title", "")))
     detail_files_enabled = bool({"files", "media", "audio"} & source_keys)
     day_files = _fetch_day_files(data.conn, anchor) if detail_files_enabled else []
@@ -833,7 +835,7 @@ def day_view_route():
         next_month = 1
         next_year += 1
     month_end = date(next_year, next_month, 1)
-    month_events = _fetch_events(project=project, start_date=month_start, end_date=month_end, source_keys=source_keys)
+    month_events = _fetch_events(area=area, start_date=month_start, end_date=month_end, source_keys=source_keys)
     events_by_day = {}
     for event in month_events:
         try:
@@ -849,7 +851,7 @@ def day_view_route():
         active_tab="calendar",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=_calendar_title(anchor.strftime("%Y-%m-%d"), project),
+        content_title=_calendar_title(anchor.strftime("%Y-%m-%d"), area),
         content_html="",
         view_date=anchor,
         day_date=anchor,
@@ -868,14 +870,14 @@ def day_view_route():
         calendar_thumbnail_limit=media_settings["thumbnail_limit"],
         calendar_thumbnail_class=media_settings["thumbnail_class"],
         source_action_url=url_for("calendar.day_view_route"),
-        source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), proj=project),
+        source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), area=area),
         list_from=anchor,
         list_to=anchor,
-        **_calendar_jump_context("day", anchor, project, day_source_params),
+        **_calendar_jump_context("day", anchor, area, day_source_params),
         days_with_events=set(events_by_day.keys()) | days_with_images,
         days_with_images=days_with_images,
         today=date.today(),
-        project=project,
+        area=area,
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
         col_bg_day=cfg.CAL_COL_BG_DAY,
@@ -888,15 +890,13 @@ def day_view_route():
 def year_view_route():
     today = date.today()
     year = request.args.get("year", type=int) or today.year
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = _request_area()
     day_sources, day_source_params = _parse_day_sources(request.args)
     source_keys = day_sources["selected"]
     year_start = date(year, 1, 1)
     year_end = date(year + 1, 1, 1)
     year_stats = calendar_index.fetch_calendar_day_stats(year_start, year_end, sources=source_keys, conn=data.conn)
-    year_events = _fetch_events(project=project, start_date=year_start, end_date=year_end, source_keys=source_keys)
+    year_events = _fetch_events(area=area, start_date=year_start, end_date=year_end, source_keys=source_keys)
     event_days_by_month = {}
     for event in year_events:
         try:
@@ -930,19 +930,19 @@ def year_view_route():
         active_tab="calendar",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=_calendar_title(str(year), project),
+        content_title=_calendar_title(str(year), area),
         content_html="",
         year=year,
         months=months,
         today=today,
-        project=project,
+        area=area,
         day_sources=day_sources,
         day_source_params=day_source_params,
         source_action_url=url_for("calendar.year_view_route"),
-        source_hidden_fields=_source_hidden_fields(year=year, proj=project),
+        source_hidden_fields=_source_hidden_fields(year=year, area=area),
         list_from=year_start,
         list_to=year_end - timedelta(days=1),
-        **_calendar_jump_context("year", year_start, project, day_source_params),
+        **_calendar_jump_context("year", year_start, area, day_source_params),
         highlight_day_data=cfg.CAL_HIGHLIGHT_DAY_DATA,
         highlight_day_today=cfg.CAL_HIGHLIGHT_DAY_TODAY,
         col_bg_day=cfg.CAL_COL_BG_DAY,
@@ -958,20 +958,18 @@ def summary_view_route():
     tomorrow = today + timedelta(days=1)
     next_7 = today + timedelta(days=7)
     next_30 = today + timedelta(days=30)
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = _request_area()
     day_sources, day_source_params = _parse_day_sources(request.args)
     source_keys = day_sources["selected"]
-    today_items = _fetch_events(project=project, start_date=today, end_date=tomorrow, source_keys=source_keys)
-    tomorrow_items = _fetch_events(project=project, start_date=tomorrow, end_date=tomorrow + timedelta(days=1), source_keys=source_keys)
-    next_7_items = _fetch_events(project=project, start_date=today, end_date=next_7, source_keys=source_keys)
-    next_30_items = _fetch_events(project=project, start_date=today, end_date=next_30, source_keys=source_keys)
+    today_items = _fetch_events(area=area, start_date=today, end_date=tomorrow, source_keys=source_keys)
+    tomorrow_items = _fetch_events(area=area, start_date=tomorrow, end_date=tomorrow + timedelta(days=1), source_keys=source_keys)
+    next_7_items = _fetch_events(area=area, start_date=today, end_date=next_7, source_keys=source_keys)
+    next_30_items = _fetch_events(area=area, start_date=today, end_date=next_30, source_keys=source_keys)
     grouped = {}
     for group_key, col in {
         "event_type": "event_type",
         "category": "category",
-        "project": "project",
+        "area": "area",
         "source": "source_key",
     }.items():
         rows = data.conn.execute(
@@ -992,10 +990,10 @@ def summary_view_route():
         active_tab="calendar",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=_calendar_title("Calendar Summary", project),
+        content_title=_calendar_title("Calendar Summary", area),
         content_html="",
         today=today,
-        project=project,
+        area=area,
         day_sources=day_sources,
         day_source_params=day_source_params,
         today_items=today_items,
@@ -1006,16 +1004,14 @@ def summary_view_route():
         source_status=source_status,
         stats=stats,
         source_action_url=url_for("calendar.summary_view_route"),
-        source_hidden_fields=_source_hidden_fields(proj=project),
-        **_calendar_jump_context("summary", today, project, day_source_params),
+        source_hidden_fields=_source_hidden_fields(area=area),
+        **_calendar_jump_context("summary", today, area, day_source_params),
     )
 
 
 @calendar_bp.route("/list")
 def list_view_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = _request_area()
     sort_col = request.args.get("sort") or "date"
     sort_dir = request.args.get("dir") or "asc"
     source_param = request.args.get("source") or ""
@@ -1025,7 +1021,7 @@ def list_view_route():
     if end_date:
         end_date = end_date + timedelta(days=1)
     events = _fetch_agenda_items(
-        project=project,
+        area=area,
         source_keys=source_keys,
         start_date=start_date,
         end_date=end_date,
@@ -1039,8 +1035,8 @@ def list_view_route():
         key_fn = lambda e: (e.get("time") or "", e.get("date") or "", e.get("title") or "")
     elif sort_col == "title":
         key_fn = lambda e: (e.get("title") or "", e.get("date") or "", e.get("time") or "")
-    elif sort_col == "project":
-        key_fn = lambda e: (e.get("project") or "", e.get("date") or "", e.get("time") or "")
+    elif sort_col == "area":
+        key_fn = lambda e: (e.get("area") or "", e.get("date") or "", e.get("time") or "")
     else:
         sort_col = "date"
         key_fn = lambda e: (e.get("date") or "", e.get("time") or "", e.get("title") or "")
@@ -1054,7 +1050,7 @@ def list_view_route():
     pagination = build_pagination(
         url_for,
         "calendar.list_view_route",
-        {"proj": project, "sort": sort_col, "dir": sort_dir},
+        {"area": area, "sort": sort_col, "dir": sort_dir},
         page,
         total_pages,
     )
@@ -1063,11 +1059,11 @@ def list_view_route():
         active_tab="calendar",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=_calendar_title("Agenda", project),
+        content_title=_calendar_title("Agenda", area),
         content_html="",
         events=events,
         videos_by_date=videos_by_date,
-        project=project,
+        area=area,
         sort_col=sort_col,
         sort_dir=sort_dir,
         page=page,
@@ -1076,15 +1072,13 @@ def list_view_route():
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
         now=date.today(),
-        **_calendar_jump_context("list", date.today(), project),
+        **_calendar_jump_context("list", date.today(), area),
     )
 
 
 @calendar_bp.route("/event-list")
 def event_list_route():
-    project = request.args.get("proj")
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = None
+    area = _request_area()
     day_sources, day_source_params = _parse_day_sources(request.args)
     source_keys = day_sources["selected"]
     default_from, default_to = _default_list_dates()
@@ -1092,7 +1086,7 @@ def event_list_route():
     end_date_inclusive = _parse_date_param(request.args.get("to")) or default_to
     end_date = end_date_inclusive + timedelta(days=1)
     events = _fetch_agenda_items(
-        project=project,
+        area=area,
         source_keys=source_keys,
         start_date=start_date,
         end_date=end_date,
@@ -1102,14 +1096,14 @@ def event_list_route():
         search=request.args.get("q") or None,
         recurring_only=request.args.get("recurring") == "1",
     )
-    events.sort(key=lambda e: (e.get("date") or "", e.get("time") or "", e.get("title") or "", e.get("project") or ""))
+    events.sort(key=lambda e: (e.get("date") or "", e.get("time") or "", e.get("title") or "", e.get("area") or ""))
     page = request.args.get("page", type=int) or 1
     page_data = paginate_items(events, page, cfg.RECS_PER_PAGE)
     events = page_data["items"]
     total_pages = page_data["total_pages"]
     page = page_data["page"]
     pagination_args = {
-        "proj": project,
+        "area": area,
         "from": start_date.strftime("%Y-%m-%d"),
         "to": end_date_inclusive.strftime("%Y-%m-%d"),
         "show_events": day_source_params["show_events"],
@@ -1128,10 +1122,10 @@ def event_list_route():
         active_tab="calendar",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=_calendar_title("List", project),
+        content_title=_calendar_title("List", area),
         content_html="",
         events=events,
-        project=project,
+        area=area,
         day_sources=day_sources,
         day_source_params=day_source_params,
         from_date=start_date,
@@ -1143,7 +1137,7 @@ def event_list_route():
         last_url=pagination["last_url"],
         source_action_url=url_for("calendar.event_list_route"),
         source_hidden_fields=_source_hidden_fields(
-            proj=project,
+            area=area,
             **{
                 "from": start_date.strftime("%Y-%m-%d"),
                 "to": end_date_inclusive.strftime("%Y-%m-%d"),
@@ -1155,7 +1149,7 @@ def event_list_route():
             },
         ),
         now=date.today(),
-        **_calendar_jump_context("list", date.today(), project, day_source_params),
+        **_calendar_jump_context("list", date.today(), area, day_source_params),
     )
 
 
@@ -1177,7 +1171,7 @@ def view_event_route(event_id):
         content_title=event.get("title") or "Event",
         content_html="",
         event=event,
-        project=event.get("project"),
+        area=event.get("area"),
         view_date=view_date,
     )
 
@@ -1189,7 +1183,7 @@ def add_event_route():
         values = _form_event_values(request.form)
         event_id = calendar_index.create_calendar_event(values, data.conn)
         date_str = values["start_date"]
-        project = values["project"]
+        area = values["area"]
         year_month = _date_to_year_month(date_str)
         if year_month:
             return redirect(
@@ -1197,13 +1191,13 @@ def add_event_route():
                     "calendar.month_view_route",
                     year=year_month[0],
                     month=year_month[1],
-                    proj=project,
+                    area=area,
                 )
             )
-        return redirect(url_for("calendar.month_view_route", proj=project))
+        return redirect(url_for("calendar.month_view_route", area=area))
 
     default_date = request.args.get("date") or date.today().strftime("%Y-%m-%d")
-    default_project = request.args.get("proj") or "General"
+    default_area = _request_area("General") or "General"
     return render_template(
         "calendar_edit.html",
         active_tab="calendar",
@@ -1213,8 +1207,8 @@ def add_event_route():
         content_html="",
         event=None,
         default_date=default_date,
-        default_project=default_project,
-        project_options=_project_options(data.conn),
+        default_area=default_area,
+        area_options=_area_options(data.conn),
     )
 
 
@@ -1239,10 +1233,10 @@ def edit_event_route(event_id):
                     "calendar.month_view_route",
                     year=year_month[0],
                     month=year_month[1],
-                    proj=values["project"],
+                    area=values["area"],
                 )
             )
-        return redirect(url_for("calendar.month_view_route", proj=values["project"]))
+        return redirect(url_for("calendar.month_view_route", area=values["area"]))
 
     return render_template(
         "calendar_edit.html",
@@ -1253,8 +1247,8 @@ def edit_event_route(event_id):
         content_html="",
         event=event,
         default_date=event.get("date"),
-        default_project=event.get("project"),
-        project_options=_project_options(data.conn),
+        default_area=event.get("area"),
+        area_options=_area_options(data.conn),
     )
 
 
@@ -1272,9 +1266,9 @@ def delete_event_route(event_id):
         return redirect(url_for("calendar.view_event_route", event_id=event_id))
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
-    project = request.args.get("proj")
+    area = _request_area()
     if year and month:
-        return redirect(url_for("calendar.month_view_route", year=year, month=month, proj=project))
+        return redirect(url_for("calendar.month_view_route", year=year, month=month, area=area))
     if event:
         year_month = _date_to_year_month(event.get("date", ""))
         if year_month:
@@ -1283,18 +1277,16 @@ def delete_event_route(event_id):
                     "calendar.month_view_route",
                     year=year_month[0],
                     month=year_month[1],
-                    proj=project or event.get("project"),
+                    area=area or event.get("area"),
                 )
             )
-        return redirect(url_for("calendar.month_view_route", proj=project or event.get("project")))
-    return redirect(url_for("calendar.month_view_route", proj=project))
+        return redirect(url_for("calendar.month_view_route", area=area or event.get("area")))
+    return redirect(url_for("calendar.month_view_route", area=area))
 
 
 @calendar_bp.route("/import", methods=["GET", "POST"])
 def import_events_route():
-    project = request.args.get("proj") or ""
-    if project in ("any", "All", "all", "ALL", "spacer"):
-        project = ""
+    area = _request_area() or ""
     tbl = get_table_def("calendar")
     csv_path = ""
     headers = []
@@ -1313,11 +1305,11 @@ def import_events_route():
             map_list = []
             for col in tbl["col_list"]:
                 choice = mappings.get(col, "")
-                if choice == "{curr_project_selected}":
-                    choice = project
+                if choice == "{curr_area_selected}":
+                    choice = area
                 map_list.append(choice)
             try:
-                importer.set_token("curr_project_selected", project)
+                importer.set_token("curr_area_selected", area)
                 imported = importer.import_to_table(tbl["name"], csv_path, map_list)
                 calendar_index.run_calendar_migration(data.conn)
             except Exception as exc:
@@ -1331,7 +1323,7 @@ def import_events_route():
         side_tabs=get_side_tabs(),
         content_title="Import Events",
         content_html="",
-        project=project,
+        area=area,
         table_def=tbl,
         csv_path=csv_path,
         csv_headers=headers,
@@ -1376,7 +1368,7 @@ def _form_event_values(form):
         "blocks_time": form.get("blocks_time") == "1",
         "event_type": form.get("event_type") or "event",
         "category": form.get("category") or "",
-        "project": form.get("project", "").strip(),
+        "area": form.get("area", "").strip(),
         "status": form.get("status") or "active",
         "color": form.get("color") or "",
         "icon": form.get("icon") or "",

@@ -2,16 +2,16 @@
 {% block module_content %}
   <div class="calendar-controls">
     <div class="calendar-views">
-      <a href="{{ url_for('calendar.month_view_route', year=view_date.year, month=view_date.month, proj=project) }}">Monthly</a> |
-      <a href="{{ url_for('calendar.week_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Weekly</a> |
-      <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Daily</a> |
-      <a href="{{ url_for('calendar.year_view_route', year=view_date.year, proj=project) }}">Yearly</a> |
-      <a href="{{ url_for('calendar.list_view_route', proj=project) }}">Agenda</a> |
-      <a href="{{ url_for('calendar.event_list_route', proj=project) }}">List</a> |
-      <a href="{{ url_for('calendar.summary_view_route', proj=project) }}">Summary</a>
+      <a href="{{ url_for('calendar.month_view_route', year=view_date.year, month=view_date.month, area=area) }}">Monthly</a> |
+      <a href="{{ url_for('calendar.week_view_route', date=view_date.strftime('%Y-%m-%d'), area=area) }}">Weekly</a> |
+      <a href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), area=area) }}">Daily</a> |
+      <a href="{{ url_for('calendar.year_view_route', year=view_date.year, area=area) }}">Yearly</a> |
+      <a href="{{ url_for('calendar.list_view_route', area=area) }}">Agenda</a> |
+      <a href="{{ url_for('calendar.event_list_route', area=area) }}">List</a> |
+      <a href="{{ url_for('calendar.summary_view_route', area=area) }}">Summary</a>
     </div>
-    <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), proj=project) }}">Back</a>
-    <a class="calendar-add-main" href="{{ url_for('calendar.edit_event_route', event_id=event.id, proj=project) }}">Edit</a>
+    <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), area=area) }}">Back</a>
+    <a class="calendar-add-main" href="{{ url_for('calendar.edit_event_route', event_id=event.id, area=area) }}">Edit</a>
   </div>
 
   <table border="1" cellpadding="5">
@@ -19,7 +19,7 @@
     <tr><th>Date</th><td>{{ event.date }}</td></tr>
     <tr><th>Time</th><td>{{ event.time }}</td></tr>
     <tr><th>Detail</th><td>{{ event.detail }}</td></tr>
-    <tr><th>Project</th><td>{{ event.project }}</td></tr>
+    <tr><th>Area</th><td>{{ event.area }}</td></tr>
   </table>
   {% set link_record_type = "event" %}
   {% set link_record_id = event.id %}

@@ -1,7 +1,7 @@
 ---
 key: renovate-bathroom
 title: Renovate Bathroom
-project: Home
+area: Home
 status: outline
 tags:
 - bathroom

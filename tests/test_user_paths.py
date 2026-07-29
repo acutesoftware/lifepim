@@ -12,7 +12,7 @@ if root_folder not in sys.path:
     sys.path.append(root_folder)
 
 from common import data
-from common import projects
+from common import areas
 from common import user_paths
 from core import security
 from modules.admin import routes as admin_routes
@@ -30,37 +30,37 @@ class TestUserPaths(unittest.TestCase):
         data.conn = self._old_conn
         self.conn.close()
 
-    def test_create_user_creates_isolated_file_roots_and_simple_project_list(self):
+    def test_create_user_creates_isolated_file_roots_and_simple_area_list(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             old_env = os.environ.get("LIFEPIM_LAN_USER_ROOT_BASE")
             os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = tmpdir
             try:
                 security.ensure_security_schema(self.conn)
-                projects.ensure_projects_schema(self.conn)
+                areas.ensure_areas_schema(self.conn)
 
                 user_id = security.create_user("alice", "Alice", "password", role="user", is_active=True)
 
                 row = self.conn.execute(
-                    "SELECT file_root_path, notes_root_path, projects_root_path, lists_root_path "
+                    "SELECT file_root_path, notes_root_path, areas_root_path, lists_root_path "
                     "FROM users WHERE user_id = ?",
                     (user_id,),
                 ).fetchone()
                 expected_root = os.path.join(tmpdir, "alice")
                 self.assertTrue(row["file_root_path"].lower().startswith(expected_root.lower()))
                 self.assertTrue(os.path.isdir(row["notes_root_path"]))
-                self.assertTrue(os.path.isdir(row["projects_root_path"]))
+                self.assertTrue(os.path.isdir(row["areas_root_path"]))
                 self.assertTrue(os.path.isdir(row["lists_root_path"]))
-                project_ids = {
-                    row["project_id"]
+                area_ids = {
+                    row["area_id"]
                     for row in self.conn.execute(
-                        "SELECT project_id FROM lp_projects WHERE owner_user_id = ?",
+                        "SELECT area_id FROM lp_areas WHERE owner_user_id = ?",
                         (user_id,),
                     ).fetchall()
                 }
-                self.assertEqual(project_ids, {"home", "work", "family", "fun"})
+                self.assertEqual(area_ids, {"home", "work", "family", "fun"})
                 self.assertEqual(
                     self.conn.execute(
-                        "SELECT COUNT(1) AS cnt FROM lp_project_folders WHERE owner_user_id = ?",
+                        "SELECT COUNT(1) AS cnt FROM lp_area_folders WHERE owner_user_id = ?",
                         (user_id,),
                     ).fetchone()["cnt"],
                     0,
@@ -74,7 +74,7 @@ class TestUserPaths(unittest.TestCase):
     def test_create_user_accepts_overridden_file_roots(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             security.ensure_security_schema(self.conn)
-            projects.ensure_projects_schema(self.conn)
+            areas.ensure_areas_schema(self.conn)
             custom_paths = user_paths.paths_from_root(os.path.join(tmpdir, "custom-alice"))
 
             user_id = security.create_user(
@@ -87,7 +87,7 @@ class TestUserPaths(unittest.TestCase):
             )
 
             row = self.conn.execute(
-                "SELECT file_root_path, notes_root_path, projects_root_path, lists_root_path "
+                "SELECT file_root_path, notes_root_path, areas_root_path, lists_root_path "
                 "FROM users WHERE user_id = ?",
                 (user_id,),
             ).fetchone()
@@ -96,7 +96,7 @@ class TestUserPaths(unittest.TestCase):
             self.assertTrue(os.path.isdir(custom_paths["notes_root_path"]))
             self.assertEqual(
                 self.conn.execute(
-                    "SELECT COUNT(1) AS cnt FROM lp_project_folders WHERE owner_user_id = ?",
+                    "SELECT COUNT(1) AS cnt FROM lp_area_folders WHERE owner_user_id = ?",
                     (user_id,),
                 ).fetchone()["cnt"],
                 0,
@@ -116,7 +116,7 @@ class TestUserPaths(unittest.TestCase):
                         "username": "alice",
                         "file_root_path": submitted_root,
                         "notes_root_path": os.path.join(submitted_root, "notes"),
-                        "projects_root_path": os.path.join(submitted_root, "projects"),
+                        "areas_root_path": os.path.join(submitted_root, "areas"),
                         "lists_root_path": os.path.join(submitted_root, "lists"),
                     },
                 ):
@@ -170,7 +170,7 @@ class TestUserPaths(unittest.TestCase):
                         folder_id TEXT,
                         size TEXT,
                         date_modified TEXT,
-                        project TEXT,
+                        area TEXT,
                         owner_user_id INTEGER,
                         visibility TEXT DEFAULT 'private',
                         is_public INTEGER DEFAULT 0
@@ -186,7 +186,7 @@ class TestUserPaths(unittest.TestCase):
                     """
                 )
                 security.ensure_security_schema(self.conn)
-                projects.ensure_projects_schema(self.conn)
+                areas.ensure_areas_schema(self.conn)
                 user_id = security.create_user("alice", "Alice", "password", role="user", is_active=True)
                 fake_user = type(
                     "FakeUser",
@@ -204,13 +204,13 @@ class TestUserPaths(unittest.TestCase):
                 else:
                     os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = old_env
 
-    def test_non_duncan_note_create_uses_notes_root_without_project_mapping(self):
+    def test_non_duncan_note_create_uses_notes_root_without_area_mapping(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             old_env = os.environ.get("LIFEPIM_LAN_USER_ROOT_BASE")
             os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = tmpdir
             try:
                 security.ensure_security_schema(self.conn)
-                projects.ensure_projects_schema(self.conn)
+                areas.ensure_areas_schema(self.conn)
                 self.conn.execute(
                     """
                     CREATE TABLE lp_notes (
@@ -220,7 +220,7 @@ class TestUserPaths(unittest.TestCase):
                         folder_id TEXT,
                         size TEXT,
                         date_modified TEXT,
-                        project TEXT,
+                        area TEXT,
                         owner_user_id INTEGER,
                         visibility TEXT DEFAULT 'private',
                         is_public INTEGER DEFAULT 0
@@ -235,10 +235,10 @@ class TestUserPaths(unittest.TestCase):
                 )()
 
                 with patch("modules.notes.routes.current_user", fake_user):
-                    folder, project_id = notes_routes._note_create_target_folder("home")
+                    folder, area_id = notes_routes._note_create_target_folder("home")
 
                 self.assertEqual(folder, os.path.join(tmpdir, "alice", "notes"))
-                self.assertEqual(project_id, "home")
+                self.assertEqual(area_id, "home")
                 self.assertTrue(os.path.isdir(folder))
                 self.assertFalse(os.path.isdir(os.path.join(tmpdir, "alice", "notes", "home")))
             finally:
@@ -247,10 +247,10 @@ class TestUserPaths(unittest.TestCase):
                 else:
                     os.environ["LIFEPIM_LAN_USER_ROOT_BASE"] = old_env
 
-    def test_duncan_note_create_requires_project_mapping(self):
+    def test_duncan_note_create_requires_area_mapping(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             security.ensure_security_schema(self.conn)
-            projects.ensure_projects_schema(self.conn)
+            areas.ensure_areas_schema(self.conn)
             user_id = security.create_user(
                 "duncan",
                 "Duncan",
@@ -260,16 +260,16 @@ class TestUserPaths(unittest.TestCase):
                 file_paths={
                     "file_root_path": tmpdir,
                     "notes_root_path": os.path.join(tmpdir, "notes"),
-                    "projects_root_path": os.path.join(tmpdir, "projects"),
+                    "areas_root_path": os.path.join(tmpdir, "areas"),
                     "lists_root_path": os.path.join(tmpdir, "lists"),
                 },
             )
-            projects.project_upsert(
+            areas.area_upsert(
                 {
-                    "project_id": "home",
+                    "area_id": "home",
                     "tab": "HOME",
                     "group_name": "HOME",
-                    "project_name": "Home",
+                    "area_name": "Home",
                 },
                 owner_user_id=user_id,
                 conn=self.conn,

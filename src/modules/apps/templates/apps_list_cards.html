@@ -1,10 +1,10 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('apps.list_apps_table_route', proj=project) }}">Table</a> |
-    <a href="{{ url_for('apps.list_apps_list_route', proj=project) }}">List</a> |
-    <a href="{{ url_for('apps.list_apps_cards_route', proj=project) }}">Cards</a> |
-    <a href="{{ url_for('apps.import_apps_route', proj=project) }}">Add Apps</a>
+    <a href="{{ url_for('apps.list_apps_table_route', area=area) }}">Table</a> |
+    <a href="{{ url_for('apps.list_apps_list_route', area=area) }}">List</a> |
+    <a href="{{ url_for('apps.list_apps_cards_route', area=area) }}">Cards</a> |
+    <a href="{{ url_for('apps.import_apps_route', area=area) }}">Add Apps</a>
   </div>
 
   {% set col_values = card_values %}
@@ -14,10 +14,10 @@
   <ul style="list-style:none; padding:0; margin:8px 0;">
     {% for item in items %}
     <li style="padding:2px 0;">
-      <a href="{{ url_for('apps.launch_app_route', item_id=item.id, proj=project) }}" target="_blank" rel="noopener noreferrer">Launch</a> |
-      <a href="{{ url_for('apps.view_app_route', item_id=item.id, proj=project) }}">View</a> |
-      <a href="{{ url_for('apps.edit_app_route', item_id=item.id, proj=project) }}">Edit</a> |
-      <a href="{{ url_for('apps.delete_app_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+      <a href="{{ url_for('apps.launch_app_route', item_id=item.id, area=area) }}" target="_blank" rel="noopener noreferrer">Launch</a> |
+      <a href="{{ url_for('apps.view_app_route', item_id=item.id, area=area) }}">View</a> |
+      <a href="{{ url_for('apps.edit_app_route', item_id=item.id, area=area) }}">Edit</a> |
+      <a href="{{ url_for('apps.delete_app_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
     </li>
     {% endfor %}
   </ul>

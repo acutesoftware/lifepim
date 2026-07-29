@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block module_content %}
   <div>
-    <a href="{{ url_for('goals.list_goals_route', proj=project) }}">Back to list</a>
+    <a href="{{ url_for('goals.list_goals_route', area=area) }}">Back to list</a>
   </div>
   <table border="1" cellpadding="5">
     {% for col in col_list %}
@@ -12,7 +12,7 @@
     {% endfor %}
   </table>
   <p>
-    <a href="{{ url_for('goals.edit_goal_route', item_id=item.id, proj=project) }}">Edit</a> |
-    <a href="{{ url_for('goals.delete_goal_route', item_id=item.id, proj=project) }}" onclick="return confirm('Delete item?');">Del</a>
+    <a href="{{ url_for('goals.edit_goal_route', item_id=item.id, area=area) }}">Edit</a> |
+    <a href="{{ url_for('goals.delete_goal_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
   </p>
 {% endblock %}

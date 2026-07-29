@@ -54,17 +54,17 @@ class CalendarStage2Tests(unittest.TestCase):
         try:
             conn.execute(
                 "CREATE TABLE lp_calendar_events ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, event_date TEXT, remind_date TEXT, project TEXT)"
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, event_date TEXT, remind_date TEXT, area TEXT)"
             )
             conn.execute(
-                "INSERT INTO lp_calendar_events (id, title, content, event_date, project) VALUES (7, 'Timed', '', '2026-02-03 04:05:06', 'Work')"
+                "INSERT INTO lp_calendar_events (id, title, content, event_date, area) VALUES (7, 'Timed', '', '2026-02-03 04:05:06', 'Work')"
             )
             calendar_index.run_calendar_migration(conn)
             calendar_index.run_calendar_migration(conn)
             row = conn.execute("SELECT * FROM lp_calendar_events WHERE id = 7").fetchone()
             self.assertEqual(row["start_date"], "2026-02-03")
             self.assertEqual(row["start_time"], "04:05")
-            self.assertEqual(row["project"], "Work")
+            self.assertEqual(row["area"], "Work")
             item = conn.execute("SELECT * FROM lp_calendar_items WHERE source_key = 'manual' AND source_record_id = '7'").fetchone()
             self.assertIsNotNone(item)
             self.assertEqual(item["occurrence_key"], "manual:7")

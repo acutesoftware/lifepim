@@ -1,15 +1,13 @@
+{% if note_folder_panel_items %}
 <div class="note-folder-list note-folder-panel" data-collapsible="note-subfolders" data-default-collapsed="true">
   <div class="note-folder-title">
-    <span>Folders</span>
+    <span>Subfolders</span>
     <button type="button" class="note-folder-toggle" aria-expanded="false">[+]</button>
   </div>
   <div class="note-folder-body" hidden>
-    {% if note_folder_panel_items %}
-      {% for folder in note_folder_panel_items %}
-        <a class="note-folder-link" href="{{ folder.url }}" title="{{ folder.path }}">{{ folder.label }}</a>
-      {% endfor %}
-    {% else %}
-      <span class="note-empty-state">No folders.</span>
-    {% endif %}
+    {% for folder in note_folder_panel_items %}
+      <a class="note-folder-link" href="{{ folder.url }}" title="{{ folder.path }}">{{ folder.label }}</a>
+    {% endfor %}
   </div>
 </div>
+{% endif %}

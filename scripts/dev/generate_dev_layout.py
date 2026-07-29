@@ -4,8 +4,8 @@
 """
 samples from config.py below: 
 
-SIDE_TABS = [  # Tabs down left side of LifePIM - any project goes into one of these groups
-    { 'icon': '*', 'id': 'any', 'label': 'All Projects'},
+SIDE_TABS = [  # Tabs down left side of LifePIM - any area goes into one of these groups
+    { 'icon': '*', 'id': 'any', 'label': 'All Areas'},
     { 'icon': '', 'id': 'spacer', 'label': 'PERS________'}, 
     { 'icon': '💊', 'id': 'health', 'label': 'Health'}, 
     { 'icon': '👪', 'id': 'family', 'label': 'Family'}, 
@@ -48,7 +48,7 @@ TABS = [  #Tabs across top of LifePIM
 sub_menus = [
     {'root':'notes', 'name':'Ideas'},
     {'root':'notes', 'name':'Meeting Notes'},
-    {'root':'notes', 'name':'Project Info'},
+    {'root':'notes', 'name':'Area Info'},
     {'root':'notes', 'name':'Research'},
     {'root':'tasks', 'name':'Today'},
     {'root':'tasks', 'name':'This Week'},
@@ -149,7 +149,7 @@ def render_layout(html_file="lifepim.html"):
                 # Create a simple ID from the name (e.g., "Meeting Notes" -> "meeting_notes")
                 sub_id = sub['fn']# sub_name.replace(' ', '_').lower()
                 # Route to [TAB]_[SUBTAB]  f"#{tab_id}_{sub_id}"
-                href = f"?tab={sub['fn']}?proj=any"
+                href = f"?tab={sub['fn']}?area=any"
 
                 print('href = ' + href )
                 html.append(f"          <a href='{href}'>{sub_name}</a>")
@@ -164,7 +164,7 @@ def render_layout(html_file="lifepim.html"):
 
     for s in mod_cfg.SIDE_TABS:
         desc = s.get("label", "")
-        href = f"?tab=home?proj={s['id']}"
+        href = f"?tab=home?area={s['id']}"
 
         # is this a side spacer?
         if desc.endswith("___") or s['icon'] == '':
@@ -242,7 +242,7 @@ def generate_filter_spec():
     creates a filter spec for tables to be displayed.
     Shopping List = select from FOOD where PROJ = 'Home'
     Holiday Pictures = select from photos where location != 'Home'
-    PC Notes = select from NOTES where project = 'PC'
+    PC Notes = select from NOTES where area = 'PC'
     Weekend Tasks = select from TASKS where due_date >= '2024-09-21' and due_date <= '2024-09-22'
 
     """

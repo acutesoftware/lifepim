@@ -3,7 +3,7 @@ import json
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 
-from common.utils import get_side_tabs, get_tabs
+from common.utils import get_side_tabs, get_tabs, request_area_param
 from modules.data import catalogue
 
 
@@ -21,45 +21,44 @@ def _ctx(title):
     }
 
 
-def _project_options():
+def _area_options():
     options = []
     seen = set()
     for item in get_side_tabs():
         if not isinstance(item, dict):
             continue
-        project_id = (item.get("proj") or item.get("id") or "").strip()
-        label = (item.get("label") or project_id).strip()
-        if not project_id or project_id.lower() in {"any", "all", "spacer"}:
+        area_id = (item.get("area") or item.get("id") or "").strip()
+        label = (item.get("label") or area_id).strip()
+        if not area_id or area_id.lower() in {"any", "all", "spacer"}:
             continue
-        key = project_id.lower()
+        key = area_id.lower()
         if key in seen:
             continue
         seen.add(key)
-        options.append({"id": project_id, "label": label})
+        options.append({"id": area_id, "label": label})
     return options
 
 
-def _request_project(default=""):
-    project = request.args.get("proj") or default or ""
-    return "" if project in ("any", "All", "all", "ALL", "spacer") else project
+def _request_area(default=""):
+    return request_area_param(default)
 
 
-def _with_project(**kwargs):
-    project = _request_project()
-    if project:
-        kwargs["proj"] = project
+def _with_area(**kwargs):
+    area = _request_area()
+    if area:
+        kwargs["area"] = area
     return kwargs
 
 
 @data_bp.route("/")
 def overview_route():
-    project = _request_project()
+    area = _request_area()
     return render_template(
         "data_overview.html",
         **_ctx("Data Workbench"),
-        project=project,
-        counts=catalogue.overview_counts(project=project),
-        recent=catalogue.recent_activity(project=project),
+        area=area,
+        counts=catalogue.overview_counts(area=area),
+        recent=catalogue.recent_activity(area=area),
         attention=catalogue.attention_items(),
     )
 
@@ -71,25 +70,25 @@ def sources_route():
 
 @data_bp.route("/sources/databases")
 def database_sources_route():
-    project = _request_project()
+    area = _request_area()
     return render_template(
         "data_sources.html",
         **_ctx("Database Sources"),
         section="databases",
-        project=project,
-        sources=catalogue.source_list("DATABASE", {"project": project} if project else None),
+        area=area,
+        sources=catalogue.source_list("DATABASE", {"area": area} if area else None),
     )
 
 
 @data_bp.route("/sources/files")
 def file_sources_route():
-    project = _request_project()
+    area = _request_area()
     return render_template(
         "data_sources.html",
         **_ctx("File Sources"),
         section="files",
-        project=project,
-        sources=catalogue.source_list("FILE_SOURCE", {"project": project} if project else None),
+        area=area,
+        sources=catalogue.source_list("FILE_SOURCE", {"area": area} if area else None),
     )
 
 
@@ -158,7 +157,7 @@ def _source_form(source_id, kind):
                     source=source,
                     kind=kind,
                     source_types=catalogue.DB_SOURCE_TYPES,
-                    project_options=_project_options(),
+                    area_options=_area_options(),
                     error=error,
                     submitted=form,
                 )
@@ -166,7 +165,7 @@ def _source_form(source_id, kind):
         if kind == "DATABASE" and source_type in {"SQLITE", "CSV", "EXCEL"}:
             catalogue.scan_source(new_id)
         endpoint = "data.database_source_detail_route" if kind == "DATABASE" else "data.file_source_detail_route"
-        return redirect(url_for(endpoint, source_id=new_id, **_with_project()))
+        return redirect(url_for(endpoint, source_id=new_id, **_with_area()))
     title = ("Edit " if source_id else "Add ") + ("Database Source" if kind == "DATABASE" else "File Source")
     return render_template(
         "data_source_form.html",
@@ -174,9 +173,9 @@ def _source_form(source_id, kind):
         source=source,
         kind=kind,
         source_types=catalogue.DB_SOURCE_TYPES if kind == "DATABASE" else catalogue.FILE_SOURCE_TYPES,
-        project_options=_project_options(),
+        area_options=_area_options(),
         error=error,
-        submitted={"project": _request_project()} if not source else {},
+        submitted={"area": _request_area()} if not source else {},
     )
 
 
@@ -262,7 +261,7 @@ def _source_detail(source_id, kind):
         return redirect(url_for("data.database_sources_route" if kind == "DATABASE" else "data.file_sources_route"))
     objects = catalogue.object_list({"source_id": str(source_id)})
     recent_tasks = [task for task in catalogue.tasks(limit=50) if task.get("data_source_id") == source_id][:10]
-    return render_template("data_source_detail.html", **_ctx(source["source_name"]), project=_request_project(), source=source, objects=objects, tasks=recent_tasks)
+    return render_template("data_source_detail.html", **_ctx(source["source_name"]), area=_request_area(), source=source, objects=objects, tasks=recent_tasks)
 
 
 @data_bp.route("/sources/<int:source_id>/delete", methods=["POST"])
@@ -270,25 +269,25 @@ def source_delete_route(source_id):
     source = catalogue.source_get(source_id)
     catalogue.delete_source(source_id)
     if source and source["source_kind"] == "FILE_SOURCE":
-        return redirect(url_for("data.file_sources_route", **_with_project()))
-    return redirect(url_for("data.database_sources_route", **_with_project()))
+        return redirect(url_for("data.file_sources_route", **_with_area()))
+    return redirect(url_for("data.database_sources_route", **_with_area()))
 
 
 @data_bp.route("/sources/<int:source_id>/test", methods=["POST"])
 def source_test_route(source_id):
     task_id = catalogue.test_database_connection(source_id)
-    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_project()))
+    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_area()))
 
 
 @data_bp.route("/sources/<int:source_id>/scan", methods=["POST"])
 def source_scan_route(source_id):
     task_id = catalogue.scan_source(source_id)
-    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_project()))
+    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_area()))
 
 
 @data_bp.route("/objects")
 def objects_route():
-    project = _request_project()
+    area = _request_area()
     filters = {
         key: request.args.get(key, "")
         for key in [
@@ -297,7 +296,7 @@ def objects_route():
             "object_type",
             "catalogue_level",
             "environment",
-            "project",
+            "area",
             "profile_status",
             "quality_status",
             "favourite",
@@ -305,19 +304,19 @@ def objects_route():
             "active",
         ]
     }
-    if project and not filters.get("project"):
-        filters["project"] = project
+    if area and not filters.get("area"):
+        filters["area"] = area
     return render_template(
         "data_objects.html",
         **_ctx("Data Objects"),
         objects=catalogue.object_list(filters),
         filters=filters,
-        project=project,
-        sources=catalogue.source_list(None, {"project": project} if project else None),
+        area=area,
+        sources=catalogue.source_list(None, {"area": area} if area else None),
         object_types=catalogue.OBJECT_TYPES,
         catalogue_levels=catalogue.CATALOGUE_LEVELS,
         environments=catalogue.distinct_values("d_data_source", "environment"),
-        project_options=_project_options(),
+        area_options=_area_options(),
     )
 
 
@@ -325,7 +324,7 @@ def objects_route():
 def object_detail_route(object_id):
     if request.method == "POST":
         catalogue.save_object_metadata(object_id, request.form)
-        return redirect(url_for("data.object_detail_route", object_id=object_id, **_with_project()))
+        return redirect(url_for("data.object_detail_route", object_id=object_id, **_with_area()))
     obj = catalogue.object_get(object_id)
     if not obj:
         return redirect(url_for("data.objects_route"))
@@ -341,15 +340,15 @@ def object_detail_route(object_id):
         columns=catalogue.object_columns(object_id),
         related_sql=related_sql,
         levels=catalogue.CATALOGUE_LEVELS,
-        project_options=_project_options(),
-        project=_request_project(),
+        area_options=_area_options(),
+        area=_request_area(),
     )
 
 
 @data_bp.route("/object/<int:object_id>/level/<level>", methods=["POST"])
 def object_level_route(object_id, level):
     catalogue.update_object_level(object_id, level.upper())
-    return redirect(url_for("data.object_detail_route", object_id=object_id, **_with_project()))
+    return redirect(url_for("data.object_detail_route", object_id=object_id, **_with_area()))
 
 
 @data_bp.route("/object/<int:object_id>/toggle/<flag>", methods=["POST"])
@@ -359,7 +358,7 @@ def object_toggle_route(object_id, flag):
     if obj and flag in allowed:
         col = allowed[flag]
         catalogue.update_object_flags(object_id, **{col: 0 if obj.get(col) else 1})
-    return redirect(url_for("data.object_detail_route", object_id=object_id, **_with_project()))
+    return redirect(url_for("data.object_detail_route", object_id=object_id, **_with_area()))
 
 
 @data_bp.route("/object/<int:object_id>/profile", methods=["POST"])
@@ -367,28 +366,28 @@ def object_profile_route(object_id):
     task_id = catalogue.create_task("Profile object", "PROFILE_OBJECT", object_id=object_id, params={"object_id": object_id})
     catalogue.start_task(task_id)
     catalogue.finish_task(task_id, "COMPLETED_WITH_WARNINGS", result_summary="Profile action placeholder created. Profiling is not implemented in Phase 1.")
-    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_project()))
+    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_area()))
 
 
 @data_bp.route("/sql")
 def sql_route():
-    project = _request_project()
+    area = _request_area()
     filters = {
         "q": request.args.get("q", ""),
         "source_id": request.args.get("source_id", ""),
-        "project": request.args.get("project", ""),
+        "area": _request_area(),
         "favourite": request.args.get("favourite", ""),
     }
-    if project and not filters.get("project"):
-        filters["project"] = project
+    if area and not filters.get("area"):
+        filters["area"] = area
     return render_template(
         "data_sql_list.html",
         **_ctx("Saved SQL"),
         sql_items=catalogue.sql_list(filters),
         filters=filters,
-        project=project,
-        sources=catalogue.source_list("DATABASE", {"project": project} if project else None),
-        project_options=_project_options(),
+        area=area,
+        sources=catalogue.source_list("DATABASE", {"area": area} if area else None),
+        area_options=_area_options(),
     )
 
 
@@ -406,17 +405,17 @@ def _sql_form(sql_id):
     item = catalogue.sql_get(sql_id) if sql_id else None
     if request.method == "POST":
         new_id = catalogue.save_sql(sql_id, request.form)
-        return redirect(url_for("data.sql_detail_route", sql_id=new_id, **_with_project()))
-    project = _request_project()
+        return redirect(url_for("data.sql_detail_route", sql_id=new_id, **_with_area()))
+    area = _request_area()
     return render_template(
         "data_sql_form.html",
         **_ctx("Edit Saved SQL" if sql_id else "Add Saved SQL"),
         item=item,
-        sources=catalogue.source_list("DATABASE", {"project": project} if project else None),
-        objects=catalogue.object_list({"project": project} if project else {}),
-        project_options=_project_options(),
-        project=project,
-        submitted={"project": project} if not item else {},
+        sources=catalogue.source_list("DATABASE", {"area": area} if area else None),
+        objects=catalogue.object_list({"area": area} if area else {}),
+        area_options=_area_options(),
+        area=area,
+        submitted={"area": area} if not item else {},
     )
 
 
@@ -430,14 +429,14 @@ def sql_detail_route(sql_id):
         **_ctx(item["sql_name"]),
         item=item,
         related_objects=catalogue.sql_related_objects(sql_id),
-        project=_request_project(),
+        area=_request_area(),
     )
 
 
 @data_bp.route("/sql/<int:sql_id>/delete", methods=["POST"])
 def sql_delete_route(sql_id):
     catalogue.delete_sql(sql_id)
-    return redirect(url_for("data.sql_route", **_with_project()))
+    return redirect(url_for("data.sql_route", **_with_area()))
 
 
 @data_bp.route("/sql/<int:sql_id>/download")
@@ -458,13 +457,13 @@ def sql_run_route(sql_id):
     task_id = catalogue.create_task("Run saved SQL", "RUN_SAVED_SQL", sql_id=sql_id, params={"saved_sql_id": sql_id})
     catalogue.start_task(task_id)
     catalogue.finish_task(task_id, "COMPLETED_WITH_WARNINGS", result_summary="Runner task placeholder created. SQL execution is not implemented in Phase 1.")
-    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_project()))
+    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_area()))
 
 
 @data_bp.route("/tasks")
 def tasks_route():
-    project = _request_project()
-    return render_template("data_tasks.html", **_ctx("Data Tasks"), project=project, tasks=catalogue.tasks(filters={"project": project} if project else None))
+    area = _request_area()
+    return render_template("data_tasks.html", **_ctx("Data Tasks"), area=area, tasks=catalogue.tasks(filters={"area": area} if area else None))
 
 
 @data_bp.route("/task/<int:task_id>")
@@ -477,7 +476,7 @@ def task_detail_route(task_id):
 
 @data_bp.route("/import-db", methods=["GET", "POST"])
 def import_data_db_route():
-    project = (request.form.get("project") if request.method == "POST" else None) or _request_project()
+    area = request_area_param(include_form=True) if request.method == "POST" else _request_area()
     imported = None
     error = ""
     if request.method == "POST":
@@ -495,8 +494,8 @@ def import_data_db_route():
                     "source_type": "SQLITE",
                     "root_path": path_value,
                     "database_name": os.path.basename(path_value),
-                    "environment": project,
-                    "project": project,
+                    "environment": area,
+                    "area": area,
                     "scan_views": "on",
                     "scan_columns": "on",
                     "is_active": "on",
@@ -507,8 +506,8 @@ def import_data_db_route():
     return render_template(
         "data_import_db.html",
         **_ctx("Import SQLite Databases"),
-        project=project,
-        project_options=_project_options(),
+        area=area,
+        area_options=_area_options(),
         imported=imported,
         error=error,
     )
@@ -517,7 +516,7 @@ def import_data_db_route():
 @data_bp.route("/import-db-folder", methods=["POST"])
 def import_data_db_folder_route():
     folder_path = request.form.get("db_folder", "").strip()
-    project = request.form.get("project") or _request_project()
+    area = request_area_param(include_form=True) or _request_area()
     imported = 0
     error = ""
     if not folder_path:
@@ -536,8 +535,8 @@ def import_data_db_folder_route():
                             "source_type": "SQLITE",
                             "root_path": path_value,
                             "database_name": name,
-                            "environment": project,
-                            "project": project,
+                            "environment": area,
+                            "area": area,
                             "scan_views": "on",
                             "scan_columns": "on",
                             "is_active": "on",
@@ -548,8 +547,8 @@ def import_data_db_folder_route():
     return render_template(
         "data_import_db.html",
         **_ctx("Import SQLite Databases"),
-        project=project,
-        project_options=_project_options(),
+        area=area,
+        area_options=_area_options(),
         imported=imported,
         error=error,
     )

@@ -25,7 +25,7 @@
 }
 
 .how-subtabs a,
-.how-all-projects,
+.how-all-areas,
 .how-toolbar a {
   color: #223;
   text-decoration: none;
@@ -63,7 +63,7 @@
 }
 
 .how-name-field,
-.how-project-field {
+.how-area-field {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -71,13 +71,13 @@
 }
 
 .how-name-field span,
-.how-project-field span {
+.how-area-field span {
   white-space: nowrap;
   font-weight: bold;
 }
 
 .how-name-field input,
-.how-project-field select {
+.how-area-field select {
   min-width: 0;
   flex: 1;
   font-size: 12px;
@@ -104,13 +104,13 @@
   gap: 4px;
 }
 
-.how-catalog-project {
+.how-catalog-area {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.how-catalog-project span {
+.how-catalog-area span {
   font-weight: bold;
   white-space: nowrap;
 }
@@ -2364,6 +2364,10 @@ button.calendar-nav {
   align-items: start;
 }
 
+.settings-shell-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .settings-tabs {
   display: flex;
   flex-direction: column;
@@ -2437,6 +2441,10 @@ button.calendar-nav {
   max-height: calc(100vh - 165px);
   overflow: auto;
   padding-right: 4px;
+}
+
+.areas-edit-form .tabular-scroll {
+  max-height: calc(100vh - 310px);
 }
 
 .settings-form-wide button[type="submit"] {
@@ -2609,6 +2617,50 @@ button.calendar-nav {
   min-width: 220px;
   box-sizing: border-box;
   font: inherit;
+}
+
+.areas-row-actions {
+  min-width: 155px;
+  white-space: nowrap;
+}
+
+.areas-row-actions button {
+  font-size: 11px;
+  padding: 2px 5px;
+}
+
+.areas-storage-note {
+  border: 1px solid #d8dde5;
+  background: #f7f8fa;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.areas-storage-note h4 {
+  margin: 0 0 6px;
+}
+
+.areas-storage-note dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0 0 6px;
+}
+
+.areas-storage-note dt {
+  font-weight: bold;
+}
+
+.areas-storage-note dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.areas-storage-note p {
+  margin: 0;
+  color: #333;
 }
 
 .help-page {
@@ -3612,7 +3664,7 @@ body.links-resizing {
   color: #555;
 }
 
-.note-modal-project,
+.note-modal-area,
 .note-modal-write-root {
   font-size: 10px;
   color: #666;
@@ -4252,25 +4304,25 @@ body.freeze-headers .note-card-page .note-card-grid {
   z-index: 190;
 }
 
-.project-folders {
+.area-folders {
   margin: 8px 0;
   padding: 6px;
   border: 1px solid #ddd;
   background: #fafafa;
 }
 
-.project-folders-header {
+.area-folders-header {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
 }
 
-.project-folders-header h4 {
+.area-folders-header h4 {
   margin: 0;
 }
 
-.project-folders-toggle {
+.area-folders-toggle {
   border: none;
   background: transparent;
   padding: 0 2px;
@@ -4278,11 +4330,11 @@ body.freeze-headers .note-card-page .note-card-grid {
   cursor: pointer;
 }
 
-.project-folders.collapsed .project-folders-header {
+.area-folders.collapsed .area-folders-header {
   margin-bottom: 0;
 }
 
-.project-folder-form {
+.area-folder-form {
   display: flex;
   gap: 6px;
   align-items: center;
@@ -4290,8 +4342,8 @@ body.freeze-headers .note-card-page .note-card-grid {
   margin-bottom: 6px;
 }
 
-.project-folders-table th,
-.project-folders-table td {
+.area-folders-table th,
+.area-folders-table td {
   font-size: 11px;
 }
 
