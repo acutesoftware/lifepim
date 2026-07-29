@@ -315,8 +315,12 @@ def _note_metadata_from_file(note_path, stat=None, fallback_area=""):
     )
     if not date_created and stat is not None:
         date_created = _file_created_at(stat)
-    area = _front_matter_value(front_matter, ("area", "folder", "sidebar_tab")) or fallback_area
-    if area.lower() in {"all", "all notes", "untitled"}:
+    area = _front_matter_value(
+        front_matter,
+        ("area", "area_id", "folder", "sidebar_tab", "project", "project_id", "proj"),
+    ) or fallback_area
+    area = utils_normalize_area_param(area)
+    if area.lower() in {"all", "all notes", "all areas", "all projects", "untitled"}:
         area = ""
     return {
         "title": _front_matter_value(front_matter, ("title", "name")) or title_from_file,
@@ -2099,7 +2103,7 @@ def _assign_note_area(note_id, area_id):
     file_name = note.get("file_name") or (os.path.basename(note_path) if note_path else "")
     content = None
     if note_path and os.path.isfile(note_path):
-        _set_note_front_matter_field(note_path, "area", area_id, aliases=["folder", "sidebar_tab"])
+        _set_note_front_matter_field(note_path, "area", area_id, aliases=["area_id", "folder", "sidebar_tab", "project", "project_id", "proj"])
         content = _read_note_file(note_path)
         if folder_path and file_name:
             return _update_note_file_metadata(note_id, note, file_name, folder_path, area=area_id, content=content)

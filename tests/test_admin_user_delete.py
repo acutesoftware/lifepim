@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from flask import Flask
+from flask import Flask, render_template
+from jinja2 import ChoiceLoader, FileSystemLoader
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
 if root_folder not in sys.path:
@@ -15,6 +16,79 @@ from common import data
 from common import utils as common_utils
 from modules.admin import routes as admin_routes
 from modules.notes import routes as notes_routes
+
+
+class TestAdminLogs(unittest.TestCase):
+    def test_sync_network_log_line_is_summarized(self):
+        entry = admin_routes._parse_network_log_line(
+            '2026-07-29T13:00:00Z pocket_push_finish '
+            '{"path": "/api/pocket/v1/sync/upload", "item_count": 3, "ok_count": 2, '
+            '"conflict_count": 1, "error_count": 0, "status_code": 200}'
+        )
+
+        self.assertTrue(admin_routes._is_sync_network_entry(entry))
+        self.assertEqual(admin_routes._sync_direction(entry), "Mobile -> Desktop")
+        self.assertIn("2/3 accepted", admin_routes._sync_summary(entry))
+        self.assertEqual(entry["display_log_date"], "2026-07-29 22:30:00 ACST")
+
+    def test_logs_template_renders_filters_and_blank_details(self):
+        app = Flask(
+            __name__,
+            template_folder=os.path.join(root_folder, "templates"),
+            static_folder=os.path.join(root_folder, "static"),
+        )
+        app.jinja_loader = ChoiceLoader(
+            [
+                FileSystemLoader(os.path.join(root_folder, "templates")),
+                FileSystemLoader(os.path.join(root_folder, "modules", "admin", "templates")),
+            ]
+        )
+        app.add_url_rule("/site.webmanifest", endpoint="site_webmanifest", view_func=lambda: {})
+        app.add_url_rule("/search", endpoint="search_route", view_func=lambda: "")
+        app.add_url_rule("/admin/", endpoint="admin.admin_mapping_route", view_func=lambda: "")
+        app.add_url_rule("/admin/logs", endpoint="admin.logs_route", view_func=lambda: "")
+
+        with app.test_request_context("/admin/logs"):
+            html = render_template(
+                "admin_logs.html",
+                active_tab="admin",
+                tabs=[],
+                side_tabs=[],
+                content_title="Admin - Logs",
+                content_html="",
+                include_sync_logs=True,
+                include_user_logs=True,
+                limit=200,
+                network_log_file="C:\\apps\\LifePIM_Prod\\src\\lp_network.log",
+                log_timezone="Australia/Adelaide",
+                sync_entries=[
+                    {
+                        "log_date": "2026-07-29T13:00:00Z",
+                        "direction": "Mobile -> Desktop",
+                        "event": "pocket_push_finish",
+                        "summary": "1/1 accepted",
+                        "details": None,
+                    }
+                ],
+                user_entries=[
+                    {
+                        "id": 1,
+                        "log_date": "2026-07-29T13:00:00Z",
+                        "user_name": "admin",
+                        "action": "edited note",
+                        "entity_type": "lp_notes",
+                        "entity_id": "1",
+                        "context_type": "notes",
+                        "context_id": None,
+                        "details": None,
+                    }
+                ],
+            )
+
+        self.assertIn('name="sync_logs"', html)
+        self.assertIn('name="user_logs"', html)
+        self.assertIn("Mobile -&gt; Desktop", html)
+        self.assertIn("edited note", html)
 
 
 class _AnonymousCurrentUser:

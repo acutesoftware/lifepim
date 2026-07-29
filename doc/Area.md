@@ -58,6 +58,18 @@ Before editing the database directly:
 
 Directly changing `lp_areas.area_id` will not automatically update notes, tasks, HOW records, or `lp_area_folders`. Use the Edit Areas screen for Area ID renames when possible because it performs the exact-reference updates described above.
 
+## Pocket Mobile Sync Compatibility
+
+Desktop stores the canonical taxonomy field as `area`. LifePIM Pocket may still label the same filter as Projects.
+
+The Pocket API keeps both names compatible:
+
+- Desktop-to-mobile manifest and item download responses include `area`, `area_id`, `project`, and `project_id` with the same canonical Area ID.
+- The nested `metadata` object also includes `area`, `area_id`, `project`, and `project_id`.
+- Mobile-to-desktop sync accepts `area`, `area_id`, `project`, `project_id`, or `proj` in the top-level item payload or nested `metadata` payload.
+- Markdown front matter accepts `area`, `area_id`, `folder`, `sidebar_tab`, `project`, `project_id`, or `proj`.
+- Legacy `project/...` and `proj/...` values are normalized to `area/...` before they are stored in `lp_notes.area`.
+
 ## Practical Guidance
 
 Prefer stable, lowercase Area IDs such as `work/business`, `make/build`, or `area/dev/lifepim`.

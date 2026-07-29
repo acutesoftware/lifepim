@@ -80,10 +80,6 @@ def build_caddyfile(hosts: list[str], upstream: str) -> str:
 }}
 
 {https_hosts} {{
-\trequest_body {{
-\t\tmax_size 10MB
-\t}}
-
 \theader {{
 \t\tX-Content-Type-Options nosniff
 \t\tX-Frame-Options DENY

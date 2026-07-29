@@ -419,6 +419,28 @@ class TestAreas(unittest.TestCase):
         reset_rows = areas.areas_side_tabs(owner_user_id=1, conn=self.conn, seed=False)
         self.assertEqual(len(reset_rows), len(default_rows))
 
+    def test_user_sidebar_save_logs_area_changes(self):
+        areas.save_user_sidebar_rows(
+            [
+                {
+                    "area_id": "work/client",
+                    "area_name": "Client",
+                    "icon": "W",
+                    "group_name": "WORK",
+                },
+            ],
+            owner_user_id=1,
+            conn=self.conn,
+        )
+
+        row = self.conn.execute(
+            "SELECT action, entity_type, entity_id, context_type FROM sys_user_log "
+            "WHERE entity_type = 'lp_areas' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        self.assertEqual(row["action"], "area_add")
+        self.assertEqual(row["entity_id"], "work/client")
+        self.assertEqual(row["context_type"], "areas_edit")
+
     def test_area_id_rename_updates_exact_references_and_delete_keeps_content(self):
         areas.area_upsert(
             {

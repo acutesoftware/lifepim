@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+
+from common import localtime
 
 
 MAX_LOG_BYTES = 5 * 1024 * 1024
@@ -45,7 +46,7 @@ def log_network(event, **fields):
         path = _log_path()
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         _rotate_if_needed(path)
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ts = localtime.now_log_iso()
         line = f"{ts} {event} {json.dumps(clean_fields, ensure_ascii=True, default=str, sort_keys=True)}\n"
         with open(path, "a", encoding="utf-8") as handle:
             handle.write(line)

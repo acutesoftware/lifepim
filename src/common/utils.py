@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 import math
 import common.config as mod_cfg
+from common import localtime
 from common import data as db
 
 
@@ -300,9 +301,10 @@ def lg_usr(
             "INSERT INTO sys_user_log "
             "(log_date, user_name, action, entity_type, entity_id, before_json, after_json, "
             "context_type, context_id, details) "
-            "VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ),
         (
+            localtime.now_log_iso(),
             user_name or db._current_user(),
             (action or "").strip(),
             (entity_type or "").strip(),

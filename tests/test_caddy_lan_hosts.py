@@ -18,6 +18,7 @@ class TestCaddyLanHosts(unittest.TestCase):
         self.assertIn("https://192.168.1.99, https://10.181.130.24", content)
         self.assertIn("reverse_proxy 127.0.0.1:9741", content)
         self.assertIn("handle /api/pocket/v1/*", content)
+        self.assertNotIn("max_size 10MB", content)
 
     def test_collect_lan_hosts_keeps_private_addresses_only(self):
         original = update_caddy_lan_hosts._active_windows_ipv4_addresses

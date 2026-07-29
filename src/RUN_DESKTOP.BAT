@@ -112,6 +112,17 @@ if exist "%CADDY_EXE%" (
         )
     ) else (
         echo Caddy reverse proxy is already running.
+        if /I "%LIFEPIM_ENV%"=="production" (
+            echo Reloading Caddy reverse proxy configuration.
+            pushd "%CADDY_DIR%"
+            "%CADDY_EXE%" reload --config "%CADDY_CONFIG%"
+            if errorlevel 1 (
+                popd
+                echo ERROR: Caddy configuration reload failed. LifePIM was not started.
+                exit /b 1
+            )
+            popd
+        )
     )
 ) else (
     if /I "%LIFEPIM_ENV%"=="production" (

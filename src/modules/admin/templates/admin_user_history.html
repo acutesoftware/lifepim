@@ -58,7 +58,7 @@
     {% for row in entries %}
     <tr>
       <td>{{ row.id }}</td>
-      <td>{{ row.log_date }}</td>
+      <td>{{ row.display_log_date or row.log_date }}</td>
       <td>{{ row.user_name }}</td>
       <td>{{ row.action }}</td>
       <td>{{ row.entity_type }}</td>

@@ -8,6 +8,8 @@ from flask_login import current_user
 from common import data as db
 from common import config as cfg
 from common import media_migration
+from common import localtime
+from common import network_log
 from common import note_search_index
 from common import settings as settings_mod
 from common import user_paths
@@ -60,6 +62,168 @@ JOIN map_folder_area r
       LIMIT 1
   );
 """
+
+
+SYNC_PUSH_PATH_SUFFIXES = (
+    "/sync/push",
+    "/sync/upload",
+    "/sync/uploads",
+    "/sync/mobile",
+    "/sync/mobile-to-desktop",
+    "/push",
+)
+
+
+def _tail_text_lines(path, limit):
+    if not path or not os.path.exists(path):
+        return []
+    from collections import deque
+
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+            return list(deque(handle, maxlen=max(int(limit or 0), 1)))
+    except OSError:
+        return []
+
+
+def _parse_network_log_line(line):
+    text = (line or "").strip()
+    if not text:
+        return None
+    parts = text.split(" ", 2)
+    if len(parts) < 2:
+        return None
+    payload = {}
+    if len(parts) == 3 and parts[2].strip():
+        try:
+            payload = json.loads(parts[2])
+        except Exception:
+            payload = {"raw": parts[2]}
+    return {"log_date": parts[0], "display_log_date": localtime.display_log_time(parts[0]), "event": parts[1], "fields": payload}
+
+
+def _is_push_path(path):
+    clean = (path or "").rstrip("/")
+    return any(clean.endswith(suffix) for suffix in SYNC_PUSH_PATH_SUFFIXES)
+
+
+def _is_sync_network_entry(entry):
+    event = entry.get("event") or ""
+    fields = entry.get("fields") or {}
+    path = fields.get("path") or ""
+    if event.startswith("pocket_push") or event.startswith("pocket_manifest"):
+        return True
+    if event in {"pocket_payload_too_large", "pocket_auth_ok"} and ("/sync/manifest" in path or _is_push_path(path)):
+        return True
+    if event in {"request_start", "request_finish", "request_exception"} and ("/sync/manifest" in path or _is_push_path(path)):
+        return True
+    return False
+
+
+def _sync_direction(entry):
+    event = entry.get("event") or ""
+    path = (entry.get("fields") or {}).get("path") or ""
+    if event.startswith("pocket_push") or _is_push_path(path) or event == "pocket_payload_too_large":
+        return "Mobile -> Desktop"
+    if event.startswith("pocket_manifest") or "/sync/manifest" in path:
+        return "Desktop -> Mobile"
+    return "Sync"
+
+
+def _sync_summary(entry):
+    event = entry.get("event") or ""
+    fields = entry.get("fields") or {}
+    if event == "pocket_manifest_finish":
+        return (
+            f"{fields.get('item_count', 0)} manifest items; "
+            f"{fields.get('skipped_count', 0)} skipped; {fields.get('error_count', 0)} errors"
+        )
+    if event == "pocket_manifest_progress":
+        return f"{fields.get('processed_count', 0)}/{fields.get('total_count', 0)} manifest items"
+    if event == "pocket_push_start":
+        return f"{fields.get('item_count', 0)} incoming items; {fields.get('content_length', '')} bytes"
+    if event == "pocket_push_connect":
+        return f"{fields.get('method', '')} {fields.get('path', '')}; {fields.get('content_length', '')} bytes"
+    if event == "pocket_push_finish":
+        return (
+            f"{fields.get('ok_count', 0)}/{fields.get('item_count', 0)} accepted; "
+            f"{fields.get('conflict_count', 0)} conflicts; {fields.get('error_count', 0)} errors; "
+            f"HTTP {fields.get('status_code', '')}"
+        )
+    if event == "pocket_push_mobile_file_saved":
+        return f"{fields.get('kind', '')} {fields.get('relative_path', '')}; {fields.get('size', 0)} bytes"
+    if event == "pocket_push_note_deleted":
+        return f"deleted note {fields.get('note_id', '')}"
+    if event == "pocket_push_item_error":
+        return f"{fields.get('item_id', '')}: {fields.get('error', '')}"
+    if event == "pocket_payload_too_large":
+        return f"{fields.get('content_length', '')} bytes exceeded {fields.get('max_bytes', '')}"
+    if event == "request_finish":
+        return f"HTTP {fields.get('status_code', '')}; {fields.get('duration_ms', '')} ms"
+    if event == "request_exception":
+        return f"{fields.get('error_type', '')}: {fields.get('error', '')}"
+    if event == "request_start":
+        return f"{fields.get('method', '')} {fields.get('path', '')}"
+    if event == "pocket_auth_ok":
+        return f"authenticated {fields.get('username', '')}"
+    return event
+
+
+def _network_fields_preview(fields):
+    if not fields:
+        return ""
+    keep = {}
+    for key in (
+        "path",
+        "method",
+        "username",
+        "user_id",
+        "device_id",
+        "remote_addr",
+        "status_code",
+        "duration_ms",
+        "item_count",
+        "ok_count",
+        "conflict_count",
+        "error_count",
+        "total_count",
+        "skipped_count",
+        "relative_path",
+        "kind",
+        "size",
+        "has_device_id",
+    ):
+        if key in fields:
+            keep[key] = fields.get(key)
+    return json.dumps(keep or fields, ensure_ascii=True, default=str, sort_keys=True)
+
+
+def _sync_log_entries(limit):
+    entries = []
+    for line in _tail_text_lines(network_log.network_log_path(), max(int(limit or 0) * 8, 200)):
+        entry = _parse_network_log_line(line)
+        if not entry or not _is_sync_network_entry(entry):
+            continue
+        entry["direction"] = _sync_direction(entry)
+        entry["summary"] = _sync_summary(entry)
+        entry["details"] = _network_fields_preview(entry.get("fields") or {})
+        entries.append(entry)
+    return entries[-int(limit or 0) :]
+
+
+def _user_log_entries(conn, limit):
+    ensure_user_log_schema(conn)
+    rows = conn.execute(
+        "SELECT id, log_date, user_name, action, entity_type, entity_id, context_type, context_id, details "
+        "FROM sys_user_log ORDER BY id DESC LIMIT ?",
+        [int(limit or 0)],
+    ).fetchall()
+    entries = []
+    for row in rows:
+        item = dict(row)
+        item["display_log_date"] = localtime.display_log_time(item.get("log_date"))
+        entries.append(item)
+    return entries
 
 
 @admin_bp.route("/", methods=["GET", "POST"])
@@ -678,6 +842,7 @@ def user_history_route():
     entries = [dict(row) for row in rows]
     for entry in entries:
         entry["undoable"] = _is_undoable(entry)
+        entry["display_log_date"] = localtime.display_log_time(entry.get("log_date"))
 
     return render_template(
         "admin_user_history.html",
@@ -692,6 +857,36 @@ def user_history_route():
         sort_col=sort_col,
         sort_dir=sort_dir,
         now=datetime.now(),
+    )
+
+
+@admin_bp.route("/logs")
+def logs_route():
+    security.require_role("admin")
+    conn = db.conn if db.conn is not None else None
+    conn = db._get_conn() if conn is None else conn
+    first_load = not request.args
+    include_sync_logs = request.args.get("sync_logs") == "1" or first_load
+    include_user_logs = request.args.get("user_logs") == "1" or first_load
+    limit = request.args.get("limit", type=int) or 200
+    limit = max(10, min(limit, 1000))
+    sync_entries = _sync_log_entries(limit) if include_sync_logs else []
+    user_entries = _user_log_entries(conn, limit) if include_user_logs else []
+    return render_template(
+        "admin_logs.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Admin - Logs",
+        content_html="",
+        include_sync_logs=include_sync_logs,
+        include_user_logs=include_user_logs,
+        limit=limit,
+        sync_entries=sync_entries,
+        user_entries=user_entries,
+        network_log_file=network_log.network_log_path(),
+        log_timezone=localtime.log_timezone_name(),
+        db_file=getattr(cfg, "DB_FILE", ""),
     )
 
 

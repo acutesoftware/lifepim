@@ -14,7 +14,7 @@ from flask_login import current_user
 from common import data
 from common import user_paths
 from common.network_log import log_network
-from common.utils import get_table_def
+from common.utils import get_table_def, lg_usr, normalize_area_param
 from core import security
 from modules.notes import routes as notes_routes
 
@@ -27,7 +27,7 @@ PAIRING_CODE_TTL = timedelta(minutes=5)
 PAIRING_CODE_MAX_ACTIVE_PER_USER = 5
 REGISTRATION_FAILURE_LIMIT = 5
 REGISTRATION_FAILURE_WINDOW = timedelta(minutes=15)
-POCKET_MAX_SYNC_PAYLOAD_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", str(50 * 1024 * 1024)))
+POCKET_MAX_SYNC_PAYLOAD_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", str(100 * 1024 * 1024)))
 POCKET_MAX_ATTACHMENT_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_ATTACHMENT_BYTES", str(25 * 1024 * 1024)))
 POCKET_ATTACHMENT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 POCKET_FRONT_MATTER_READ_LIMIT = 128 * 1024
@@ -98,6 +98,22 @@ def ensure_pocket_schema(conn=None):
             last_seen_at TEXT NOT NULL,
             PRIMARY KEY(device_id, client_item_id)
         );
+        CREATE TABLE IF NOT EXISTS pocket_mobile_files (
+            mobile_file_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_user_id INTEGER NOT NULL,
+            device_id TEXT,
+            relative_path TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            operation TEXT NOT NULL DEFAULT 'UPSERT',
+            file_path TEXT,
+            content_sha256 TEXT,
+            file_size INTEGER NOT NULL DEFAULT 0,
+            modified_at TEXT,
+            version INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT,
+            UNIQUE(owner_user_id, relative_path)
+        );
         CREATE TABLE IF NOT EXISTS pocket_user_settings (
             user_id INTEGER PRIMARY KEY,
             default_note_folder TEXT,
@@ -126,6 +142,8 @@ def ensure_pocket_schema(conn=None):
         CREATE INDEX IF NOT EXISTS idx_pocket_devices_token_hash ON pocket_devices(token_hash);
         CREATE INDEX IF NOT EXISTS idx_pocket_item_map_entity ON pocket_item_map(entity_type, entity_id);
         CREATE INDEX IF NOT EXISTS idx_pocket_client_item_entity ON pocket_client_item_map(entity_type, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_pocket_mobile_files_owner_path
+            ON pocket_mobile_files(owner_user_id, relative_path);
         CREATE INDEX IF NOT EXISTS idx_pocket_pairing_user_active ON pocket_pairing_codes(user_id, used_at, expires_at);
         CREATE INDEX IF NOT EXISTS idx_pocket_registration_attempts_lookup
             ON pocket_registration_attempts(attempted_at, was_successful, ip_address, username, pairing_code_hash, device_id);
@@ -133,6 +151,15 @@ def ensure_pocket_schema(conn=None):
     )
     _add_column_if_missing(conn, "pocket_devices", "username", "TEXT")
     _add_column_if_missing(conn, "pocket_devices", "user_id", "INTEGER")
+    for column_name, column_type in (
+        ("device_id", "TEXT"),
+        ("operation", "TEXT NOT NULL DEFAULT 'UPSERT'"),
+        ("file_size", "INTEGER NOT NULL DEFAULT 0"),
+        ("modified_at", "TEXT"),
+        ("version", "INTEGER NOT NULL DEFAULT 1"),
+        ("deleted_at", "TEXT"),
+    ):
+        _add_column_if_missing(conn, "pocket_mobile_files", column_name, column_type)
     conn.commit()
 
 
@@ -285,7 +312,26 @@ def _json_error(error, status_code):
 @pocket_api_bp.before_request
 def _reject_oversized_pocket_payload():
     max_bytes = int(current_app.config.get("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", POCKET_MAX_SYNC_PAYLOAD_BYTES))
-    if request.path.endswith("/sync/push") and request.content_length and request.content_length > max_bytes:
+    push_paths = (
+        "/sync/push",
+        "/sync/upload",
+        "/sync/uploads",
+        "/sync/mobile",
+        "/sync/mobile-to-desktop",
+        "/push",
+    )
+    is_push_path = any(request.path.rstrip("/").endswith(path) for path in push_paths)
+    if is_push_path:
+        log_network(
+            "pocket_push_connect",
+            path=request.path,
+            method=request.method,
+            content_length=request.content_length,
+            remote_addr=_client_ip(),
+            has_authorization=bool(request.headers.get("Authorization")),
+            has_device_id=bool(request.headers.get("X-LifePIM-Device-ID")),
+        )
+    if is_push_path and request.content_length and request.content_length > max_bytes:
         log_network(
             "pocket_payload_too_large",
             path=request.path,
@@ -528,6 +574,67 @@ def _cached_note_sha_map(note_ids):
     return {int(row["entity_id"]): (row["sha256"] or "") for row in rows}
 
 
+def _mobile_file_rows(user_id=None, include_deleted=False):
+    ensure_pocket_schema()
+    where = "1=1"
+    params = []
+    if user_id is not None:
+        where += " AND owner_user_id = ?"
+        params.append(user_id)
+    if not include_deleted:
+        where += " AND deleted_at IS NULL"
+    rows = data._get_conn().execute(
+        f"""
+        SELECT mobile_file_id, owner_user_id, device_id, relative_path, kind, operation,
+               file_path, content_sha256, file_size, modified_at, version, updated_at, deleted_at
+        FROM pocket_mobile_files
+        WHERE {where}
+        ORDER BY relative_path COLLATE NOCASE, mobile_file_id
+        """,
+        params,
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _mobile_file_row_by_id(mobile_file_id, user_id=None, include_deleted=False):
+    ensure_pocket_schema()
+    where = "mobile_file_id = ?"
+    params = [mobile_file_id]
+    if user_id is not None:
+        where += " AND owner_user_id = ?"
+        params.append(user_id)
+    if not include_deleted:
+        where += " AND deleted_at IS NULL"
+    row = data._get_conn().execute(
+        f"""
+        SELECT mobile_file_id, owner_user_id, device_id, relative_path, kind, operation,
+               file_path, content_sha256, file_size, modified_at, version, updated_at, deleted_at
+        FROM pocket_mobile_files
+        WHERE {where}
+        """,
+        params,
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _cached_mobile_file_sha_map(mobile_file_ids):
+    mobile_file_ids = [int(row_id) for row_id in mobile_file_ids if row_id is not None]
+    if not mobile_file_ids:
+        return {}
+    placeholders = ", ".join("?" for _ in mobile_file_ids)
+    try:
+        rows = data._get_conn().execute(
+            f"""
+            SELECT entity_id, sha256 FROM pocket_item_state
+            WHERE entity_type = 'mobile_file' AND entity_id IN ({placeholders})
+            """,
+            mobile_file_ids,
+        ).fetchall()
+    except Exception:
+        return {}
+    return {int(row["entity_id"]): (row["sha256"] or "") for row in rows}
+
+
 def _upsert_item_state(entity_type, entity_id, note_path, state):
     if not state:
         return
@@ -750,6 +857,21 @@ def _metadata_from_note_row(note):
     return result
 
 
+def _payload_area(payload_item):
+    if not isinstance(payload_item, dict):
+        return ""
+    candidate_sources = [payload_item]
+    metadata = payload_item.get("metadata")
+    if isinstance(metadata, dict):
+        candidate_sources.append(metadata)
+    for source in candidate_sources:
+        for key in ("area", "area_id", "project", "project_id", "proj"):
+            value = source.get(key)
+            if value is not None and str(value).strip():
+                return normalize_area_param(str(value).strip())
+    return ""
+
+
 def _iso_from_note_value(value):
     if not value:
         return ""
@@ -848,6 +970,75 @@ def _item_uuid_map_for_notes(notes, user_id=None):
     return item_ids
 
 
+def _item_uuid_for_mobile_file(mobile_file_id, user_id=None):
+    conn = data._get_conn()
+    if user_id is None:
+        row = conn.execute(
+            "SELECT owner_user_id FROM pocket_mobile_files WHERE mobile_file_id = ?",
+            (mobile_file_id,),
+        ).fetchone()
+        user_id = row["owner_user_id"] if row else None
+    item_uuid = str(uuid.uuid5(ITEM_NAMESPACE, f"user:{user_id}:mobile_file:{int(mobile_file_id)}"))
+    now = _utc_now_sql()
+    conn.execute(
+        """
+        INSERT INTO pocket_item_map(item_uuid, entity_type, entity_id, created_at, last_seen_at)
+        VALUES (?, 'mobile_file', ?, ?, ?)
+        ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+            item_uuid = excluded.item_uuid,
+            last_seen_at = excluded.last_seen_at
+        """,
+        (item_uuid, mobile_file_id, now, now),
+    )
+    conn.commit()
+    return item_uuid
+
+
+def _item_uuid_map_for_mobile_files(rows):
+    now = _utc_now_sql()
+    expected = {}
+    mobile_file_ids = []
+    for row in rows:
+        mobile_file_id = int(row["mobile_file_id"])
+        mobile_file_ids.append(mobile_file_id)
+        expected[mobile_file_id] = str(
+            uuid.uuid5(ITEM_NAMESPACE, f"user:{row.get('owner_user_id')}:mobile_file:{mobile_file_id}")
+        )
+    existing = {}
+    if mobile_file_ids:
+        placeholders = ", ".join("?" for _ in mobile_file_ids)
+        try:
+            mapped = data._get_conn().execute(
+                f"""
+                SELECT entity_id, item_uuid
+                FROM pocket_item_map
+                WHERE entity_type = 'mobile_file' AND entity_id IN ({placeholders})
+                """,
+                mobile_file_ids,
+            ).fetchall()
+            existing = {int(row["entity_id"]): (row["item_uuid"] or "") for row in mapped}
+        except Exception:
+            existing = {}
+    values = [
+        (item_uuid, mobile_file_id, now, now)
+        for mobile_file_id, item_uuid in expected.items()
+        if existing.get(mobile_file_id) != item_uuid
+    ]
+    if values:
+        data._get_conn().executemany(
+            """
+            INSERT INTO pocket_item_map(item_uuid, entity_type, entity_id, created_at, last_seen_at)
+            VALUES (?, 'mobile_file', ?, ?, ?)
+            ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                item_uuid = excluded.item_uuid,
+                last_seen_at = excluded.last_seen_at
+            """,
+            values,
+        )
+        data._get_conn().commit()
+    return expected
+
+
 def _note_id_for_item(item_id):
     ensure_pocket_schema()
     item_id = (item_id or "").strip()
@@ -865,6 +1056,18 @@ def _note_id_for_item(item_id):
         return None
 
 
+def _mobile_file_id_for_item(item_id):
+    ensure_pocket_schema()
+    item_id = (item_id or "").strip()
+    if not item_id:
+        return None
+    row = data._get_conn().execute(
+        "SELECT entity_id FROM pocket_item_map WHERE item_uuid = ? AND entity_type = 'mobile_file'",
+        (item_id,),
+    ).fetchone()
+    return int(row["entity_id"]) if row else None
+
+
 def _note_id_for_client_item(device_id, client_item_id):
     ensure_pocket_schema()
     device_id = (device_id or "").strip()
@@ -880,6 +1083,360 @@ def _note_id_for_client_item(device_id, client_item_id):
         (device_id, client_item_id),
     ).fetchone()
     return int(row["entity_id"]) if row else None
+
+
+def _mobile_file_id_for_client_item(device_id, client_item_id):
+    ensure_pocket_schema()
+    device_id = (device_id or "").strip()
+    client_item_id = (client_item_id or "").strip()
+    if not device_id or not client_item_id:
+        return None
+    row = data._get_conn().execute(
+        """
+        SELECT entity_id
+        FROM pocket_client_item_map
+        WHERE device_id = ? AND client_item_id = ? AND entity_type = 'mobile_file'
+        """,
+        (device_id, client_item_id),
+    ).fetchone()
+    return int(row["entity_id"]) if row else None
+
+
+def _mobile_file_id_for_relative_path(user_id, relative_path, include_deleted=False):
+    ensure_pocket_schema()
+    relative_path = (relative_path or "").strip()
+    if user_id is None or not relative_path:
+        return None
+    row = data._get_conn().execute(
+        """
+        SELECT mobile_file_id
+        FROM pocket_mobile_files
+        WHERE owner_user_id = ? AND relative_path = ?
+          AND (? OR deleted_at IS NULL)
+        """,
+        (user_id, relative_path, 1 if include_deleted else 0),
+    ).fetchone()
+    return int(row["mobile_file_id"]) if row else None
+
+
+def _mobile_backup_root_for_user(user_id):
+    conn = data._get_conn()
+    paths = user_paths.get_user_paths(conn, user_id)
+    root = notes_routes._normalize_note_path(paths.get("file_root_path") or "")
+    if not root:
+        default_folder = _default_note_folder_for_user(user_id)
+        if default_folder:
+            root = os.path.dirname(default_folder)
+    if not root:
+        paths = user_paths.get_or_create_user_paths(conn, user_id, create_dirs=False)
+        root = notes_routes._normalize_note_path(paths.get("file_root_path") or "")
+    if not root:
+        root = getattr(data, "DB_FILE", "") and os.path.dirname(getattr(data, "DB_FILE", ""))
+    root = notes_routes._normalize_note_path(root or os.getcwd())
+    backup_root = os.path.abspath(os.path.join(root, "pocket_mobile"))
+    os.makedirs(backup_root, exist_ok=True)
+    return backup_root
+
+
+def _mobile_file_path_for_payload(payload_item, user_id):
+    backup_root = _mobile_backup_root_for_user(user_id)
+    relative_path = _safe_mobile_relative_path(payload_item)
+    target_path = os.path.abspath(os.path.join(backup_root, relative_path.replace("/", os.sep)))
+    if target_path != backup_root and not target_path.startswith(backup_root + os.sep):
+        raise ValueError("invalid_mobile_path")
+    return relative_path, target_path
+
+
+def _write_mobile_file_bytes(target_path, content_bytes, modified_at=""):
+    parent = os.path.dirname(target_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    temp_path = f"{target_path}.tmp"
+    try:
+        with open(temp_path, "wb") as handle:
+            handle.write(content_bytes)
+        os.replace(temp_path, target_path)
+        source_ts = _parse_payload_modified_at({"modified_at": modified_at})
+        if source_ts is not None:
+            os.utime(target_path, (source_ts, source_ts))
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+    return notes_routes._note_file_state(target_path)
+
+
+def _find_mobile_file_id(payload_item, device):
+    item_id = _payload_id(payload_item)
+    mobile_file_id = _mobile_file_id_for_item(item_id)
+    if mobile_file_id is not None:
+        return mobile_file_id
+    mobile_file_id = _mobile_file_id_for_client_item(device.get("device_id"), item_id)
+    if mobile_file_id is not None:
+        return mobile_file_id
+    relative_path = _safe_mobile_relative_path(payload_item)
+    return _mobile_file_id_for_relative_path(device.get("user_id"), relative_path)
+
+
+def _log_pocket_user_change(action, entity_type, entity_id, before=None, after=None, extra=None, device=None):
+    try:
+        lg_usr(
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            before=before,
+            after=after,
+            context_type="pocket_sync",
+            context_id=device.get("device_id") if device else None,
+            extra=extra,
+            conn=data._get_conn(),
+            user_name=device.get("username") if device else None,
+        )
+    except Exception:
+        pass
+
+
+def _delete_mobile_file_from_payload(payload_item, device):
+    mobile_file_id = _find_mobile_file_id(payload_item, device)
+    client_item_id = _payload_id(payload_item)
+    if mobile_file_id is None:
+        return {
+            "id": client_item_id,
+            "client_change_id": _payload_client_change_id(payload_item),
+            "server_item_id": "",
+            "ok": True,
+            "deleted": True,
+            "missing": True,
+        }
+    before = _mobile_file_row_by_id(mobile_file_id, user_id=device.get("user_id"), include_deleted=True)
+    if not before:
+        return {"id": client_item_id, "ok": False, "error": "not_found", "debug": _payload_debug(payload_item)}
+    if before.get("file_path") and os.path.exists(before["file_path"]):
+        try:
+            os.remove(before["file_path"])
+        except OSError:
+            pass
+    now = _utc_now_sql()
+    data._get_conn().execute(
+        """
+        UPDATE pocket_mobile_files
+        SET operation = 'DELETE',
+            version = COALESCE(version, 0) + 1,
+            updated_at = ?,
+            deleted_at = ?
+        WHERE mobile_file_id = ? AND owner_user_id = ?
+        """,
+        (now, now, mobile_file_id, device.get("user_id")),
+    )
+    data._get_conn().commit()
+    if client_item_id:
+        _upsert_client_item_map(device.get("device_id"), client_item_id, "mobile_file", mobile_file_id)
+    item_uuid = _item_uuid_for_mobile_file(mobile_file_id, device.get("user_id"))
+    _log_pocket_user_change(
+        "sync_mobile_file_delete",
+        "pocket_mobile_files",
+        mobile_file_id,
+        before=before,
+        after=_mobile_file_row_by_id(mobile_file_id, user_id=device.get("user_id"), include_deleted=True),
+        extra={"relative_path": before.get("relative_path"), "kind": before.get("kind")},
+        device=device,
+    )
+    return {
+        "id": item_uuid,
+        "client_change_id": _payload_client_change_id(payload_item),
+        "server_item_id": item_uuid,
+        "ok": True,
+        "deleted": True,
+    }
+
+
+def _upsert_mobile_file_from_payload(payload_item, device):
+    content_bytes = _payload_content_bytes(payload_item)
+    if content_bytes is None:
+        return {"id": _payload_id(payload_item), "ok": False, "error": "missing_content", "debug": _payload_debug(payload_item)}
+    supplied_sha = str(payload_item.get("sha256") or "").strip().lower()
+    actual_sha = hashlib.sha256(content_bytes).hexdigest()
+    if supplied_sha and supplied_sha != actual_sha:
+        return {"id": _payload_id(payload_item), "ok": False, "error": "hash_mismatch", "debug": _payload_debug(payload_item)}
+    relative_path, target_path = _mobile_file_path_for_payload(payload_item, device.get("user_id"))
+    kind = _payload_kind(payload_item)
+    modified_at = payload_item.get("modified_at") or payload_item.get("modifiedAt") or ""
+    state = _write_mobile_file_bytes(target_path, content_bytes, modified_at=modified_at)
+    existing_id = _mobile_file_id_for_relative_path(device.get("user_id"), relative_path, include_deleted=True)
+    before = _mobile_file_row_by_id(existing_id, user_id=device.get("user_id"), include_deleted=True) if existing_id else None
+    now = _utc_now_sql()
+    if existing_id:
+        version = int(before.get("version") or 0) + 1 if before else 1
+        data._get_conn().execute(
+            """
+            UPDATE pocket_mobile_files
+            SET device_id = ?,
+                kind = ?,
+                operation = 'UPSERT',
+                file_path = ?,
+                content_sha256 = ?,
+                file_size = ?,
+                modified_at = ?,
+                version = ?,
+                updated_at = ?,
+                deleted_at = NULL
+            WHERE mobile_file_id = ? AND owner_user_id = ?
+            """,
+            (
+                device.get("device_id"),
+                kind,
+                target_path,
+                actual_sha,
+                int(state.get("size") or len(content_bytes)) if state else len(content_bytes),
+                modified_at or (state or {}).get("date_modified") or now,
+                version,
+                now,
+                existing_id,
+                device.get("user_id"),
+            ),
+        )
+        mobile_file_id = existing_id
+        created = False
+    else:
+        cur = data._get_conn().execute(
+            """
+            INSERT INTO pocket_mobile_files
+            (owner_user_id, device_id, relative_path, kind, operation, file_path, content_sha256,
+             file_size, modified_at, version, updated_at, deleted_at)
+            VALUES (?, ?, ?, ?, 'UPSERT', ?, ?, ?, ?, 1, ?, NULL)
+            """,
+            (
+                device.get("user_id"),
+                device.get("device_id"),
+                relative_path,
+                kind,
+                target_path,
+                actual_sha,
+                int(state.get("size") or len(content_bytes)) if state else len(content_bytes),
+                modified_at or (state or {}).get("date_modified") or now,
+                now,
+            ),
+        )
+        mobile_file_id = cur.lastrowid
+        created = True
+    data._get_conn().commit()
+    client_item_id = _payload_id(payload_item)
+    if client_item_id:
+        _upsert_client_item_map(device.get("device_id"), client_item_id, "mobile_file", mobile_file_id)
+    _upsert_item_state("mobile_file", mobile_file_id, target_path, state or {"size": len(content_bytes), "sha256": actual_sha})
+    item = _serialize_mobile_file_item(
+        _mobile_file_row_by_id(mobile_file_id, user_id=device.get("user_id")),
+        include_content=False,
+        item_uuid=_item_uuid_for_mobile_file(mobile_file_id, device.get("user_id")),
+        state_override=state,
+    )
+    _log_pocket_user_change(
+        "sync_mobile_file_add" if created else "sync_mobile_file_update",
+        "pocket_mobile_files",
+        mobile_file_id,
+        before=before,
+        after=_mobile_file_row_by_id(mobile_file_id, user_id=device.get("user_id")),
+        extra={"relative_path": relative_path, "kind": kind},
+        device=device,
+    )
+    log_network(
+        "pocket_push_mobile_file_saved",
+        device_id=device.get("device_id"),
+        username=device.get("username"),
+        user_id=device.get("user_id"),
+        mobile_file_id=mobile_file_id,
+        relative_path=relative_path,
+        kind=kind,
+        size=len(content_bytes),
+        created=created,
+    )
+    return {
+        "id": item["id"],
+        "client_change_id": _payload_client_change_id(payload_item),
+        "server_item_id": item["id"],
+        "ok": True,
+        "created": created,
+        "item": item,
+    }
+
+
+def _mapped_note_id_for_item(item_id):
+    ensure_pocket_schema()
+    item_id = (item_id or "").strip()
+    if not item_id:
+        return None
+    row = data._get_conn().execute(
+        "SELECT entity_id FROM pocket_item_map WHERE item_uuid = ? AND entity_type = 'note'",
+        (item_id,),
+    ).fetchone()
+    return int(row["entity_id"]) if row else None
+
+
+def _delete_note_from_mobile(payload_item, device):
+    item_id = _payload_id(payload_item)
+    note_id = _mapped_note_id_for_item(item_id)
+    if note_id is None:
+        note_id = _note_id_for_client_item(device.get("device_id"), item_id)
+    if note_id is None:
+        return {
+            "id": item_id,
+            "client_change_id": _payload_client_change_id(payload_item),
+            "server_item_id": "",
+            "ok": True,
+            "deleted": True,
+            "missing": True,
+        }
+    note = _note_row_by_id(note_id, user_id=device.get("user_id"))
+    if not note:
+        return {
+            "id": item_id,
+            "client_change_id": _payload_client_change_id(payload_item),
+            "server_item_id": item_id,
+            "ok": True,
+            "deleted": True,
+            "missing": True,
+        }
+    before = dict(note)
+    archived_path = notes_routes._archive_and_delete_note(note_id)
+    data._get_conn().execute(
+        "DELETE FROM pocket_item_state WHERE entity_type = 'note' AND entity_id = ?",
+        (note_id,),
+    )
+    data._get_conn().execute(
+        "DELETE FROM pocket_item_map WHERE entity_type = 'note' AND entity_id = ?",
+        (note_id,),
+    )
+    data._get_conn().execute(
+        "DELETE FROM pocket_client_item_map WHERE entity_type = 'note' AND entity_id = ?",
+        (note_id,),
+    )
+    data._get_conn().commit()
+    _log_pocket_user_change(
+        "sync_note_delete",
+        "lp_notes",
+        note_id,
+        before=before,
+        after=None,
+        extra={"archived_path": archived_path, "relative_path": _payload_relative_path(payload_item)},
+        device=device,
+    )
+    log_network(
+        "pocket_push_note_deleted",
+        device_id=device.get("device_id"),
+        username=device.get("username"),
+        user_id=device.get("user_id"),
+        note_id=note_id,
+        archived_path=archived_path,
+    )
+    return {
+        "id": item_id,
+        "client_change_id": _payload_client_change_id(payload_item),
+        "server_item_id": item_id,
+        "ok": True,
+        "deleted": True,
+    }
 
 
 def _upsert_client_item_map(device_id, client_item_id, entity_type, entity_id):
@@ -902,9 +1459,9 @@ def _upsert_client_item_map(device_id, client_item_id, entity_type, entity_id):
     data._get_conn().commit()
 
 
-def _notes_root(user_id=None):
+def _notes_root(user_id=None, notes=None):
     roots = []
-    for note in _note_rows(user_id=user_id):
+    for note in (notes if notes is not None else _note_rows(user_id=user_id)):
         try:
             path_value = notes_routes._normalize_note_path(note.get("path"))
         except Exception:
@@ -1142,16 +1699,22 @@ def _derived_area_for_note(note, owner_user_id=None, area_folder_rows=None):
     return sorted(best_rows, key=_sort_key)[0].get("area_id") or fallback
 
 
-def _iso_from_state_or_note(state, note):
+def _iso_from_state_or_note(state, note, allow_file_stat=True):
     if state and state.get("modified_at"):
         return state.get("modified_at")
-    if state:
+    note_modified = _iso_from_note_value(note.get("date_modified") or note.get("rec_extract_date") or "")
+    if note_modified:
+        return note_modified
+    state_modified = _iso_from_note_value(state.get("date_modified") if state else "")
+    if state_modified:
+        return state_modified
+    if state and allow_file_stat:
         full_path = notes_routes._build_note_path(note)
         try:
             return datetime.fromtimestamp(os.path.getmtime(full_path), timezone.utc).isoformat()
         except OSError:
             pass
-    return _iso_from_note_value(note.get("date_modified") or note.get("rec_extract_date") or "")
+    return ""
 
 
 def _item_kind(note, content=None):
@@ -1182,6 +1745,7 @@ def _serialize_note_item(
     item_uuid=None,
     cached_sha="",
     area_folder_rows=None,
+    allow_file_stat=True,
 ):
     note_path = note_path_override or notes_routes._build_note_path(note)
     if include_content:
@@ -1224,24 +1788,80 @@ def _serialize_note_item(
         "ownership": "DESKTOP_MASTER",
         "sha256": state.get("sha256") if state and state.get("sha256") else (cached_sha or _cached_item_sha("note", note["id"]) or ""),
         "version": _version_from_state(state),
-        "modified_at": _iso_from_state_or_note(state, note) or "",
+        "modified_at": _iso_from_state_or_note(state, note, allow_file_stat=allow_file_stat) or "",
         "area": derived_area or "",
+        "area_id": derived_area or "",
+        "project": derived_area or "",
+        "project_id": derived_area or "",
         "derived_area": derived_area or "",
     }
     item.update(front_matter_metadata)
+    item["area"] = derived_area or ""
+    item["area_id"] = derived_area or ""
+    item["project"] = derived_area or ""
+    item["project_id"] = derived_area or ""
+    item["derived_area"] = derived_area or ""
     item["metadata"] = dict(front_matter_metadata)
     item["metadata"]["area"] = derived_area or ""
+    item["metadata"]["area_id"] = derived_area or ""
+    item["metadata"]["project"] = derived_area or ""
+    item["metadata"]["project_id"] = derived_area or ""
     item["metadata"]["derived_area"] = derived_area or ""
     if include_content:
         item["content"] = content
     return item
 
 
-def _update_note_metadata(note_id, note, state):
+def _mobile_file_state(row):
+    file_path = row.get("file_path") if row else ""
+    if file_path and os.path.exists(file_path):
+        return notes_routes._note_file_state(file_path)
+    return {
+        "size": str(row.get("file_size") or 0),
+        "sha256": row.get("content_sha256") or "",
+        "date_modified": row.get("modified_at") or row.get("updated_at") or "",
+        "modified_at": row.get("modified_at") or row.get("updated_at") or "",
+        "mtime_ns": 0,
+    }
+
+
+def _serialize_mobile_file_item(row, include_content=False, item_uuid=None, state_override=None, cached_sha=""):
+    state = state_override or _mobile_file_state(row)
+    mobile_file_id = int(row["mobile_file_id"])
+    item = {
+        "id": item_uuid or _item_uuid_for_mobile_file(mobile_file_id, row.get("owner_user_id")),
+        "relative_path": row.get("relative_path") or "",
+        "kind": (row.get("kind") or "NOTE").upper(),
+        "ownership": "MOBILE_MASTER",
+        "sha256": row.get("content_sha256") or (state.get("sha256") if state else "") or cached_sha or "",
+        "version": int(row.get("version") or _version_from_state(state)),
+        "modified_at": row.get("modified_at") or (state.get("modified_at") if state else "") or _iso_from_note_value(row.get("updated_at") or ""),
+        "deleted": bool(row.get("deleted_at")),
+    }
+    if include_content and not item["deleted"]:
+        file_path = row.get("file_path") or ""
+        if item["kind"] == "MEDIA" or "base64" in str(row.get("operation") or "").lower():
+            try:
+                with open(file_path, "rb") as handle:
+                    item["content_base64"] = base64.b64encode(handle.read()).decode("ascii")
+                    item["content_encoding"] = "base64"
+            except OSError:
+                item["content_base64"] = ""
+                item["content_encoding"] = "base64"
+        else:
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as handle:
+                    item["content"] = handle.read()
+            except OSError:
+                item["content"] = ""
+    return item
+
+
+def _update_note_metadata(note_id, note, state, area_override=""):
     tbl = _note_table()
     values_map = {col: note.get(col, "") for col in tbl["col_list"]}
     note_path = notes_routes._build_note_path(note)
-    metadata = notes_routes._note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
+    metadata = notes_routes._note_metadata_from_file(note_path, fallback_area=area_override or note.get("area") or "")
     if state:
         values_map["size"] = state.get("size", values_map.get("size", ""))
         values_map["date_modified"] = state.get("date_modified", values_map.get("date_modified", ""))
@@ -1306,6 +1926,75 @@ def _safe_mobile_file_name(payload_item):
     return f"{name}{ext}"
 
 
+def _payload_relative_path(payload_item):
+    raw_path = (
+        payload_item.get("relative_path")
+        or payload_item.get("relativePath")
+        or payload_item.get("path")
+        or payload_item.get("file_name")
+        or payload_item.get("fileName")
+        or payload_item.get("title")
+        or ""
+    )
+    return str(raw_path or "").replace("\\", "/").strip()
+
+
+def _payload_kind(payload_item):
+    value = (payload_item.get("kind") or payload_item.get("type") or "").strip().upper()
+    if value:
+        return value
+    relative_path = _payload_relative_path(payload_item)
+    if relative_path.startswith("Media/"):
+        return "MEDIA"
+    if relative_path.startswith("Lists/"):
+        return "LIST"
+    if relative_path == "_LifePIM/projects.json":
+        return "PROJECTS"
+    if relative_path == "_LifePIM/settings.json":
+        return "SETTINGS"
+    return "NOTE"
+
+
+def _payload_operation(payload_item):
+    return (payload_item.get("operation") or payload_item.get("op") or "UPSERT").strip().upper()
+
+
+def _is_mobile_file_payload(payload_item):
+    kind = _payload_kind(payload_item)
+    relative_path = _payload_relative_path(payload_item)
+    return kind in {"LIST", "MEDIA", "PROJECTS", "SETTINGS"} or relative_path.startswith(("Lists/", "Media/", "_LifePIM/"))
+
+
+def _safe_mobile_relative_path(payload_item):
+    relative_path = _payload_relative_path(payload_item)
+    kind = _payload_kind(payload_item)
+    if not relative_path:
+        default_name = {
+            "MEDIA": "Media/mobile-file",
+            "LIST": "Lists/mobile-list.md",
+            "PROJECTS": "_LifePIM/projects.json",
+            "SETTINGS": "_LifePIM/settings.json",
+        }.get(kind, "mobile-file")
+        relative_path = default_name
+    relative_path = relative_path.replace("\\", "/").strip().lstrip("/")
+    cleaned_parts = []
+    for part in relative_path.split("/"):
+        part = part.strip()
+        if not part or part in {".", ".."}:
+            continue
+        stem, ext = os.path.splitext(part)
+        stem = INVALID_FILENAME_CHARS.sub("_", stem).strip(" ._")
+        ext = INVALID_FILENAME_CHARS.sub("", ext).strip()
+        if ext and not ext.startswith("."):
+            ext = "." + ext.lstrip(".")
+        cleaned = f"{stem}{ext}" if stem else ext
+        if cleaned:
+            cleaned_parts.append(cleaned)
+    if not cleaned_parts:
+        cleaned_parts = ["mobile-file"]
+    return "/".join(cleaned_parts)
+
+
 def _payload_content(payload_item):
     for key in (
         "content",
@@ -1321,6 +2010,25 @@ def _payload_content(payload_item):
         if key in payload_item and payload_item.get(key) is not None:
             return payload_item.get(key)
     return None
+
+
+def _payload_content_bytes(payload_item):
+    encoded = (
+        payload_item.get("content_base64")
+        or payload_item.get("contentBase64")
+        or payload_item.get("base64")
+        or payload_item.get("data")
+        or ""
+    )
+    encoded = str(encoded).strip()
+    if encoded:
+        if encoded.lower().startswith("data:") and "," in encoded:
+            encoded = encoded.split(",", 1)[1]
+        return base64.b64decode(encoded, validate=True)
+    content = _payload_content(payload_item)
+    if content is None:
+        return None
+    return str(content).encode("utf-8")
 
 
 def _payload_id(payload_item):
@@ -1551,7 +2259,8 @@ def _create_note_from_mobile(payload_item, device):
     attachment_result = _write_payload_attachments(payload_item, note_path)
     front_matter = notes_routes._parse_note_front_matter_text(str(content))
     content_metadata = _metadata_from_front_matter(front_matter)
-    file_metadata = notes_routes._note_metadata_from_file(note_path, fallback_area=payload_item.get("area") or "")
+    payload_area = _payload_area(payload_item)
+    file_metadata = notes_routes._note_metadata_from_file(note_path, fallback_area=payload_area)
 
     tbl = _note_table()
     table_columns = _table_columns(data._get_conn(), tbl["name"])
@@ -1576,7 +2285,7 @@ def _create_note_from_mobile(payload_item, device):
             or ""
         ),
         "date_modified": state.get("date_modified", "") if state else "",
-        "area": payload_item.get("area") or content_metadata.get("area") or file_metadata.get("area") or "",
+        "area": payload_area or file_metadata.get("area") or "",
         "important": (
             notes_routes._front_matter_bool_text(payload_item.get("important"))
             if payload_item.get("important") is not None
@@ -1814,22 +2523,31 @@ def sync_manifest_route():
     if user_error:
         return user_error
     log_network("pocket_manifest_start", device_id=device["device_id"], username=device.get("username"), user_id=device.get("user_id"))
-    root = _notes_root(user_id=device.get("user_id"))
     items = []
     skipped = 0
     errors = []
     error_count = 0
     rows = _note_rows(user_id=device.get("user_id"))
+    mobile_rows = _mobile_file_rows(user_id=device.get("user_id"))
+    total_records = len(rows) + len(mobile_rows)
+    root = _notes_root(user_id=device.get("user_id"), notes=rows)
     include_front_matter = str(request.args.get("include_metadata") or "").strip().lower() in {"1", "true", "yes"}
     if not include_front_matter:
         include_front_matter = len(rows) <= int(current_app.config.get("LIFEPIM_POCKET_MANIFEST_FRONT_MATTER_LIMIT", POCKET_MANIFEST_FRONT_MATTER_LIMIT))
+    include_file_dates = include_front_matter or str(request.args.get("include_file_dates") or "").strip().lower() in {"1", "true", "yes"}
     item_uuid_map = _item_uuid_map_for_notes(rows, user_id=device.get("user_id"))
     cached_sha_map = _cached_note_sha_map([note.get("id") for note in rows])
+    mobile_item_uuid_map = _item_uuid_map_for_mobile_files(mobile_rows)
+    mobile_cached_sha_map = _cached_mobile_file_sha_map([row.get("mobile_file_id") for row in mobile_rows])
     area_folder_rows = _area_folder_rows_for_manifest(device.get("user_id"))
+    processed_count = 0
     for idx, note in enumerate(rows, start=1):
+        processed_count += 1
         try:
             note_path = notes_routes._build_note_path(note)
-            state = _state_with_file_created_at(_metadata_from_note_row(note), note_path)
+            state = _metadata_from_note_row(note)
+            if include_file_dates:
+                state = _state_with_file_created_at(state, note_path)
             if not note_path:
                 skipped += 1
                 error_count += 1
@@ -1847,6 +2565,7 @@ def sync_manifest_route():
                     item_uuid=item_uuid_map.get(int(note["id"])),
                     cached_sha=cached_sha_map.get(int(note["id"]), ""),
                     area_folder_rows=area_folder_rows,
+                    allow_file_stat=include_file_dates,
                 )
             )
         except Exception as exc:
@@ -1873,8 +2592,47 @@ def sync_manifest_route():
             log_network(
                 "pocket_manifest_progress",
                 device_id=device["device_id"],
-                processed_count=idx,
-                total_count=len(rows),
+                processed_count=processed_count,
+                total_count=total_records,
+                item_count=len(items),
+                skipped_count=skipped,
+            )
+    for mobile_row in mobile_rows:
+        processed_count += 1
+        try:
+            mobile_file_id = int(mobile_row["mobile_file_id"])
+            items.append(
+                _serialize_mobile_file_item(
+                    mobile_row,
+                    include_content=False,
+                    item_uuid=mobile_item_uuid_map.get(mobile_file_id),
+                    cached_sha=mobile_cached_sha_map.get(mobile_file_id, ""),
+                )
+            )
+        except Exception as exc:
+            skipped += 1
+            error_count += 1
+            error_info = {
+                "mobile_file_id": mobile_row.get("mobile_file_id"),
+                "relative_path": mobile_row.get("relative_path") or "",
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            }
+            if len(errors) < 25:
+                errors.append(error_info)
+            log_network(
+                "pocket_manifest_mobile_file_error",
+                device_id=device["device_id"],
+                user_id=device.get("user_id"),
+                username=device.get("username"),
+                **error_info,
+            )
+        if processed_count % 500 == 0:
+            log_network(
+                "pocket_manifest_progress",
+                device_id=device["device_id"],
+                processed_count=processed_count,
+                total_count=total_records,
                 item_count=len(items),
                 skipped_count=skipped,
             )
@@ -1887,9 +2645,12 @@ def sync_manifest_route():
         item_count=len(items),
         skipped_count=skipped,
         error_count=error_count,
-        total_count=len(rows),
+        total_count=total_records,
+        note_count=len(rows),
+        mobile_file_count=len(mobile_rows),
         root=root,
         front_matter_included=include_front_matter,
+        file_dates_included=include_file_dates,
     )
     payload = {
         "generated_at": _utc_now().isoformat(),
@@ -1897,6 +2658,7 @@ def sync_manifest_route():
         "skipped_count": skipped,
         "error_count": error_count,
         "front_matter_included": include_front_matter,
+        "file_dates_included": include_file_dates,
     }
     if errors:
         payload["errors"] = errors
@@ -1914,8 +2676,25 @@ def item_route(item_id):
     note_id = _note_id_for_item(item_id)
     note = _note_row_by_id(note_id, user_id=device.get("user_id")) if note_id is not None else None
     if not note:
-        log_network("pocket_item_not_found_or_forbidden", device_id=device["device_id"], user_id=device.get("user_id"), item_id=item_id, note_id=note_id)
-        return _json_error("not_found", 404)
+        mobile_file_id = _mobile_file_id_for_item(item_id)
+        mobile_file = (
+            _mobile_file_row_by_id(mobile_file_id, user_id=device.get("user_id"))
+            if mobile_file_id is not None
+            else None
+        )
+        if not mobile_file:
+            log_network("pocket_item_not_found_or_forbidden", device_id=device["device_id"], user_id=device.get("user_id"), item_id=item_id, note_id=note_id)
+            return _json_error("not_found", 404)
+        log_network(
+            "pocket_mobile_file_download",
+            device_id=device["device_id"],
+            user_id=device.get("user_id"),
+            item_id=item_id,
+            mobile_file_id=mobile_file_id,
+            relative_path=mobile_file.get("relative_path"),
+            kind=mobile_file.get("kind"),
+        )
+        return jsonify(_serialize_mobile_file_item(mobile_file, include_content=True, item_uuid=item_id))
     note_path = notes_routes._build_note_path(note)
     if not note_path or not os.path.isfile(note_path):
         log_network("pocket_item_file_missing", device_id=device["device_id"], item_id=item_id, note_id=note_id, note_path=note_path)
@@ -1934,6 +2713,12 @@ def item_route(item_id):
 
 
 def _push_one_item(payload_item, device):
+    if _payload_operation(payload_item) == "DELETE":
+        if _is_mobile_file_payload(payload_item):
+            return _delete_mobile_file_from_payload(payload_item, device)
+        return _delete_note_from_mobile(payload_item, device)
+    if _is_mobile_file_payload(payload_item):
+        return _upsert_mobile_file_from_payload(payload_item, device)
     item_id = _payload_id(payload_item)
     note_id = _note_id_for_item(item_id)
     if note_id is None:
@@ -2003,7 +2788,7 @@ def _push_one_item(payload_item, device):
     if item_id:
         _upsert_client_item_map(device.get("device_id"), item_id, "note", note_id)
     _upsert_item_state("note", note_id, note_path, next_state)
-    _update_note_metadata(note_id, note, next_state)
+    _update_note_metadata(note_id, note, next_state, area_override=_payload_area(payload_item))
     updated_note = _note_row_by_id(note_id, user_id=device.get("user_id"))
     item = _serialize_note_item(updated_note, include_content=False, user_id=device.get("user_id"))
     return {
@@ -2017,7 +2802,12 @@ def _push_one_item(payload_item, device):
     }
 
 
-@pocket_api_bp.route("/sync/push", methods=["POST"])
+@pocket_api_bp.route("/sync/push", methods=["POST"], strict_slashes=False)
+@pocket_api_bp.route("/sync/upload", methods=["POST"], strict_slashes=False)
+@pocket_api_bp.route("/sync/uploads", methods=["POST"], strict_slashes=False)
+@pocket_api_bp.route("/sync/mobile", methods=["POST"], strict_slashes=False)
+@pocket_api_bp.route("/sync/mobile-to-desktop", methods=["POST"], strict_slashes=False)
+@pocket_api_bp.route("/push", methods=["POST"], strict_slashes=False)
 def sync_push_route():
     device, error = require_pocket_auth()
     if error:
@@ -2040,6 +2830,9 @@ def sync_push_route():
         "pocket_push_start",
         device_id=device["device_id"],
         username=device.get("username"),
+        user_id=device.get("user_id"),
+        path=request.path,
+        content_length=request.content_length,
         item_count=len(incoming_items),
         payload_keys=sorted(payload.keys()),
         item_debug=[_payload_debug(item or {}) for item in incoming_items[:5]],
@@ -2061,6 +2854,8 @@ def sync_push_route():
         "pocket_push_finish",
         device_id=device["device_id"],
         username=device.get("username"),
+        user_id=device.get("user_id"),
+        path=request.path,
         item_count=len(incoming_items),
         ok_count=len([result for result in results if result.get("ok")]),
         conflict_count=len([result for result in results if result.get("conflict")]),

@@ -290,6 +290,9 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["kind"], "NOTE")
         self.assertEqual(item["ownership"], "DESKTOP_MASTER")
         self.assertEqual(item["area"], "pers")
+        self.assertEqual(item["area_id"], "pers")
+        self.assertEqual(item["project"], "pers")
+        self.assertEqual(item["project_id"], "pers")
         self.assertEqual(item["derived_area"], "pers")
         note_stat = os.stat(os.path.join(self.tmpdir.name, "Shopping.md"))
         expected_created = datetime.fromtimestamp(note_stat.st_ctime).strftime("%Y-%m-%d %H:%M:%S")
@@ -301,6 +304,7 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item["title"], "")
         self.assertEqual(item["source_note_id"], "")
         self.assertEqual(item["metadata"]["area"], "pers")
+        self.assertEqual(item["metadata"]["project"], "pers")
 
         item_resp = self.client.get(f"/api/pocket/v1/items/{item['id']}", headers=headers)
         self.assertEqual(item_resp.status_code, 200)
@@ -308,6 +312,8 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item_payload["kind"], "LIST")
         self.assertEqual(item_payload["content"], "# Shopping\n\n- [ ] Milk\n")
         self.assertEqual(item_payload["date_created"], expected_created)
+        self.assertEqual(item_payload["project"], "pers")
+        self.assertEqual(item_payload["metadata"]["project"], "pers")
 
     def test_item_download_uses_file_created_date_when_front_matter_is_missing(self):
         self._add_note(file_name="Plain.md", content="Plain body")
@@ -446,6 +452,21 @@ class TestPocketApi(unittest.TestCase):
 
         item_payload = self.client.get(f"/api/pocket/v1/items/{payload['items'][0]['id']}", headers=headers).get_json()
         self.assertEqual(item_payload["title"], "First")
+
+    def test_large_manifest_skips_per_file_date_stats(self):
+        self.app.config["LIFEPIM_POCKET_MANIFEST_FRONT_MATTER_LIMIT"] = 1
+        self._add_note(file_name="first.md", content="first")
+        self._add_note(file_name="second.md", content="second")
+        headers = self._register_headers()
+
+        with patch("modules.pocket_api.routes.os.stat", side_effect=AssertionError("manifest stat")):
+            manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+
+        self.assertEqual(manifest_resp.status_code, 200)
+        payload = manifest_resp.get_json()
+        self.assertFalse(payload["front_matter_included"])
+        self.assertFalse(payload["file_dates_included"])
+        self.assertEqual(payload["error_count"], 0)
 
     def test_manifest_only_returns_notes_owned_by_mobile_user(self):
         owned_id = self._add_note(file_name="owned.md", content="owned", owner_user_id=3)
@@ -603,6 +624,136 @@ class TestPocketApi(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(row["owner_user_id"], 3)
 
+    def test_push_accepts_upload_alias_route(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/upload",
+            headers=headers,
+            json={
+                "id": "mobile-local-upload-alias",
+                "relative_path": "upload alias note.md",
+                "content": "# Upload alias note\n",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["results"][0]["created"])
+        self.assertTrue(os.path.exists(os.path.join(self.tmpdir.name, "upload alias note.md")))
+
+    def test_push_accepts_mobile_media_record_and_manifest_returns_it(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+        media_bytes = b"mobile photo bytes"
+        media_sha = hashlib.sha256(media_bytes).hexdigest()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "changes": [
+                    {
+                        "client_change_id": "media-change-1",
+                        "relative_path": "Media/photo.jpg",
+                        "kind": "MEDIA",
+                        "sha256": media_sha,
+                        "modified_at": "2026-07-29T12:00:00+0930",
+                        "content_base64": base64.b64encode(media_bytes).decode("ascii"),
+                        "content_encoding": "base64",
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        accepted = resp.get_json()["accepted"][0]
+        self.assertEqual(accepted["client_change_id"], "media-change-1")
+        self.assertTrue(accepted["server_item_id"])
+
+        row = self.conn.execute(
+            "SELECT relative_path, kind, file_path, content_sha256 FROM pocket_mobile_files"
+        ).fetchone()
+        self.assertEqual(row["relative_path"], "Media/photo.jpg")
+        self.assertEqual(row["kind"], "MEDIA")
+        self.assertEqual(row["content_sha256"], media_sha)
+        self.assertTrue(os.path.exists(row["file_path"]))
+
+        manifest = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()
+        media_items = [item for item in manifest["items"] if item["relative_path"] == "Media/photo.jpg"]
+        self.assertEqual(len(media_items), 1)
+        self.assertEqual(media_items[0]["kind"], "MEDIA")
+        self.assertEqual(media_items[0]["sha256"], media_sha)
+
+        downloaded = self.client.get(f"/api/pocket/v1/items/{media_items[0]['id']}", headers=headers).get_json()
+        self.assertEqual(base64.b64decode(downloaded["content_base64"]), media_bytes)
+
+    def test_push_accepts_mobile_list_record(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "changes": [
+                    {
+                        "client_change_id": "list-change-1",
+                        "relative_path": "Lists/mobile-list.md",
+                        "kind": "LIST",
+                        "content": "- [ ] From phone\n",
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        item_id = resp.get_json()["accepted"][0]["server_item_id"]
+        downloaded = self.client.get(f"/api/pocket/v1/items/{item_id}", headers=headers).get_json()
+        self.assertEqual(downloaded["kind"], "LIST")
+        self.assertEqual(downloaded["relative_path"], "Lists/mobile-list.md")
+        self.assertEqual(downloaded["content"], "- [ ] From phone\n")
+
+    def test_push_accepts_mobile_file_delete_for_mapped_item(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+        create_resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "changes": [
+                    {
+                        "client_change_id": "settings-change-1",
+                        "relative_path": "_LifePIM/settings.json",
+                        "kind": "SETTINGS",
+                        "content": "{\"theme\":\"dark\"}",
+                    }
+                ]
+            },
+        )
+        item_id = create_resp.get_json()["accepted"][0]["server_item_id"]
+
+        delete_resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "changes": [
+                    {
+                        "client_change_id": "settings-delete-1",
+                        "server_item_id": item_id,
+                        "relative_path": "_LifePIM/settings.json",
+                        "kind": "SETTINGS",
+                        "operation": "DELETE",
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(delete_resp.status_code, 200)
+        self.assertTrue(delete_resp.get_json()["results"][0]["deleted"])
+        manifest = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()
+        self.assertFalse(any(item["relative_path"] == "_LifePIM/settings.json" for item in manifest["items"]))
+
     def test_push_creates_mobile_only_note_with_metadata(self):
         self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
         headers = self._register_headers()
@@ -640,6 +791,32 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(row["important"], "true")
         self.assertEqual(row["source_note_id"], "9876")
 
+    def test_push_creates_mobile_only_note_accepts_project_alias(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": "mobile-local-project",
+                "relative_path": "project phone note.md",
+                "project": "project/mobile",
+                "content": "# Project alias note\n",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        result = resp.get_json()["results"][0]
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["item"]["area"], "area/mobile")
+        self.assertEqual(result["item"]["project"], "area/mobile")
+        row = self.conn.execute(
+            "SELECT area FROM lp_notes WHERE file_name = ?",
+            ("project phone note.md",),
+        ).fetchone()
+        self.assertEqual(row["area"], "area/mobile")
+
     def test_push_updates_existing_note_metadata_from_front_matter(self):
         self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
         headers = self._register_headers()
@@ -676,6 +853,56 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(row["area"], "updated/area")
         self.assertEqual(row["important"], "true")
         self.assertEqual(row["source_note_id"], "5432")
+
+    def test_push_updates_existing_note_accepts_project_alias_payload(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+        item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": item["id"],
+                "base_sha256": item["sha256"],
+                "project_id": "project/updated",
+                "content": "Updated body without front matter\n",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        row = self.conn.execute(
+            "SELECT area FROM lp_notes WHERE file_name = ?",
+            ("existing.md",),
+        ).fetchone()
+        self.assertEqual(row["area"], "area/updated")
+
+    def test_push_updates_existing_note_accepts_project_front_matter(self):
+        self._add_note(file_name="existing.md", content="existing", owner_user_id=3)
+        headers = self._register_headers()
+        item = self.client.get("/api/pocket/v1/sync/manifest", headers=headers).get_json()["items"][0]
+
+        resp = self.client.post(
+            "/api/pocket/v1/sync/push",
+            headers=headers,
+            json={
+                "id": item["id"],
+                "base_sha256": item["sha256"],
+                "content": (
+                    "---\n"
+                    "project: project/front-matter\n"
+                    "---\n"
+                    "Updated body\n"
+                ),
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        row = self.conn.execute(
+            "SELECT area FROM lp_notes WHERE file_name = ?",
+            ("existing.md",),
+        ).fetchone()
+        self.assertEqual(row["area"], "area/front-matter")
 
     def test_push_creates_mobile_only_note_with_image_attachment(self):
         self._add_note(file_name="existing.md", content="existing", owner_user_id=3)

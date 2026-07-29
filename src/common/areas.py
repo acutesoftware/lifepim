@@ -732,6 +732,74 @@ def _rename_area_references(conn, old_area_id, new_area_id, owner_user_id=None):
     return changed
 
 
+def _user_area_rows_by_id(conn, owner_user_id):
+    rows = conn.execute(
+        "SELECT owner_user_id, area_id, icon, tab, group_name, area_name, is_header, "
+        "is_system, status, tags, sort_order, pinned, notes, created_utc, updated_utc "
+        "FROM lp_areas WHERE owner_user_id IS ?",
+        (owner_user_id,),
+    ).fetchall()
+    return {row["area_id"]: dict(row) for row in rows}
+
+
+def _log_sidebar_row_changes(conn, before_rows, after_rows, rename_pairs, owner_user_id):
+    try:
+        from common import utils as utils_mod
+
+        rename_old_ids = {old_id for old_id, _new_id in rename_pairs}
+        rename_new_ids = {new_id for _old_id, new_id in rename_pairs}
+        for old_area_id, new_area_id in rename_pairs:
+            utils_mod.lg_usr(
+                action="area_rename",
+                entity_type="lp_areas",
+                entity_id=new_area_id,
+                before=before_rows.get(old_area_id),
+                after=after_rows.get(new_area_id),
+                context_type="areas_edit",
+                context_id=str(owner_user_id),
+                conn=conn,
+            )
+        for area_id in sorted(set(after_rows) - set(before_rows) - rename_new_ids):
+            utils_mod.lg_usr(
+                action="area_add",
+                entity_type="lp_areas",
+                entity_id=area_id,
+                before=None,
+                after=after_rows.get(area_id),
+                context_type="areas_edit",
+                context_id=str(owner_user_id),
+                conn=conn,
+            )
+        for area_id in sorted(set(before_rows) - set(after_rows) - rename_old_ids):
+            utils_mod.lg_usr(
+                action="area_delete",
+                entity_type="lp_areas",
+                entity_id=area_id,
+                before=before_rows.get(area_id),
+                after=None,
+                context_type="areas_edit",
+                context_id=str(owner_user_id),
+                conn=conn,
+            )
+        compare_cols = ("icon", "tab", "group_name", "area_name", "is_header", "is_system", "status", "sort_order", "pinned", "notes")
+        for area_id in sorted(set(before_rows) & set(after_rows)):
+            before = before_rows[area_id]
+            after = after_rows[area_id]
+            if any(str(before.get(col) or "") != str(after.get(col) or "") for col in compare_cols):
+                utils_mod.lg_usr(
+                    action="area_update",
+                    entity_type="lp_areas",
+                    entity_id=area_id,
+                    before=before,
+                    after=after,
+                    context_type="areas_edit",
+                    context_id=str(owner_user_id),
+                    conn=conn,
+                )
+    except Exception:
+        pass
+
+
 def save_user_sidebar_rows(rows, owner_user_id=None, conn=None):
     conn = _get_conn(conn)
     ensure_areas_schema(conn)
@@ -739,6 +807,7 @@ def save_user_sidebar_rows(rows, owner_user_id=None, conn=None):
     if owner_user_id is None:
         raise ValueError("A logged-in user is required.")
     now = _utc_now()
+    before_rows = _user_area_rows_by_id(conn, owner_user_id)
     seen_area_ids = set()
     rename_pairs = []
     normalized_rows = []
@@ -798,6 +867,8 @@ def save_user_sidebar_rows(rows, owner_user_id=None, conn=None):
             ),
         )
     conn.commit()
+    after_rows = _user_area_rows_by_id(conn, owner_user_id)
+    _log_sidebar_row_changes(conn, before_rows, after_rows, rename_pairs, owner_user_id)
 
 
 def area_get(area_id, conn=None, owner_user_id=None):

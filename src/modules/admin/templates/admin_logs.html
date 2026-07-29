@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% set admin_tabs = [
+    ('security', 'Security', url_for('admin.admin_mapping_route', tab='security')),
+    ('folder_mapping', 'Folder Mapping', url_for('admin.admin_mapping_route', tab='folder_mapping')),
+    ('folders', 'Folders (dim_folder)', url_for('admin.admin_mapping_route', tab='folders')),
+    ('migration', 'Migration', url_for('admin.admin_mapping_route', tab='migration')),
+    ('logs', 'Logs', url_for('admin.logs_route'))
+  ] %}
+
+  <div class="settings-shell">
+    <nav class="settings-tabs" aria-label="Admin sections">
+      {% for tab_id, tab_label, tab_url in admin_tabs %}
+        <a class="{% if tab_id == 'logs' %}active{% endif %}" href="{{ tab_url }}">{{ tab_label }}</a>
+      {% endfor %}
+    </nav>
+
+    <section class="settings-panel">
+      <form method="get" class="settings-form admin-log-filter">
+        <label>
+          <input type="checkbox" name="sync_logs" value="1" {% if include_sync_logs %}checked{% endif %}>
+          sync logs
+        </label>
+        <label>
+          <input type="checkbox" name="user_logs" value="1" {% if include_user_logs %}checked{% endif %}>
+          user logs
+        </label>
+        <label>
+          Show last
+          <input type="number" name="limit" value="{{ limit }}" min="10" max="1000">
+        </label>
+        <button type="submit">Apply</button>
+      </form>
+      <p class="settings-empty">Times shown in <code>{{ log_timezone }}</code>.</p>
+
+      {% if include_sync_logs %}
+        <h4>Sync Logs</h4>
+        <p class="settings-empty">Source: <code>{{ network_log_file }}</code></p>
+        <div class="tabular-scroll admin-list-scroll">
+          <table border="1" cellpadding="5">
+            <tr>
+              <th>Time</th>
+              <th>Direction</th>
+              <th>Event</th>
+              <th>Summary</th>
+              <th>Details</th>
+            </tr>
+            {% for row in sync_entries|reverse %}
+            <tr>
+              <td>{{ row.display_log_date or row.log_date }}</td>
+              <td>{{ row.direction }}</td>
+              <td>{{ row.event }}</td>
+              <td>{{ row.summary }}</td>
+              <td><code>{{ (row.details or '')[:260] }}{% if row.details and row.details|length > 260 %}...{% endif %}</code></td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% endif %}
+
+      {% if include_user_logs %}
+        <h4>User Logs</h4>
+        <p class="settings-empty">Source: <code>{{ db_file }}</code>, table <code>sys_user_log</code></p>
+        <div class="tabular-scroll admin-list-scroll">
+          <table border="1" cellpadding="5">
+            <tr>
+              <th>Id</th>
+              <th>Time</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Entity</th>
+              <th>Entity Id</th>
+              <th>Context</th>
+              <th>Details</th>
+            </tr>
+            {% for row in user_entries %}
+            <tr>
+              <td>{{ row.id }}</td>
+              <td>{{ row.display_log_date or row.log_date }}</td>
+              <td>{{ row.user_name }}</td>
+              <td>{{ row.action }}</td>
+              <td>{{ row.entity_type }}</td>
+              <td>{{ row.entity_id }}</td>
+              <td>{{ row.context_type }}{% if row.context_id %}:{{ row.context_id }}{% endif %}</td>
+              <td><code>{{ (row.details or '')[:260] }}{% if row.details and row.details|length > 260 %}...{% endif %}</code></td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}
