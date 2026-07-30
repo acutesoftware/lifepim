@@ -1,0 +1,201 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% if message %}
+    <div class="settings-message">{{ message }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="settings-message settings-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="projects-page">
+    <form method="post" class="project-edit-form">
+      <div class="project-form-grid">
+        <label>
+          Name
+          <input type="text" name="name" value="{{ project.name if project else '' }}" required>
+        </label>
+        <label>
+          Type
+          <input type="text" name="project_type" value="{{ project.project_type if project else '' }}" placeholder="Travel, event, software, build">
+        </label>
+        <label>
+          Status
+          <select name="status">
+            {% set selected_status = project.status if project else 'planned' %}
+            {% for option in status_options %}
+              <option value="{{ option.value }}" {% if selected_status == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="project-icon-field">
+          Icon
+          <span class="icon-input-row">
+            <input id="project-icon-input" class="icon-small-input" type="text" name="icon" value="{{ project.icon if project else '' }}" maxlength="16">
+            <button type="button" class="icon-picker-button" data-icon-picker-target="project-icon-input" data-icon-picker-mode="replace">[..]</button>
+          </span>
+        </label>
+        <label>
+          Start date
+          <input type="date" name="start_date" value="{{ project.start_date if project else '' }}">
+        </label>
+        <label>
+          End date
+          <input type="date" name="end_date" value="{{ project.end_date if project else '' }}">
+        </label>
+        <label>
+          Parent Project
+          <select name="parent_project_id">
+            <option value="">None</option>
+            {% for parent in parent_projects %}
+              <option value="{{ parent.project_id }}" {% if project and parent.project_id == project.parent_project_id %}selected{% endif %}>
+                {{ parent.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Sort order
+          <input type="number" name="sort_order" value="{{ project.sort_order if project else 100 }}">
+        </label>
+        <label class="project-checkbox-label">
+          <input type="checkbox" name="pinned" value="1" {% if project and project.pinned %}checked{% endif %}>
+          Pinned
+        </label>
+      </div>
+
+      <label class="project-wide-field">
+        Description
+        <textarea name="description" rows="4">{{ project.description if project else '' }}</textarea>
+      </label>
+
+      <fieldset class="project-area-select">
+        <legend>Related Areas</legend>
+        {% for option in area_options %}
+          <label>
+            <input type="checkbox" name="area_ids" value="{{ option.area_id }}" {% if option.selected %}checked{% endif %}>
+            <span>{{ option.icon or '' }} {{ option.label }} <small>{{ option.area_id }}</small></span>
+          </label>
+        {% endfor %}
+      </fieldset>
+
+      <label class="project-wide-field">
+        Comments
+        <textarea name="comments" rows="4">{{ project.comments if project else '' }}</textarea>
+      </label>
+
+      <div class="project-actions">
+        <button type="submit" name="action" value="save">Save Project</button>
+        <a href="{{ url_for('projects.list_projects_route', area=area) }}">Back to Projects</a>
+        {% if project %}
+          <button type="submit" name="action" value="archive" onclick="return confirm('Archive this Project?');">Archive</button>
+          <button type="submit" name="action" value="delete" onclick="return confirm('Delete this Project and its references? Original items will not be deleted.');">Delete</button>
+        {% endif %}
+      </div>
+    </form>
+
+    {% if project %}
+      <section class="project-contents"
+               data-project-id="{{ project.project_id }}"
+               data-add-url="{{ url_for('projects.add_project_items_api', project_id=project.project_id) }}">
+        <div class="project-contents-header">
+          <h4>Project Contents</h4>
+          <form method="get" action="{{ url_for('projects.view_project_route', project_id=project.project_id) }}">
+            {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+            <label>
+              Group
+              <select name="group_by" onchange="this.form.submit()">
+                <option value="type" {% if group_by == 'type' %}selected{% endif %}>Type</option>
+                <option value="section" {% if group_by == 'section' %}selected{% endif %}>Section</option>
+                <option value="none" {% if group_by == 'none' %}selected{% endif %}>None</option>
+              </select>
+            </label>
+          </form>
+        </div>
+
+        <div class="project-drop-zone" data-project-drop-zone>
+          Drop Tasks, Notes, Events, Files, People, Places, Media, Audio, How-tos, Money records, or other LifePIM items here.
+        </div>
+
+        <div class="project-search-add">
+          <div class="project-search-row">
+            <input type="search" class="project-search-input" placeholder="Search existing items">
+            <select class="project-search-types" aria-label="Item types">
+              <option value="">All types</option>
+              <option value="task,note,event">Tasks, Notes, Events</option>
+              <option value="how,file,media,audio">How, Files, Media, Audio</option>
+              <option value="person,place,money,album">People, Places, Money, Albums</option>
+            </select>
+          </div>
+          <div class="project-search-results"></div>
+        </div>
+
+        <div class="project-content-groups">
+          {% for group in content_groups %}
+            <section class="project-content-group">
+              <h5>{{ group.label }}</h5>
+              <div class="tabular-scroll">
+                <table class="project-items-table">
+                  <thead>
+                    <tr>
+                      <th>Pin</th>
+                      <th>Type</th>
+                      <th>Item</th>
+                      <th>Section</th>
+                      <th>Order</th>
+                      <th>Primary</th>
+                      <th>Actions</th>
+                      <th>Arrange</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in group["items"] %}
+                    {% set summary = item.summary %}
+                    {% set update_form_id = 'project-item-update-' ~ item.project_item_id %}
+                    <tr>
+                      <td>
+                        <form id="{{ update_form_id }}" method="post" action="{{ url_for('projects.update_project_item_route', project_item_id=item.project_item_id) }}">
+                          <input type="hidden" name="next" value="{{ request.full_path }}">
+                        </form>
+                        <input form="{{ update_form_id }}" type="checkbox" name="pinned" value="1" {% if item.pinned %}checked{% endif %}>
+                      </td>
+                      <td>{{ item.item_type }}</td>
+                      <td>
+                        <input form="{{ update_form_id }}" type="text" name="item_title" value="{{ item.item_title or summary.title }}">
+                        {% if summary.subtitle %}<div class="project-item-subtitle">{{ summary.subtitle }}</div>{% endif %}
+                      </td>
+                      <td><input form="{{ update_form_id }}" type="text" name="section" value="{{ item.section or '' }}"></td>
+                      <td><input form="{{ update_form_id }}" type="number" name="sort_order" value="{{ item.sort_order }}"></td>
+                      <td><input form="{{ update_form_id }}" type="checkbox" name="is_primary" value="1" {% if item.is_primary %}checked{% endif %}></td>
+                      <td class="project-item-actions">
+                        <button form="{{ update_form_id }}" type="submit">Update</button>
+                        {% if summary.open_url %}
+                          <a href="{{ summary.open_url }}">Open Original</a>
+                        {% endif %}
+                      </td>
+                      <td class="project-row-extra-actions">
+                        <form method="post" action="{{ url_for('projects.move_project_item_route', project_item_id=item.project_item_id) }}">
+                          <input type="hidden" name="next" value="{{ request.full_path }}">
+                          <button type="submit" name="direction" value="up" title="Move up">Up</button>
+                          <button type="submit" name="direction" value="down" title="Move down">Down</button>
+                        </form>
+                        <form method="post" action="{{ url_for('projects.remove_project_item_route', project_item_id=item.project_item_id) }}" onsubmit="return confirm('Remove this item from the Project? The original item will not be deleted.');">
+                          <input type="hidden" name="next" value="{{ request.full_path }}">
+                          <button type="submit">Remove</button>
+                        </form>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          {% else %}
+            <div class="project-empty-state">No contents yet.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <script src="{{ url_for('static', filename='projects.js') }}"></script>
+    {% endif %}
+  </div>
+{% endblock %}

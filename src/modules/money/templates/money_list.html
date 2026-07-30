@@ -68,7 +68,11 @@
       </thead>
       <tbody>
         {% for row in rows %}
-          <tr class="money-row"
+          {% set money_title = row.get('name') or row.get('item') or row.get('supplier') or row.get('source') or row.get('symbol') or active_section.label %}
+          <tr class="money-row link-draggable"
+              data-record-type="money"
+              data-record-id="{{ active_section.id }}:{{ row.get(active_section.pk) }}"
+              data-record-title="{{ money_title }}"
               data-record='{{ row|tojson }}'>
             {% for col in active_section.columns %}
               {% set value = row.get(col.name) %}

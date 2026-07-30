@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import config as cfg
+from common import projects as projects_mod
 from common.utils import build_pagination, get_side_tabs, get_tabs, paginate_total
 from utils import importer
 
@@ -186,6 +187,8 @@ def view_contact_route(contact_id):
         contact=contact,
         facts=facts,
         fact_types=dao.FACT_TYPES,
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("person", contact_id),
     )
 
 

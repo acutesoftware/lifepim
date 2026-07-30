@@ -37,9 +37,10 @@
     <div class="menu-wrapper">
       <button class="menu-btn" id="menuToggle">☰</button>
       <div class="dropdown-menu" id="menuDropdown">
-        <a href="#" id="showSidebar">Show area list</a>
-        <a href="#" id="hideSidebar">Hide area list</a>
+        <a href="#" id="showSidebar">Show sidebar</a>
+        <a href="#" id="hideSidebar">Hide sidebar</a>
         <a href="/areas/edit">Edit areas</a>
+        <a href="/projects">Manage projects</a>
         <div class="menu-spacer"></div>
         <a href="/admin/settings">Settings</a>
         <a href="/help">Help</a>
@@ -131,6 +132,7 @@
 
   <div class="container">
     <aside class="side-tabs" id="sidebar">
+      <div class="side-section-title">Areas</div>
       {% for s in side_tabs %}
         {% set tab_area = (s.area if s.area is defined and s.area else s.id) %}
         {% set is_all = tab_area in ['any', 'All', 'all', 'ALL'] %}
@@ -142,6 +144,29 @@
           <span class="lab">{{s.label}}</span>
         </a>
       {% endfor %}
+      {% if sidebar_projects is defined %}
+        <div class="side-section-title project-sidebar-heading">
+          <span>Projects{% if current_area %} ({{ sidebar_area_label|default(current_area) }}){% endif %}</span>
+          <a href="{{ url_for('projects.add_project_route') }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}" title="Add Project">+</a>
+        </div>
+        {% if sidebar_projects %}
+          {% for project in sidebar_projects %}
+            <a class="side project-side {% if active_project_id and project.project_id == active_project_id %}active{% endif %}"
+               href="{{ url_for('projects.view_project_route', project_id=project.project_id) }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}"
+               title="{{ project.name }}">
+              <span class="ic">{{ project.icon or 'P' }}</span>
+              <span class="lab">{{ project.name }}</span>
+              <span class="project-side-count">{{ project.item_count }}</span>
+            </a>
+          {% endfor %}
+        {% else %}
+          <a class="side project-side project-side-empty"
+             href="{{ url_for('projects.add_project_route') }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}">
+            <span class="ic">+</span>
+            <span class="lab">Add Project</span>
+          </a>
+        {% endif %}
+      {% endif %}
     </aside>
 
     <main class="main">
@@ -229,6 +254,7 @@
     });
   </script>
   <script src="{{ url_for('static', filename='links.js') }}"></script>
+  <script src="{{ url_for('static', filename='icon_picker_client.js') }}"></script>
   <script src="{{ url_for('static', filename='notes.js') }}"></script>
 </body>
 </html>

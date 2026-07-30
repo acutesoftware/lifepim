@@ -21,6 +21,10 @@
     <tr><th>Detail</th><td>{{ event.detail }}</td></tr>
     <tr><th>Area</th><td>{{ event.area }}</td></tr>
   </table>
+  {% set project_assign_record_type = "event" %}
+  {% set project_assign_record_id = event.id %}
+  {% set project_assign_record_title = event.title %}
+  {% include "widgets/project_assign.html" %}
   {% set link_record_type = "event" %}
   {% set link_record_id = event.id %}
   {% set link_record_title = event.title %}

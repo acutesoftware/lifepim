@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
+from common import projects as projects_mod
 from common.utils import get_side_tabs, get_tabs, request_area_param
 from modules.how import service
 
@@ -57,6 +58,8 @@ def view_how_route(item_id):
         area=area,
         detail=detail,
         tree=service.build_tree(item_id, max_depth=8),
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("how", item_id),
     )
 
 

@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
 from common import config as cfg
+from common import projects as projects_mod
 from common import settings as settings_mod
 from common.utils import (
     build_form_fields,
@@ -264,6 +265,8 @@ def view_place_route(place_id):
         item=item,
         col_list=tbl["col_list"] if tbl else [],
         area=area,
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("place", place_id),
     )
 
 

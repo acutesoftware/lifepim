@@ -22,6 +22,7 @@ import common.config as mod_cfg
 from common import data as db
 from common import search as search_mod
 from common import areas as areas_mod
+from common import projects as projects_mod
 from common import settings as settings_mod
 from common.network_log import log_network
 from core.security import configure_security
@@ -164,6 +165,7 @@ app.jinja_env.filters["duration_friendly"] = format_duration_friendly
 app.jinja_env.filters["duration_label"] = format_duration_label
 app.jinja_env.filters["area_param"] = normalize_area_param
 areas_mod.ensure_areas_schema(db._get_conn())
+projects_mod.ensure_projects_schema(db._get_conn())
 db.ensure_area_columns(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
 db.ensure_notes_schema(db._get_conn())
@@ -258,6 +260,8 @@ from modules.tasks.tasks import tasks_bp
 from modules.admin.routes import admin_bp
 from modules.links.routes import links_bp
 from modules.areas.routes import areas_bp
+from modules.icons.routes import icons_bp
+from modules.projects.routes import projects_bp
 from modules.pocket_api.routes import pocket_api_bp
 
 _dbg("Registering blueprints")
@@ -280,6 +284,8 @@ app.register_blueprint(tasks_bp, url_prefix="/tasks")
 app.register_blueprint(admin_bp, url_prefix="/admin")
 app.register_blueprint(links_bp, url_prefix="/links")
 app.register_blueprint(areas_bp, url_prefix="/areas")
+app.register_blueprint(icons_bp, url_prefix="/icons")
+app.register_blueprint(projects_bp, url_prefix="/projects")
 app.register_blueprint(pocket_api_bp)
 configure_security(app)
 _dbg("Blueprints registered")
@@ -288,10 +294,30 @@ _dbg("Blueprints registered")
 @app.context_processor
 def inject_layout_settings():
     general_settings = settings_mod.get_general_settings()
+    area_label = ""
+    try:
+        area = request_area_param() or None
+        sidebar_projects = projects_mod.sidebar_projects(area_id=area)
+        if area:
+            area_row = areas_mod.area_get(area)
+            area_label = (area_row or {}).get("area_name") or area
+    except Exception:
+        sidebar_projects = []
+    active_project_id = None
+    try:
+        if request.view_args:
+            active_project_id = request.view_args.get("project_id")
+        if active_project_id is None:
+            active_project_id = request.args.get("project_id", type=int)
+    except Exception:
+        active_project_id = None
     return {
         "freeze_headers": general_settings.get("freeze_headers", False),
         "mobile_font_size": general_settings.get("mobile_font_size", 14),
         "static_asset_version": _static_asset_version("lifepim.css"),
+        "sidebar_projects": sidebar_projects,
+        "active_project_id": active_project_id,
+        "sidebar_area_label": area_label,
     }
 
 

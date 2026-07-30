@@ -21,6 +21,10 @@
       {% endfor %}
     {% endif %}
   </p>
+  {% set project_assign_record_type = "place" %}
+  {% set project_assign_record_id = item.id %}
+  {% set project_assign_record_title = item.name %}
+  {% include "widgets/project_assign.html" %}
   {% set link_record_type = "place" %}
   {% set link_record_id = item.id %}
   {% set link_record_title = item.name %}

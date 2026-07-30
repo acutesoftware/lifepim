@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, url_for, send_file, abort, redirect
 
 from common import data as db
+from common import projects as projects_mod
 from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination, request_area_param
 from common import config as cfg
 from common import settings as settings_mod
@@ -620,6 +621,8 @@ def view_audio_route(item_id):
         area=area,
         audio_url=audio_url,
         file_exists=os.path.exists(full_path),
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("audio", item_id),
     )
 
 

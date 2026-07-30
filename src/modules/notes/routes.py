@@ -30,6 +30,7 @@ from common.utils import (
 from common import config as cfg
 import etl_folder_mapping as folder_etl
 from common import areas as areas_mod
+from common import projects as projects_mod
 from common import user_paths
 from core import security
 from modules.how import service as how_service
@@ -1881,6 +1882,8 @@ def view_note_route(note_id):
         front_matter_raw=front_matter_raw,
         sample_lines=note_settings["sample_lines"],
         message=request.args.get("message", ""),
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("note", note_id),
     )
 
 
@@ -2607,6 +2610,8 @@ def edit_note_route(note_id):
         note_state=note_state,
         note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_area),
         content_title=f"Edit: {note.get('file_name')}" if note else "Edit Note",
+        project_options=projects_mod.project_list(statuses=("planned", "active")) if note else [],
+        record_projects=projects_mod.record_projects("note", note_id) if note else [],
     )
 
 @notes_bp.route('/api/save/<int:note_id>', methods=["POST"])

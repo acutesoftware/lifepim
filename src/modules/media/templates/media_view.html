@@ -25,6 +25,10 @@
     </tr>
     {% endfor %}
   </table>
+  {% set project_assign_record_type = "media" %}
+  {% set project_assign_record_id = item.media_id %}
+  {% set project_assign_record_title = item.filename %}
+  {% include "widgets/project_assign.html" %}
   <div class="media-viewer {{ view_mode }}">
     {% if not file_exists %}
       <p>File not found: {{ item.path }}{% if item.filename %}\{{ item.filename }}{% endif %}</p>

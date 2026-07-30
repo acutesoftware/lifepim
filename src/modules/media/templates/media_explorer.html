@@ -19,7 +19,8 @@
       <tbody>
         {% for item in items %}
         {% set is_focus = focus_item and focus_item.media_id == item.media_id %}
-        <tr class="media-table-row {% if is_focus %}focused{% endif %}">
+        <tr class="media-table-row link-draggable {% if is_focus %}focused{% endif %}"
+            data-record-type="media" data-record-id="{{ item.media_id }}" data-record-title="{{ item.filename }}">
           <td>
             <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
           </td>
@@ -40,7 +41,8 @@
     <div class="media-grid">
       {% for item in items %}
       {% set is_focus = focus_item and focus_item.media_id == item.media_id %}
-      <div class="media-card {% if is_focus %}focused{% endif %}">
+      <div class="media-card link-draggable {% if is_focus %}focused{% endif %}"
+           data-record-type="media" data-record-id="{{ item.media_id }}" data-record-title="{{ item.filename }}">
         <label class="media-select">
           <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
         </label>
@@ -60,7 +62,8 @@
     <ul class="media-filmstrip">
       {% for item in items %}
       {% set is_focus = focus_item and focus_item.media_id == item.media_id %}
-      <li class="media-row {% if is_focus %}focused{% endif %}">
+      <li class="media-row link-draggable {% if is_focus %}focused{% endif %}"
+          data-record-type="media" data-record-id="{{ item.media_id }}" data-record-title="{{ item.filename }}">
         <label class="media-select">
           <input type="checkbox" class="media-select-box" name="media_id" value="{{ item.media_id }}" data-path="{{ item.path }}">
         </label>

@@ -22,7 +22,7 @@
         <th>Actions</th>
       </tr>
       {% for item in items %}
-      <tr>
+      <tr class="link-draggable" data-record-type="how" data-record-id="{{ item.howto_id }}" data-record-title="{{ item.title }}">
         <td><a href="{{ url_for('how.view_how_route', item_id=item.howto_id, area=area) }}">{{ item.title }}</a></td>
         <td>{{ item.area_id }}</td>
         <td>{{ item.status }}</td>

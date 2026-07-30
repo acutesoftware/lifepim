@@ -73,6 +73,11 @@
       </div>
     </div>
 
+    {% set project_assign_record_type = "note" %}
+    {% set project_assign_record_id = note.id %}
+    {% set project_assign_record_title = note.file_name %}
+    {% include "widgets/project_assign.html" %}
+
     {% if message %}
       <div class="settings-message">{{ message }}</div>
     {% endif %}

@@ -12,7 +12,7 @@ def search_records(query, types=None, limit=20):
     terms = [term.lower() for term in terms]
     types = [link_model._norm_type_id(t) for t in (types or []) if t]
     if not types:
-        types = ["note", "task", "event", "file", "person", "place"]
+        types = ["note", "task", "event", "how", "file", "media", "audio", "person", "place", "money", "album", "app", "3d"]
     results = []
     remaining = max(1, int(limit or 20))
 
@@ -30,12 +30,26 @@ def search_records(query, types=None, limit=20):
         _extend(_search_tasks(terms, remaining))
     if "event" in types:
         _extend(_search_events(terms, remaining))
+    if "how" in types:
+        _extend(_search_howtos(terms, remaining))
     if "file" in types:
         _extend(_search_files(terms, remaining))
+    if "media" in types:
+        _extend(_search_media(terms, remaining))
+    if "audio" in types:
+        _extend(_search_audio(terms, remaining))
     if "person" in types or "contact" in types:
         _extend(_search_contacts(terms, remaining))
     if "place" in types:
         _extend(_search_places(terms, remaining))
+    if "money" in types:
+        _extend(_search_money(terms, remaining))
+    if "album" in types:
+        _extend(_search_albums(terms, remaining))
+    if "app" in types:
+        _extend(_search_generic_config_table("apps", "app", terms, remaining))
+    if "3d" in types:
+        _extend(_search_generic_config_table("3d", "3d", terms, remaining))
     return results
 
 
@@ -56,10 +70,12 @@ def get_record_summary(type_id, record_id):
             contact.get("display_name"),
             contact.get("normalized_name"),
         )
+    if type_id == "money":
+        return _money_summary(record_id)
     tbl = _table_for_type(type_id)
     if not tbl:
         return None
-    id_col = "id"
+    id_col = tbl.get("pk") or "id"
     sql = f"SELECT * FROM {tbl['name']} WHERE {id_col} = ?"
     row = data._get_conn().execute(sql, [record_id]).fetchone()
     if not row:
@@ -93,10 +109,24 @@ def _table_for_type(type_id):
         return get_table_def("tasks")
     if type_id == "event":
         return get_table_def("calendar")
+    if type_id == "how":
+        return {"name": "lp_howto", "pk": "howto_id"}
     if type_id == "file":
         return get_table_def("files")
+    if type_id == "media":
+        return {"name": "lp_media", "pk": "media_id"}
+    if type_id == "audio":
+        return get_table_def("audio")
     if type_id == "place":
         return get_table_def("places")
+    if type_id == "album":
+        return {"name": "lp_albums", "pk": "album_id"}
+    if type_id == "app":
+        return get_table_def("apps")
+    if type_id == "3d":
+        return get_table_def("3d")
+    if type_id == "project":
+        return {"name": "lp_project_workspaces", "pk": "project_id"}
     return None
 
 
@@ -146,6 +176,23 @@ def _search_events(terms, limit):
     ]
 
 
+def _search_howtos(terms, limit):
+    conn = data._get_conn()
+    if not _table_exists(conn, "lp_howto"):
+        return []
+    cols = ["howto_id", "title", "summary", "area_id", "status"]
+    rows = _search_table("lp_howto", cols, ["title", "summary", "markdown_full_content"], terms, limit)
+    return [
+        _summary_from_values(
+            "how",
+            row["howto_id"],
+            row.get("title"),
+            row.get("area_id") or row.get("status"),
+        )
+        for row in rows
+    ]
+
+
 def _search_files(terms, limit):
     tbl = get_table_def("files")
     if not tbl:
@@ -158,6 +205,40 @@ def _search_files(terms, limit):
             row["id"],
             row.get("filelist_name"),
             row.get("path") or row.get("area"),
+        )
+        for row in rows
+    ]
+
+
+def _search_media(terms, limit):
+    conn = data._get_conn()
+    if not _table_exists(conn, "lp_media"):
+        return []
+    cols = ["media_id", "filename", "path", "media_type", "mtime_utc"]
+    rows = _search_table("lp_media", cols, ["filename", "path", "media_type"], terms, limit)
+    return [
+        _summary_from_values(
+            "media",
+            row["media_id"],
+            row.get("filename"),
+            row.get("media_type") or row.get("mtime_utc"),
+        )
+        for row in rows
+    ]
+
+
+def _search_audio(terms, limit):
+    tbl = get_table_def("audio")
+    if not tbl:
+        return []
+    cols = ["id", "file_name", "path", "artist", "album", "song"]
+    rows = _search_table(tbl["name"], cols, ["file_name", "path", "artist", "album", "song"], terms, limit)
+    return [
+        _summary_from_values(
+            "audio",
+            row["id"],
+            row.get("song") or row.get("file_name"),
+            row.get("artist") or row.get("album") or row.get("path"),
         )
         for row in rows
     ]
@@ -180,8 +261,67 @@ def _search_places(terms, limit):
     ]
 
 
+def _search_money(terms, limit):
+    conn = data._get_conn()
+    results = []
+    for section in getattr(__import__("common.config", fromlist=["MONEY_SECTIONS"]), "MONEY_SECTIONS", []):
+        if len(results) >= limit:
+            break
+        table_name = section.get("table")
+        pk = section.get("pk")
+        if not table_name or not pk or not _table_exists(conn, table_name):
+            continue
+        columns = [col["name"] for col in section.get("columns", [])]
+        search_cols = [col["name"] for col in section.get("columns", []) if col.get("type") in ("text", "textarea", "select")]
+        if not search_cols:
+            continue
+        cols = [pk] + columns
+        rows = _search_table(table_name, cols, search_cols, terms, max(1, limit - len(results)))
+        title_col = _money_title_column(section)
+        for row in rows:
+            results.append(
+                _summary_from_values(
+                    "money",
+                    f"{section['id']}:{row[pk]}",
+                    row.get(title_col) or section.get("label"),
+                    section.get("label"),
+                )
+            )
+    return results
+
+
+def _search_albums(terms, limit):
+    conn = data._get_conn()
+    if not _table_exists(conn, "lp_albums"):
+        return []
+    rows = _search_table("lp_albums", ["album_id", "title", "description", "album_type"], ["title", "description", "album_type"], terms, limit)
+    return [
+        _summary_from_values("album", row["album_id"], row.get("title"), row.get("album_type"))
+        for row in rows
+    ]
+
+
+def _search_generic_config_table(route_id, type_id, terms, limit):
+    tbl = get_table_def(route_id)
+    if not tbl:
+        return []
+    title_col = "title" if "title" in tbl["col_list"] else ("file_name" if "file_name" in tbl["col_list"] else tbl["col_list"][0])
+    subtitle_col = "path" if "path" in tbl["col_list"] else ("area" if "area" in tbl["col_list"] else "")
+    search_cols = [col for col in [title_col, subtitle_col] if col]
+    rows = _search_table(tbl["name"], ["id"] + tbl["col_list"], search_cols, terms, limit)
+    return [
+        _summary_from_values(type_id, row["id"], row.get(title_col), row.get(subtitle_col) if subtitle_col else "")
+        for row in rows
+    ]
+
+
 def _search_contacts(terms, limit):
     conn = data._get_conn()
+    if not _table_exists(conn, "lp_contacts"):
+        return []
+    existing_cols = _table_columns(conn, "lp_contacts")
+    if not {"contact_id", "display_name", "normalized_name"}.issubset(existing_cols):
+        return []
     term_conditions = []
     params = []
     for term in terms:
@@ -216,16 +356,38 @@ def _summary_fields(type_id, row):
         return row.get("title"), row.get("due_date") or row.get("area")
     if type_id == "event":
         return row.get("title"), row.get("event_date") or row.get("area")
+    if type_id == "how":
+        return row.get("title"), row.get("area_id") or row.get("status")
     if type_id == "file":
         return row.get("filelist_name"), row.get("path")
+    if type_id == "media":
+        return row.get("filename"), row.get("media_type") or row.get("path")
+    if type_id == "audio":
+        return row.get("song") or row.get("file_name"), row.get("artist") or row.get("album") or row.get("path")
     if type_id == "place":
         subtitle = row.get("suburb") or row.get("state") or row.get("country")
         return row.get("name"), subtitle
+    if type_id == "album":
+        return row.get("title"), row.get("album_type") or row.get("description")
+    if type_id == "app":
+        return row.get("title"), row.get("file_path")
+    if type_id == "3d":
+        return row.get("file_name"), row.get("path")
+    if type_id == "project":
+        return row.get("name"), row.get("status")
     return "", ""
 
 
 def _search_table(tbl_name, cols, search_cols, terms, limit):
     if not search_cols or not terms:
+        return []
+    conn = data._get_conn()
+    if not _table_exists(conn, tbl_name):
+        return []
+    existing_cols = _table_columns(conn, tbl_name)
+    cols = [col for col in cols if col in existing_cols]
+    search_cols = [col for col in search_cols if col in existing_cols]
+    if not cols or not search_cols:
         return []
     term_conditions = []
     params = []
@@ -237,5 +399,47 @@ def _search_table(tbl_name, cols, search_cols, terms, limit):
     where_clause = " AND ".join(term_conditions)
     sql = f"SELECT {', '.join(cols)} FROM {tbl_name} WHERE {where_clause} LIMIT ?"
     params.append(int(limit or 20))
-    rows = data._get_conn().execute(sql, params).fetchall()
+    rows = conn.execute(sql, params).fetchall()
     return [dict(row) for row in rows]
+
+
+def _table_exists(conn, table_name):
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone() is not None
+
+
+def _table_columns(conn, table_name):
+    try:
+        return {row["name"] if hasattr(row, "keys") else row[1] for row in conn.execute(f"PRAGMA table_info({table_name})")}
+    except Exception:
+        return set()
+
+
+def _money_title_column(section):
+    preferred = ("name", "item", "supplier", "source", "symbol", "company_name", "institution", "domain")
+    columns = [col["name"] for col in section.get("columns", [])]
+    for col_name in preferred:
+        if col_name in columns:
+            return col_name
+    return columns[0] if columns else section.get("pk")
+
+
+def _money_summary(record_id):
+    if ":" not in str(record_id):
+        return None
+    section_id, raw_id = str(record_id).split(":", 1)
+    from modules.money import dao as money_dao
+
+    section = money_dao.section(section_id)
+    record = money_dao.get_record(section_id, raw_id)
+    if not record:
+        return None
+    title_col = _money_title_column(section)
+    return _summary_from_values(
+        "money",
+        record_id,
+        record.get(title_col) or section.get("label"),
+        section.get("label"),
+    )

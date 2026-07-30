@@ -39,7 +39,7 @@
             <th>Actions</th>
           </tr>
           {% for item in items %}
-          <tr class="audio-track-row">
+          <tr class="audio-track-row link-draggable" data-record-type="audio" data-record-id="{{ item.id }}" data-record-title="{{ item.song or item.file_name }}">
             <td>
               <button
                 type="button"

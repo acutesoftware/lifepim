@@ -26,7 +26,7 @@
         <audio id="audio-row-player" preload="none"></audio>
         <ul class="audio-list">
           {% for item in items %}
-          <li class="audio-list-item audio-track-row">
+          <li class="audio-list-item audio-track-row link-draggable" data-record-type="audio" data-record-id="{{ item.id }}" data-record-title="{{ item.song or item.file_name }}">
             <button
               type="button"
               class="audio-row-play"

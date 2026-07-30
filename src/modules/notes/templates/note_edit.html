@@ -60,6 +60,7 @@
           <button type="button" data-md-action="image" title="Markdown image">Image</button>
           <button type="button" data-md-action="lifepim-image" title="LifePIM image tag">[img]</button>
           <button type="button" data-md-action="table" title="Table">Table</button>
+          <button type="button" data-icon-picker-target="note-editor" data-icon-picker-mode="insert" title="Add icon">😀</button>
         </div>
         <textarea id="note-editor"
                   data-note-id="{{ note.id }}"
@@ -73,6 +74,10 @@
         </div>
       {% endif %}
       </div>
+      {% set project_assign_record_type = "note" %}
+      {% set project_assign_record_id = note.id %}
+      {% set project_assign_record_title = note.file_name %}
+      {% include "widgets/project_assign.html" %}
     </div>
     <script src="{{ url_for('static', filename='note_editor.js') }}"></script>
   {% endif %}

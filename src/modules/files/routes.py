@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data as db
+from common import projects as projects_mod
 from common.utils import (
     build_form_fields,
     get_side_tabs,
@@ -285,6 +286,8 @@ def view_file_route(item_id):
         base_path=base_path,
         drives=drives,
         selected_drive=drive,
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("file", item_id),
     )
 
 

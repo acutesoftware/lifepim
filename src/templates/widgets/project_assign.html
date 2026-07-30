@@ -1,0 +1,39 @@
+{% if project_assign_record_id %}
+  <div class="project-assign-widget">
+    <div class="project-assign-title">Projects</div>
+    {% if record_projects %}
+      <ul class="project-assigned-list">
+        {% for linked_project in record_projects %}
+          <li>
+            <a href="{{ url_for('projects.view_project_route', project_id=linked_project.project_id) }}">
+              {{ linked_project.icon or '*' }} {{ linked_project.name }}
+            </a>
+            {% if linked_project.is_primary %}<span class="project-primary-badge">Primary</span>{% endif %}
+            <form method="post" action="{{ url_for('projects.remove_project_item_route', project_item_id=linked_project.project_item_id) }}" onsubmit="return confirm('Remove this Project reference?');">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button type="submit">Remove</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="project-empty-state">Not assigned to any Project.</div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('projects.assign_project_route') }}" class="project-assign-form">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <input type="hidden" name="item_type" value="{{ project_assign_record_type }}">
+      <input type="hidden" name="item_id" value="{{ project_assign_record_id }}">
+      <input type="hidden" name="item_title" value="{{ project_assign_record_title }}">
+      <select name="project_id" required>
+        <option value="">Assign to Project...</option>
+        {% for option in project_options %}
+          <option value="{{ option.project_id }}">{{ option.icon or '*' }} {{ option.name }}</option>
+        {% endfor %}
+      </select>
+      <label><input type="checkbox" name="is_primary" value="1"> Primary</label>
+      <button type="submit">Assign</button>
+      <a href="{{ url_for('projects.add_project_route', area=request.args.get('area', '')) }}">New Project</a>
+    </form>
+  </div>
+{% endif %}

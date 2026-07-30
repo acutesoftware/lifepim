@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, make_r
 
 from common import data
 from common import areas as areas_mod
+from common import projects as projects_mod
 from utils import importer
 from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination, request_area_param
 from common import config as cfg
@@ -83,6 +84,7 @@ def add_task_route():
     tbl = get_table_def("tasks")
     area = request_area_param() or ""
     error = ""
+    project_options = projects_mod.project_list(statuses=("planned", "active"))
     if area:
         try:
             if not areas_mod.area_default_folder_get(area):
@@ -100,6 +102,8 @@ def add_task_route():
                 task=None,
                 area=area,
                 error=error,
+                project_options=project_options,
+                record_projects=[],
             )
         values = [
             request.form.get("title", "").strip(),
@@ -108,7 +112,16 @@ def add_task_route():
             request.form.get("start_date", "").strip(),
             request.form.get("due_date", "").strip(),
         ]
-        data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
+        task_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
+        project_id = request.form.get("project_id", type=int)
+        if task_id and project_id:
+            projects_mod.assign_item_to_project(
+                project_id,
+                "task",
+                task_id,
+                item_title=values[0],
+                is_primary=1 if request.form.get("project_is_primary") == "1" else 0,
+            )
         return redirect(url_for("tasks.list_tasks_route", area=area))
     return render_template(
         "tasks_edit.html",
@@ -119,6 +132,8 @@ def add_task_route():
         task=None,
         area=area,
         error=error,
+        project_options=project_options,
+        record_projects=[],
     )
 
 
@@ -126,6 +141,8 @@ def add_task_route():
 def edit_task_route(task_id):
     tbl = get_table_def("tasks")
     task = None
+    project_options = projects_mod.project_list(statuses=("planned", "active"))
+    record_projects = projects_mod.record_projects("task", task_id)
     if tbl:
         rows = data.get_data(data.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [task_id])
         if rows:
@@ -139,6 +156,15 @@ def edit_task_route(task_id):
             request.form.get("due_date", "").strip(),
         ]
         data.update_record(data.conn, tbl["name"], task_id, tbl["col_list"], values)
+        project_id = request.form.get("project_id", type=int)
+        if project_id:
+            projects_mod.assign_item_to_project(
+                project_id,
+                "task",
+                task_id,
+                item_title=values[0],
+                is_primary=1 if request.form.get("project_is_primary") == "1" else 0,
+            )
         return redirect(url_for("tasks.list_tasks_route"))
     return render_template(
         "tasks_edit.html",
@@ -147,6 +173,9 @@ def edit_task_route(task_id):
         side_tabs=get_side_tabs(),
         content_title="Edit Task",
         task=task,
+        area=task.get("area") if task else "",
+        project_options=project_options,
+        record_projects=record_projects,
     )
 
 

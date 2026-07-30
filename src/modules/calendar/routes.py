@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for
 
 from common import data
 from common import areas as areas_mod
+from common import projects as projects_mod
 from common import settings as settings_mod
 from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination, request_area_param
 import common.config as cfg
@@ -1173,6 +1174,8 @@ def view_event_route(event_id):
         event=event,
         area=event.get("area"),
         view_date=view_date,
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("event", event_id),
     )
 
 
@@ -1249,6 +1252,8 @@ def edit_event_route(event_id):
         default_date=event.get("date"),
         default_area=event.get("area"),
         area_options=_area_options(data.conn),
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("event", event_id),
     )
 
 

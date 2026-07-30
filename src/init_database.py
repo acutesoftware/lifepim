@@ -7,6 +7,7 @@ import etl_folder_mapping as folder_etl
 import common.config as cfg
 from common import data as db
 from common import areas as areas_mod
+from common import projects as projects_mod
 from common.media_schema import ensure_media_schema
 from common.settings import ensure_settings_schema
 from lifepim.importer.schema import ensure_import_schema
@@ -39,6 +40,7 @@ def reset_database(db_file):
         create_table(db_conn, tbl)
     db_conn.executescript(folder_etl.DDL_RESET)
     areas_mod.ensure_areas_schema(db_conn)
+    projects_mod.ensure_projects_schema(db_conn)
     db.ensure_area_columns(db_conn)
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_contacts.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_links.sql"))

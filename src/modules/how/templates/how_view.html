@@ -47,6 +47,10 @@
     <tr><th>Source</th><td>{{ howto.source_filepath }}</td></tr>
     <tr><th>Last Verified</th><td>{{ howto.last_verified }}</td></tr>
   </table>
+  {% set project_assign_record_type = "how" %}
+  {% set project_assign_record_id = howto.howto_id %}
+  {% set project_assign_record_title = howto.title %}
+  {% include "widgets/project_assign.html" %}
   {% if howto.summary %}<h4>Summary</h4><p>{{ howto.summary }}</p>{% endif %}
   {% if howto.outcome %}<h4>Outcome</h4><p>{{ howto.outcome }}</p>{% endif %}
   <div class="data-two-col">

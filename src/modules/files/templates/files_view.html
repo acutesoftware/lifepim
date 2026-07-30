@@ -15,6 +15,10 @@
     <a href="{{ url_for('files.edit_file_route', item_id=item.id, area=area) }}">Edit</a> |
     <a href="{{ url_for('files.delete_file_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
   </p>
+  {% set project_assign_record_type = "file" %}
+  {% set project_assign_record_id = item.id %}
+  {% set project_assign_record_title = item.filelist_name or item.path %}
+  {% include "widgets/project_assign.html" %}
 
   <h4>Explorer</h4>
   {% if explorer_error %}

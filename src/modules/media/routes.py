@@ -11,6 +11,7 @@ from flask_login import current_user
 
 from common import data as db
 from common import config as cfg
+from common import projects as projects_mod
 from common import settings as settings_mod
 from common.media_schema import ensure_media_schema
 from common.search import parse_search_terms
@@ -1305,6 +1306,8 @@ def view_media_route(media_id):
         is_video=_is_video(item),
         view_mode=view_mode,
         area=request_area_param() or None,
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("media", media_id),
     )
 
 

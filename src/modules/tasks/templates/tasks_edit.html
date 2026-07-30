@@ -15,9 +15,32 @@
     <label>Details:</label><br>
     <textarea name="content" rows="6" cols="60" class="mention-enabled"
               {% if task %}data-record-type="task" data-record-id="{{ task.id }}"{% endif %}>{{ task.content if task else '' }}</textarea><br><br>
+    {% if not task and project_options %}
+      <label>Project:</label><br>
+      <select name="project_id">
+        <option value="">No Project</option>
+        {% for option in project_options %}
+          <option value="{{ option.project_id }}">{{ option.icon or 'P' }} {{ option.name }}</option>
+        {% endfor %}
+      </select>
+      <label><input type="checkbox" name="project_is_primary" value="1"> Primary Project</label><br><br>
+    {% elif task and project_options %}
+      <label>Assign to Project:</label><br>
+      <select name="project_id">
+        <option value="">No change</option>
+        {% for option in project_options %}
+          <option value="{{ option.project_id }}">{{ option.icon or 'P' }} {{ option.name }}</option>
+        {% endfor %}
+      </select>
+      <label><input type="checkbox" name="project_is_primary" value="1"> Primary Project</label><br><br>
+    {% endif %}
     <button type="submit">Save</button>
   </form>
   {% if task %}
+    {% set project_assign_record_type = "task" %}
+    {% set project_assign_record_id = task.id %}
+    {% set project_assign_record_title = task.title %}
+    {% include "widgets/project_assign.html" %}
     {% set link_record_type = "task" %}
     {% set link_record_id = task.id %}
     {% set link_record_title = task.title %}
