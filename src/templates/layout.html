@@ -40,7 +40,7 @@
         <a href="#" id="showSidebar">Show sidebar</a>
         <a href="#" id="hideSidebar">Hide sidebar</a>
         <a href="/areas/edit">Edit areas</a>
-        <a href="/projects">Manage projects</a>
+        <a href="/projects/{% if current_area %}?area={{ current_area|urlencode }}{% endif %}">Manage projects</a>
         <div class="menu-spacer"></div>
         <a href="/admin/settings">Settings</a>
         <a href="/help">Help</a>
@@ -132,42 +132,52 @@
 
   <div class="container">
     <aside class="side-tabs" id="sidebar">
-      <div class="side-section-title">Areas</div>
-      {% for s in side_tabs %}
-        {% set tab_area = (s.area if s.area is defined and s.area else s.id) %}
-        {% set is_all = tab_area in ['any', 'All', 'all', 'ALL'] %}
-        {% set is_active = (current_area and tab_area and tab_area|lower == current_area|lower) or (not current_area and is_all) %}
-        {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names'] %}
-        {% set side_base_path = '/' if active_tab == 'home' else (request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab) %}
-        <a class="side {% if is_active %}active{% endif %}" href="{{ side_base_path }}{% if tab_area not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?area={{tab_area|urlencode}}{% endif %}">
-          <span class="ic">{{s.icon}}</span>
-          <span class="lab">{{s.label}}</span>
-        </a>
-      {% endfor %}
-      {% if sidebar_projects is defined %}
-        <div class="side-section-title project-sidebar-heading">
-          <span>Projects{% if current_area %} ({{ sidebar_area_label|default(current_area) }}){% endif %}</span>
-          <a href="{{ url_for('projects.add_project_route') }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}" title="Add Project">+</a>
-        </div>
-        {% if sidebar_projects %}
-          {% for project in sidebar_projects %}
-            <a class="side project-side {% if active_project_id and project.project_id == active_project_id %}active{% endif %}"
-               href="{{ url_for('projects.view_project_route', project_id=project.project_id) }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}"
-               title="{{ project.name }}">
-              <span class="ic">{{ project.icon or 'P' }}</span>
-              <span class="lab">{{ project.name }}</span>
-              <span class="project-side-count">{{ project.item_count }}</span>
-            </a>
-          {% endfor %}
-        {% else %}
-          <a class="side project-side project-side-empty"
-             href="{{ url_for('projects.add_project_route') }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}">
-            <span class="ic">+</span>
-            <span class="lab">Add Project</span>
+      <div class="side-area-panel" id="sidebarAreasPanel">
+        <div class="side-section-title">Areas</div>
+        {% for s in side_tabs %}
+          {% set tab_area = (s.area if s.area is defined and s.area else s.id) %}
+          {% set is_all = tab_area in ['any', 'All', 'all', 'ALL'] %}
+          {% set is_active = (current_area and tab_area and tab_area|lower == current_area|lower) or (not current_area and is_all) %}
+          {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names'] %}
+          {% set side_base_path = '/' if active_tab == 'home' else (request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab) %}
+          <a class="side {% if is_active %}active{% endif %}" href="{{ side_base_path }}{% if tab_area not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?area={{tab_area|urlencode}}{% endif %}">
+            <span class="ic">{{s.icon}}</span>
+            <span class="lab">{{s.label}}</span>
           </a>
-        {% endif %}
+        {% endfor %}
+      </div>
+      {% if sidebar_projects is defined %}
+        <div class="side-split-resizer" id="sidebarProjectsResizer" role="separator" aria-orientation="horizontal" title="Resize Areas and Projects"></div>
+        <section class="side-project-panel" id="sidebarProjectsPanel">
+          <div class="side-section-title project-sidebar-heading">
+            <a class="project-heading-link" href="{{ url_for('projects.list_projects_route') }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}">
+              Projects{% if current_area %} ({{ sidebar_area_label|default(current_area) }}){% endif %}
+            </a>
+            <a class="project-add-link" href="{{ url_for('projects.add_project_route') }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}" title="Add Project">+</a>
+          </div>
+          <div class="side-project-list">
+            {% if sidebar_projects %}
+              {% for project in sidebar_projects %}
+                <a class="side project-side {% if active_project_id and project.project_id == active_project_id %}active{% endif %}"
+                   href="{{ url_for('projects.view_project_route', project_id=project.project_id) }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}"
+                   title="{{ project.name }}">
+                  <span class="ic">{{ project.icon or 'P' }}</span>
+                  <span class="lab">{{ project.name }}</span>
+                  <span class="project-side-count">{{ project.item_count }}</span>
+                </a>
+              {% endfor %}
+            {% else %}
+              <a class="side project-side project-side-empty"
+                 href="{{ url_for('projects.add_project_route') }}{% if current_area %}?area={{ current_area|urlencode }}{% endif %}">
+                <span class="ic">+</span>
+                <span class="lab">Add Project</span>
+              </a>
+            {% endif %}
+          </div>
+        </section>
       {% endif %}
     </aside>
+    <div class="layout-resizer-vertical" id="sidebarWidthResizer" role="separator" aria-orientation="vertical" title="Resize sidebar"></div>
 
     <main class="main">
       <h3>{{ content_title or active_tab }}</h3>
@@ -255,6 +265,7 @@
   </script>
   <script src="{{ url_for('static', filename='links.js') }}"></script>
   <script src="{{ url_for('static', filename='icon_picker_client.js') }}"></script>
+  <script src="{{ url_for('static', filename='sidebar_resize.js') }}"></script>
   <script src="{{ url_for('static', filename='notes.js') }}"></script>
 </body>
 </html>
