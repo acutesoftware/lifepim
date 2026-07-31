@@ -11,6 +11,7 @@ from flask_login import current_user
 
 from common import data as db
 from common import config as cfg
+from common import collections as collections_mod
 from common import projects as projects_mod
 from common import settings as settings_mod
 from common.media_schema import ensure_media_schema
@@ -61,9 +62,11 @@ AUDIO_EXTS = {
 def _ensure_schema():
     global _MEDIA_SCHEMA_READY
     if _MEDIA_SCHEMA_READY:
+        collections_mod.ensure_collections_schema(db._get_conn())
         return
     conn = db._get_conn()
     ensure_media_schema(conn)
+    collections_mod.ensure_collections_schema(conn)
     _MEDIA_SCHEMA_READY = True
 
 
@@ -643,6 +646,101 @@ def _fetch_album_memberships(conn, media_id):
     return [dict(row) for row in rows]
 
 
+def _media_collection_form_values(form, area=""):
+    area_ids = form.getlist("area_ids")
+    if not area_ids and area:
+        area_ids = [area]
+    return {
+        "collection_name": (form.get("collection_name") or "").strip(),
+        "collection_domain": "media",
+        "collection_type": "album",
+        "description": (form.get("description") or "").strip(),
+        "icon": (form.get("icon") or "").strip(),
+        "status": (form.get("status") or "active").strip() or "active",
+        "visibility": (form.get("visibility") or "private").strip() or "private",
+        "area_ids": area_ids,
+        "project_ids": form.getlist("project_ids"),
+    }
+
+
+def _safe_int(value):
+    try:
+        if value in (None, ""):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _collection_media_ids(collection_items):
+    ids = []
+    for item in collection_items or []:
+        if item.get("entry_kind") == "item" and item.get("item_type") == "media":
+            media_id = _safe_int(item.get("item_id"))
+            if media_id is not None:
+                ids.append(media_id)
+    return ids
+
+
+def _fetch_media_by_ids(conn, media_ids):
+    if not media_ids:
+        return {}
+    placeholders = ", ".join(["?"] * len(media_ids))
+    rows = conn.execute(
+        "SELECT m.media_id, m.path, m.filename, m.ext, m.media_type, m.size_bytes, m.mtime_utc, "
+        "meta.taken_utc, meta.width, meta.height, meta.duration_sec "
+        "FROM lp_media m "
+        "LEFT JOIN lp_media_meta meta ON meta.media_id = m.media_id "
+        f"WHERE m.media_id IN ({placeholders})",
+        media_ids,
+    ).fetchall()
+    return {row["media_id"]: dict(row) for row in rows}
+
+
+def _media_collection_entries(conn, collection_items):
+    media_by_id = _fetch_media_by_ids(conn, _collection_media_ids(collection_items))
+    entries = []
+    for item in collection_items or []:
+        entry = dict(item)
+        if item.get("entry_kind") == "item" and item.get("item_type") == "media":
+            media_id = _safe_int(item.get("item_id"))
+            media = media_by_id.get(media_id)
+            if not media:
+                continue
+            media["is_video"] = _is_video(media)
+            media["file_url"] = url_for("media.media_file_route", media_id=media["media_id"])
+            media["open_url"] = url_for("media.view_media_route", media_id=media["media_id"])
+            entry["media"] = media
+            entry["display_title"] = entry.get("display_title") or media.get("filename") or f"Media {media_id}"
+        entries.append(entry)
+    return entries
+
+
+def _media_source_options(conn, collection_items, query="", limit=80):
+    existing = set(_collection_media_ids(collection_items))
+    terms = parse_search_terms(query)
+    joins, where, params = _build_media_filters(
+        "all",
+        None,
+        None,
+        True,
+        "",
+        [],
+        terms,
+        None,
+    )
+    rows = _fetch_media(conn, joins, where, params, "taken_desc", limit=limit)
+    options = []
+    for item in rows:
+        item = dict(item)
+        item["already_present"] = item["media_id"] in existing
+        item["is_video"] = _is_video(item)
+        item["file_url"] = url_for("media.media_file_route", media_id=item["media_id"])
+        item["open_url"] = url_for("media.view_media_route", media_id=item["media_id"])
+        options.append(item)
+    return options
+
+
 def _fetch_event_memberships(conn, media_id):
     rows = conn.execute(
         "SELECT e.event_id, e.title FROM lp_event_items i "
@@ -1098,6 +1196,97 @@ def media_explorer_route():
         nav_query=nav_query,
         event_nav_query=event_nav_query,
         media_settings=media_settings,
+    )
+
+
+@media_bp.route("/albums", methods=["GET", "POST"])
+def media_collections_route():
+    _ensure_schema()
+    conn = db._get_conn()
+    area = request_area_param(include_form=True) or ""
+    message = request.args.get("message", "")
+    error = ""
+    collection_id = request.values.get("collection_id", type=int)
+
+    if request.method == "POST":
+        action = request.form.get("action", "create")
+        collection_id = request.form.get("collection_id", type=int)
+        try:
+            if action == "create":
+                collection_id = collections_mod.create_collection(_media_collection_form_values(request.form, area))
+                message = "Album created."
+            elif action == "save" and collection_id:
+                collections_mod.update_collection(collection_id, _media_collection_form_values(request.form, area))
+                message = "Album saved."
+            elif action == "archive" and collection_id:
+                collections_mod.archive_collection(collection_id)
+                message = "Album archived."
+            elif action == "restore" and collection_id:
+                collections_mod.restore_collection(collection_id)
+                message = "Album restored."
+            elif action == "delete" and collection_id:
+                collections_mod.delete_collection(collection_id)
+                return redirect(url_for("media.media_collections_route", area=area, message="Album deleted."))
+            elif action == "add_media" and collection_id:
+                collections_mod.add_item_to_collection(collection_id, "media", request.form.get("media_id"))
+                message = "Media added."
+            elif action == "add_heading" and collection_id:
+                collections_mod.add_heading_to_collection(collection_id, request.form.get("title_override"))
+                message = "Heading added."
+            elif action == "add_divider" and collection_id:
+                collections_mod.add_divider_to_collection(collection_id)
+                message = "Divider added."
+            elif action == "remove_entry":
+                collections_mod.remove_item_from_collection(request.form.get("collection_item_id", type=int))
+                message = "Entry removed."
+            elif action in {"move_up", "move_down"}:
+                collections_mod.move_collection_item(
+                    request.form.get("collection_item_id", type=int),
+                    direction="up" if action == "move_up" else "down",
+                )
+                message = "Entry moved."
+        except ValueError as exc:
+            error = str(exc)
+        args = {"area": area, "message": message}
+        if collection_id:
+            args["collection_id"] = collection_id
+        if error:
+            args["error"] = error
+        return redirect(url_for("media.media_collections_route", **args))
+
+    error = request.args.get("error", "")
+    active_status = (request.args.get("status") or "").strip().lower()
+    include_archived = active_status == "all"
+    albums = collections_mod.get_collection_list(
+        domain="media",
+        collection_type="album",
+        area_id=area,
+        include_archived=include_archived,
+    )
+    selected = collections_mod.get_collection(collection_id) if collection_id else None
+    if not selected and albums:
+        selected = albums[0]
+    collection_items = collections_mod.get_collection_items(selected["collection_id"]) if selected else []
+    entries = _media_collection_entries(conn, collection_items)
+    source_query = request.args.get("q", "")
+    return render_template(
+        "media_collections.html",
+        active_tab="media",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Albums ({area or 'All Areas'})",
+        content_html="",
+        area=area,
+        collections=albums,
+        selected_collection=selected,
+        collection_items=entries,
+        source_media=_media_source_options(conn, collection_items, source_query),
+        source_query=source_query,
+        message=message,
+        error=error,
+        active_status=active_status,
+        area_options=collections_mod.area_options(selected.get("area_ids") if selected else ([area] if area else [])),
+        project_options=collections_mod.project_options(selected.get("project_ids") if selected else []),
     )
 
 

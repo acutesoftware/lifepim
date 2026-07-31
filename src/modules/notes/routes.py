@@ -32,6 +32,7 @@ from common import config as cfg
 import etl_folder_mapping as folder_etl
 from common import areas as areas_mod
 from common import projects as projects_mod
+from common import collections as collections_mod
 from common import user_paths
 from core import security
 from modules.how import service as how_service
@@ -94,6 +95,7 @@ NOTE_LIST_VIEW_OPTIONS = [
     ("table", "Table"),
     ("grid", "Grid"),
     ("preview", "Preview"),
+    ("collections", "Notebooks"),
     ("names", "Names only"),
 ]
 NOTE_TABLE_SORT_COLUMNS = [
@@ -909,7 +911,7 @@ def _normalize_note_list_view(value):
         return "grid"
     if value == "cards":
         return "grid"
-    if value in {"list", "table", "grid", "preview", "names"}:
+    if value in {"list", "table", "grid", "preview", "collections", "names"}:
         return value
     return "table"
 
@@ -942,6 +944,8 @@ def _notes_route_for_view(view_mode):
         return "notes.list_notes_names_route"
     if view_mode in {"grid", "preview"}:
         return "notes.list_notes_cards_route"
+    if view_mode == "collections":
+        return "notes.notes_collections_route"
     return "notes.list_notes_table_route"
 
 
@@ -1638,7 +1642,7 @@ def list_notes_route():
         context["notes"] = []
         return render_template("notes_list.html", **context)
     view_pref = request.cookies.get("notes_view")
-    if view_pref in ("list", "cards", "grid", "preview", "names"):
+    if view_pref in ("list", "cards", "grid", "preview", "collections", "names"):
         return redirect(_notes_view_url(view_pref, area, folder_filter, request.cookies.get("notes_sort_col") or "date_modified", request.cookies.get("notes_sort_dir") or "desc"))
     sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
@@ -1998,6 +2002,211 @@ def list_notes_cards_route():
     resp.set_cookie("notes_card_mode", card_mode)
     resp.set_cookie("notes_sort_col", sort_col)
     resp.set_cookie("notes_sort_dir", sort_dir)
+    return resp
+
+
+def _notebook_form_values(form, area=""):
+    selected_area_ids = form.getlist("area_ids")
+    if not selected_area_ids and area:
+        selected_area_ids = [area]
+    return {
+        "collection_name": form.get("collection_name", "").strip(),
+        "collection_domain": "notes",
+        "collection_type": form.get("collection_type", "notebook").strip() or "notebook",
+        "description": form.get("description", "").strip(),
+        "icon": form.get("icon", "").strip(),
+        "status": form.get("status", "active").strip() or "active",
+        "visibility": form.get("visibility", "private").strip() or "private",
+        "area_ids": selected_area_ids,
+        "project_ids": form.getlist("project_ids"),
+    }
+
+
+def _collection_note_ids(collection_items):
+    ids = []
+    for item in collection_items or []:
+        if item.get("entry_kind") == "item" and item.get("item_type") == "note":
+            note_id = _safe_int(item.get("item_id"))
+            if note_id is not None:
+                ids.append(note_id)
+    return ids
+
+
+def _note_source_options(area, collection_items, query=""):
+    existing = set(_collection_note_ids(collection_items))
+    notes = _fetch_notes(area, "date_modified", "desc", limit=50, offset=0)
+    query = (query or "").strip().lower()
+    options = []
+    for note in notes:
+        title = note.get("file_name") or note.get("title") or f"Note {note.get('id')}"
+        haystack = f"{title} {note.get('path') or ''}".lower()
+        if query and query not in haystack:
+            continue
+        options.append(
+            {
+                "id": note.get("id"),
+                "title": title,
+                "subtitle": note.get("path") or note.get("area") or "",
+                "already_present": note.get("id") in existing,
+            }
+        )
+    return options
+
+
+def _notebook_continuous_entries(collection_items):
+    entries = []
+    for item in collection_items or []:
+        if item.get("entry_kind") == "item" and item.get("item_type") == "note" and item.get("is_visible", True):
+            summary = item.get("summary") or {}
+            note_id = _safe_int(item.get("item_id"))
+            note = _load_note_by_id(note_id) if note_id is not None else None
+            text = ""
+            if note:
+                note_path = _build_note_path(note)
+                if note_path and os.path.isfile(note_path):
+                    text = _note_body_text(_read_note_file(note_path), note.get("file_name"), note.get("title"))
+            entries.append(
+                {
+                    "title": item.get("display_title") or summary.get("title") or f"Note {item.get('item_id')}",
+                    "text": text,
+                    "open_url": summary.get("open_url") or "",
+                }
+            )
+    return entries
+
+
+def _load_note_by_id(note_id):
+    tbl = get_table_def("notes")
+    if not tbl:
+        return None
+    cols = ["id"] + tbl["col_list"]
+    row = data._get_conn().execute(
+        f"SELECT {', '.join(cols)} FROM {tbl['name']} WHERE id = ?",
+        (note_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _safe_int(value):
+    try:
+        if value in (None, ""):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@notes_bp.route('/notebooks', methods=["GET", "POST"])
+def notes_collections_route():
+    _ensure_notes_schema()
+    collections_mod.ensure_collections_schema(data._get_conn())
+    area = _normalize_area(request_area_param())
+    area_info, area_folders = _area_context(area)
+    area_label = area_info["area_name"] if area_info else area
+    message = request.args.get("message", "")
+    error = ""
+
+    if request.method == "POST":
+        action = request.form.get("action", "create")
+        collection_id = request.form.get("collection_id", type=int)
+        try:
+            if action == "create":
+                collection_id = collections_mod.create_collection(_notebook_form_values(request.form, area))
+                message = "Notebook created."
+            elif action == "save" and collection_id:
+                collections_mod.update_collection(collection_id, _notebook_form_values(request.form, area))
+                message = "Notebook saved."
+            elif action == "archive" and collection_id:
+                collections_mod.archive_collection(collection_id)
+                message = "Notebook archived."
+            elif action == "restore" and collection_id:
+                collections_mod.restore_collection(collection_id)
+                message = "Notebook restored."
+            elif action == "delete" and collection_id:
+                collections_mod.delete_collection(collection_id)
+                return redirect(url_for("notes.notes_collections_route", area=area, message="Notebook deleted."))
+            elif action == "add_note" and collection_id:
+                collections_mod.add_item_to_collection(collection_id, "note", request.form.get("note_id"))
+                message = "Note added."
+            elif action == "add_heading" and collection_id:
+                collections_mod.add_heading_to_collection(collection_id, request.form.get("title_override"))
+                message = "Heading added."
+            elif action == "add_divider" and collection_id:
+                collections_mod.add_divider_to_collection(collection_id)
+                message = "Divider added."
+            elif action == "remove_entry":
+                collections_mod.remove_item_from_collection(request.form.get("collection_item_id", type=int))
+                message = "Entry removed."
+            elif action in {"move_up", "move_down"}:
+                collections_mod.move_collection_item(
+                    request.form.get("collection_item_id", type=int),
+                    direction="up" if action == "move_up" else "down",
+                )
+                message = "Entry moved."
+        except ValueError as exc:
+            error = str(exc)
+        args = {"area": area, "message": message}
+        if collection_id:
+            args["collection_id"] = collection_id
+        if error:
+            args["error"] = error
+        return redirect(url_for("notes.notes_collections_route", **args))
+
+    error = request.args.get("error", "")
+    active_status = (request.args.get("status") or "").strip().lower()
+    include_archived = active_status == "all"
+    collection_type = request.args.get("type") or ""
+    selected_collection_id = request.args.get("collection_id", type=int)
+    notebooks = collections_mod.get_collection_list(
+        domain="notes",
+        collection_type=collection_type or None,
+        area_id=area,
+        include_archived=include_archived,
+    )
+    selected = None
+    if selected_collection_id:
+        selected = collections_mod.get_collection(selected_collection_id)
+    if not selected and notebooks:
+        selected = notebooks[0]
+    collection_items = collections_mod.get_collection_items(selected["collection_id"]) if selected else []
+    source_query = request.args.get("q", "")
+    context = _notes_list_context(
+        area=area,
+        folder_filter="",
+        area_info=area_info,
+        area_folders=area_folders,
+        area_label=area_label,
+        total=len(notebooks),
+        sort_col="date_modified",
+        sort_dir="desc",
+        route_name="notes.notes_collections_route",
+        view_mode="collections",
+        page=1,
+        total_pages=1,
+        pages=[],
+        first_url=url_for("notes.notes_collections_route", area=area),
+        last_url=url_for("notes.notes_collections_route", area=area),
+        note_settings=_note_display_settings(),
+    )
+    context.update(
+        {
+            "content_title": f"Notebooks ({area_label or 'All Areas'})",
+            "collections": notebooks,
+            "selected_collection": selected,
+            "collection_items": collection_items,
+            "source_notes": _note_source_options(area, collection_items, source_query),
+            "continuous_entries": _notebook_continuous_entries(collection_items),
+            "message": message,
+            "error": error,
+            "active_status": active_status,
+            "type_options": collections_mod.collection_type_options("notes"),
+            "area_options": collections_mod.area_options(selected.get("area_ids") if selected else ([area] if area else [])),
+            "project_options": collections_mod.project_options(selected.get("project_ids") if selected else []),
+            "source_query": source_query,
+        }
+    )
+    resp = make_response(render_template("notes_collections.html", **context))
+    resp.set_cookie("notes_view", "collections")
     return resp
 
 @notes_bp.route('/view/<int:note_id>')

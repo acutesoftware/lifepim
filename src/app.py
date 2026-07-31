@@ -23,6 +23,7 @@ from common import data as db
 from common import search as search_mod
 from common import areas as areas_mod
 from common import projects as projects_mod
+from common import collections as collections_mod
 from common import settings as settings_mod
 from common.network_log import log_network
 from core.security import configure_security
@@ -166,6 +167,7 @@ app.jinja_env.filters["duration_label"] = format_duration_label
 app.jinja_env.filters["area_param"] = normalize_area_param
 areas_mod.ensure_areas_schema(db._get_conn())
 projects_mod.ensure_projects_schema(db._get_conn())
+collections_mod.ensure_collections_schema(db._get_conn())
 db.ensure_area_columns(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
 db.ensure_notes_schema(db._get_conn())

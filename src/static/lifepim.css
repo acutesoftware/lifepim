@@ -4048,6 +4048,236 @@ body.links-resizing {
   cursor: pointer;
 }
 
+.collection-workspace {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(320px, 1fr) minmax(220px, 300px);
+  gap: 8px;
+  align-items: start;
+}
+
+.collection-pane {
+  min-width: 0;
+  border: 1px solid #d4d8dd;
+  border-radius: 4px;
+  background: #fff;
+  padding: 8px;
+}
+
+.collection-pane h4,
+.collection-pane legend {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.collection-pane-header,
+.collection-title-row,
+.collection-actions,
+.collection-filter-form,
+.collection-create-form,
+.collection-source-item,
+.collection-entry-actions form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.collection-create-form,
+.collection-detail-form,
+.collection-actions {
+  margin-bottom: 8px;
+}
+
+.collection-pane input,
+.collection-pane select,
+.collection-pane textarea,
+.collection-pane button {
+  box-sizing: border-box;
+  min-height: 24px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.collection-pane textarea,
+.collection-detail-form input[name="collection_name"] {
+  width: 100%;
+}
+
+.collection-list,
+.collection-source-list {
+  display: grid;
+  gap: 4px;
+}
+
+.collection-list-item,
+.collection-source-item {
+  color: #222;
+  text-decoration: none;
+  border: 1px solid #e0e3e6;
+  border-radius: 4px;
+  padding: 6px;
+  background: #fafafa;
+}
+
+.collection-list-item.active {
+  border-color: #3866a3;
+  background: #eef4ff;
+}
+
+.collection-list-icon {
+  display: inline-flex;
+  width: 20px;
+  justify-content: center;
+}
+
+.collection-list-item small,
+.collection-source-item small {
+  display: block;
+  color: #666;
+  overflow-wrap: anywhere;
+}
+
+.collection-relations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.collection-relations fieldset {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin: 0;
+  padding: 6px;
+}
+
+.collection-relations label {
+  display: block;
+  margin: 2px 0;
+}
+
+.collection-entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.collection-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: center;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 5px 0;
+}
+
+.collection-entry-heading .collection-entry-title {
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.collection-entry-divider hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #c9cdd2;
+}
+
+.collection-reading {
+  margin-top: 10px;
+  border-top: 1px solid #ddd;
+  padding-top: 8px;
+}
+
+.collection-reading pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f8f9fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.collection-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.collection-media-tile {
+  min-width: 0;
+  border: 1px solid #dfe3e8;
+  border-radius: 4px;
+  padding: 6px;
+  background: #fafafa;
+}
+
+.collection-media-tile img,
+.collection-media-tile video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: #111;
+  border-radius: 3px;
+}
+
+.collection-media-caption {
+  margin: 5px 0;
+  font-size: 12px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.collection-grid-heading,
+.collection-grid-divider {
+  grid-column: 1 / -1;
+}
+
+.collection-grid-heading {
+  font-weight: bold;
+  text-transform: uppercase;
+  border-bottom: 1px solid #d4d8dd;
+  padding: 6px 0 2px;
+}
+
+.collection-media-source {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+}
+
+.collection-media-source img,
+.collection-media-source video {
+  width: 54px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #111;
+}
+
+.audio-collection-track {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.audio-collection-track .collection-entry-title small {
+  display: block;
+  color: #666;
+  font-weight: normal;
+}
+
+@media (max-width: 900px) {
+  .collection-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .collection-relations {
+    grid-template-columns: 1fr;
+  }
+}
+
 .note-view-toolbar button:hover,
 .note-button:hover {
   background: #e9edf5;

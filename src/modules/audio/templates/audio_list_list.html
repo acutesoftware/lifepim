@@ -5,6 +5,7 @@
       <div class="audio-list-nav">
         <a href="{{ url_for('audio.list_audio_table_route', area=area) }}">Table</a> |
         <a href="{{ url_for('audio.list_audio_list_route', area=area) }}">List</a> |
+        <a href="{{ url_for('audio.audio_collections_route', area=area) }}">Playlists</a> |
         <a href="{{ url_for('audio.import_audio_route', area=area) }}">Add Audio</a> |
         <a href="{{ url_for('audio.audio_player_route', area=area, ids=items|map(attribute='id')|join(',')) }}" onclick="window.open(this.href, 'audio_player', 'width=420,height=640,menubar=no,toolbar=no,location=no,status=no'); return false;">Player</a>
       </div>

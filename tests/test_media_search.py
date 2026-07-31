@@ -135,6 +135,7 @@ class TestMediaExplorerPagination(unittest.TestCase):
         self.app.add_url_rule("/help", endpoint="help_route", view_func=lambda: "")
         self.app.add_url_rule("/history", endpoint="admin.user_history_route", view_func=lambda: "")
         self.app.add_url_rule("/search", endpoint="search_route", view_func=lambda: "")
+        self.app.add_url_rule("/site.webmanifest", endpoint="site_webmanifest", view_func=lambda: "")
         self.app.config["TESTING"] = True
 
     def tearDown(self):

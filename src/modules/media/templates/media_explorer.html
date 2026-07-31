@@ -149,7 +149,8 @@
           <div class="media-nav-title">Browse</div>
           <a class="media-nav-link {% if view == 'all' %}active{% endif %}" href="{{ media_url(nav_query, 'view=all') }}">All Media</a>
           <a class="media-nav-link {% if view == 'timeline' %}active{% endif %}" href="{{ media_url(nav_query, 'view=timeline') }}">Timeline</a>
-          <a class="media-nav-link {% if view == 'albums' %}active{% endif %}" href="{{ media_url(nav_query, 'view=albums') }}">Albums</a>
+          <a class="media-nav-link {% if view == 'albums' %}active{% endif %}" href="{{ media_url(nav_query, 'view=albums') }}">Legacy Albums</a>
+          <a class="media-nav-link" href="{{ url_for('media.media_collections_route', area=area) }}">Albums</a>
           <a class="media-nav-link {% if view == 'events' %}active{% endif %}" href="{{ media_url(nav_query, 'view=events') }}">Events</a>
           <a class="media-nav-link {% if view == 'smart' %}active{% endif %}" href="{{ media_url(nav_query, 'view=smart') }}">Smart Views</a>
         </div>

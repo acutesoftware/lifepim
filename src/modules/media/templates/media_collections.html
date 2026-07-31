@@ -1,0 +1,165 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="audio-list-nav">
+    <a href="{{ url_for('media.media_explorer_route', area=area) }}">Explorer</a> |
+    <a href="{{ url_for('media.media_collections_route', area=area) }}">Albums</a>
+  </div>
+
+  {% if message %}<div class="settings-message">{{ message }}</div>{% endif %}
+  {% if error %}<div class="settings-error">{{ error }}</div>{% endif %}
+
+  <div class="collection-workspace media-collection-workspace">
+    <aside class="collection-pane collection-list-pane">
+      <div class="collection-pane-header">
+        <h4>Albums</h4>
+        <form method="get" action="{{ url_for('media.media_collections_route') }}" class="collection-filter-form">
+          {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+          <select name="status" onchange="this.form.submit()" aria-label="Album status">
+            <option value="" {% if not active_status %}selected{% endif %}>Active</option>
+            <option value="all" {% if active_status == 'all' %}selected{% endif %}>All</option>
+          </select>
+        </form>
+      </div>
+
+      <form method="post" action="{{ url_for('media.media_collections_route', area=area) }}" class="collection-create-form">
+        <input type="hidden" name="action" value="create">
+        <input name="collection_name" placeholder="New album" required>
+        <button type="submit">Create</button>
+      </form>
+
+      <div class="collection-list">
+        {% for collection in collections %}
+          <a class="collection-list-item{% if selected_collection and selected_collection.collection_id == collection.collection_id %} active{% endif %}"
+             href="{{ url_for('media.media_collections_route', area=area, collection_id=collection.collection_id, status=active_status) }}">
+            <span class="collection-list-icon">{{ collection.icon or '#' }}</span>
+            <span>
+              <strong>{{ collection.collection_name }}</strong>
+              <small>{{ collection.item_count }} items · {{ collection.status_label }}</small>
+            </span>
+          </a>
+        {% else %}
+          <p class="project-empty-state">No albums found.</p>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <section class="collection-pane collection-content-pane">
+      {% if selected_collection %}
+        <form method="post" action="{{ url_for('media.media_collections_route', area=area, collection_id=selected_collection.collection_id) }}" class="collection-detail-form">
+          <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+          <input type="hidden" name="action" value="save">
+          <div class="collection-title-row">
+            <input name="collection_name" value="{{ selected_collection.collection_name }}" aria-label="Album name" required>
+            <button type="submit">Save</button>
+          </div>
+          <textarea name="description" rows="2" placeholder="Description">{{ selected_collection.description or '' }}</textarea>
+          <div class="collection-relations">
+            <fieldset>
+              <legend>Areas</legend>
+              {% for option in area_options %}
+                <label><input type="checkbox" name="area_ids" value="{{ option.area_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.label }}</label>
+              {% endfor %}
+            </fieldset>
+            <fieldset>
+              <legend>Projects</legend>
+              {% for option in project_options %}
+                <label><input type="checkbox" name="project_ids" value="{{ option.project_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.name }}</label>
+              {% else %}
+                <small>No projects available.</small>
+              {% endfor %}
+            </fieldset>
+          </div>
+        </form>
+
+        <div class="collection-actions">
+          <form method="post" action="{{ url_for('media.media_collections_route', area=area, collection_id=selected_collection.collection_id) }}">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="action" value="add_heading">
+            <input name="title_override" placeholder="Heading">
+            <button type="submit">Add Heading</button>
+          </form>
+          <form method="post" action="{{ url_for('media.media_collections_route', area=area, collection_id=selected_collection.collection_id) }}">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="action" value="add_divider">
+            <button type="submit">Add Divider</button>
+          </form>
+          <form method="post" action="{{ url_for('media.media_collections_route', area=area) }}" onsubmit="return confirm('Delete this album? Source media is not deleted.');">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="action" value="delete">
+            <button type="submit">Delete</button>
+          </form>
+          <form method="post" action="{{ url_for('media.media_collections_route', area=area, collection_id=selected_collection.collection_id) }}">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="action" value="{{ 'restore' if selected_collection.status == 'archived' else 'archive' }}">
+            <button type="submit">{{ 'Restore' if selected_collection.status == 'archived' else 'Archive' }}</button>
+          </form>
+        </div>
+
+        <div class="collection-media-grid">
+          {% for item in collection_items %}
+            {% if item.entry_kind == 'heading' %}
+              <div class="collection-grid-heading">{{ item.display_title }}</div>
+            {% elif item.entry_kind == 'divider' %}
+              <hr class="collection-grid-divider">
+            {% elif item.media %}
+              <article class="collection-media-tile">
+                <a href="{{ item.media.open_url }}">
+                  {% if item.media.is_video %}
+                    <video muted preload="none" controls>
+                      <source src="{{ item.media.file_url }}">
+                    </video>
+                  {% else %}
+                    <img src="{{ item.media.file_url }}" alt="{{ item.display_title }}" loading="lazy">
+                  {% endif %}
+                </a>
+                <div class="collection-media-caption">{{ item.display_title }}</div>
+                <form method="post" action="{{ url_for('media.media_collections_route', area=area, collection_id=selected_collection.collection_id) }}">
+                  <input type="hidden" name="collection_item_id" value="{{ item.collection_item_id }}">
+                  <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+                  <button type="submit" name="action" value="move_up" title="Move up">^</button>
+                  <button type="submit" name="action" value="move_down" title="Move down">v</button>
+                  <button type="submit" name="action" value="remove_entry">Remove</button>
+                </form>
+              </article>
+            {% endif %}
+          {% else %}
+            <p class="project-empty-state">No media in this album yet.</p>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="project-empty-state">Create an album to start grouping media.</p>
+      {% endif %}
+    </section>
+
+    <aside class="collection-pane collection-source-pane">
+      <h4>Available Media</h4>
+      <form method="get" action="{{ url_for('media.media_collections_route') }}" class="collection-filter-form">
+        {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+        {% if selected_collection %}<input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">{% endif %}
+        <input name="q" value="{{ source_query }}" placeholder="Search media">
+        <button type="submit">Search</button>
+      </form>
+      <div class="collection-source-list">
+        {% for item in source_media %}
+          <form method="post" action="{{ url_for('media.media_collections_route', area=area, collection_id=selected_collection.collection_id if selected_collection else None) }}" class="collection-source-item collection-media-source">
+            <input type="hidden" name="action" value="add_media">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id if selected_collection else '' }}">
+            <input type="hidden" name="media_id" value="{{ item.media_id }}">
+            {% if item.is_video %}
+              <video muted preload="none"><source src="{{ item.file_url }}"></video>
+            {% else %}
+              <img src="{{ item.file_url }}" alt="{{ item.filename }}" loading="lazy">
+            {% endif %}
+            <span>
+              <strong>{{ item.filename }}</strong>
+              <small>{{ item.media_type }} {{ item.taken_utc or item.mtime_utc }}</small>
+            </span>
+            <button type="submit" {% if not selected_collection or item.already_present %}disabled{% endif %}>{{ 'Added' if item.already_present else 'Add' }}</button>
+          </form>
+        {% else %}
+          <p class="project-empty-state">No matching media.</p>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}
