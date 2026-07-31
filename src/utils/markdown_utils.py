@@ -3,6 +3,7 @@
 # markdown_utils.py - basic markdown rendering helpers
 
 import html
+import inspect
 import re
 
 try:
@@ -12,6 +13,7 @@ except Exception:
 
 
 _OBSIDIAN_IMG_RE = re.compile(r"!\[\[([^\]]+)\]\]")
+_OBSIDIAN_WIKI_LINK_RE = re.compile(r"(?<!!)\[\[([^\]\n]+)\]\]")
 _LIFEPIM_IMG_RE = re.compile(r"\[img\](.*?)\[/img\]", re.IGNORECASE | re.DOTALL)
 _MARKDOWN_IMG_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 _HTML_IMG_RE = re.compile(r"(?is)<img\b([^>]*?)\bsrc\s*=\s*(['\"]?)([^'\"\s>]+)\2([^>]*)>")
@@ -123,18 +125,87 @@ def _convert_note_images(text, asset_resolver):
     return _convert_markdown_images(text, asset_resolver)
 
 
+def _wiki_link_html(title, resolved):
+    label = html.escape(title, quote=False)
+    status = (resolved or {}).get("status") or "broken"
+    if status == "resolved" and resolved.get("url"):
+        link_title = (resolved.get("title") or title).strip()
+        return '<a class="wiki-link wiki-link-resolved" href="{0}" title="{1}">{2}</a>'.format(
+            html.escape(resolved["url"], quote=True),
+            html.escape(link_title, quote=True),
+            label,
+        )
+    if status == "ambiguous":
+        count = resolved.get("count") or len(resolved.get("matches") or [])
+        title_attr = f"Ambiguous link: {count} notes match" if count else "Ambiguous link"
+        return '<span class="wiki-link wiki-link-ambiguous" title="{0}">{1}</span>'.format(
+            html.escape(title_attr, quote=True),
+            label,
+        )
+    return '<span class="wiki-link wiki-link-broken" title="{0}">{1}</span>'.format(
+        html.escape("Broken link: no matching note", quote=True),
+        label,
+    )
+
+
+def _obsidian_wiki_link_parts(value):
+    parts = [part.strip() for part in (value or "").split("|")]
+    title = parts[0] if parts else ""
+    target_note_id = ""
+    for part in parts[1:]:
+        match = re.match(r"(?i)^note:(\d+)$", part)
+        if match:
+            target_note_id = match.group(1)
+            break
+    if not title:
+        for part in parts:
+            if not re.match(r"(?i)^note:\d+$", part or ""):
+                title = part
+                break
+    return title, target_note_id
+
+
+def _resolve_wiki_link(wiki_link_resolver, title, target_note_id):
+    try:
+        params = inspect.signature(wiki_link_resolver).parameters
+        if len(params) >= 2:
+            return wiki_link_resolver(title, target_note_id=target_note_id)
+    except (TypeError, ValueError):
+        pass
+    try:
+        return wiki_link_resolver(title)
+    except Exception:
+        return {"status": "broken"}
+
+
+def _convert_obsidian_wiki_links(text, wiki_link_resolver):
+    if not wiki_link_resolver:
+        return text
+
+    def _replace(match):
+        title, target_note_id = _obsidian_wiki_link_parts(match.group(1))
+        if not title:
+            return match.group(0)
+        resolved = _resolve_wiki_link(wiki_link_resolver, title, target_note_id)
+        return _wiki_link_html(title, resolved)
+
+    return _OBSIDIAN_WIKI_LINK_RE.sub(_replace, text)
+
+
 def _escape_fallback_paragraph(value):
     placeholders = []
 
-    def _replace_img(match):
-        token = f"@@LIFEPIM_IMG_{len(placeholders)}@@"
+    def _replace_html(match):
+        token = f"@@LIFEPIM_HTML_{len(placeholders)}@@"
         placeholders.append((token, match.group(0)))
         return token
 
-    value = _HTML_IMG_RE.sub(_replace_img, value)
+    value = _HTML_IMG_RE.sub(_replace_html, value)
+    value = re.sub(r"<a\b[^>]*\bclass=\"wiki-link\b[^>]*>.*?</a>", _replace_html, value)
+    value = re.sub(r"<span\b[^>]*\bclass=\"wiki-link\b[^>]*>.*?</span>", _replace_html, value)
     escaped = html.escape(value).replace("\n", "<br>")
-    for token, image_tag in placeholders:
-        escaped = escaped.replace(token, image_tag)
+    for token, html_fragment in placeholders:
+        escaped = escaped.replace(token, html_fragment)
     return escaped
 
 
@@ -174,12 +245,13 @@ def _render_fallback_markdown(text):
     return "<br>".join(blocks)
 
 
-def render_markdown(text, asset_resolver=None, allow_html=True):
+def render_markdown(text, asset_resolver=None, allow_html=True, wiki_link_resolver=None):
     if text is None:
         return ""
     if not allow_html:
         text = html.escape(text, quote=False)
     text = _convert_note_images(text, asset_resolver)
+    text = _convert_obsidian_wiki_links(text, wiki_link_resolver)
     if md_lib:
         return md_lib.markdown(text, extensions=["fenced_code", "nl2br", "sane_lists", "tables"])
     return _render_fallback_markdown(text)

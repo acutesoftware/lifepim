@@ -15,14 +15,22 @@
   const modifiedEl = qs("#note-meta-modified");
   const saveNowBtn = qs("#note-save-now");
   const toolbar = qs(".note-markdown-toolbar");
+  const wikiPopup = qs("#note-wiki-popup");
+  const previewEl = qs("#note-editor-preview");
   const noteId = editor.dataset.noteId || "";
   const saveUrl = editor.dataset.saveUrl || "";
+  const wikiSearchUrl = editor.dataset.wikiSearchUrl || "";
+  const wikiPreviewUrl = editor.dataset.wikiPreviewUrl || "";
   const saveDelayMs = 1500;
+  const previewDelayMs = 450;
   const draftKey = noteId ? `lifepim.noteDraft.${noteId}` : "";
 
   let saveTimer = null;
+  let previewTimer = null;
   let inflight = false;
   let pending = false;
+  let wikiSearchToken = 0;
+  let wikiPopupState = null;
   let lastSaved = editor.value;
   let fileMtimeNs = editor.dataset.fileMtimeNs || "";
   let fileHash = editor.dataset.fileHash || "";
@@ -104,6 +112,209 @@
     editor.value = before + replacement + after;
     setEditorSelection(cursorStart, cursorEnd);
     scheduleSave();
+  }
+
+  function hideWikiPopup() {
+    wikiPopupState = null;
+    if (wikiPopup) {
+      wikiPopup.hidden = true;
+      wikiPopup.innerHTML = "";
+    }
+  }
+
+  function activeWikiQuery() {
+    const cursor = selection().start;
+    const before = editor.value.slice(0, cursor);
+    const start = before.lastIndexOf("[[");
+    if (start < 0) {
+      return null;
+    }
+    const between = before.slice(start + 2);
+    if (between.includes("]]") || between.includes("\n")) {
+      return null;
+    }
+    return { start, end: cursor, query: between };
+  }
+
+  function textareaCaretRect(position) {
+    const editorRect = editor.getBoundingClientRect();
+    const style = window.getComputedStyle(editor);
+    const mirror = document.createElement("div");
+    const trackedStyles = [
+      "boxSizing",
+      "width",
+      "height",
+      "borderTopWidth",
+      "borderRightWidth",
+      "borderBottomWidth",
+      "borderLeftWidth",
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft",
+      "fontFamily",
+      "fontSize",
+      "fontWeight",
+      "fontStyle",
+      "letterSpacing",
+      "textTransform",
+      "wordSpacing",
+      "textIndent",
+      "lineHeight",
+      "tabSize",
+    ];
+    trackedStyles.forEach((name) => {
+      mirror.style[name] = style[name];
+    });
+    mirror.style.position = "absolute";
+    mirror.style.visibility = "hidden";
+    mirror.style.whiteSpace = "pre-wrap";
+    mirror.style.overflowWrap = "break-word";
+    mirror.style.top = "0";
+    mirror.style.left = "-9999px";
+    mirror.textContent = editor.value.slice(0, position);
+    const marker = document.createElement("span");
+    marker.textContent = editor.value.slice(position, position + 1) || ".";
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    const markerRect = marker.getBoundingClientRect();
+    const mirrorRect = mirror.getBoundingClientRect();
+    const left = editorRect.left + (markerRect.left - mirrorRect.left) - editor.scrollLeft;
+    const top = editorRect.top + (markerRect.top - mirrorRect.top) - editor.scrollTop;
+    const height = markerRect.height || parseFloat(style.lineHeight) || 18;
+    document.body.removeChild(mirror);
+    return { left, top, height };
+  }
+
+  function positionWikiPopup(state) {
+    if (!wikiPopup) {
+      return;
+    }
+    const caret = textareaCaretRect(state.end);
+    const popupWidth = Math.min(420, Math.max(260, editor.getBoundingClientRect().width * 0.45));
+    const gap = 8;
+    let left = caret.left + gap;
+    let top = caret.top - 4;
+    if (left + popupWidth > window.innerWidth - 8) {
+      left = Math.max(8, caret.left - popupWidth - gap);
+    }
+    const maxTop = window.innerHeight - 80;
+    top = Math.max(8, Math.min(top, maxTop));
+    wikiPopup.style.left = `${left + window.scrollX}px`;
+    wikiPopup.style.top = `${top + window.scrollY}px`;
+    wikiPopup.style.width = `${popupWidth}px`;
+  }
+
+  function renderWikiPopup(state, results) {
+    if (!wikiPopup) {
+      return;
+    }
+    wikiPopupState = {
+      start: state.start,
+      end: state.end,
+      query: state.query,
+      results,
+      index: 0,
+    };
+    wikiPopup.innerHTML = "";
+    if (!results.length) {
+      const empty = document.createElement("div");
+      empty.className = "note-wiki-empty";
+      empty.textContent = "No matching notes";
+      wikiPopup.appendChild(empty);
+    } else {
+      results.forEach((item, index) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = index === 0 ? "note-wiki-option active" : "note-wiki-option";
+        row.dataset.index = String(index);
+        const title = document.createElement("span");
+        title.className = "note-wiki-title";
+        title.textContent = item.title || item.file_name || "Untitled";
+        const meta = document.createElement("span");
+        meta.className = "note-wiki-meta";
+        meta.textContent = item.path || item.area || "";
+        row.appendChild(title);
+        row.appendChild(meta);
+        row.addEventListener("mousedown", (evt) => {
+          evt.preventDefault();
+          insertWikiResult(index);
+        });
+        wikiPopup.appendChild(row);
+      });
+    }
+    positionWikiPopup(state);
+    wikiPopup.hidden = false;
+  }
+
+  function updateWikiActiveOption() {
+    if (!wikiPopup || !wikiPopupState) {
+      return;
+    }
+    Array.from(wikiPopup.querySelectorAll(".note-wiki-option")).forEach((row, index) => {
+      row.classList.toggle("active", index === wikiPopupState.index);
+    });
+  }
+
+  function insertWikiResult(index) {
+    if (!wikiPopupState || !wikiPopupState.results.length) {
+      return;
+    }
+    const item = wikiPopupState.results[index] || wikiPopupState.results[0];
+    const replacement = item.wiki_link || `[[${item.title || item.file_name || ""}]]`;
+    const cursor = wikiPopupState.start + replacement.length;
+    replaceSelection(wikiPopupState.start, selection().start, replacement, cursor, cursor);
+    hideWikiPopup();
+    schedulePreview();
+  }
+
+  async function refreshWikiPopup() {
+    const state = activeWikiQuery();
+    if (!state || !wikiSearchUrl) {
+      hideWikiPopup();
+      return;
+    }
+    const token = ++wikiSearchToken;
+    const params = new URLSearchParams();
+    params.set("q", state.query);
+    params.set("exclude_id", noteId);
+    params.set("limit", "12");
+    try {
+      const resp = await fetch(`${wikiSearchUrl}?${params.toString()}`);
+      const data = await resp.json();
+      if (token !== wikiSearchToken) {
+        return;
+      }
+      renderWikiPopup(state, data.results || []);
+    } catch (err) {
+      hideWikiPopup();
+    }
+  }
+
+  function wikiLinkAtCursor() {
+    const cursor = selection().start;
+    const text = editor.value;
+    const re = /\[\[([^\]\n]+)\]\]/g;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      if (cursor >= match.index && cursor <= match.index + match[0].length) {
+        const parts = match[1].split("|").map((part) => part.trim());
+        const notePart = parts.find((part) => /^note:\d+$/i.test(part));
+        if (notePart) {
+          return `/notes/view/${notePart.split(":", 2)[1]}`;
+        }
+      }
+    }
+    return "";
+  }
+
+  function openWikiLinkAtCursor() {
+    const url = wikiLinkAtCursor();
+    if (url) {
+      window.location.href = url;
+      return true;
+    }
+    return false;
   }
 
   function needsLeadingNewline(position) {
@@ -267,6 +478,39 @@
       }
       void doSave();
     }, saveDelayMs);
+    schedulePreview();
+  }
+
+  function schedulePreview() {
+    if (!previewEl || !wikiPreviewUrl) {
+      return;
+    }
+    if (previewTimer) {
+      clearTimeout(previewTimer);
+    }
+    previewTimer = setTimeout(() => {
+      void refreshPreview();
+    }, previewDelayMs);
+  }
+
+  async function refreshPreview() {
+    if (!previewEl || !wikiPreviewUrl) {
+      return;
+    }
+    try {
+      const resp = await fetch(wikiPreviewUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editor.value }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.error || "Unable to render preview.");
+      }
+      previewEl.innerHTML = data.html || "";
+    } catch (err) {
+      previewEl.textContent = "";
+    }
   }
 
   async function doSave() {
@@ -303,6 +547,9 @@
         fileHash = String(data.sha256 || "");
         editor.dataset.fileHash = fileHash;
       }
+      if (data.link_count !== undefined) {
+        editor.dataset.linkCount = String(data.link_count || 0);
+      }
       if (sizeEl && data.size !== undefined) {
         sizeEl.textContent = data.size;
       }
@@ -332,7 +579,44 @@
   }
 
   restoreDraftIfNeeded();
-  editor.addEventListener("input", scheduleSave);
+  schedulePreview();
+  editor.addEventListener("input", () => {
+    scheduleSave();
+    void refreshWikiPopup();
+  });
+  editor.addEventListener("click", (evt) => {
+    if ((evt.ctrlKey || evt.metaKey) && openWikiLinkAtCursor()) {
+      evt.preventDefault();
+    }
+  });
+  editor.addEventListener("touchend", () => {
+    window.setTimeout(openWikiLinkAtCursor, 0);
+  });
+  editor.addEventListener("keyup", (evt) => {
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(evt.key)) {
+      void refreshWikiPopup();
+    }
+  });
+  editor.addEventListener("keydown", (evt) => {
+    if (!wikiPopupState || (wikiPopup && wikiPopup.hidden)) {
+      return;
+    }
+    if (evt.key === "Escape") {
+      evt.preventDefault();
+      hideWikiPopup();
+    } else if (evt.key === "ArrowDown") {
+      evt.preventDefault();
+      wikiPopupState.index = Math.min(wikiPopupState.results.length - 1, wikiPopupState.index + 1);
+      updateWikiActiveOption();
+    } else if (evt.key === "ArrowUp") {
+      evt.preventDefault();
+      wikiPopupState.index = Math.max(0, wikiPopupState.index - 1);
+      updateWikiActiveOption();
+    } else if (evt.key === "Enter" && wikiPopupState.results.length) {
+      evt.preventDefault();
+      insertWikiResult(wikiPopupState.index);
+    }
+  });
   editor.addEventListener("blur", () => {
     if (editor.value !== lastSaved) {
       void doSave();
@@ -345,6 +629,18 @@
         saveTimer = null;
       }
       void doSave();
+    });
+  }
+  if (previewEl) {
+    previewEl.addEventListener("click", (evt) => {
+      const link = evt.target.closest("a.wiki-link");
+      if (!link) {
+        return;
+      }
+      if (evt.ctrlKey || evt.metaKey || window.matchMedia("(pointer: coarse)").matches) {
+        return;
+      }
+      evt.preventDefault();
     });
   }
   if (toolbar) {

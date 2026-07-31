@@ -4424,6 +4424,86 @@ body.freeze-headers .note-card-page .note-card-grid {
   box-sizing: border-box;
 }
 
+.note-rendered-content .wiki-link-ambiguous,
+.note-rendered-content .wiki-link-broken {
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
+}
+
+.note-rendered-content .wiki-link-ambiguous {
+  color: #8a5a00;
+}
+
+.note-rendered-content .wiki-link-broken {
+  color: #b00020;
+  text-decoration: line-through;
+}
+
+.note-wiki-popup {
+  position: absolute;
+  z-index: 2000;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #9aa0a6;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+
+.note-wiki-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  color: #222;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-wiki-option.active,
+.note-wiki-option:hover {
+  background: #eaf2ff;
+}
+
+.note-wiki-title {
+  font-weight: 600;
+}
+
+.note-wiki-meta,
+.note-wiki-empty {
+  color: #666;
+  font-size: 12px;
+}
+
+.note-wiki-empty {
+  padding: 9px;
+}
+
+.note-editor-preview-shell {
+  margin-top: 10px;
+  border-top: 1px solid #d0d7de;
+  padding-top: 8px;
+}
+
+.note-editor-preview-title {
+  margin-bottom: 5px;
+  color: #555;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.note-editor-preview {
+  min-height: 80px;
+  padding: 8px;
+  border: 1px solid #d0d7de;
+  background: #fff;
+}
+
 .note-folder-list {
   display: flex;
   flex-wrap: wrap;

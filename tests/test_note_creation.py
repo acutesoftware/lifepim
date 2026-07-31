@@ -98,6 +98,18 @@ class TestNoteCreation(unittest.TestCase):
         def site_webmanifest():
             return {}
 
+        app.add_url_rule(
+            "/projects/assign",
+            endpoint="projects.assign_project_route",
+            view_func=lambda: "",
+            methods=["POST"],
+        )
+        app.add_url_rule(
+            "/projects/add",
+            endpoint="projects.add_project_route",
+            view_func=lambda: "",
+        )
+
         return app
 
     def test_unmapped_and_filtered_notes_and_search(self):
@@ -435,6 +447,85 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn("Body text", html)
         self.assertNotIn("title: Markdown View", html)
         self.assertNotIn("color: Blue", html)
+
+    def test_note_view_markdown_mode_resolves_obsidian_wiki_links_by_title(self):
+        note_dir = os.path.join(self.tmpdir.name, "wiki_links")
+        source_id, source = self._create_note_record("source", note_dir, area="")
+        target_id, _target = self._create_note_record("Target Note", note_dir, area="")
+        dup1_id, _dup1 = self._create_note_record("duplicate-one", note_dir, area="")
+        dup2_id, _dup2 = self._create_note_record("duplicate-two", note_dir, area="")
+        tbl = common_utils.get_table_def("notes")
+        self.conn.execute(f"UPDATE {tbl['name']} SET title = ? WHERE id = ?", ("Duplicate", dup1_id))
+        self.conn.execute(f"UPDATE {tbl['name']} SET title = ? WHERE id = ?", ("Duplicate", dup2_id))
+        self.conn.commit()
+        with open(source["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("See [[Target Note]], [[Duplicate]], and [[Missing Note]].")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{source_id}?format=markdown")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'href="/notes/view/{target_id}"', html)
+        self.assertIn('class="wiki-link wiki-link-ambiguous"', html)
+        self.assertIn("Ambiguous link: 2 notes match", html)
+        self.assertIn('class="wiki-link wiki-link-broken"', html)
+        self.assertIn("Broken link: no matching note", html)
+
+    def test_wiki_search_returns_id_backed_link_syntax(self):
+        note_dir = os.path.join(self.tmpdir.name, "wiki_search")
+        source_id, _source = self._create_note_record("source", note_dir, area="")
+        target_id, _target = self._create_note_record("Alpha Project Plan", note_dir, area="")
+
+        response = self._notes_test_app().test_client().get(
+            f"/notes/api/wiki-search?q=alp proj&exclude_id={source_id}"
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["results"][0]["id"], target_id)
+        self.assertEqual(payload["results"][0]["wiki_link"], f"[[Alpha Project Plan|note:{target_id}]]")
+
+    def test_wiki_preview_renders_id_backed_links(self):
+        note_dir = os.path.join(self.tmpdir.name, "wiki_preview")
+        source_id, _source = self._create_note_record("source", note_dir, area="")
+        target_id, _target = self._create_note_record("Preview Target", note_dir, area="")
+
+        response = self._notes_test_app().test_client().post(
+            f"/notes/api/wiki-preview/{source_id}",
+            json={"content": f"See [[Preview Target|note:{target_id}]]."},
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'href="/notes/view/{target_id}"', payload["html"])
+        self.assertIn(">Preview Target</a>", payload["html"])
+
+    def test_autosave_maintains_note_links_table_with_target_ids(self):
+        note_dir = os.path.join(self.tmpdir.name, "wiki_save")
+        source_id, source = self._create_note_record("source", note_dir, area="")
+        target_id, _target = self._create_note_record("Saved Target", note_dir, area="")
+        state = notes_routes._note_file_state(source["full_path"])
+
+        app = Flask(__name__)
+        app.register_blueprint(notes_routes.notes_bp)
+        response = app.test_client().post(
+            f"/notes/api/save/{source_id}",
+            json={
+                "content": f"Saved [[Saved Target|note:{target_id}]] link.",
+                "base_mtime_ns": state["mtime_ns"],
+                "base_hash": state["sha256"],
+            },
+        )
+        row = self.conn.execute(
+            "SELECT src_note_id, target_note_id, link_text, link_title FROM lp_note_links"
+        ).fetchone()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["link_count"], 1)
+        self.assertEqual(row["src_note_id"], source_id)
+        self.assertEqual(row["target_note_id"], target_id)
+        self.assertEqual(row["link_text"], f"[[Saved Target|note:{target_id}]]")
+        self.assertEqual(row["link_title"], "Saved Target")
 
     def test_notes_table_view_uses_new_header_and_columns(self):
         note_dir = os.path.join(self.tmpdir.name, "notes_table_view")

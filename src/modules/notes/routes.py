@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
@@ -77,6 +78,8 @@ NOTE_COLOR_OPTIONS = [
     ("White", NOTE_COLOR_NAMES["white"]),
 ]
 NOTE_VIEW_MODES = {"text", "markdown", "hex", "sample", "metadata"}
+NOTE_WIKI_LINK_RE = re.compile(r"(?<!!)\[\[([^\]\n]+)\]\]")
+NOTE_WIKI_TARGET_ID_RE = re.compile(r"(?i)^note:(\d+)$")
 NOTE_LIST_SORT_OPTIONS = [
     ("title", "Title"),
     ("size", "Size"),
@@ -108,9 +111,31 @@ def _ensure_notes_schema(conn=None):
     conn = data._get_conn() if conn is None else conn
     try:
         data.ensure_notes_schema(conn)
+        _ensure_note_links_schema(conn)
         _ensure_note_areas_materialized(conn)
     except Exception:
         pass
+
+
+def _ensure_note_links_schema(conn=None):
+    conn = data._get_conn() if conn is None else conn
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS lp_note_links (
+            link_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            src_note_id INTEGER NOT NULL,
+            target_note_id INTEGER NOT NULL,
+            link_text TEXT NOT NULL,
+            link_title TEXT,
+            created_utc TEXT NOT NULL,
+            updated_utc TEXT NOT NULL,
+            UNIQUE (src_note_id, target_note_id, link_text)
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_note_links_src ON lp_note_links(src_note_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_note_links_target ON lp_note_links(target_note_id)")
+    conn.commit()
 
 
 def _file_created_at(stat):
@@ -1388,6 +1413,200 @@ def _get_note_record(note_id):
     _apply_note_display_fields(note)
     return note, tbl
 
+
+def _note_title_match_expr(alias="t"):
+    prefix = f"{alias}." if alias else ""
+    return (
+        f"CASE WHEN COALESCE({prefix}title, '') != '' THEN {prefix}title "
+        f"WHEN lower(COALESCE({prefix}file_name, '')) LIKE '%.md' "
+        f"THEN substr({prefix}file_name, 1, length({prefix}file_name) - 3) "
+        f"ELSE COALESCE({prefix}file_name, '') END"
+    )
+
+
+def _note_display_title(row):
+    return (row.get("title") or os.path.splitext(row.get("file_name") or "")[0] or row.get("file_name") or "").strip()
+
+
+def _parse_note_wiki_link_value(value):
+    parts = [part.strip() for part in (value or "").split("|")]
+    title = parts[0] if parts else ""
+    target_note_id = None
+    for part in parts[1:]:
+        match = NOTE_WIKI_TARGET_ID_RE.match(part or "")
+        if match:
+            target_note_id = int(match.group(1))
+            break
+    if not title:
+        for part in parts:
+            if not NOTE_WIKI_TARGET_ID_RE.match(part or ""):
+                title = part
+                break
+    return title, target_note_id
+
+
+def _note_link_syntax(title, target_note_id):
+    title = (title or "").strip()
+    if not title or not target_note_id:
+        return ""
+    escaped = title.replace("]", "").replace("|", " ")
+    return f"[[{escaped}|note:{int(target_note_id)}]]"
+
+
+def _visible_note_by_id(note_id):
+    try:
+        note_id = int(note_id)
+    except (TypeError, ValueError):
+        return None
+    if not security.can_view_note(note_id, current_user):
+        return None
+    note, _tbl = _get_note_record(note_id)
+    return note
+
+
+def _resolve_note_wiki_link(title, target_note_id=None):
+    title = (title or "").strip()
+    if target_note_id:
+        note = _visible_note_by_id(target_note_id)
+        if note:
+            return {
+                "status": "resolved",
+                "url": url_for("notes.view_note_route", note_id=note["id"]),
+                "title": _note_display_title(note) or title,
+                "target_note_id": note["id"],
+            }
+        return {"status": "broken"}
+    if not title:
+        return {"status": "broken"}
+    tbl = get_table_def("notes")
+    if not tbl:
+        return {"status": "broken"}
+    condition, params = security.visible_record_condition("t", current_user)
+    title_expr = _note_title_match_expr("t")
+    rows = data._get_conn().execute(
+        f"SELECT t.id, t.file_name, t.title, t.path "
+        f"FROM {tbl['name']} t "
+        f"WHERE {condition} AND lower({title_expr}) = lower(?) "
+        f"ORDER BY lower(COALESCE(NULLIF(t.title, ''), t.file_name, '')), t.path, t.id ",
+        [*params, title],
+    ).fetchall()
+    if not rows:
+        return {"status": "broken"}
+    if len(rows) > 1:
+        return {"status": "ambiguous", "count": len(rows)}
+    row = rows[0]
+    return {
+        "status": "resolved",
+        "url": url_for("notes.view_note_route", note_id=row["id"]),
+        "title": _note_display_title(dict(row)) or title,
+        "target_note_id": row["id"],
+    }
+
+
+def _visible_note_rows(limit=None):
+    _ensure_notes_schema()
+    tbl = get_table_def("notes")
+    if not tbl:
+        return []
+    condition, params = security.visible_record_condition("t", current_user)
+    sql = (
+        f"SELECT t.id, t.file_name, t.title, t.path, t.area, t.date_modified "
+        f"FROM {tbl['name']} t "
+        f"WHERE {condition} "
+        "ORDER BY lower(COALESCE(NULLIF(t.title, ''), t.file_name, ''))"
+    )
+    if limit:
+        sql += " LIMIT ?"
+        params.append(int(limit))
+    rows = data._get_conn().execute(sql, params).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _fuzzy_note_score(query, row):
+    query = (query or "").strip().lower()
+    title = _note_display_title(row).lower()
+    file_name = (row.get("file_name") or "").lower()
+    path = (row.get("path") or "").lower()
+    haystack = " ".join([title, file_name, path])
+    if not query:
+        return 1.0
+    if query == title:
+        return 4.0
+    if title.startswith(query):
+        return 3.5
+    if query in title:
+        return 3.0
+    if query in haystack:
+        return 2.0
+    return SequenceMatcher(None, query, title or file_name).ratio()
+
+
+def _search_wiki_notes(query, exclude_note_id=None, limit=20):
+    rows = _visible_note_rows()
+    scored = []
+    for row in rows:
+        if exclude_note_id and str(row.get("id")) == str(exclude_note_id):
+            continue
+        score = _fuzzy_note_score(query, row)
+        if query and score < 0.35:
+            continue
+        scored.append((score, row))
+    scored.sort(key=lambda item: (-item[0], _note_display_title(item[1]).lower(), item[1].get("id") or 0))
+    results = []
+    for score, row in scored[: max(1, int(limit or 20))]:
+        title = _note_display_title(row)
+        results.append(
+            {
+                "id": row["id"],
+                "title": title,
+                "file_name": row.get("file_name") or "",
+                "path": row.get("path") or "",
+                "area": row.get("area") or "",
+                "score": round(score, 3),
+                "wiki_link": _note_link_syntax(title, row["id"]),
+                "open_url": url_for("notes.view_note_route", note_id=row["id"]),
+            }
+        )
+    return results
+
+
+def _iter_note_wiki_links(content):
+    for match in NOTE_WIKI_LINK_RE.finditer(content or ""):
+        title, target_note_id = _parse_note_wiki_link_value(match.group(1))
+        if title:
+            yield title, target_note_id, match.group(0)
+
+
+def _sync_note_links(note_id, content):
+    _ensure_note_links_schema()
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows = {}
+    for title, target_note_id, link_text in _iter_note_wiki_links(content):
+        resolved = _resolve_note_wiki_link(title, target_note_id=target_note_id)
+        if resolved.get("status") != "resolved" or not resolved.get("target_note_id"):
+            continue
+        target_id = int(resolved["target_note_id"])
+        if int(note_id) == target_id:
+            continue
+        rows[(int(note_id), target_id, link_text)] = (
+            int(note_id),
+            target_id,
+            link_text,
+            title,
+            now,
+            now,
+        )
+    conn = data._get_conn()
+    conn.execute("DELETE FROM lp_note_links WHERE src_note_id = ?", (int(note_id),))
+    conn.executemany(
+        "INSERT OR REPLACE INTO lp_note_links "
+        "(src_note_id, target_note_id, link_text, link_title, created_utc, updated_utc) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        list(rows.values()),
+    )
+    conn.commit()
+    return len(rows)
+
 @notes_bp.route('/')
 def list_notes_route():
     area = _normalize_area(request_area_param())
@@ -1835,7 +2054,11 @@ def view_note_route(note_id):
         def _asset_url(asset_name):
             return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
 
-        content_html = markdown_utils.render_markdown(note_body_text, asset_resolver=_asset_url)
+        content_html = markdown_utils.render_markdown(
+            note_body_text,
+            asset_resolver=_asset_url,
+            wiki_link_resolver=_resolve_note_wiki_link,
+        )
     elif render_mode == "hex":
         hex_rows = hex_utils.hex_dump(note_text)
     elif render_mode == "sample":
@@ -2578,6 +2801,7 @@ def edit_note_route(note_id):
                         _normalize_note_path(note.get("path")) or os.path.dirname(note_path),
                         content=content,
                     )
+                    _sync_note_links(note_id, content)
                 except OSError:
                     pass
         return redirect(url_for("notes.edit_note_route", note_id=note_id))
@@ -2667,6 +2891,7 @@ def save_note_route(note_id):
             _normalize_note_path(note.get("path")) or os.path.dirname(note_path),
             content=content,
         )
+    link_count = _sync_note_links(note_id, content)
 
     return jsonify({
         "ok": True,
@@ -2674,7 +2899,34 @@ def save_note_route(note_id):
         "date_modified": date_modified,
         "mtime_ns": mtime_ns,
         "sha256": sha256,
+        "link_count": link_count,
     })
+
+
+@notes_bp.route('/api/wiki-search')
+def wiki_search_route():
+    query = request.args.get("q", "")
+    exclude_note_id = request.args.get("exclude_id", type=int)
+    limit = request.args.get("limit", type=int) or 20
+    return jsonify({"results": _search_wiki_notes(query, exclude_note_id=exclude_note_id, limit=limit)})
+
+
+@notes_bp.route('/api/wiki-preview/<int:note_id>', methods=["POST"])
+def wiki_preview_route(note_id):
+    if not security.can_edit_note(note_id, current_user):
+        abort(403)
+    payload = request.get_json(silent=True) or {}
+    content = payload.get("content") or ""
+
+    def _asset_url(asset_name):
+        return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
+
+    html_rendered = markdown_utils.render_markdown(
+        content,
+        asset_resolver=_asset_url,
+        wiki_link_resolver=_resolve_note_wiki_link,
+    )
+    return jsonify({"html": html_rendered})
 
 @notes_bp.route('/delete/<int:note_id>')
 def delete_note_route(note_id):

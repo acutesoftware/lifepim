@@ -65,9 +65,16 @@
         <textarea id="note-editor"
                   data-note-id="{{ note.id }}"
                   data-save-url="{{ url_for('notes.save_note_route', note_id=note.id) }}"
+                  data-wiki-search-url="{{ url_for('notes.wiki_search_route') }}"
+                  data-wiki-preview-url="{{ url_for('notes.wiki_preview_route', note_id=note.id) }}"
                   data-file-mtime-ns="{{ note_state.mtime_ns if note_state else '' }}"
                   data-file-hash="{{ note_state.sha256 if note_state else '' }}"
                   style="width:100%; min-height:60vh; font-family:inherit;">{{ note_text }}</textarea>
+        <div id="note-wiki-popup" class="note-wiki-popup" hidden></div>
+        <div class="note-editor-preview-shell">
+          <div class="note-editor-preview-title">Preview</div>
+          <div id="note-editor-preview" class="note-rendered-content note-editor-preview"></div>
+        </div>
         <div style="margin-top:6px; font-size:0.85em; color:#777;">
           Autosaves after you pause typing.
           <button type="button" id="note-save-now" style="margin-left:8px;">Save now</button>

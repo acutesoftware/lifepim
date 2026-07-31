@@ -74,6 +74,70 @@ class TestMarkdownUtils(unittest.TestCase):
         self.assertIn("&lt;div", rendered)
         self.assertIn("<strong>bold</strong>", rendered)
 
+    def test_obsidian_wiki_link_renders_resolved_link(self):
+        rendered = markdown_utils.render_markdown(
+            "See [[Target Note]].",
+            wiki_link_resolver=lambda title: {
+                "status": "resolved",
+                "url": "/notes/view/12",
+                "title": title,
+            },
+        )
+
+        self.assertIn('<a class="wiki-link wiki-link-resolved" href="/notes/view/12"', rendered)
+        self.assertIn(">Target Note</a>", rendered)
+        self.assertNotIn("[[Target Note]]", rendered)
+
+    def test_obsidian_wiki_link_marks_ambiguous_and_broken_links(self):
+        def resolver(title):
+            if title == "Duplicate":
+                return {"status": "ambiguous", "count": 2}
+            return {"status": "broken"}
+
+        rendered = markdown_utils.render_markdown(
+            "[[Duplicate]] and [[Missing]]",
+            wiki_link_resolver=resolver,
+        )
+
+        self.assertIn('class="wiki-link wiki-link-ambiguous"', rendered)
+        self.assertIn("Ambiguous link: 2 notes match", rendered)
+        self.assertIn('class="wiki-link wiki-link-broken"', rendered)
+        self.assertIn("Broken link: no matching note", rendered)
+
+    def test_obsidian_image_is_not_treated_as_wiki_link(self):
+        rendered = markdown_utils.render_markdown(
+            "![[photo.jpg]] and [[Target]]",
+            asset_resolver=lambda name: "/notes/asset/7/" + name,
+            wiki_link_resolver=lambda title: {
+                "status": "resolved",
+                "url": "/notes/view/12",
+                "title": title,
+            },
+        )
+
+        self.assertIn('<img src="/notes/asset/7/photo.jpg"', rendered)
+        self.assertIn('href="/notes/view/12"', rendered)
+
+    def test_obsidian_wiki_link_passes_target_note_id_to_resolver(self):
+        seen = {}
+
+        def resolver(title, target_note_id=None):
+            seen["title"] = title
+            seen["target_note_id"] = target_note_id
+            return {
+                "status": "resolved",
+                "url": f"/notes/view/{target_note_id}",
+                "title": title,
+            }
+
+        rendered = markdown_utils.render_markdown(
+            "[[Display Title|note:42]]",
+            wiki_link_resolver=resolver,
+        )
+
+        self.assertEqual(seen, {"title": "Display Title", "target_note_id": "42"})
+        self.assertIn('href="/notes/view/42"', rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
