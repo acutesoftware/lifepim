@@ -4139,6 +4139,34 @@ body.links-resizing {
   overflow-wrap: anywhere;
 }
 
+.collection-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.collection-overview-card {
+  display: grid;
+  gap: 4px;
+  color: #222;
+  text-decoration: none;
+  border: 1px solid #dfe3e8;
+  border-radius: 4px;
+  padding: 8px;
+  background: #fafafa;
+}
+
+.collection-overview-card:hover {
+  border-color: #3866a3;
+  background: #eef4ff;
+}
+
+.collection-overview-card span,
+.collection-overview-card small {
+  color: #666;
+  overflow-wrap: anywhere;
+}
+
 .collection-relations {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

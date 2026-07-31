@@ -63,6 +63,7 @@
               {% endfor %}
             </select>
             <button type="submit">Save</button>
+            <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, read=1) }}">Read</a>
           </div>
           <textarea name="description" rows="2" placeholder="Description">{{ selected_collection.description or '' }}</textarea>
           <div class="collection-relations">
@@ -142,12 +143,30 @@
               </article>
             {% endfor %}
           </div>
+        {% elif reading_mode %}
+          <div class="collection-reading">
+            <p class="project-empty-state">No readable notes in this notebook.</p>
+          </div>
         {% endif %}
       {% else %}
-        <p class="project-empty-state">Create a notebook to start grouping notes.</p>
+        <div class="collection-overview">
+          <h4>Notebook List</h4>
+          <div class="collection-overview-grid">
+            {% for collection in collections %}
+              <a class="collection-overview-card" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">
+                <strong>{{ collection.collection_name }}</strong>
+                <span>{{ collection.type_label }} · {{ collection.item_count }} entries</span>
+                {% if collection.description %}<small>{{ collection.description }}</small>{% endif %}
+              </a>
+            {% else %}
+              <p class="project-empty-state">Create a notebook to start grouping notes.</p>
+            {% endfor %}
+          </div>
+        </div>
       {% endif %}
     </section>
 
+    {% if selected_collection %}
     <aside class="collection-pane collection-source-pane">
       <h4>Available Notes</h4>
       <form method="get" action="{{ url_for('notes.notes_collections_route') }}" class="collection-filter-form">
@@ -173,5 +192,6 @@
         {% endfor %}
       </div>
     </aside>
+    {% endif %}
   </div>
 {% endblock %}

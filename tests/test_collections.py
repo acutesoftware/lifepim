@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import unittest
+from unittest.mock import patch
 
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
@@ -19,6 +20,9 @@ class TestCollections(unittest.TestCase):
         data.conn = self.conn
         self.conn.execute(
             "CREATE TABLE lp_notes (id INTEGER PRIMARY KEY, file_name TEXT, path TEXT, area TEXT, owner_user_id INTEGER, rec_extract_date TEXT)"
+        )
+        self.conn.execute(
+            "CREATE TABLE users (user_id INTEGER PRIMARY KEY, username TEXT, display_name TEXT, password_hash TEXT, role TEXT, is_active INTEGER)"
         )
         self.conn.execute("INSERT INTO lp_notes(id, file_name, path, area, owner_user_id, rec_extract_date) VALUES (1, 'Rome.md', 'notes', 'fun/travel', 1, 'now')")
         self.conn.execute("INSERT INTO lp_notes(id, file_name, path, area, owner_user_id, rec_extract_date) VALUES (2, 'Food.md', 'notes', 'fun/food', 1, 'now')")
@@ -158,7 +162,35 @@ class TestCollections(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Route Notebook", response.data)
-        self.assertIn(b"Available Notes", response.data)
+        self.assertIn(b"Notebook List", response.data)
+        self.assertNotIn(b"Available Notes", response.data)
+
+    def test_notes_route_loads_notebook_contents_only_when_selected(self):
+        from app import app
+
+        data.conn = self.conn
+        self.conn.execute(
+            "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
+            "VALUES (1, 'alice', 'Alice', 'hash', 'user', 1)"
+        )
+        notebook_id = collections.create_collection(
+            {"collection_name": "Lazy Notebook", "collection_domain": "notes", "collection_type": "notebook"},
+            owner_user_id=1,
+            conn=self.conn,
+        )
+        collections.add_item_to_collection(notebook_id, "note", 1, owner_user_id=1, conn=self.conn)
+        app.config["TESTING"] = True
+        with app.test_client() as client:
+            with client.session_transaction() as session:
+                session["_user_id"] = "1"
+                session["_fresh"] = True
+            with patch("modules.notes.routes._read_note_file", side_effect=AssertionError("default notebook list must not read note files")):
+                default_response = client.get("/notes/notebooks")
+            selected_response = client.get(f"/notes/notebooks?collection_id={notebook_id}")
+
+        self.assertEqual(default_response.status_code, 200)
+        self.assertEqual(selected_response.status_code, 200)
+        self.assertIn(b"Available Notes", selected_response.data)
 
 
 if __name__ == "__main__":
