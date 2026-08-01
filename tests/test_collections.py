@@ -9,6 +9,7 @@ if root_folder not in os.sys.path:
     os.sys.path.append(root_folder)
 
 from common import areas, collections, data, projects
+from modules.how.schema import ensure_how_schema, utc_now
 import etl_folder_mapping as folder_etl
 
 
@@ -29,6 +30,7 @@ class TestCollections(unittest.TestCase):
         areas.ensure_areas_schema(self.conn)
         projects.ensure_projects_schema(self.conn)
         collections.ensure_collections_schema(self.conn)
+        ensure_how_schema(self.conn)
         self.conn.executescript(folder_etl.DDL_CREATE_NO_FK)
         for area_id, name in [("fun", "Fun"), ("fun/travel", "Travel"), ("family", "Family")]:
             areas.area_upsert(
@@ -154,6 +156,7 @@ class TestCollections(unittest.TestCase):
             conn=self.conn,
         )
         app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
         with app.test_client() as client:
             with client.session_transaction() as session:
                 session["_user_id"] = "1"
@@ -191,6 +194,79 @@ class TestCollections(unittest.TestCase):
         self.assertEqual(default_response.status_code, 200)
         self.assertEqual(selected_response.status_code, 200)
         self.assertIn(b"Available Notes", selected_response.data)
+
+    def test_phase4_domain_registry_drives_labels_and_compatibility(self):
+        adapter = collections.get_domain_adapter("how")
+
+        self.assertEqual(adapter["plural_label"], "Manuals")
+        self.assertEqual(
+            collections.collection_type_options("how"),
+            [{"value": "manual", "label": "Manual"}, {"value": "runbook", "label": "Runbook"}],
+        )
+        self.assertEqual(collections.normalize_collection_type("manuals", "how"), "manual")
+        self.assertEqual(collections._validate_item_type_for_domain("how", "howto"), "how")
+
+        with self.assertRaises(ValueError):
+            collections.create_collection(
+                {"collection_name": "Wrong", "collection_domain": "how", "collection_type": "notebook"},
+                owner_user_id=1,
+                conn=self.conn,
+            )
+        with self.assertRaises(ValueError):
+            manual_id = collections.create_collection(
+                {"collection_name": "Backup Manual", "collection_domain": "how", "collection_type": "manual"},
+                owner_user_id=1,
+                conn=self.conn,
+            )
+            collections.add_item_to_collection(manual_id, "note", 1, owner_user_id=1, conn=self.conn)
+
+    def test_how_manuals_route_uses_generic_collection_view_and_preserves_howtos(self):
+        from app import app
+
+        data.conn = self.conn
+        self.conn.execute(
+            "INSERT OR IGNORE INTO users(user_id, username, display_name, password_hash, role, is_active) "
+            "VALUES (1, 'alice', 'Alice', 'hash', 'user', 1)"
+        )
+        now = utc_now()
+        self.conn.execute(
+            "INSERT INTO lp_howto(howto_id, howto_key, title, area_id, summary, markdown_full_content, status, tags, parse_status, created_at, updated_at) "
+            "VALUES (1, 'backup-db', 'Back up the SQLite database', 'fun/travel', 'Backup step', '# Backup', 'active', '[]', 'OK', ?, ?)",
+            (now, now),
+        )
+        manual_id = collections.create_collection(
+            {"collection_name": "LifePIM Backup Manual", "collection_domain": "how", "collection_type": "manual"},
+            owner_user_id=1,
+            conn=self.conn,
+        )
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        with app.test_client() as client:
+            with client.session_transaction() as session:
+                session["_user_id"] = "1"
+                session["_fresh"] = True
+            response = client.get(f"/how/manuals?collection_id={manual_id}&q=backup")
+            post_response = client.post(
+                "/collections/how",
+                data={
+                    "action": "add_item",
+                    "collection_id": str(manual_id),
+                    "item_type": "how",
+                    "item_id": "1",
+                },
+                follow_redirects=False,
+            )
+
+        html = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("LifePIM Backup Manual", html)
+        self.assertIn("Available How-tos", html)
+        self.assertIn("Back up the SQLite database", html)
+        self.assertEqual(post_response.status_code, 302)
+        self.assertEqual(self.conn.execute("SELECT COUNT(1) FROM lp_howto WHERE howto_id = 1").fetchone()[0], 1)
+        items = collections.get_collection_items(manual_id, owner_user_id=1, conn=self.conn)
+        self.assertEqual(items[0]["item_type"], "how")
+        self.assertEqual(items[0]["item_id"], "1")
 
 
 if __name__ == "__main__":

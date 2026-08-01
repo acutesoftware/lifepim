@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
+from common import collections as collections_mod
 from common import projects as projects_mod
 from common.utils import get_side_tabs, get_tabs, request_area_param
 from modules.how import service
@@ -37,7 +38,15 @@ def list_how_route():
         subtab="howtos",
         area=area,
         items=service.list_howtos(area),
+        manual_options=collections_mod.get_collection_list(domain="how", area_id=area),
     )
+
+
+@how_bp.route("/manuals", methods=["GET", "POST"])
+def manuals_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("how")
 
 
 @how_bp.route("/howtos/<int:item_id>")

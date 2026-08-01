@@ -13,36 +13,238 @@ COLLECTION_STATUS_LABELS = {
     "archived": "Archived",
 }
 
+NOTES_COLLECTION_ADAPTER = {
+    "collection_domain": "notes",
+    "collection_types": ("notebook", "book"),
+    "collection_type_labels": {"notebook": "Notebook", "book": "Book"},
+    "singular_label": "Notebook",
+    "plural_label": "Notebooks",
+    "add_item_label": "Add to Notebook",
+    "compatible_item_types": ("note",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": True,
+    "default_view": "continuous",
+    "source_label": "Available Notes",
+    "empty_label": "No notebooks found.",
+}
+
+MEDIA_COLLECTION_ADAPTER = {
+    "collection_domain": "media",
+    "collection_types": ("album",),
+    "collection_type_labels": {"album": "Album"},
+    "singular_label": "Album",
+    "plural_label": "Albums",
+    "add_item_label": "Add to Album",
+    "compatible_item_types": ("media",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": False,
+    "default_view": "grid",
+    "source_label": "Available Media",
+    "empty_label": "No albums found.",
+}
+
+AUDIO_COLLECTION_ADAPTER = {
+    "collection_domain": "audio",
+    "collection_types": ("playlist",),
+    "collection_type_labels": {"playlist": "Playlist"},
+    "singular_label": "Playlist",
+    "plural_label": "Playlists",
+    "add_item_label": "Add to Playlist",
+    "compatible_item_types": ("audio",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": False,
+    "default_view": "list",
+    "source_label": "Available Audio",
+    "empty_label": "No playlists found.",
+}
+
+HOW_COLLECTION_ADAPTER = {
+    "collection_domain": "how",
+    "collection_types": ("manual", "runbook"),
+    "collection_type_labels": {"manual": "Manual", "runbook": "Runbook"},
+    "singular_label": "Manual",
+    "plural_label": "Manuals",
+    "add_item_label": "Add to Manual",
+    "compatible_item_types": ("how",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": True,
+    "default_view": "continuous",
+    "source_label": "Available How-tos",
+    "empty_label": "No manuals found.",
+}
+
+FILES_COLLECTION_ADAPTER = {
+    "collection_domain": "files",
+    "collection_types": ("file_collection", "project_files"),
+    "collection_type_labels": {"file_collection": "File Collection", "project_files": "Project Files"},
+    "singular_label": "File Collection",
+    "plural_label": "File Collections",
+    "add_item_label": "Add to File Collection",
+    "compatible_item_types": ("file",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": False,
+    "default_view": "list",
+    "source_label": "Available Files",
+    "empty_label": "No file collections found.",
+}
+
+PEOPLE_COLLECTION_ADAPTER = {
+    "collection_domain": "people",
+    "collection_types": ("group",),
+    "collection_type_labels": {"group": "Group"},
+    "singular_label": "Group",
+    "plural_label": "Groups",
+    "add_item_label": "Add to Group",
+    "compatible_item_types": ("person", "organization"),
+    "supports_manual_order": True,
+    "supports_headings": False,
+    "supports_nested_collections": False,
+    "default_view": "list",
+    "source_label": "Available Contacts",
+    "empty_label": "No groups found.",
+}
+
+PLACES_COLLECTION_ADAPTER = {
+    "collection_domain": "places",
+    "collection_types": ("trip", "region", "place_collection"),
+    "collection_type_labels": {"trip": "Trip", "region": "Region", "place_collection": "Place Collection"},
+    "singular_label": "Trip",
+    "plural_label": "Trips and Regions",
+    "add_item_label": "Add to Trip",
+    "compatible_item_types": ("place",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": True,
+    "default_view": "map",
+    "source_label": "Available Places",
+    "empty_label": "No trips or regions found.",
+}
+
+DATA_COLLECTION_ADAPTER = {
+    "collection_domain": "data",
+    "collection_types": ("workspace", "dataset"),
+    "collection_type_labels": {"workspace": "Data Workspace", "dataset": "Dataset"},
+    "singular_label": "Data Workspace",
+    "plural_label": "Data Workspaces",
+    "add_item_label": "Add to Data Workspace",
+    "compatible_item_types": ("data", "data_source", "database", "table", "data_file", "saved_query", "report"),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": True,
+    "default_view": "list",
+    "source_label": "Available Data Items",
+    "empty_label": "No data workspaces found.",
+}
+
+THREE_D_COLLECTION_ADAPTER = {
+    "collection_domain": "3d",
+    "collection_types": ("asset_pack", "scene"),
+    "collection_type_labels": {"asset_pack": "Asset Pack", "scene": "Scene"},
+    "singular_label": "Asset Pack",
+    "plural_label": "Asset Packs and Scenes",
+    "add_item_label": "Add to Asset Pack",
+    "compatible_item_types": ("3d",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": True,
+    "default_view": "grid",
+    "source_label": "Available 3D Assets",
+    "empty_label": "No asset packs found.",
+}
+
+MONEY_COLLECTION_ADAPTER = {
+    "collection_domain": "money",
+    "collection_types": ("portfolio", "budget", "financial_plan"),
+    "collection_type_labels": {"portfolio": "Portfolio", "budget": "Budget", "financial_plan": "Financial Plan"},
+    "singular_label": "Portfolio",
+    "plural_label": "Portfolios and Budgets",
+    "add_item_label": "Add to Portfolio",
+    "compatible_item_types": ("money", "account", "investment", "holding", "expense", "income", "budget_category", "financial_plan", "transaction"),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": False,
+    "default_view": "list",
+    "source_label": "Available Money Records",
+    "empty_label": "No portfolios found.",
+}
+
+APPS_COLLECTION_ADAPTER = {
+    "collection_domain": "apps",
+    "collection_types": ("app_group", "stack"),
+    "collection_type_labels": {"app_group": "App Group", "stack": "Stack"},
+    "singular_label": "App Group",
+    "plural_label": "App Groups and Stacks",
+    "add_item_label": "Add to App Group",
+    "compatible_item_types": ("app",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": True,
+    "default_view": "list",
+    "source_label": "Available Apps",
+    "empty_label": "No app groups found.",
+}
+
+CALENDAR_COLLECTION_ADAPTER = {
+    "collection_domain": "calendar",
+    "collection_types": ("agenda", "calendar"),
+    "collection_type_labels": {"agenda": "Agenda", "calendar": "Calendar"},
+    "singular_label": "Agenda",
+    "plural_label": "Agendas",
+    "add_item_label": "Add to Agenda",
+    "compatible_item_types": ("event",),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": False,
+    "default_view": "chronological",
+    "source_label": "Available Events",
+    "empty_label": "No agendas found.",
+}
+
+GOALS_COLLECTION_ADAPTER = {
+    "collection_domain": "goals",
+    "collection_types": ("plan", "roadmap"),
+    "collection_type_labels": {"plan": "Plan", "roadmap": "Roadmap"},
+    "singular_label": "Plan",
+    "plural_label": "Plans and Roadmaps",
+    "add_item_label": "Add to Plan",
+    "compatible_item_types": ("goal", "task", "milestone", "achievement", "evidence", "routine"),
+    "supports_manual_order": True,
+    "supports_headings": True,
+    "supports_nested_collections": True,
+    "default_view": "list",
+    "source_label": "Available Goals and Tasks",
+    "empty_label": "No plans found.",
+}
+
+COLLECTION_DOMAIN_ADAPTERS = {
+    "notes": NOTES_COLLECTION_ADAPTER,
+    "media": MEDIA_COLLECTION_ADAPTER,
+    "audio": AUDIO_COLLECTION_ADAPTER,
+    "how": HOW_COLLECTION_ADAPTER,
+    "files": FILES_COLLECTION_ADAPTER,
+    "people": PEOPLE_COLLECTION_ADAPTER,
+    "places": PLACES_COLLECTION_ADAPTER,
+    "data": DATA_COLLECTION_ADAPTER,
+    "3d": THREE_D_COLLECTION_ADAPTER,
+    "money": MONEY_COLLECTION_ADAPTER,
+    "apps": APPS_COLLECTION_ADAPTER,
+    "calendar": CALENDAR_COLLECTION_ADAPTER,
+    "goals": GOALS_COLLECTION_ADAPTER,
+}
+
 DOMAIN_COLLECTION_TYPES = {
-    "calendar": ("agenda", "calendar"),
-    "goals": ("plan", "roadmap"),
-    "how": ("manual", "runbook"),
-    "notes": ("notebook", "book"),
-    "data": ("dataset", "workspace"),
-    "files": ("file_collection", "project_files"),
-    "media": ("album",),
-    "audio": ("playlist",),
-    "3d": ("asset_pack", "scene"),
-    "money": ("portfolio", "budget"),
-    "people": ("group",),
-    "places": ("trip", "region"),
-    "apps": ("app_group", "stack"),
+    domain: tuple(adapter["collection_types"])
+    for domain, adapter in COLLECTION_DOMAIN_ADAPTERS.items()
 }
 
 DOMAIN_ITEM_TYPES = {
-    "calendar": ("event",),
-    "goals": ("goal", "milestone", "task", "achievement", "evidence"),
-    "how": ("how", "howto"),
-    "notes": ("note",),
-    "data": ("data_source", "database", "table", "csv", "saved_sql", "report"),
-    "files": ("file",),
-    "media": ("media",),
-    "audio": ("audio",),
-    "3d": ("3d", "model", "material", "texture", "scene"),
-    "money": ("money", "account", "investment", "expense", "budget_category", "financial_plan"),
-    "people": ("person", "contact", "organisation", "organization"),
-    "places": ("place", "virtual_place"),
-    "apps": ("app", "game", "tool", "server_app"),
+    domain: tuple(adapter["compatible_item_types"])
+    for domain, adapter in COLLECTION_DOMAIN_ADAPTERS.items()
 }
 
 ENTRY_KINDS = ("item", "heading", "divider", "collection")
@@ -262,9 +464,22 @@ def normalize_domain(value):
     domain = _clean_text(value).lower()
     if domain == "three_d":
         domain = "3d"
+    if domain == "contacts":
+        domain = "people"
     if domain not in DOMAIN_COLLECTION_TYPES:
         raise ValueError("Unsupported collection domain.")
     return domain
+
+
+def get_domain_adapter(domain):
+    return COLLECTION_DOMAIN_ADAPTERS[normalize_domain(domain)]
+
+
+def collection_domain_options():
+    return [
+        {"value": domain, "label": adapter["plural_label"]}
+        for domain, adapter in COLLECTION_DOMAIN_ADAPTERS.items()
+    ]
 
 
 def normalize_collection_type(value, domain=None):
@@ -276,6 +491,21 @@ def normalize_collection_type(value, domain=None):
         "playlists": "playlist",
         "manuals": "manual",
         "runbooks": "runbook",
+        "workspaces": "workspace",
+        "data_workspace": "workspace",
+        "data_workspaces": "workspace",
+        "datasets": "dataset",
+        "file_collections": "file_collection",
+        "project_file": "project_files",
+        "place_collections": "place_collection",
+        "asset_packs": "asset_pack",
+        "portfolios": "portfolio",
+        "budgets": "budget",
+        "financial_plans": "financial_plan",
+        "app_groups": "app_group",
+        "stacks": "stack",
+        "agendas": "agenda",
+        "calendars": "calendar",
         "groups": "group",
         "plans": "plan",
         "roadmaps": "roadmap",
@@ -301,6 +531,28 @@ def _normalize_item_type(value):
         "people": "person",
         "contacts": "person",
         "organisation": "organization",
+        "organisations": "organization",
+        "organizations": "organization",
+        "calendar_event": "event",
+        "calendar_events": "event",
+        "appointment": "event",
+        "appointments": "event",
+        "reminder": "event",
+        "reminders": "event",
+        "saved_sql": "saved_query",
+        "saved_queries": "saved_query",
+        "csv": "data_file",
+        "3d_object": "3d",
+        "three_d": "3d",
+        "ue_asset": "3d",
+        "blender_asset": "3d",
+        "real_object": "3d",
+        "game": "app",
+        "games": "app",
+        "tool": "app",
+        "tools": "app",
+        "server_app": "app",
+        "server_apps": "app",
     }
     return aliases.get(text, text)
 
@@ -318,11 +570,19 @@ def status_options():
 
 def collection_type_options(domain=None):
     if domain:
-        domain = normalize_domain(domain)
-        values = DOMAIN_COLLECTION_TYPES[domain]
+        adapter = get_domain_adapter(domain)
+        values = adapter["collection_types"]
+        labels = adapter.get("collection_type_labels", {})
     else:
         values = sorted({value for values in DOMAIN_COLLECTION_TYPES.values() for value in values})
-    return [{"value": value, "label": value.replace("_", " ").title()} for value in values]
+        labels = {}
+    return [{"value": value, "label": labels.get(value) or value.replace("_", " ").title()} for value in values]
+
+
+def collection_type_label(domain, collection_type):
+    adapter = get_domain_adapter(domain)
+    collection_type = normalize_collection_type(collection_type, domain)
+    return adapter.get("collection_type_labels", {}).get(collection_type) or collection_type.replace("_", " ").title()
 
 
 def area_options(selected_area_ids=None, conn=None, owner_user_id=None):
@@ -995,7 +1255,10 @@ def _collection_row(row, conn=None, owner_user_id=None):
         return None
     collection = dict(row)
     collection["status_label"] = COLLECTION_STATUS_LABELS.get(collection.get("status"), collection.get("status") or "")
-    collection["type_label"] = (collection.get("collection_type") or "").replace("_", " ").title()
+    try:
+        collection["type_label"] = collection_type_label(collection.get("collection_domain"), collection.get("collection_type"))
+    except Exception:
+        collection["type_label"] = (collection.get("collection_type") or "").replace("_", " ").title()
     collection["areas"] = list_collection_areas(collection["collection_id"], conn=conn, owner_user_id=owner_user_id)
     collection["area_ids"] = [area["area_id"] for area in collection["areas"]]
     collection["projects"] = list_collection_projects(collection["collection_id"], conn=conn, owner_user_id=owner_user_id)

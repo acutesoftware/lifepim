@@ -37,6 +37,19 @@
         <td class="data-actions-cell">
           <a href="{{ url_for('how.view_how_route', item_id=item.howto_id, area=area) }}">Open</a>
           <a href="{{ url_for('how.edit_how_route', item_id=item.howto_id, area=area) }}">Edit Blueprint</a>
+          {% if manual_options %}
+          <form method="post" action="{{ url_for('collections.collection_domain_route', domain='how', area=area) }}">
+            <input type="hidden" name="action" value="add_item">
+            <input type="hidden" name="item_type" value="how">
+            <input type="hidden" name="item_id" value="{{ item.howto_id }}">
+            <select name="collection_id" aria-label="Manual">
+              {% for manual in manual_options %}
+                <option value="{{ manual.collection_id }}">{{ manual.collection_name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Add to Manual...</button>
+          </form>
+          {% endif %}
           <form method="post" action="{{ url_for('how.convert_howto_to_note_route', item_id=item.howto_id, area=area) }}" onsubmit="return confirm('Convert this HOWTO back to a Note and remove it from HOW?');">
             <button type="submit">Convert to Note</button>
           </form>

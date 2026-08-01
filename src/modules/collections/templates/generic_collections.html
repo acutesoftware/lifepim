@@ -1,0 +1,194 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% if domain == "how" %}
+    {% include "how_nav.html" %}
+  {% endif %}
+
+  {% if message %}
+    <div class="settings-message">{{ message }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="settings-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="collection-workspace">
+    <aside class="collection-pane collection-list-pane">
+      <div class="collection-pane-header">
+        <h4>{{ adapter.plural_label }}</h4>
+        <form method="get" action="{{ url_for('collections.collection_domain_route', domain=domain) }}" class="collection-filter-form">
+          {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+          <select name="status" onchange="this.form.submit()" aria-label="{{ adapter.singular_label }} status">
+            <option value="" {% if not active_status %}selected{% endif %}>Active</option>
+            <option value="all" {% if active_status == 'all' %}selected{% endif %}>All</option>
+          </select>
+          <select name="type" onchange="this.form.submit()" aria-label="{{ adapter.singular_label }} type">
+            <option value="">All types</option>
+            {% for option in type_options %}
+              <option value="{{ option.value }}" {% if request.args.get('type') == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+
+      <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area) }}" class="collection-create-form">
+        <input type="hidden" name="action" value="create">
+        <input name="collection_name" placeholder="New {{ adapter.singular_label|lower }}" required>
+        <button type="submit">Create</button>
+      </form>
+
+      <div class="collection-list">
+        {% for collection in collections %}
+          <a class="collection-list-item{% if selected_collection and selected_collection.collection_id == collection.collection_id %} active{% endif %}"
+             href="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">
+            <span class="collection-list-icon">{{ collection.icon or '#' }}</span>
+            <span>
+              <strong>{{ collection.collection_name }}</strong>
+              <small>{{ collection.type_label }} · {{ collection.item_count }} entries</small>
+            </span>
+          </a>
+        {% else %}
+          <p class="project-empty-state">{{ adapter.empty_label }}</p>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <section class="collection-pane collection-content-pane">
+      {% if selected_collection %}
+        <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=selected_collection.collection_id) }}" class="collection-detail-form">
+          <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+          <input type="hidden" name="action" value="save">
+          <div class="collection-title-row">
+            <input name="collection_name" value="{{ selected_collection.collection_name }}" aria-label="{{ adapter.singular_label }} name" required>
+            <select name="collection_type" aria-label="{{ adapter.singular_label }} type">
+              {% for option in type_options %}
+                <option value="{{ option.value }}" {% if selected_collection.collection_type == option.value %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Save</button>
+          </div>
+          <textarea name="description" rows="2" placeholder="Description">{{ selected_collection.description or '' }}</textarea>
+          <div class="collection-relations">
+            <fieldset>
+              <legend>Areas</legend>
+              {% for option in area_options %}
+                <label><input type="checkbox" name="area_ids" value="{{ option.area_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.label }}</label>
+              {% endfor %}
+            </fieldset>
+            <fieldset>
+              <legend>Projects</legend>
+              {% for option in project_options %}
+                <label><input type="checkbox" name="project_ids" value="{{ option.project_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.name }}</label>
+              {% else %}
+                <small>No projects available.</small>
+              {% endfor %}
+            </fieldset>
+          </div>
+        </form>
+
+        <div class="collection-actions">
+          {% if adapter.supports_headings %}
+            <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=selected_collection.collection_id) }}">
+              <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+              <input type="hidden" name="action" value="add_heading">
+              <input name="title_override" placeholder="Heading">
+              <button type="submit">Add Heading</button>
+            </form>
+            <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=selected_collection.collection_id) }}">
+              <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+              <input type="hidden" name="action" value="add_divider">
+              <button type="submit">Add Divider</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area) }}" onsubmit="return confirm('Delete this {{ adapter.singular_label|lower }}? Source records are not deleted.');">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="action" value="delete">
+            <button type="submit">Delete</button>
+          </form>
+          <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=selected_collection.collection_id) }}">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="action" value="{{ 'restore' if selected_collection.status == 'archived' else 'archive' }}">
+            <button type="submit">{{ 'Restore' if selected_collection.status == 'archived' else 'Archive' }}</button>
+          </form>
+        </div>
+
+        <ol class="collection-entry-list">
+          {% for item in collection_items %}
+            <li class="collection-entry collection-entry-{{ item.entry_kind }}">
+              {% if item.entry_kind == 'divider' %}
+                <hr>
+              {% else %}
+                <span class="collection-entry-title">{{ item.display_title or item.entry_kind|title }}</span>
+                {% if item.summary and item.summary.subtitle %}
+                  <small>{{ item.summary.subtitle }}</small>
+                {% endif %}
+                {% if item.comments %}
+                  <small>{{ item.comments }}</small>
+                {% endif %}
+                {% if item.summary and item.summary.open_url %}
+                  <a href="{{ item.summary.open_url }}">Open</a>
+                {% endif %}
+              {% endif %}
+              <span class="collection-entry-actions">
+                <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=selected_collection.collection_id) }}">
+                  <input type="hidden" name="collection_item_id" value="{{ item.collection_item_id }}">
+                  <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+                  {% if adapter.supports_manual_order %}
+                    <button type="submit" name="action" value="move_up" title="Move up">^</button>
+                    <button type="submit" name="action" value="move_down" title="Move down">v</button>
+                  {% endif %}
+                  <button type="submit" name="action" value="remove_entry">Remove</button>
+                </form>
+              </span>
+            </li>
+          {% else %}
+            <li class="project-empty-state">No entries yet.</li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <div class="collection-overview">
+          <h4>{{ adapter.plural_label }}</h4>
+          <div class="collection-overview-grid">
+            {% for collection in collections %}
+              <a class="collection-overview-card" href="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">
+                <strong>{{ collection.collection_name }}</strong>
+                <span>{{ collection.type_label }} · {{ collection.item_count }} entries</span>
+                {% if collection.description %}<small>{{ collection.description }}</small>{% endif %}
+              </a>
+            {% else %}
+              <p class="project-empty-state">{{ adapter.empty_label }}</p>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </section>
+
+    {% if selected_collection %}
+    <aside class="collection-pane collection-source-pane">
+      <h4>{{ adapter.source_label }}</h4>
+      <form method="get" action="{{ url_for('collections.collection_domain_route', domain=domain) }}" class="collection-filter-form">
+        {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+        <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+        <input name="q" value="{{ source_query }}" placeholder="Search">
+        <button type="submit">Search</button>
+      </form>
+      <div class="collection-source-list">
+        {% for item in source_items %}
+          <form method="post" action="{{ url_for('collections.collection_domain_route', domain=domain, area=area, collection_id=selected_collection.collection_id) }}" class="collection-source-item">
+            <input type="hidden" name="action" value="add_item">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="item_type" value="{{ item.type }}">
+            <input type="hidden" name="item_id" value="{{ item.id }}">
+            <span>
+              <strong>{{ item.title }}</strong>
+              <small>{{ item.subtitle }}{% if item.type %} · {{ item.type }}{% endif %}</small>
+            </span>
+            <button type="submit" {% if item.already_present %}disabled{% endif %}>{{ 'Added' if item.already_present else adapter.add_item_label }}</button>
+          </form>
+        {% else %}
+          <p class="project-empty-state">Search to add compatible records.</p>
+        {% endfor %}
+      </div>
+    </aside>
+    {% endif %}
+  </div>
+{% endblock %}

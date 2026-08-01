@@ -254,6 +254,7 @@ from modules.three_d.routes import three_d_bp
 from modules.apps.routes import apps_bp
 from modules.goals.routes import goals_bp
 from modules.how.routes import how_bp
+from modules.collections.routes import collections_bp
 from modules.notes.routes import notes_bp
 from modules.places.routes import places_bp
 from modules.money.routes import money_bp
@@ -278,6 +279,7 @@ app.register_blueprint(three_d_bp, url_prefix="/3d")
 app.register_blueprint(apps_bp, url_prefix="/apps")
 app.register_blueprint(goals_bp, url_prefix="/goals")
 app.register_blueprint(how_bp, url_prefix="/how")
+app.register_blueprint(collections_bp)
 app.register_blueprint(notes_bp, url_prefix="/notes")
 app.register_blueprint(places_bp, url_prefix="/places")
 app.register_blueprint(money_bp, url_prefix="/money")
@@ -291,6 +293,76 @@ app.register_blueprint(projects_bp, url_prefix="/projects")
 app.register_blueprint(pocket_api_bp)
 configure_security(app)
 _dbg("Blueprints registered")
+
+
+@app.route("/files/collections", methods=["GET", "POST"])
+@app.route("/files/project-files", methods=["GET", "POST"])
+def files_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("files")
+
+
+@app.route("/contacts/groups", methods=["GET", "POST"])
+def people_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("people")
+
+
+@app.route("/places/trips", methods=["GET", "POST"])
+@app.route("/places/regions", methods=["GET", "POST"])
+def places_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("places")
+
+
+@app.route("/data/workspaces", methods=["GET", "POST"])
+@app.route("/data/datasets", methods=["GET", "POST"])
+def data_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("data")
+
+
+@app.route("/3d/asset-packs", methods=["GET", "POST"])
+@app.route("/3d/scenes", methods=["GET", "POST"])
+def three_d_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("3d")
+
+
+@app.route("/money/portfolios", methods=["GET", "POST"])
+@app.route("/money/budgets", methods=["GET", "POST"])
+def money_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("money")
+
+
+@app.route("/apps/groups", methods=["GET", "POST"])
+@app.route("/apps/stacks", methods=["GET", "POST"])
+def apps_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("apps")
+
+
+@app.route("/calendar/agendas", methods=["GET", "POST"])
+def calendar_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("calendar")
+
+
+@app.route("/goals/plans", methods=["GET", "POST"])
+@app.route("/goals/roadmaps", methods=["GET", "POST"])
+def goals_collections_route():
+    from modules.collections.routes import collection_domain_route
+
+    return collection_domain_route("goals")
 
 
 @app.context_processor
