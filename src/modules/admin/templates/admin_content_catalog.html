@@ -2,46 +2,90 @@
 {% block module_content %}
   <div class="settings-shell settings-shell-single content-catalog-admin"
        data-config='{{ catalog_config|tojson }}'
-       data-summary='{{ summary|tojson }}'>
+       data-summary='{{ summary|tojson }}'
+       data-initial-mode="{{ catalog_mode or 'matrix' }}">
     <section class="settings-panel">
-      <nav class="settings-tabs content-catalog-tabs" aria-label="Content Catalog sections">
-        <button type="button" class="active" data-catalog-tab="content-kinds">Content Kinds</button>
-        <button type="button" data-catalog-tab="patterns">Patterns</button>
-        <button type="button" data-catalog-tab="templates">Templates</button>
-        <button type="button" data-catalog-tab="views">Views</button>
+      <nav class="content-catalog-mode-tabs" aria-label="Content Catalog modes">
+        <a href="{{ url_for('admin.content_catalog_route', mode='matrix') }}" data-catalog-mode="matrix">Matrix</a>
+        <a href="{{ url_for('admin.content_catalog_route', mode='report') }}" data-catalog-mode="report">Report</a>
+        <a href="{{ url_for('admin.content_catalog_route', mode='editor') }}" data-catalog-mode="editor">Editor</a>
       </nav>
 
       <div class="content-catalog-summary" data-catalog-summary></div>
 
-      <section data-catalog-panel="content-kinds">
-        <div class="content-catalog-filters">
-          <select data-kind-filter="object_type_code"><option value="">Object Type</option></select>
-          <select data-kind-filter="canonical_tab_code"><option value="">Tab</option></select>
-          <select data-kind-filter="area_id"><option value="">Area</option></select>
-          <select data-kind-filter="mapping_status_code"><option value="">Mapping Status</option></select>
-          <select data-kind-filter="active">
-            <option value="all">All Active States</option>
-            <option value="1">Active</option>
-            <option value="0">Inactive</option>
+      <section data-mode-panel="matrix">
+        <div class="content-catalog-filters matrix-filters">
+          <select data-matrix-filter="mapping_status_code"><option value="">Status</option></select>
+          <select data-matrix-filter="object_type_code"><option value="">Object Type</option></select>
+          <select data-matrix-filter="active">
+            <option value="">Active</option>
+            <option value="1">Active Only</option>
+            <option value="0">Inactive Only</option>
           </select>
+          <input type="search" data-matrix-filter="q" placeholder="Search">
+          <label><input type="checkbox" data-matrix-toggle="show_status_counts" checked> Show status counts</label>
+          <label><input type="checkbox" data-matrix-toggle="include_roots"> Include root kinds</label>
+          <label><input type="checkbox" data-matrix-toggle="include_inactive"> Include inactive</label>
         </div>
-        {% set editor_id = 'contentKindsEditor' %}
-        {% include "widgets/admin_table_editor.html" %}
+        <div class="content-catalog-matrix-meta" data-matrix-meta></div>
+        <div class="content-catalog-matrix-wrap" data-matrix-wrap></div>
+        <aside class="content-catalog-drawer" data-catalog-drawer hidden>
+          <div class="content-catalog-drawer-head">
+            <strong data-drawer-title></strong>
+            <button type="button" data-drawer-close>Close</button>
+          </div>
+          <div data-drawer-body></div>
+        </aside>
       </section>
 
-      <section data-catalog-panel="patterns" hidden>
-        {% set editor_id = 'patternsEditor' %}
-        {% include "widgets/admin_table_editor.html" %}
+      <section data-mode-panel="report" hidden>
+        <nav class="content-catalog-compact-tabs" aria-label="Report groups">
+          <button type="button" class="active" data-report-group="by-tab">By Tab</button>
+          <button type="button" data-report-group="by-area">By Area</button>
+          <button type="button" data-report-group="by-object-type">By Object Type</button>
+          <button type="button" data-report-group="coverage-gaps">Coverage Gaps</button>
+        </nav>
+        <div class="content-catalog-report" data-report-body></div>
       </section>
 
-      <section data-catalog-panel="templates" hidden>
-        {% set editor_id = 'templatesEditor' %}
-        {% include "widgets/admin_table_editor.html" %}
-      </section>
+      <section data-mode-panel="editor" hidden>
+        <nav class="content-catalog-compact-tabs" aria-label="Content Catalog editor sections">
+          <button type="button" class="active" data-catalog-tab="content-kinds">Content Kinds</button>
+          <button type="button" data-catalog-tab="patterns">Patterns</button>
+          <button type="button" data-catalog-tab="templates">Templates</button>
+          <button type="button" data-catalog-tab="views">Views</button>
+        </nav>
 
-      <section data-catalog-panel="views" hidden>
-        {% set editor_id = 'viewsEditor' %}
-        {% include "widgets/admin_table_editor.html" %}
+        <section data-catalog-panel="content-kinds">
+          <div class="content-catalog-filters">
+            <select data-kind-filter="object_type_code"><option value="">Object Type</option></select>
+            <select data-kind-filter="canonical_tab_code"><option value="">Tab</option></select>
+            <select data-kind-filter="area_id"><option value="">Area</option></select>
+            <select data-kind-filter="mapping_status_code"><option value="">Mapping Status</option></select>
+            <select data-kind-filter="active">
+              <option value="all">All Active States</option>
+              <option value="1">Active</option>
+              <option value="0">Inactive</option>
+            </select>
+          </div>
+          {% set editor_id = 'contentKindsEditor' %}
+          {% include "widgets/admin_table_editor.html" %}
+        </section>
+
+        <section data-catalog-panel="patterns" hidden>
+          {% set editor_id = 'patternsEditor' %}
+          {% include "widgets/admin_table_editor.html" %}
+        </section>
+
+        <section data-catalog-panel="templates" hidden>
+          {% set editor_id = 'templatesEditor' %}
+          {% include "widgets/admin_table_editor.html" %}
+        </section>
+
+        <section data-catalog-panel="views" hidden>
+          {% set editor_id = 'viewsEditor' %}
+          {% include "widgets/admin_table_editor.html" %}
+        </section>
       </section>
     </section>
   </div>

@@ -37,6 +37,20 @@
         this.renderRows();
       });
       this.addButton.addEventListener("click", () => this.addRow());
+      this.root.addEventListener("click", (event) => {
+        const toggle = event.target.closest("[data-picker-toggle]");
+        if (toggle) {
+          event.preventDefault();
+          event.stopPropagation();
+          const picker = toggle.closest(".admin-popup-multiselect");
+          this.closePickers(picker);
+          picker.classList.toggle("open");
+          return;
+        }
+        if (!event.target.closest(".admin-popup-multiselect")) {
+          this.closePickers();
+        }
+      });
       this.tbody.addEventListener("keydown", (event) => {
         const input = event.target.closest("input, select, textarea");
         if (!input) return;
@@ -56,7 +70,7 @@
         if (!button) return;
         const row = button.closest("tr");
         if (button.dataset.action === "save") this.saveRow(row);
-        if (button.dataset.action === "deactivate") this.deactivateRow(row);
+        if (button.dataset.action === "remove") this.removeRow(row);
       });
       this.tbody.addEventListener("input", (event) => {
         const input = event.target.closest("input, textarea");
@@ -72,6 +86,10 @@
       });
       this.tbody.addEventListener("change", (event) => {
         const input = event.target.closest("input, select, textarea");
+        const picker = event.target.closest(".admin-popup-multiselect");
+        if (picker) {
+          this.updatePickerLabel(picker);
+        }
         if (input && input.dataset.field === this.config.codeField) {
           input.dataset.touched = "1";
           input.value = toCode(input.value);
@@ -79,10 +97,34 @@
       });
     }
 
+    closePickers(exceptPicker) {
+      this.root.querySelectorAll(".admin-popup-multiselect.open").forEach((picker) => {
+        if (picker !== exceptPicker) {
+          picker.classList.remove("open");
+        }
+      });
+    }
+
+    pickerLabels(picker) {
+      const labels = Array.from(picker.querySelectorAll('input[type="checkbox"]:checked')).map((checkbox) => checkbox.dataset.label || checkbox.value);
+      return labels;
+    }
+
+    updatePickerLabel(picker) {
+      const label = picker.querySelector("[data-picker-label]");
+      const labels = this.pickerLabels(picker);
+      if (!label) {
+        return;
+      }
+      label.textContent = labels.length ? labels.join(", ") : "None";
+      label.title = label.textContent;
+    }
+
     renderHeader() {
       const tr = document.createElement("tr");
-      tr.appendChild(this.th("Actions"));
+      tr.appendChild(this.th("Save"));
       this.config.columns.forEach((column) => tr.appendChild(this.th(column.label)));
+      tr.appendChild(this.th(""));
       this.thead.replaceChildren(tr);
     }
 
@@ -135,7 +177,7 @@
 
       const actionCell = document.createElement("td");
       actionCell.className = "admin-editor-actions";
-      actionCell.innerHTML = '<button type="button" data-action="save">Save</button> <button type="button" data-action="deactivate">Deactivate</button><div class="admin-editor-row-error" data-row-error></div>';
+      actionCell.innerHTML = '<button type="button" data-action="save">Save</button><div class="admin-editor-row-error" data-row-error></div>';
       tr.appendChild(actionCell);
 
       this.config.columns.forEach((column) => {
@@ -143,6 +185,10 @@
         td.appendChild(this.control(column, row));
         tr.appendChild(td);
       });
+      const deleteCell = document.createElement("td");
+      deleteCell.className = "admin-editor-delete";
+      deleteCell.innerHTML = '<button type="button" data-action="remove" title="Remove this row">x</button>';
+      tr.appendChild(deleteCell);
       return tr;
     }
 
@@ -164,6 +210,31 @@
           opt.selected = selected.has(idString(option.value));
           input.appendChild(opt);
         });
+      } else if (column.type === "popup-multiselect") {
+        input = document.createElement("div");
+        input.className = "admin-popup-multiselect";
+        input.dataset.field = column.field;
+        const selected = new Set((value || []).map(idString));
+        const labels = (column.options || [])
+          .filter((option) => selected.has(idString(option.value)))
+          .map((option) => option.label);
+        input.innerHTML = '<button type="button" class="admin-picker-button" data-picker-toggle>...</button><span class="admin-picker-label" data-picker-label></span><div class="admin-picker-popup"></div>';
+        const label = input.querySelector("[data-picker-label]");
+        label.textContent = labels.length ? labels.join(", ") : "None";
+        label.title = label.textContent;
+        const popup = input.querySelector(".admin-picker-popup");
+        (column.options || []).forEach((option) => {
+          const row = document.createElement("label");
+          row.className = "admin-picker-option";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.value = option.value;
+          checkbox.dataset.label = option.label;
+          checkbox.checked = selected.has(idString(option.value));
+          row.appendChild(checkbox);
+          row.appendChild(document.createTextNode(option.label));
+          popup.appendChild(row);
+        });
       } else if (column.type === "textarea") {
         input = document.createElement("textarea");
         input.rows = column.rows || 3;
@@ -177,7 +248,9 @@
         input.type = column.type || "text";
         input.value = value || "";
       }
-      input.dataset.field = column.field;
+      if (!input.dataset.field) {
+        input.dataset.field = column.field;
+      }
       if (column.required) input.dataset.required = "1";
       if (column.json) input.dataset.json = "1";
       return input;
@@ -190,6 +263,8 @@
         if (!input) return;
         if (column.type === "multiselect") {
           values[column.field] = Array.from(input.selectedOptions).map((opt) => opt.value);
+        } else if (column.type === "popup-multiselect") {
+          values[column.field] = Array.from(input.querySelectorAll('input[type="checkbox"]:checked')).map((checkbox) => checkbox.value);
         } else if (column.type === "checkbox") {
           values[column.field] = input.checked ? 1 : 0;
         } else {
@@ -241,7 +316,7 @@
       }
     }
 
-    async deactivateRow(tr) {
+    async removeRow(tr) {
       if (tr.dataset.newRow === "1") {
         tr.remove();
         return;
@@ -250,11 +325,11 @@
         const response = await fetch(`${this.config.endpoint}/${tr.dataset.recordId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "deactivate" }),
+          body: JSON.stringify({ action: "remove" }),
         });
         const payload = await response.json();
-        if (!payload.ok) throw new Error(payload.error || "Deactivate failed.");
-        this.flash("Deactivated.");
+        if (!payload.ok) throw new Error(payload.error || "Remove failed.");
+        this.flash(payload.deactivated ? "Deactivated." : "Removed.");
         await this.load(this.config.getParams ? this.config.getParams() : {});
       } catch (error) {
         this.setError(tr, error.message);
@@ -290,14 +365,30 @@
     }
   }
 
+  function escapeHtml(value) {
+    return idString(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   function initCatalog() {
     const shell = document.querySelector(".content-catalog-admin");
     if (!shell) return;
     const config = JSON.parse(shell.dataset.config || "{}");
     let summary = JSON.parse(shell.dataset.summary || "{}");
     const filterEls = Array.from(shell.querySelectorAll("[data-kind-filter]"));
+    const matrixFilters = Array.from(shell.querySelectorAll("[data-matrix-filter]"));
+    const matrixToggles = Array.from(shell.querySelectorAll("[data-matrix-toggle]"));
+    const panels = Array.from(shell.querySelectorAll("[data-mode-panel]"));
+    const modeLinks = Array.from(shell.querySelectorAll("[data-catalog-mode]"));
+    let currentMode = shell.dataset.initialMode || "matrix";
+    let currentReportGroup = "by-tab";
+    let summaryFilter = {};
 
     function selectOptions(select, values) {
+      if (!select) return;
       values.forEach((item) => {
         if (typeof item === "string") {
           select.appendChild(new Option(item, item));
@@ -310,6 +401,8 @@
     selectOptions(shell.querySelector('[data-kind-filter="canonical_tab_code"]'), config.tabCodes || []);
     selectOptions(shell.querySelector('[data-kind-filter="mapping_status_code"]'), config.mappingStatusCodes || []);
     selectOptions(shell.querySelector('[data-kind-filter="area_id"]'), (config.areas || []).map((area) => ({ value: area.area_id, label: area.area_name || area.area_id })));
+    selectOptions(shell.querySelector('[data-matrix-filter="object_type_code"]'), config.objectTypeCodes || []);
+    selectOptions(shell.querySelector('[data-matrix-filter="mapping_status_code"]'), config.mappingStatusCodes || []);
 
     function kindParams() {
       const params = {};
@@ -317,6 +410,24 @@
         if (el.value) params[el.dataset.kindFilter] = el.value;
       });
       return params;
+    }
+
+    function matrixParams(extra) {
+      const params = Object.assign({}, summaryFilter, extra || {});
+      matrixFilters.forEach((el) => {
+        if (el.value) params[el.dataset.matrixFilter] = el.value;
+      });
+      matrixToggles.forEach((el) => {
+        if (el.checked && el.dataset.matrixToggle !== "show_status_counts") {
+          params[el.dataset.matrixToggle] = "1";
+        }
+      });
+      return params;
+    }
+
+    function showStatusCounts() {
+      const el = shell.querySelector('[data-matrix-toggle="show_status_counts"]');
+      return !el || el.checked;
     }
 
     function renderSummary() {
@@ -328,13 +439,16 @@
         NEEDS_OBJECT: "Need Objects",
         UNDECIDED: "Undecided",
       };
-      const buttons = [`<button type="button" data-summary-filter="" data-summary-value="">Total Kinds <strong>${summary.total || 0}</strong></button>`];
+      const buttons = [
+        `<button type="button" data-summary-filter="" data-summary-value="">${summary.total || 0} Content Kinds</button>`,
+        `<button type="button" data-summary-filter="" data-summary-value="">${summary.mappings || 0} Area-Tab Mappings</button>`,
+      ];
       Object.keys(statusLabels).forEach((code) => {
-        buttons.push(`<button type="button" data-summary-filter="mapping_status_code" data-summary-value="${code}">${statusLabels[code]} <strong>${(summary.statuses || {})[code] || 0}</strong></button>`);
+        buttons.push(`<button type="button" data-summary-filter="mapping_status_code" data-summary-value="${code}">${(summary.statuses || {})[code] || 0} ${statusLabels[code]}</button>`);
       });
-      buttons.push(`<button type="button" data-summary-filter="active" data-summary-value="0">Inactive <strong>${summary.inactive || 0}</strong></button>`);
+      buttons.push(`<button type="button" data-summary-filter="active" data-summary-value="0">${summary.inactive || 0} Inactive</button>`);
       (config.tabCodes || []).forEach((code) => {
-        buttons.push(`<button type="button" data-summary-filter="canonical_tab_code" data-summary-value="${code}">${code} <strong>${(summary.tabs || {})[code] || 0}</strong></button>`);
+        buttons.push(`<button type="button" data-summary-filter="canonical_tab_code" data-summary-value="${code}">${(summary.tabs || {})[code] || 0} ${code}</button>`);
       });
       box.innerHTML = buttons.join("");
     }
@@ -362,11 +476,11 @@
           { field: "canonical_table_name", label: "Canonical Table" },
           { field: "subtype_code", label: "Subtype", code: true },
           { field: "date_behaviour_code", label: "Date Behaviour", type: "select", required: true, options: optionList(config.dateBehaviourCodes) },
-          { field: "area_ids", label: "Areas", type: "multiselect", options: areaOptions() },
+          { field: "area_ids", label: "Areas", type: "popup-multiselect", options: areaOptions() },
           { field: "default_area_id", label: "Default Area", type: "select", options: areaOptions() },
           { field: "mapping_status_code", label: "Mapping Status", type: "select", required: true, options: optionList(config.mappingStatusCodes) },
           { field: "is_active", label: "Active", type: "checkbox" },
-          { field: "notes", label: "Notes", type: "textarea", rows: 2 },
+          { field: "notes", label: "Notes" },
         ],
       }),
       patterns: new AdminTableEditor(document.querySelector('[data-editor="patternsEditor"]'), {
@@ -383,10 +497,10 @@
           { field: "default_template_id", label: "Default Template", type: "select", options: templateOptions() },
           { field: "default_view_id", label: "Default View", type: "select", options: viewOptions() },
           { field: "is_active", label: "Active", type: "checkbox" },
-          { field: "notes", label: "Notes", type: "textarea", rows: 2 },
-          { field: "description", label: "Description", type: "textarea", rows: 2 },
-          { field: "creation_config", label: "Creation Config", type: "textarea", rows: 3, json: true },
-          { field: "view_filter_config", label: "View Filter Config", type: "textarea", rows: 3, json: true },
+          { field: "notes", label: "Notes" },
+          { field: "description", label: "Description" },
+          { field: "creation_config", label: "Creation Config", json: true },
+          { field: "view_filter_config", label: "View Filter Config", json: true },
         ],
       }),
       templates: new AdminTableEditor(document.querySelector('[data-editor="templatesEditor"]'), {
@@ -401,13 +515,13 @@
           { field: "template_type_code", label: "Template Type", type: "select", required: true, options: optionList(config.templateTypeCodes) },
           { field: "target_object_type", label: "Target Object", type: "select", options: optionList(config.objectTypeCodes) },
           { field: "target_tab_code", label: "Target Tab", type: "select", options: optionList(config.tabCodes) },
-          { field: "content_kind_ids", label: "Content Kinds", type: "multiselect", options: kindOptions() },
+          { field: "content_kind_ids", label: "Content Kinds", type: "popup-multiselect", options: kindOptions() },
           { field: "default_content_kind_id", label: "Default For Kind", type: "select", options: kindOptions() },
           { field: "is_active", label: "Active", type: "checkbox" },
-          { field: "notes", label: "Notes", type: "textarea", rows: 2 },
-          { field: "description", label: "Description", type: "textarea", rows: 2 },
-          { field: "template_content", label: "Template Content", type: "textarea", rows: 6 },
-          { field: "template_config", label: "Template Config", type: "textarea", rows: 3, json: true },
+          { field: "notes", label: "Notes" },
+          { field: "description", label: "Description", type: "textarea", rows: 1 },
+          { field: "template_content", label: "Template Content", type: "textarea", rows: 1 },
+          { field: "template_config", label: "Template Config", type: "textarea", rows: 1, json: true },
         ],
       }),
       views: new AdminTableEditor(document.querySelector('[data-editor="viewsEditor"]'), {
@@ -421,12 +535,12 @@
           { field: "view_code", label: "Code", required: true, code: true },
           { field: "tab_code", label: "Tab", type: "select", options: optionList(config.tabCodes) },
           { field: "view_type_code", label: "View Type", type: "select", required: true, options: optionList(config.viewTypeCodes) },
-          { field: "content_kind_ids", label: "Content Kinds", type: "multiselect", options: kindOptions() },
+          { field: "content_kind_ids", label: "Content Kinds", type: "popup-multiselect", options: kindOptions() },
           { field: "default_content_kind_id", label: "Default For Kind", type: "select", options: kindOptions() },
           { field: "is_active", label: "Active", type: "checkbox" },
-          { field: "notes", label: "Notes", type: "textarea", rows: 2 },
-          { field: "description", label: "Description", type: "textarea", rows: 2 },
-          { field: "view_config", label: "View Config", type: "textarea", rows: 4, json: true },
+          { field: "notes", label: "Notes" },
+          { field: "description", label: "Description", type: "textarea", rows: 1 },
+          { field: "view_config", label: "View Config", type: "textarea", rows: 1, json: true },
         ],
       }),
     };
@@ -439,10 +553,180 @@
       }
     }
 
+    function setMode(mode) {
+      currentMode = mode || "matrix";
+      panels.forEach((panel) => {
+        panel.hidden = panel.dataset.modePanel !== currentMode;
+      });
+      modeLinks.forEach((link) => link.classList.toggle("active", link.dataset.catalogMode === currentMode));
+      const url = new URL(window.location.href);
+      url.searchParams.set("mode", currentMode);
+      window.history.replaceState({}, "", url);
+      if (currentMode === "matrix") loadMatrix();
+      if (currentMode === "report") loadReport();
+      if (currentMode === "editor" && !editors["content-kinds"].rows.length) loadKinds();
+    }
+
+    function setEditorFilters(filters) {
+      filterEls.forEach((el) => {
+        const value = filters[el.dataset.kindFilter];
+        if (value !== undefined) el.value = value;
+      });
+      loadKinds();
+    }
+
+    function renderStatusLine(statuses) {
+      if (!showStatusCounts()) return "";
+      const confirmed = statuses.CONFIRMED || 0;
+      const needsTemplate = statuses.NEEDS_TEMPLATE || 0;
+      const needsView = statuses.NEEDS_VIEW || 0;
+      const needsObject = statuses.NEEDS_OBJECT || 0;
+      const undecided = statuses.UNDECIDED || 0;
+      return `<span class="matrix-cell-status">C${confirmed} T${needsTemplate} V${needsView} O${needsObject} ?${undecided}</span>`;
+    }
+
+    async function loadMatrix() {
+      const response = await fetch(`/admin/content-catalog/api/matrix?${new URLSearchParams(matrixParams()).toString()}`);
+      const payload = await response.json();
+      if (!payload.ok) return;
+      renderMatrix(payload.matrix);
+    }
+
+    function renderMatrix(matrix) {
+      const meta = shell.querySelector("[data-matrix-meta]");
+      const wrap = shell.querySelector("[data-matrix-wrap]");
+      meta.textContent = `${matrix.totals.unique_kinds} unique content kinds; ${matrix.totals.area_tab_mappings} Area-Tab mappings`;
+      const header = matrix.tabs.map((tab) => `<th>${escapeHtml(tab.label)}<span>${tab.total || 0}</span></th>`).join("");
+      const rows = matrix.areas.map((area) => {
+        const cells = matrix.tabs.map((tab) => {
+          const key = `${area.area_id}|${tab.code}`;
+          const cell = matrix.cells[key] || { total: 0, statuses: {} };
+          if (!cell.total) {
+            return '<td class="matrix-empty"></td>';
+          }
+          return `<td><button type="button" class="matrix-cell" data-area-id="${escapeHtml(area.area_id)}" data-area-label="${escapeHtml(area.label)}" data-tab-code="${escapeHtml(tab.code)}" data-tab-label="${escapeHtml(tab.label)}"><strong>${cell.total}</strong>${renderStatusLine(cell.statuses || {})}</button></td>`;
+        }).join("");
+        return `<tr><th class="matrix-area">${escapeHtml(area.label)}<span>${area.total || 0}</span></th>${cells}<td class="matrix-total">${area.total || 0}</td></tr>`;
+      }).join("");
+      const totals = matrix.tabs.map((tab) => `<td class="matrix-total">${tab.total || 0}</td>`).join("");
+      wrap.innerHTML = `<table class="content-catalog-matrix"><thead><tr><th class="matrix-area">Area</th>${header}<th>Total</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th class="matrix-area">Total</th>${totals}<td class="matrix-total">${matrix.totals.area_tab_mappings}</td></tr></tfoot></table>`;
+    }
+
+    async function openCell(button) {
+      const params = matrixParams({
+        area_id: button.dataset.areaId,
+        tab_code: button.dataset.tabCode,
+      });
+      const response = await fetch(`/admin/content-catalog/api/cell?${new URLSearchParams(params).toString()}`);
+      const payload = await response.json();
+      if (!payload.ok) return;
+      const drawer = shell.querySelector("[data-catalog-drawer]");
+      const title = shell.querySelector("[data-drawer-title]");
+      const body = shell.querySelector("[data-drawer-body]");
+      title.textContent = `${button.dataset.areaLabel} -> ${button.dataset.tabLabel}`;
+      const items = (payload.rows || []).map((row) => {
+        const template = row.default_template ? row.default_template.name : "";
+        const view = row.default_view ? row.default_view.name : "";
+        return `<article class="drawer-kind-item">
+          <button type="button" data-open-kind="${escapeHtml(row.kind_code)}">${escapeHtml(row.name)}</button>
+          <span>${escapeHtml(row.mapping_status_code)}</span>
+          <dl>
+            <dt>Code</dt><dd>${escapeHtml(row.kind_code)}</dd>
+            <dt>Parent</dt><dd>${escapeHtml(row.parent_name || "")}</dd>
+            <dt>Object</dt><dd>${escapeHtml(row.object_type_code)}</dd>
+            <dt>Template</dt><dd>${escapeHtml(template)}</dd>
+            <dt>View</dt><dd>${escapeHtml(view)}</dd>
+          </dl>
+        </article>`;
+      }).join("");
+      body.innerHTML = `<p>${payload.rows.length} content kinds</p><button type="button" data-open-filtered-editor>Open Filtered Editor</button>${items || '<p class="settings-empty">No content kinds.</p>'}`;
+      body.querySelector("[data-open-filtered-editor]").addEventListener("click", () => {
+        setMode("editor");
+        setEditorFilters({
+          area_id: button.dataset.areaId === config.unassignedAreaId ? "" : button.dataset.areaId,
+          canonical_tab_code: button.dataset.tabCode === config.noTabCode ? "" : button.dataset.tabCode,
+        });
+      });
+      body.querySelectorAll("[data-open-kind]").forEach((itemButton) => {
+        itemButton.addEventListener("click", () => {
+          setMode("editor");
+          editors["content-kinds"].searchInput.value = itemButton.dataset.openKind;
+          editors["content-kinds"].search = itemButton.dataset.openKind.toLowerCase();
+          editors["content-kinds"].renderRows();
+        });
+      });
+      drawer.hidden = false;
+    }
+
+    async function loadReport() {
+      const params = matrixParams({ group: currentReportGroup });
+      const response = await fetch(`/admin/content-catalog/api/report?${new URLSearchParams(params).toString()}`);
+      const payload = await response.json();
+      if (!payload.ok) return;
+      renderReport(payload.report);
+    }
+
+    function renderKindSummary(row) {
+      const areas = (row.areas || []).map((area) => area.area_name || area.area_id).join(", ");
+      const templates = (row.templates || []).map((item) => item.name).join(", ");
+      const views = (row.views || []).map((item) => item.name).join(", ");
+      return `<article class="report-kind">
+        <h5>${escapeHtml(row.name)}</h5>
+        <p>Code: ${escapeHtml(row.kind_code)} | Parent: ${escapeHtml(row.parent_name || "")} | Object type: ${escapeHtml(row.object_type_code)} | Status: ${escapeHtml(row.mapping_status_code)}</p>
+        <p>Canonical table: ${escapeHtml(row.canonical_table_name || "")}</p>
+        <p>Areas: ${escapeHtml(areas)}</p>
+        <p>Templates: ${escapeHtml(templates)}</p>
+        <p>Views: ${escapeHtml(views)}</p>
+      </article>`;
+    }
+
+    function renderReport(report) {
+      const body = shell.querySelector("[data-report-body]");
+      if (report.group === "by-area") {
+        body.innerHTML = report.sections.map((section) => `<section class="report-section"><h4>${escapeHtml(section.label)}</h4>${section.tabs.map((tab) => `<h5>${escapeHtml(tab.label)}</h5>${tab.items.map(renderKindSummary).join("")}`).join("")}</section>`).join("");
+        return;
+      }
+      body.innerHTML = report.sections.map((section) => `<section class="report-section"><h4>${escapeHtml(section.label)} <span>${(section.items || []).length}</span></h4>${(section.items || []).map(renderKindSummary).join("") || '<p class="settings-empty">No items.</p>'}</section>`).join("");
+    }
+
     filterEls.forEach((el) => el.addEventListener("change", loadKinds));
+    matrixFilters.forEach((el) => el.addEventListener("input", () => {
+      if (currentMode === "matrix") loadMatrix();
+      if (currentMode === "report") loadReport();
+    }));
+    matrixToggles.forEach((el) => el.addEventListener("change", () => {
+      if (currentMode === "matrix") loadMatrix();
+      if (currentMode === "report") loadReport();
+    }));
+    shell.querySelector("[data-matrix-wrap]").addEventListener("click", (event) => {
+      const button = event.target.closest(".matrix-cell");
+      if (button) openCell(button);
+    });
+    shell.querySelector("[data-drawer-close]").addEventListener("click", () => {
+      shell.querySelector("[data-catalog-drawer]").hidden = true;
+    });
+    modeLinks.forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        setMode(link.dataset.catalogMode);
+      });
+    });
     shell.querySelector("[data-catalog-summary]").addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button) return;
+      if (currentMode === "matrix" || currentMode === "report") {
+        summaryFilter = {};
+        if (button.dataset.summaryFilter && !["mapping_status_code", "object_type_code", "active"].includes(button.dataset.summaryFilter)) {
+          summaryFilter[button.dataset.summaryFilter] = button.dataset.summaryValue;
+        }
+        matrixFilters.forEach((el) => {
+          if (!button.dataset.summaryFilter) el.value = "";
+          if (el.dataset.matrixFilter === button.dataset.summaryFilter) el.value = button.dataset.summaryValue;
+        });
+        if (currentMode === "matrix") loadMatrix();
+        if (currentMode === "report") loadReport();
+        return;
+      }
       filterEls.forEach((el) => {
         if (!button.dataset.summaryFilter) el.value = el.dataset.kindFilter === "active" ? "all" : "";
         if (el.dataset.kindFilter === button.dataset.summaryFilter) el.value = button.dataset.summaryValue;
@@ -450,7 +734,7 @@
       loadKinds();
     });
 
-    shell.querySelector(".content-catalog-tabs").addEventListener("click", (event) => {
+    shell.querySelector("[data-mode-panel='editor'] .content-catalog-compact-tabs").addEventListener("click", (event) => {
       const button = event.target.closest("button[data-catalog-tab]");
       if (!button) return;
       shell.querySelectorAll("[data-catalog-tab]").forEach((btn) => btn.classList.toggle("active", btn === button));
@@ -461,7 +745,15 @@
       if (editor && !editor.rows.length) editor.load();
     });
 
-    loadKinds();
+    shell.querySelector("[data-mode-panel='report'] .content-catalog-compact-tabs").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-report-group]");
+      if (!button) return;
+      currentReportGroup = button.dataset.reportGroup;
+      shell.querySelectorAll("[data-report-group]").forEach((btn) => btn.classList.toggle("active", btn === button));
+      loadReport();
+    });
+
+    setMode(currentMode);
   }
 
   window.AdminTableEditor = AdminTableEditor;

@@ -71,6 +71,9 @@ def content_catalog_route():
     security.require_role("admin")
     conn = db._get_conn()
     catalog_mod.ensure_content_catalog_schema(conn)
+    mode = (request.args.get("mode") or "matrix").strip().lower()
+    if mode not in {"matrix", "report", "editor"}:
+        mode = "matrix"
     return render_template(
         "admin_content_catalog.html",
         active_tab="admin",
@@ -78,6 +81,7 @@ def content_catalog_route():
         side_tabs=get_side_tabs(),
         content_title="Content Catalog",
         content_html="",
+        catalog_mode=mode,
         catalog_config=catalog_mod.get_admin_config(conn),
         summary=catalog_mod.catalog_summary(conn),
     )
@@ -100,6 +104,48 @@ def content_catalog_config_api():
     security.require_role("admin")
     conn = db._get_conn()
     return jsonify({"ok": True, "config": catalog_mod.get_admin_config(conn), "summary": catalog_mod.catalog_summary(conn)})
+
+
+@admin_bp.route("/content-catalog/api/matrix")
+def content_catalog_matrix_api():
+    security.require_role("admin")
+    conn = db._get_conn()
+    try:
+        matrix = catalog_mod.content_catalog_matrix(request.args, conn=conn)
+        return jsonify({"ok": True, "matrix": matrix})
+    except Exception as exc:
+        return _catalog_error(exc)
+
+
+@admin_bp.route("/content-catalog/api/cell")
+def content_catalog_cell_api():
+    security.require_role("admin")
+    conn = db._get_conn()
+    try:
+        rows = catalog_mod.content_catalog_cell_details(
+            request.args.get("area_id") or catalog_mod.UNASSIGNED_AREA_ID,
+            request.args.get("tab_code") or catalog_mod.NO_TAB_CODE,
+            filters=request.args,
+            conn=conn,
+        )
+        return jsonify({"ok": True, "rows": rows})
+    except Exception as exc:
+        return _catalog_error(exc)
+
+
+@admin_bp.route("/content-catalog/api/report")
+def content_catalog_report_api():
+    security.require_role("admin")
+    conn = db._get_conn()
+    try:
+        report = catalog_mod.content_catalog_report(
+            request.args.get("group") or "by-tab",
+            filters=request.args,
+            conn=conn,
+        )
+        return jsonify({"ok": True, "report": report})
+    except Exception as exc:
+        return _catalog_error(exc)
 
 
 @admin_bp.route("/content-catalog/api/<entity>")
@@ -155,6 +201,18 @@ def content_catalog_update_api(entity, record_id):
     conn = db._get_conn()
     payload = _catalog_payload()
     try:
+        if payload.get("action") == "remove":
+            if entity == "content-kinds":
+                result = catalog_mod.remove_content_kind(record_id, conn=conn)
+            elif entity == "patterns":
+                result = catalog_mod.remove_content_pattern(record_id, conn=conn)
+            elif entity == "templates":
+                result = catalog_mod.remove_template(record_id, conn=conn)
+            elif entity == "views":
+                result = catalog_mod.remove_content_view(record_id, conn=conn)
+            else:
+                abort(404)
+            return jsonify({"ok": True, **result})
         if payload.get("action") == "deactivate":
             if entity == "content-kinds":
                 catalog_mod.deactivate_content_kind(record_id, conn=conn)

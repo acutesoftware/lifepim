@@ -158,6 +158,149 @@ class TestContentCatalog(unittest.TestCase):
         self.assertNotIn("BOOK_NOTE", active_codes)
         self.assertIn("BOOK_NOTE", inactive_codes)
 
+    def test_pattern_list_is_not_duplicated_by_duplicate_area_rows(self):
+        areas.area_upsert(
+            {"area_id": "work", "tab": "AREAS", "group_name": "AREAS", "area_name": "Work Duplicate"},
+            owner_user_id=99,
+            conn=self.conn,
+        )
+        pattern_id = content_catalog.create_content_pattern(
+            {
+                "pattern_code": "WORK_DUPLICATE_CHECK",
+                "name": "Work Duplicate Check",
+                "content_kind_id": content_catalog._kind_id_by_code(self.conn, "IDEA"),
+                "default_area_id": "work",
+            },
+            conn=self.conn,
+        )
+
+        rows = content_catalog.list_content_patterns(conn=self.conn, include_inactive=True)
+        ids = [row["content_pattern_id"] for row in rows]
+
+        self.assertEqual(ids.count(pattern_id), 1)
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_remove_pattern_template_and_view_delete_rows_and_clear_defaults(self):
+        kind_id = content_catalog._kind_id_by_code(self.conn, "IDEA")
+        template_id = content_catalog.create_template(
+            {
+                "template_code": "REMOVE_ME_TEMPLATE",
+                "name": "Remove Me Template",
+                "template_type_code": "NOTE",
+                "content_kind_ids": [kind_id],
+                "default_content_kind_id": kind_id,
+            },
+            conn=self.conn,
+        )
+        view_id = content_catalog.create_content_view(
+            {
+                "view_code": "REMOVE_ME_VIEW",
+                "name": "Remove Me View",
+                "view_type_code": "LIST",
+                "content_kind_ids": [kind_id],
+                "default_content_kind_id": kind_id,
+            },
+            conn=self.conn,
+        )
+        pattern_id = content_catalog.create_content_pattern(
+            {
+                "pattern_code": "REMOVE_ME_PATTERN",
+                "name": "Remove Me Pattern",
+                "content_kind_id": kind_id,
+                "default_template_id": template_id,
+                "default_view_id": view_id,
+            },
+            conn=self.conn,
+        )
+
+        self.assertEqual(content_catalog.remove_template(template_id, conn=self.conn), {"removed": True, "deactivated": False})
+        self.assertEqual(content_catalog.remove_content_view(view_id, conn=self.conn), {"removed": True, "deactivated": False})
+
+        pattern = self.conn.execute(
+            "SELECT default_template_id, default_view_id FROM lp_content_pattern WHERE content_pattern_id = ?",
+            (pattern_id,),
+        ).fetchone()
+        self.assertIsNone(pattern["default_template_id"])
+        self.assertIsNone(pattern["default_view_id"])
+        self.assertEqual(
+            self.conn.execute("SELECT COUNT(1) AS cnt FROM lp_template WHERE template_id = ?", (template_id,)).fetchone()["cnt"],
+            0,
+        )
+        self.assertEqual(
+            self.conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_view WHERE content_view_id = ?", (view_id,)).fetchone()["cnt"],
+            0,
+        )
+
+        self.assertEqual(content_catalog.remove_content_pattern(pattern_id, conn=self.conn), {"removed": True, "deactivated": False})
+        self.assertEqual(
+            self.conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_pattern WHERE content_pattern_id = ?", (pattern_id,)).fetchone()["cnt"],
+            0,
+        )
+
+    def test_matrix_counts_area_tab_mappings_and_hides_roots_by_default(self):
+        matrix = content_catalog.content_catalog_matrix(conn=self.conn)
+        needs_object_matrix = content_catalog.content_catalog_matrix({"mapping_status_code": "NEEDS_OBJECT"}, conn=self.conn)
+
+        self.assertGreater(matrix["totals"]["unique_kinds"], 0)
+        self.assertGreaterEqual(matrix["totals"]["area_tab_mappings"], matrix["totals"]["unique_kinds"])
+        self.assertGreater(needs_object_matrix["totals"]["statuses"]["NEEDS_OBJECT"], 0)
+        self.assertEqual(needs_object_matrix["totals"]["statuses"]["CONFIRMED"], 0)
+        self.assertIn(content_catalog.UNASSIGNED_AREA_ID, [row["area_id"] for row in matrix["areas"]])
+        self.assertIn(content_catalog.NO_TAB_CODE, [col["code"] for col in matrix["tabs"]])
+
+        root_note_id = content_catalog._kind_id_by_code(self.conn, "NOTE")
+        self.conn.execute(
+            "INSERT OR IGNORE INTO lp_content_kind_area(content_kind_id, area_id, created_at, updated_at) "
+            "VALUES (?, 'personal', 'now', 'now')",
+            (root_note_id,),
+        )
+        self.conn.commit()
+        without_roots = content_catalog.content_catalog_matrix(conn=self.conn)
+        with_roots = content_catalog.content_catalog_matrix({"include_roots": "1"}, conn=self.conn)
+
+        self.assertGreater(with_roots["totals"]["unique_kinds"], without_roots["totals"]["unique_kinds"])
+
+    def test_matrix_uses_sidebar_visible_area_source_not_all_area_rows(self):
+        areas.area_upsert(
+            {
+                "area_id": "home",
+                "tab": "Areas",
+                "group_name": "Areas",
+                "area_name": "Home",
+                "status": "active",
+            },
+            owner_user_id=99,
+            conn=self.conn,
+        )
+
+        matrix = content_catalog.content_catalog_matrix(conn=self.conn)
+
+        self.assertNotIn("home", {row["area_id"] for row in matrix["areas"]})
+
+    def test_cell_details_are_loaded_for_area_and_tab(self):
+        rows = content_catalog.content_catalog_cell_details("personal", "NOTES", conn=self.conn)
+
+        codes = {row["kind_code"] for row in rows}
+        self.assertIn("IDEA", codes)
+        idea = next(row for row in rows if row["kind_code"] == "IDEA")
+        self.assertEqual(idea["default_template"]["code"], "IDEA_NOTE")
+
+    def test_report_coverage_groups_are_generated_from_current_catalog(self):
+        report = content_catalog.content_catalog_report("coverage-gaps", conn=self.conn)
+
+        labels = [section["label"] for section in report["sections"]]
+        self.assertIn("Needs Templates", labels)
+        self.assertIn("No Area Mapping", labels)
+        self.assertTrue(any(section["items"] for section in report["sections"] if section["label"] == "Needs Objects"))
+
+    def test_report_by_area_groups_items_under_tabs(self):
+        report = content_catalog.content_catalog_report("by-area", conn=self.conn)
+
+        house = next((section for section in report["sections"] if section["label"] == "House"), None)
+        self.assertIsNotNone(house)
+        tab_labels = {tab["label"] for tab in house["tabs"]}
+        self.assertIn("GOALS", tab_labels)
+
 
 if __name__ == "__main__":
     unittest.main()
