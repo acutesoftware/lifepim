@@ -11,7 +11,25 @@
         <a href="{{ url_for('admin.content_catalog_route', mode='editor') }}" data-catalog-mode="editor">Editor</a>
       </nav>
 
-      <div class="content-catalog-summary" data-catalog-summary></div>
+      <div class="content-catalog-report-toolbar">
+        <div class="content-catalog-summary" data-catalog-summary></div>
+        <nav class="content-catalog-compact-tabs" aria-label="Report groups" data-report-groups hidden>
+          <button type="button" class="active" data-report-group="by-tab">By Tab</button>
+          <button type="button" data-report-group="by-area">By Area</button>
+          <button type="button" data-report-group="by-object-type">By Object Type</button>
+          <button type="button" data-report-group="coverage-gaps">Coverage Gaps</button>
+        </nav>
+        <div class="content-catalog-table-controls" data-editor-table-controls hidden>
+          <label><span>Table: </span><select data-editor-table-select>
+            <option value="content-kinds">Content Kinds</option>
+            <option value="patterns">Patterns</option>
+            <option value="templates">Templates</option>
+            <option value="views">Views</option>
+          </select></label>
+          <span class="content-catalog-table-name" data-editor-table-name>Content Kinds</span>
+        </div>
+        <div class="content-catalog-summary-stats" data-catalog-summary-stats></div>
+      </div>
 
       <section data-mode-panel="matrix">
         <div class="content-catalog-filters matrix-filters">
@@ -39,25 +57,12 @@
       </section>
 
       <section data-mode-panel="report" hidden>
-        <nav class="content-catalog-compact-tabs" aria-label="Report groups">
-          <button type="button" class="active" data-report-group="by-tab">By Tab</button>
-          <button type="button" data-report-group="by-area">By Area</button>
-          <button type="button" data-report-group="by-object-type">By Object Type</button>
-          <button type="button" data-report-group="coverage-gaps">Coverage Gaps</button>
-        </nav>
         <div class="content-catalog-report" data-report-body></div>
       </section>
 
       <section data-mode-panel="editor" hidden>
-        <nav class="content-catalog-compact-tabs" aria-label="Content Catalog editor sections">
-          <button type="button" class="active" data-catalog-tab="content-kinds">Content Kinds</button>
-          <button type="button" data-catalog-tab="patterns">Patterns</button>
-          <button type="button" data-catalog-tab="templates">Templates</button>
-          <button type="button" data-catalog-tab="views">Views</button>
-        </nav>
-
         <section data-catalog-panel="content-kinds">
-          <div class="content-catalog-filters">
+          <div class="content-catalog-filters" hidden>
             <select data-kind-filter="object_type_code"><option value="">Object Type</option></select>
             <select data-kind-filter="canonical_tab_code"><option value="">Tab</option></select>
             <select data-kind-filter="area_id"><option value="">Area</option></select>

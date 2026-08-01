@@ -293,6 +293,16 @@ class TestContentCatalog(unittest.TestCase):
         self.assertIn("No Area Mapping", labels)
         self.assertTrue(any(section["items"] for section in report["sections"] if section["label"] == "Needs Objects"))
 
+    def test_report_summary_filters_can_include_root_kinds(self):
+        report = content_catalog.content_catalog_report(
+            "by-tab",
+            filters={"mapping_status_code": "UNDECIDED", "include_roots": "1"},
+            conn=self.conn,
+        )
+
+        codes = {item["kind_code"] for section in report["sections"] for item in section["items"]}
+        self.assertIn("MONEY_ITEM", codes)
+
     def test_report_by_area_groups_items_under_tabs(self):
         report = content_catalog.content_catalog_report("by-area", conn=self.conn)
 

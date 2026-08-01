@@ -980,7 +980,10 @@ def catalog_summary(conn=None):
     total = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind").fetchone()["cnt"]
     inactive = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind WHERE is_active = 0").fetchone()["cnt"]
     mappings = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind_area").fetchone()["cnt"]
-    status_rows = conn.execute("SELECT mapping_status_code, COUNT(1) AS cnt FROM lp_content_kind GROUP BY mapping_status_code").fetchall()
+    status_rows = conn.execute(
+        "SELECT mapping_status_code, COUNT(1) AS cnt FROM lp_content_kind "
+        "WHERE is_active = 1 GROUP BY mapping_status_code"
+    ).fetchall()
     tab_rows = conn.execute("SELECT canonical_tab_code, COUNT(1) AS cnt FROM lp_content_kind WHERE is_active = 1 GROUP BY canonical_tab_code").fetchall()
     return {
         "total": total,

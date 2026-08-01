@@ -2816,23 +2816,78 @@ button.calendar-nav {
   color: #fff;
 }
 
-.content-catalog-summary {
+.content-catalog-report-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   margin: 10px 0;
 }
 
-.content-catalog-summary button {
+.content-catalog-report-toolbar [hidden] {
+  display: none;
+}
+
+.content-catalog-report-toolbar .content-catalog-compact-tabs {
+  margin: 0;
+}
+
+.content-catalog-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.content-catalog-summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.content-catalog-summary-stat {
   border: 1px solid #c9d3df;
   background: #fff;
   border-radius: 6px;
   padding: 6px 8px;
-  cursor: pointer;
+  white-space: nowrap;
 }
 
-.content-catalog-summary strong {
-  margin-left: 4px;
+.content-catalog-summary-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.content-catalog-summary-filter span {
+  white-space: nowrap;
+}
+
+.content-catalog-summary-filter select {
+  min-width: 180px;
+}
+
+.content-catalog-table-controls {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.content-catalog-table-controls label {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.content-catalog-table-controls span,
+.content-catalog-table-controls select {
+  white-space: nowrap;
+}
+
+.content-catalog-table-name {
+  color: #6b7280;
 }
 
 .content-catalog-filters,
@@ -2878,8 +2933,8 @@ button.calendar-nav {
 }
 
 .admin-editor-actions {
-  min-width: 64px;
-  width: 64px;
+  min-width: 96px;
+  width: 96px;
 }
 
 .admin-editor-actions button {
@@ -2905,6 +2960,23 @@ button.calendar-nav {
 
 .admin-editor-delete button:hover,
 .admin-editor-delete button:focus {
+  background: #fff1f2;
+  border-color: #fca5a5;
+}
+
+.admin-editor-delete-button {
+  border: 1px solid #c9d3df;
+  background: #fff;
+  border-radius: 4px;
+  color: #7f1d1d;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 7px;
+}
+
+.admin-editor-delete-button:hover,
+.admin-editor-delete-button:focus {
   background: #fff1f2;
   border-color: #fca5a5;
 }

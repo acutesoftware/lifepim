@@ -122,9 +122,8 @@
 
     renderHeader() {
       const tr = document.createElement("tr");
-      tr.appendChild(this.th("Save"));
+      tr.appendChild(this.th("Actions"));
       this.config.columns.forEach((column) => tr.appendChild(this.th(column.label)));
-      tr.appendChild(this.th(""));
       this.thead.replaceChildren(tr);
     }
 
@@ -177,7 +176,7 @@
 
       const actionCell = document.createElement("td");
       actionCell.className = "admin-editor-actions";
-      actionCell.innerHTML = '<button type="button" data-action="save">Save</button><div class="admin-editor-row-error" data-row-error></div>';
+      actionCell.innerHTML = '<button type="button" data-action="save">Save</button><button type="button" class="admin-editor-delete-button" data-action="remove" title="Delete this row" aria-label="Delete this row">&#128465;</button><div class="admin-editor-row-error" data-row-error></div>';
       tr.appendChild(actionCell);
 
       this.config.columns.forEach((column) => {
@@ -185,10 +184,6 @@
         td.appendChild(this.control(column, row));
         tr.appendChild(td);
       });
-      const deleteCell = document.createElement("td");
-      deleteCell.className = "admin-editor-delete";
-      deleteCell.innerHTML = '<button type="button" data-action="remove" title="Remove this row">x</button>';
-      tr.appendChild(deleteCell);
       return tr;
     }
 
@@ -383,9 +378,16 @@
     const matrixToggles = Array.from(shell.querySelectorAll("[data-matrix-toggle]"));
     const panels = Array.from(shell.querySelectorAll("[data-mode-panel]"));
     const modeLinks = Array.from(shell.querySelectorAll("[data-catalog-mode]"));
+    const reportGroups = shell.querySelector("[data-report-groups]");
+    const editorTableControls = shell.querySelector("[data-editor-table-controls]");
+    const editorTableSelect = shell.querySelector("[data-editor-table-select]");
+    const editorTableName = shell.querySelector("[data-editor-table-name]");
+    const summaryStats = shell.querySelector("[data-catalog-summary-stats]");
     let currentMode = shell.dataset.initialMode || "matrix";
+    let currentEditorTable = "content-kinds";
     let currentReportGroup = "by-tab";
     let summaryFilter = {};
+    let summarySelection = "";
 
     function selectOptions(select, values) {
       if (!select) return;
@@ -432,6 +434,7 @@
 
     function renderSummary() {
       const box = shell.querySelector("[data-catalog-summary]");
+      const statsBox = shell.querySelector("[data-catalog-summary-stats]");
       const statusLabels = {
         CONFIRMED: "Confirmed",
         NEEDS_TEMPLATE: "Need Templates",
@@ -439,18 +442,27 @@
         NEEDS_OBJECT: "Need Objects",
         UNDECIDED: "Undecided",
       };
-      const buttons = [
-        `<button type="button" data-summary-filter="" data-summary-value="">${summary.total || 0} Content Kinds</button>`,
-        `<button type="button" data-summary-filter="" data-summary-value="">${summary.mappings || 0} Area-Tab Mappings</button>`,
+      const stats = [
+        `<span class="content-catalog-summary-stat">Content kind (${summary.total || 0})</span>`,
+        `<span class="content-catalog-summary-stat">Area Tab mappings (${summary.mappings || 0})</span>`,
       ];
+      const options = ['<option value="" data-summary-filter="" data-summary-value="">No quick filter</option>'];
+      const addOption = (filter, value, label, count) => {
+        const key = `${filter}|${value}`;
+        const selected = key === summarySelection ? " selected" : "";
+        options.push(`<option value="${escapeHtml(key)}" data-summary-filter="${escapeHtml(filter)}" data-summary-value="${escapeHtml(value)}"${selected}>${escapeHtml(label)} (${count || 0})</option>`);
+      };
       Object.keys(statusLabels).forEach((code) => {
-        buttons.push(`<button type="button" data-summary-filter="mapping_status_code" data-summary-value="${code}">${(summary.statuses || {})[code] || 0} ${statusLabels[code]}</button>`);
+        addOption("mapping_status_code", code, statusLabels[code], (summary.statuses || {})[code] || 0);
       });
-      buttons.push(`<button type="button" data-summary-filter="active" data-summary-value="0">${summary.inactive || 0} Inactive</button>`);
+      addOption("active", "0", "Inactive", summary.inactive || 0);
       (config.tabCodes || []).forEach((code) => {
-        buttons.push(`<button type="button" data-summary-filter="canonical_tab_code" data-summary-value="${code}">${(summary.tabs || {})[code] || 0} ${code}</button>`);
+        addOption("canonical_tab_code", code, code, (summary.tabs || {})[code] || 0);
       });
-      box.innerHTML = buttons.join("");
+      box.innerHTML = `<label class="content-catalog-summary-filter"><span>Showing : </span><select data-summary-quick-filter>${options.join("")}</select></label>`;
+      if (statsBox) {
+        statsBox.innerHTML = stats.join("");
+      }
     }
     renderSummary();
 
@@ -559,12 +571,21 @@
         panel.hidden = panel.dataset.modePanel !== currentMode;
       });
       modeLinks.forEach((link) => link.classList.toggle("active", link.dataset.catalogMode === currentMode));
+      if (reportGroups) {
+        reportGroups.hidden = currentMode !== "report";
+      }
+      if (editorTableControls) {
+        editorTableControls.hidden = currentMode !== "editor";
+      }
+      if (summaryStats) {
+        summaryStats.hidden = currentMode === "editor";
+      }
       const url = new URL(window.location.href);
       url.searchParams.set("mode", currentMode);
       window.history.replaceState({}, "", url);
       if (currentMode === "matrix") loadMatrix();
       if (currentMode === "report") loadReport();
-      if (currentMode === "editor" && !editors["content-kinds"].rows.length) loadKinds();
+      if (currentMode === "editor") setEditorTable(currentEditorTable);
     }
 
     function setEditorFilters(filters) {
@@ -689,12 +710,55 @@
       body.innerHTML = report.sections.map((section) => `<section class="report-section"><h4>${escapeHtml(section.label)} <span>${(section.items || []).length}</span></h4>${(section.items || []).map(renderKindSummary).join("") || '<p class="settings-empty">No items.</p>'}</section>`).join("");
     }
 
-    filterEls.forEach((el) => el.addEventListener("change", loadKinds));
+    filterEls.forEach((el) => el.addEventListener("change", () => {
+      clearSummarySelection();
+      loadKinds();
+    }));
+    function clearSummarySelection() {
+      summarySelection = "";
+      summaryFilter = {};
+      const select = shell.querySelector("[data-summary-quick-filter]");
+      if (select) select.value = "";
+    }
+
+    function applySummaryQuickFilter(filter, value) {
+      summarySelection = filter ? `${filter}|${value}` : "";
+      summaryFilter = {};
+      if (currentMode === "matrix" || currentMode === "report") {
+        matrixFilters.forEach((el) => {
+          el.value = "";
+        });
+        if (filter) {
+          summaryFilter.include_roots = "1";
+        }
+        const matchingFilter = matrixFilters.find((el) => el.dataset.matrixFilter === filter);
+        if (matchingFilter) {
+          matchingFilter.value = value;
+        } else if (filter) {
+          summaryFilter[filter] = value;
+        }
+        if (currentMode === "matrix") loadMatrix();
+        if (currentMode === "report") loadReport();
+        return;
+      }
+      filterEls.forEach((el) => {
+        el.value = el.dataset.kindFilter === "active" ? "all" : "";
+        if (el.dataset.kindFilter === filter) {
+          el.value = value;
+        }
+      });
+      loadKinds();
+    }
+
     matrixFilters.forEach((el) => el.addEventListener("input", () => {
+      clearSummarySelection();
       if (currentMode === "matrix") loadMatrix();
       if (currentMode === "report") loadReport();
     }));
     matrixToggles.forEach((el) => el.addEventListener("change", () => {
+      if (el.dataset.matrixToggle !== "show_status_counts") {
+        clearSummarySelection();
+      }
       if (currentMode === "matrix") loadMatrix();
       if (currentMode === "report") loadReport();
     }));
@@ -711,41 +775,34 @@
         setMode(link.dataset.catalogMode);
       });
     });
-    shell.querySelector("[data-catalog-summary]").addEventListener("click", (event) => {
-      const button = event.target.closest("button");
-      if (!button) return;
-      if (currentMode === "matrix" || currentMode === "report") {
-        summaryFilter = {};
-        if (button.dataset.summaryFilter && !["mapping_status_code", "object_type_code", "active"].includes(button.dataset.summaryFilter)) {
-          summaryFilter[button.dataset.summaryFilter] = button.dataset.summaryValue;
-        }
-        matrixFilters.forEach((el) => {
-          if (!button.dataset.summaryFilter) el.value = "";
-          if (el.dataset.matrixFilter === button.dataset.summaryFilter) el.value = button.dataset.summaryValue;
-        });
-        if (currentMode === "matrix") loadMatrix();
-        if (currentMode === "report") loadReport();
-        return;
+    shell.querySelector("[data-catalog-summary]").addEventListener("change", (event) => {
+      const select = event.target.closest("[data-summary-quick-filter]");
+      if (!select) return;
+      const option = select.selectedOptions[0];
+      applySummaryQuickFilter(option.dataset.summaryFilter || "", option.dataset.summaryValue || "");
+    });
+
+    function setEditorTable(tableKey) {
+      currentEditorTable = tableKey || "content-kinds";
+      if (editorTableSelect) {
+        editorTableSelect.value = currentEditorTable;
       }
-      filterEls.forEach((el) => {
-        if (!button.dataset.summaryFilter) el.value = el.dataset.kindFilter === "active" ? "all" : "";
-        if (el.dataset.kindFilter === button.dataset.summaryFilter) el.value = button.dataset.summaryValue;
-      });
-      loadKinds();
-    });
-
-    shell.querySelector("[data-mode-panel='editor'] .content-catalog-compact-tabs").addEventListener("click", (event) => {
-      const button = event.target.closest("button[data-catalog-tab]");
-      if (!button) return;
-      shell.querySelectorAll("[data-catalog-tab]").forEach((btn) => btn.classList.toggle("active", btn === button));
+      const selectedOption = editorTableSelect ? editorTableSelect.selectedOptions[0] : null;
+      if (editorTableName) {
+        editorTableName.textContent = selectedOption ? selectedOption.textContent : "Content Kinds";
+      }
       shell.querySelectorAll("[data-catalog-panel]").forEach((panel) => {
-        panel.hidden = panel.dataset.catalogPanel !== button.dataset.catalogTab;
+        panel.hidden = panel.dataset.catalogPanel !== currentEditorTable;
       });
-      const editor = editors[button.dataset.catalogTab];
+      const editor = editors[currentEditorTable];
       if (editor && !editor.rows.length) editor.load();
+    }
+
+    editorTableSelect.addEventListener("change", () => {
+      setEditorTable(editorTableSelect.value);
     });
 
-    shell.querySelector("[data-mode-panel='report'] .content-catalog-compact-tabs").addEventListener("click", (event) => {
+    reportGroups.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-report-group]");
       if (!button) return;
       currentReportGroup = button.dataset.reportGroup;
