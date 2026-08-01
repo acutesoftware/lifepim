@@ -1,452 +1,220 @@
 # Admin Content Catalog
 
-## Goal
+## Intent
 
-The Content Catalog is where LifePIM decides where every kind of information belongs.
+The Content Catalog is the place where LifePIM decides where every kind of information belongs.
 
-The goal is simple: any "thing" the user wants to keep should be able to be mapped, created, shown, and found again in a proper LifePIM place. A thing may be a note, task, project, list, contact, place, file, recipe, repair job, warranty, media item, dataset, account, 3D object, game-world object, or some future item type.
+The goal is to find a clear home for all information. A note, task, project, list, event, file, recipe, contact, place, media item, data item, or future object should have an agreed place in the system: which main tab it belongs to, which Area it belongs to, what template should create it, and what view should show it.
 
-High-level process:
+Use the Content Catalog when the system needs an explicit answer to questions like:
 
-1. Decide what the thing is.
-2. Give it a Content Kind.
-3. Assign the tab where it naturally belongs.
-4. Assign the Area or Areas that can own it.
-5. Decide whether it needs a template for creating it.
-6. Decide whether it needs a view for finding or reviewing it.
-7. Add a pattern if users need a quick way to create or open that kind of thing.
-8. Use Matrix and Report to check that every important kind of information has a clear place.
+- What kind of information is this?
+- Which LifePIM tab should it appear under?
+- Which Area can own it?
+- Is it already supported, or does it still need a template, a view, or an object/table?
+- What should be created when the user starts a new item of this type?
 
-The catalog does not store the actual user information. It stores the setup rules that tell LifePIM how to classify, create, and display that information.
+The catalog is not meant to store the actual user information. It stores the structure that tells LifePIM how to classify, create, and display information.
 
-## The Four Tables
+## User Process
 
-Use Admin > Content Catalog > Editor. The top row has:
+1. Start in the Matrix.
 
-```text
-Showing : [quick filter]  Table: [Content Kinds | Patterns | Templates | Views]
-```
+   The Matrix gives the quickest overview of what LifePIM already understands. It shows Areas down the side and tabs across the top. Each filled cell means that one or more Content Kinds are mapped to that Area and tab.
 
-Choose the table you want to work on, then use `+ Add Row`, Search, Save, and the row delete icon.
+2. Look for gaps.
 
-### Content Kinds
+   Use the Matrix filters and summary buttons to find inactive items, undecided items, missing templates, missing views, or content that has not yet been assigned to a clear Area or tab.
 
-Content Kinds are the master list of things LifePIM understands.
+3. Open a Matrix cell when you want detail.
 
-Use this table to answer:
+   Clicking a cell opens the drawer with the Content Kinds in that Area and tab. From there, open the filtered Editor when you need to update the records.
 
-- What kind of thing is this?
-- Which parent kind does it sit under?
-- Which tab should it appear in?
-- Which Area or Areas can it belong to?
-- Is it complete, or does it still need a template, view, object/table, or decision?
+4. Use the Report when reviewing coverage.
 
-Examples: Idea, Journal Entry, Meeting Note, Repair Project, Shopping List, Recipe, Person, Place, Warranty Expiry, Software Project, Physical Asset.
+   The Report is better for checking groups of records: by tab, by Area, by object type, or by coverage gaps. Use it to decide what still needs work.
 
-### Templates
+5. Use the Editor to make changes.
 
-Templates define starter content for new items.
+   The Editor is where you add, update, remove, or deactivate records. Work from left to right:
 
-Use this table when a Content Kind should start with headings, prompts, checklist items, or a standard structure. A template does not decide where an item belongs by itself. It gives the item a useful starting shape.
+   - Define the Content Kind first.
+   - Add or confirm Patterns that create or classify that kind of content.
+   - Add Templates for creating the content.
+   - Add Views for displaying or filtering the content.
 
-Examples: Idea Note, Meeting Note, Small Home Repair, Software Change, Trip Project, Food Shopping List, Recipe.
+6. Save each changed row.
 
-### Views
+   After editing text, choices, checkboxes, or popup selections in a row, click Save at the start of that row.
 
-Views define how items are displayed, filtered, grouped, or reviewed.
+7. Remove rows carefully.
 
-Use this table when a Content Kind needs a useful way to find or inspect records. A view may be a list, table, board, timeline, calendar, gallery, map, dashboard, or detail page.
+   The `x` button at the end of a row removes that row. For Content Kinds that are still referenced by child kinds or patterns, LifePIM deactivates the row instead of hard-deleting it so existing references are not broken.
 
-Examples: Recent Notes, Journal Timeline, Decision Register, Active Projects, People Directory, Places Map, Media Timeline.
+## Matrix
 
-### Patterns
+The Matrix shows the catalog as an Area by tab grid.
 
-Patterns are repeatable user-facing starting points.
+Use it to answer: "Do we have a place for this type of information?"
 
-Use this table when the user needs a quick action such as "New Work Meeting", "New Food Shopping List", "New Small House Repair", or "New LifePIM Software Change". A pattern links the Content Kind, default Area, default Template, and default View into one practical creation or navigation option.
+Rows are Areas from the normal LifePIM Areas sidebar. Inactive, archived, deleted, and old legacy Areas are excluded by default. Legitimate active Areas can appear even when they currently have no Content Catalog mappings.
 
-Patterns are usually added after the Content Kind, Template, and View exist.
+Columns are the main LifePIM tabs such as Notes, Goals, Calendar, People, Places, Files, Data, Money, Apps, Media, Audio, and other supported tabs.
 
-## Adding Content Kinds
+Each filled cell shows how many Content Kinds match that Area and tab. When status counts are enabled, the cell also shows compact counts for confirmed items and items that still need templates, views, objects, or decisions.
 
-### Example 1: Add A Recipe
+Available controls:
 
-Goal: make recipes sort into the HOW tab and Food Area.
+- Status: filter by mapping status.
+- Object Type: filter by the type of object LifePIM expects.
+- Active: show active or inactive records.
+- Search: search catalog names, codes, descriptions, notes, and table names.
+- Show status counts: show or hide the compact counts inside Matrix cells.
+- Include root kinds: include high-level parent kinds such as Note, Task, Project, Event, and File.
+- Include inactive: include inactive Content Kinds in the Matrix.
 
-1. Go to Editor.
-2. Set `Table` to `Content Kinds`.
-3. Click `+ Add Row`.
-4. Fill in:
+Click a filled Matrix cell to open the drawer. The drawer lists the Content Kinds in that Area and tab, including their code, parent, object type, default template, and default view.
 
-```text
-Name: Recipe
-Code: RECIPE
-Parent: How-to
-Object Type: HOWTO
-Tab: HOW
-Subtype: RECIPE
-Date Behaviour: CREATED
-Areas: Food
-Default Area: Food
-Mapping Status: NEEDS_TEMPLATE
-Active: checked
-Notes: Structured recipe instructions.
-```
+## Report
 
-5. Click Save.
-6. Later, after adding a recipe template and view, change `Mapping Status` to `CONFIRMED`.
+The Report shows the same catalog records in review-friendly groups.
 
-Why this works: Recipe is a type of how-to content. It belongs in the HOW tab, but the Area is Food because that is where the user will expect to find it.
+Use it when you want to audit the catalog rather than edit one row at a time.
 
-### Example 2: Add A Warranty Expiry
+Report views:
 
-Goal: make warranty expiries sort into Calendar and show up for review.
+- By Tab: groups Content Kinds under their canonical LifePIM tab.
+- By Area: groups Content Kinds under their assigned Areas, then by tab.
+- By Object Type: groups Content Kinds by the object type they create or represent.
+- Coverage Gaps: groups records that still need work, such as missing templates, missing views, missing object support, undecided mappings, missing canonical tables, or no Area mapping.
 
-1. Go to Editor.
-2. Set `Table` to `Content Kinds`.
-3. Click `+ Add Row`.
-4. Fill in:
+The Report is mainly for inspection. Use the Editor when you need to change records.
 
-```text
-Name: Warranty Expiry
-Code: WARRANTY_EXPIRY
-Parent: Event
-Object Type: EVENT
-Tab: CALENDAR
-Subtype: WARRANTY
-Date Behaviour: DUE
-Areas: House, Vehicles, Computers
-Default Area: House
-Mapping Status: NEEDS_VIEW
-Active: checked
-Notes: Expiry date for appliance, vehicle, computer, and other warranties.
-```
+## Editor
 
-5. Click Save.
-6. Add or link a view such as `Upcoming Expiries`.
-7. Change `Mapping Status` to `CONFIRMED` when it has a useful view.
+The Editor is where catalog records are maintained. It has four tabs: Content Kinds, Patterns, Templates, and Views.
 
-Why this works: a warranty expiry is date-driven, so Calendar is the natural tab. It can belong to several Areas depending on the object being covered.
+Common row controls:
 
-## Adding Templates
+- Save: saves the current row.
+- `x`: removes the row. If a Content Kind is still referenced, it is deactivated instead.
+- Active: controls whether the record is active.
+- Search: filters the rows in the current editor table.
+- Add: creates a new row at the top of the table.
 
-### Example 1: Add A Recipe Template
+Popup selection fields use a `...` button. Click it to open the checkbox list, tick the values that apply, then save the row.
 
-Goal: make new recipes start with useful headings.
+Text fields in the editor are compact by default. Longer text boxes start at one-row height and can be resized when you need more room.
 
-1. Set `Table` to `Templates`.
-2. Click `+ Add Row`.
-3. Fill in:
+## Editor: Content Kinds
 
-```text
-Name: Recipe
-Code: RECIPE
-Template Type: HOWTO
-Target Object: HOWTO
-Target Tab: HOW
-Content Kinds: Recipe
-Default For Kind: Recipe
-Active: checked
-Description: Standard recipe structure.
-```
+Content Kinds are the main catalog entries. A Content Kind describes a type of information LifePIM can store, classify, create, or show.
 
-4. In `Template Content`, enter:
+Enter one row for each meaningful type of information, such as Idea, Meeting Note, Repair Project, Shopping List, Recipe, Contact, Place, Warranty Document, or Financial Account.
 
-```markdown
-# {{title}}
+Fields:
 
-## Serves
+- Name: the user-friendly name.
+- Code: the stable catalog code. Use uppercase words separated by underscores.
+- Parent: the broader Content Kind. For example, Meeting Note can have Note as its parent.
+- Object Type: the LifePIM object family, such as NOTE, TASK, PROJECT, LIST, EVENT, PERSON, PLACE, FILE, DATA, MONEY, APP, MEDIA, or AUDIO.
+- Tab: the main LifePIM tab where this kind should normally appear.
+- Canonical Table: the database table or main storage location when known.
+- Subtype: a more specific subtype code when the object type has variants.
+- Date Behaviour: how date fields should be understood, such as created date, due date, occurred date, start/end date, or recurring date.
+- Areas: click `...` and tick every Area this Content Kind can belong to.
+- Default Area: the most likely Area for this kind, when one should be preferred.
+- Mapping Status: the current catalog status.
+- Active: tick when this Content Kind should be used.
+- Notes: short internal notes about the decision.
 
-## Preparation time
+Mapping Status values:
 
-## Ingredients
+- CONFIRMED: this mapping is accepted and ready to use.
+- NEEDS_TEMPLATE: the kind exists but needs a template.
+- NEEDS_VIEW: the kind exists but needs a view.
+- NEEDS_OBJECT: the kind exists conceptually but needs object or table support.
+- EXTERNAL_SYSTEM: the information belongs mainly in another system.
+- DO_NOT_STORE: LifePIM should not store this kind of information.
+- UNDECIDED: the correct handling has not been decided yet.
 
-## Equipment
+## Editor: Patterns
 
-## Steps
+Patterns describe a repeatable way that a Content Kind is created, classified, or opened.
 
-## Notes and variations
-```
+Use Patterns when the user needs a recognizable starting point, such as "New Idea", "Small Home Repair", "Trip Project", or "Recipe".
 
-5. Leave `Template Config` blank unless special behaviour is needed.
-6. Click Save.
-7. Return to Content Kinds and set Recipe to `CONFIRMED` if the view is also ready.
+Fields:
 
-### Example 2: Add A Home Maintenance Template
-
-Goal: make maintenance projects start with inspection, materials, tasks, and final notes.
+- Name: the user-friendly pattern name.
+- Code: the stable pattern code. Use uppercase words separated by underscores.
+- Content Kind: the Content Kind this pattern creates or represents.
+- Default Area: the Area normally used by this pattern.
+- Default Template: the template used when creating from this pattern.
+- Default View: the view normally used after creation or when browsing this pattern.
+- Active: tick when the pattern should be available.
+- Notes: short internal notes.
+- Description: a short single-line explanation.
+- Creation Config: optional JSON configuration for creation behaviour.
+- View Filter Config: optional JSON configuration for filtering the view.
 
-1. Set `Table` to `Templates`.
-2. Click `+ Add Row`.
-3. Fill in:
+Keep Creation Config and View Filter Config as valid JSON when they are used. Leave them blank when no special configuration is needed.
 
-```text
-Name: Home Maintenance
-Code: HOME_MAINTENANCE
-Template Type: PROJECT
-Target Object: PROJECT
-Target Tab: GOALS
-Content Kinds: Maintenance Task, Repair Project
-Default For Kind: Maintenance Task
-Active: checked
-Description: Standard home maintenance project checklist.
-```
-
-4. In `Template Content`, enter:
-
-```markdown
-# {{title}}
-
-## Problem or maintenance item
-
-## Location
+## Editor: Templates
 
-## Inspection notes
-
-## Tools and parts
-
-## Tasks
-
-- [ ] Inspect
-- [ ] Decide fix
-- [ ] Buy parts
-- [ ] Complete work
-- [ ] Test result
-- [ ] Record cost and notes
-```
-
-5. Click Save.
-
-## Adding Views
-
-### Example 1: Add An Upcoming Expiries View
-
-Goal: show warranty, insurance, and subscription dates in one place.
-
-1. Set `Table` to `Views`.
-2. Click `+ Add Row`.
-3. Fill in:
-
-```text
-Name: Upcoming Expiries
-Code: UPCOMING_EXPIRIES
-Tab: CALENDAR
-View Type: LIST
-Content Kinds: Warranty Expiry
-Default For Kind: Warranty Expiry
-Active: checked
-Description: Expiry dates that need review before they pass.
-```
-
-4. In `View Config`, enter valid JSON:
-
-```json
-{
-  "filter": {
-    "event_type": [
-      "WARRANTY",
-      "INSURANCE",
-      "SUBSCRIPTION"
-    ]
-  },
-  "sort": "event_date ASC"
-}
-```
-
-5. Click Save.
-
-### Example 2: Add A Recipe Index View
-
-Goal: find recipes by name, Area, or tags.
-
-1. Set `Table` to `Views`.
-2. Click `+ Add Row`.
-3. Fill in:
-
-```text
-Name: Recipe Index
-Code: RECIPE_INDEX
-Tab: HOW
-View Type: TABLE
-Content Kinds: Recipe
-Default For Kind: Recipe
-Active: checked
-Description: Table of recipes for browsing and searching.
-```
-
-4. In `View Config`, enter:
-
-```json
-{
-  "filter": {
-    "subtype": "RECIPE"
-  },
-  "sort": "name ASC",
-  "columns": [
-    "name",
-    "area",
-    "tags",
-    "updated_at"
-  ]
-}
-```
-
-5. Click Save.
-
-## Adding Patterns
-
-### Example 1: Add A Food Shopping Pattern
-
-Goal: make a quick starting point for food shopping lists.
-
-1. Make sure the `Shopping List` Content Kind exists.
-2. Make sure the `Food Shopping` template exists.
-3. Make sure the `Active Shopping Lists` view exists.
-4. Set `Table` to `Patterns`.
-5. Click `+ Add Row`.
-6. Fill in:
-
-```text
-Name: Food Shopping
-Code: FOOD_SHOPPING
-Content Kind: Shopping List
-Default Area: Food
-Default Template: Food Shopping
-Default View: Active Shopping Lists
-Active: checked
-Description: Create a food shopping list.
-```
-
-7. Leave JSON config fields blank unless special creation or view filters are needed.
-8. Click Save.
-
-Why this works: the user does not need to think about kind, Area, template, or view. The pattern joins those choices into one action.
-
-### Example 2: Add A Work Meeting Pattern
-
-Goal: make a quick starting point for work meeting notes.
-
-1. Make sure the `Meeting Note` Content Kind exists.
-2. Make sure the `Meeting Note` template exists.
-3. Make sure the `Recent Notes` view exists.
-4. Set `Table` to `Patterns`.
-5. Click `+ Add Row`.
-6. Fill in:
+Templates define the starting content for new items.
 
-```text
-Name: Work Meeting
-Code: WORK_MEETING
-Content Kind: Meeting Note
-Default Area: Work
-Default Template: Meeting Note
-Default View: Recent Notes
-Active: checked
-Description: Create a meeting note for Work.
-```
+Use Templates when a Content Kind should open with headings, checklist items, prompts, or a standard structure.
 
-7. Optional `Creation Config`:
-
-```json
-{
-  "default_tags": [
-    "meeting",
-    "work"
-  ]
-}
-```
-
-8. Click Save.
-
-## Checking Completeness
-
-The catalog is useful when every important thing can be answered clearly:
-
-- What is it?
-- Which tab owns it?
-- Which Area or Areas can it belong to?
-- Does it have a template if users create it often?
-- Does it have a view if users need to find or review it?
-- Is the mapping confirmed, or is there a known reason it is incomplete?
-
-Use these checks regularly.
-
-### Matrix
-
-Use Matrix to answer: "Can everything be sorted into a place?"
-
-Rows are Areas. Columns are main tabs. A filled cell means there are Content Kinds mapped to that Area and tab.
-
-Check for:
-
-- Empty Areas that should have content.
-- Important tabs with very few mapped kinds.
-- Unexpected mappings, such as a finance item under Notes when it belongs in Money.
-- Undecided items.
-- Items that need templates, views, objects, or tables.
-
-Useful controls:
-
-- `Showing`: quick filter for status, inactive rows, or tab.
-- `Status`: filter by mapping status.
-- `Object Type`: filter by object family.
-- `Active`: inspect inactive records.
-- `Search`: find names, codes, descriptions, notes, and table names.
-- `Include root kinds`: include broad parent kinds such as Note, Task, Project, Event, and File.
-- `Include inactive`: include inactive Content Kinds.
-
-### Report
-
-Use Report to review the catalog in readable groups.
-
-Report modes:
-
-- By Tab: confirms that each LifePIM tab has the right kinds of content.
-- By Area: confirms that each Area has the right content mapped to it.
-- By Object Type: confirms that similar storage/object families are handled consistently.
-- Coverage Gaps: shows what still needs work.
-
-Coverage Gaps is the main completeness report. Work through each section:
-
-- Needs Templates: add or link templates, or decide that no template is needed.
-- Needs Views: add or link views, or decide that normal browsing is enough.
-- Needs Objects: add object/table support before confirming the kind.
-- Undecided: make a placement decision or mark as external/do not store.
-- Missing Canonical Table: decide where the real item is stored.
-- No Area Mapping: assign one or more Areas.
-- No Template: check whether a template should exist.
-- No View: check whether a view should exist.
-
-### Editor Search
-
-Use Editor Search when cleaning up rows directly:
-
-- Search by name, code, notes, description, or table name.
-- Use the delete icon for rows that are wrong and unused.
-- If a Content Kind is referenced by child kinds or patterns, deletion may deactivate it rather than hard-delete it.
-
-## Practical Completion Rule
-
-Treat a Content Kind as complete when:
-
-1. It has a clear name and code.
-2. It has the right parent, object type, tab, and Area mapping.
-3. Its mapping status is no longer `UNDECIDED`.
-4. It has a template if users need structured starter content.
-5. It has a view if users need a special way to find, browse, group, or review it.
-6. It has a pattern if users need a quick creation or navigation action.
-7. It appears in the expected Matrix cell and the Report does not show it as a gap.
-
-Some kinds can be complete without a template or view. If that is intentional, add a note explaining why.
-
-## TODO
-
-- Link Content Catalog templates to the actual creation screens for Notes, Goals, How-to, Calendar, and other tabs.
-- When creating a new item, offer matching templates based on selected Content Kind, Area, and tab.
-- Show Content Kind, Template, View, and Pattern names in search results so users can understand why a result appears.
-- Include template names in normal content search results when the item was created from a template.
-- Include pattern names in search results when an item was created through a pattern.
-- Add a way to preview Template Content from the Content Catalog without opening the full editor row.
-- Add a report section for "Template exists but is not linked to any Content Kind".
-- Add a report section for "View exists but is not linked to any Content Kind".
-- Add a report section for "Pattern has no default template or view".
-- Add clearer linking from Matrix and Report rows directly into the filtered Editor table.
+Fields:
+
+- Name: the user-friendly template name.
+- Code: the stable template code. Use uppercase words separated by underscores.
+- Template Type: the kind of template, such as NOTE, PROJECT, LIST, EVENT, HOWTO, OBJECT, or MULTI_OBJECT.
+- Target Object: the object type this template creates.
+- Target Tab: the tab where the created item belongs.
+- Content Kinds: click `...` and tick every Content Kind that can use this template.
+- Default For Kind: the Content Kind this template should be the default for, when applicable.
+- Active: tick when the template should be available.
+- Notes: short internal notes.
+- Description: a short description of what the template is for.
+- Template Content: the actual starter content, headings, prompts, or checklist text.
+- Template Config: optional JSON configuration for template behaviour.
+
+Template Content and Template Config start as one-line fields in the table. Resize them when editing longer content.
+
+## Editor: Views
+
+Views define how content should be displayed, grouped, filtered, or reviewed.
+
+Use Views when a Content Kind needs a specific list, table, board, calendar, timeline, gallery, map, tree, dashboard, or detail view.
+
+Fields:
+
+- Name: the user-friendly view name.
+- Code: the stable view code. Use uppercase words separated by underscores.
+- Tab: the LifePIM tab where the view belongs.
+- View Type: the display style, such as TABLE, LIST, TIMELINE, CALENDAR, BOARD, GALLERY, MAP, TREE, DASHBOARD, or DETAIL.
+- Content Kinds: click `...` and tick every Content Kind that can use this view.
+- Default For Kind: the Content Kind this view should be the default for, when applicable.
+- Active: tick when the view should be available.
+- Notes: short internal notes.
+- Description: a short description of what the view is for.
+- View Config: optional JSON configuration for filtering, grouping, columns, sorting, or display behaviour.
+
+View Config must be valid JSON when used. Leave it blank when the default view behaviour is enough.
+
+## Practical Working Pattern
+
+When adding a new information type, use this order:
+
+1. Add or confirm the Content Kind.
+2. Assign the correct Area or Areas.
+3. Set the canonical tab and object type.
+4. Decide the Mapping Status.
+5. Add a Template if the user needs starter content.
+6. Add a View if the user needs a specific way to see the records.
+7. Add a Pattern if the user needs a shortcut or repeatable creation flow.
+8. Return to the Matrix and confirm the item appears in the right Area and tab.
+
+The catalog is complete when every important type of information has a clear Content Kind, a sensible Area and tab, and enough template/view support for the user to create and find it again.
