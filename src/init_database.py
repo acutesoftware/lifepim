@@ -9,6 +9,7 @@ from common import data as db
 from common import areas as areas_mod
 from common import projects as projects_mod
 from common import collections as collections_mod
+from common.content_catalog import ensure_content_catalog_schema
 from common.media_schema import ensure_media_schema
 from common.settings import ensure_settings_schema
 from lifepim.importer.schema import ensure_import_schema
@@ -54,6 +55,7 @@ def reset_database(db_file):
     run_calendar_migration(db_conn)
     ensure_how_schema(db_conn)
     ensure_security_schema(db_conn)
+    ensure_content_catalog_schema(db_conn)
     db_conn.commit()
     db_conn.close()
 

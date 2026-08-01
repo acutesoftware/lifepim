@@ -2786,6 +2786,104 @@ button.calendar-nav {
   font: inherit;
 }
 
+.content-catalog-admin .settings-panel {
+  max-width: none;
+}
+
+.content-catalog-tabs button {
+  border: 1px solid #c9d3df;
+  background: #f4f7fb;
+  color: #1f2937;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.content-catalog-tabs button.active {
+  background: #1f5a93;
+  border-color: #1f5a93;
+  color: #fff;
+}
+
+.content-catalog-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.content-catalog-summary button {
+  border: 1px solid #c9d3df;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.content-catalog-summary strong {
+  margin-left: 4px;
+}
+
+.content-catalog-filters,
+.admin-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.admin-editor-toolbar input[type="search"] {
+  min-width: 220px;
+  max-width: 420px;
+}
+
+.admin-table-editor-scroll {
+  max-height: calc(100vh - 290px);
+}
+
+.admin-editor-table th,
+.admin-editor-table td {
+  vertical-align: top;
+}
+
+.admin-editor-table input,
+.admin-editor-table select,
+.admin-editor-table textarea {
+  min-width: 120px;
+  max-width: 260px;
+  box-sizing: border-box;
+}
+
+.admin-editor-table textarea {
+  min-height: 48px;
+  resize: vertical;
+}
+
+.admin-editor-table select[multiple] {
+  min-width: 180px;
+}
+
+.admin-editor-actions {
+  min-width: 120px;
+}
+
+.admin-editor-actions button {
+  margin: 0 4px 4px 0;
+}
+
+.admin-editor-row-error {
+  color: #a40000;
+  font-size: 12px;
+  max-width: 180px;
+  white-space: normal;
+}
+
+.admin-editor-status {
+  color: #146c2e;
+  min-width: 80px;
+}
+
 .areas-row-actions {
   min-width: 155px;
   white-space: nowrap;

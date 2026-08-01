@@ -2,6 +2,7 @@
 {% block module_content %}
   {% set admin_tabs = [
     ('security', 'Security'),
+    ('content_catalog', 'Content Catalog'),
     ('folder_mapping', 'Folder Mapping'),
     ('folders', 'Folders (dim_folder)'),
     ('migration', 'Migration')
@@ -14,9 +15,15 @@
   <div class="settings-shell">
     <nav class="settings-tabs" aria-label="Admin sections">
       {% for tab_id, tab_label in admin_tabs %}
+        {% if tab_id == 'content_catalog' %}
+        <a href="{{ url_for('admin.content_catalog_route') }}">
+          {{ tab_label }}
+        </a>
+        {% else %}
         <a class="{% if active_admin_tab == tab_id %}active{% endif %}" href="{{ url_for('admin.admin_mapping_route', tab=tab_id) }}">
           {{ tab_label }}
         </a>
+        {% endif %}
       {% endfor %}
       <a href="{{ url_for('admin.logs_route') }}">Logs</a>
     </nav>

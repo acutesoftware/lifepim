@@ -25,6 +25,7 @@ from common import areas as areas_mod
 from common import projects as projects_mod
 from common import collections as collections_mod
 from common import settings as settings_mod
+from common import content_catalog as content_catalog_mod
 from common.network_log import log_network
 from core.security import configure_security
 from modules.how.schema import ensure_how_schema
@@ -172,6 +173,7 @@ db.ensure_area_columns(db._get_conn())
 settings_mod.ensure_settings_schema(db._get_conn())
 db.ensure_notes_schema(db._get_conn())
 ensure_how_schema(db._get_conn())
+content_catalog_mod.ensure_content_catalog_schema(db._get_conn())
 
 
 def _should_network_log():

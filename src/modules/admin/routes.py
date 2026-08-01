@@ -1,8 +1,9 @@
 from datetime import datetime
 import json
 import os
+import sqlite3
 
-from flask import Blueprint, abort, render_template, request, redirect, url_for
+from flask import Blueprint, abort, jsonify, render_template, request, redirect, url_for
 from flask_login import current_user
 
 from common import data as db
@@ -12,6 +13,7 @@ from common import localtime
 from common import network_log
 from common import note_search_index
 from common import settings as settings_mod
+from common import content_catalog as catalog_mod
 from common import user_paths
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr, paginate_total, build_pagination
 from modules.calendar.services import calendar_index
@@ -62,6 +64,123 @@ JOIN map_folder_area r
       LIMIT 1
   );
 """
+
+
+@admin_bp.route("/content-catalog")
+def content_catalog_route():
+    security.require_role("admin")
+    conn = db._get_conn()
+    catalog_mod.ensure_content_catalog_schema(conn)
+    return render_template(
+        "admin_content_catalog.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Content Catalog",
+        content_html="",
+        catalog_config=catalog_mod.get_admin_config(conn),
+        summary=catalog_mod.catalog_summary(conn),
+    )
+
+
+def _catalog_payload():
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = request.form.to_dict(flat=False)
+        payload = {key: value if len(value) > 1 else value[0] for key, value in payload.items()}
+    return payload or {}
+
+
+def _catalog_error(exc, status=400):
+    return jsonify({"ok": False, "error": str(exc)}), status
+
+
+@admin_bp.route("/content-catalog/api/config")
+def content_catalog_config_api():
+    security.require_role("admin")
+    conn = db._get_conn()
+    return jsonify({"ok": True, "config": catalog_mod.get_admin_config(conn), "summary": catalog_mod.catalog_summary(conn)})
+
+
+@admin_bp.route("/content-catalog/api/<entity>")
+def content_catalog_list_api(entity):
+    security.require_role("admin")
+    conn = db._get_conn()
+    try:
+        if entity == "content-kinds":
+            rows = catalog_mod.list_content_kinds(conn=conn, include_inactive=True, filters=request.args)
+            return jsonify({"ok": True, "rows": rows, "summary": catalog_mod.catalog_summary(conn)})
+        if entity == "patterns":
+            return jsonify({"ok": True, "rows": catalog_mod.list_content_patterns(conn=conn, include_inactive=True)})
+        if entity == "templates":
+            return jsonify({"ok": True, "rows": catalog_mod.list_templates(conn=conn, include_inactive=True)})
+        if entity == "views":
+            return jsonify({"ok": True, "rows": catalog_mod.list_content_views(conn=conn, include_inactive=True)})
+    except Exception as exc:
+        return _catalog_error(exc)
+    abort(404)
+
+
+@admin_bp.route("/content-catalog/api/<entity>", methods=["POST"])
+def content_catalog_create_api(entity):
+    security.require_role("admin")
+    conn = db._get_conn()
+    payload = _catalog_payload()
+    try:
+        if entity == "content-kinds":
+            record_id = catalog_mod.create_content_kind(payload, conn=conn)
+            return jsonify({"ok": True, "id": record_id, "row": catalog_mod.get_content_kind(record_id, conn=conn)})
+        if entity == "patterns":
+            record_id = catalog_mod.create_content_pattern(payload, conn=conn)
+            row = next(row for row in catalog_mod.list_content_patterns(conn=conn, include_inactive=True) if row["content_pattern_id"] == record_id)
+            return jsonify({"ok": True, "id": record_id, "row": row})
+        if entity == "templates":
+            record_id = catalog_mod.create_template(payload, conn=conn)
+            row = next(row for row in catalog_mod.list_templates(conn=conn, include_inactive=True) if row["template_id"] == record_id)
+            return jsonify({"ok": True, "id": record_id, "row": row})
+        if entity == "views":
+            record_id = catalog_mod.create_content_view(payload, conn=conn)
+            row = next(row for row in catalog_mod.list_content_views(conn=conn, include_inactive=True) if row["content_view_id"] == record_id)
+            return jsonify({"ok": True, "id": record_id, "row": row})
+    except sqlite3.IntegrityError:
+        return _catalog_error("Code must be unique.")
+    except Exception as exc:
+        return _catalog_error(exc)
+    abort(404)
+
+
+@admin_bp.route("/content-catalog/api/<entity>/<int:record_id>", methods=["PUT", "POST"])
+def content_catalog_update_api(entity, record_id):
+    security.require_role("admin")
+    conn = db._get_conn()
+    payload = _catalog_payload()
+    try:
+        if payload.get("action") == "deactivate":
+            if entity == "content-kinds":
+                catalog_mod.deactivate_content_kind(record_id, conn=conn)
+            elif entity == "patterns":
+                catalog_mod.deactivate_content_pattern(record_id, conn=conn)
+            elif entity == "templates":
+                catalog_mod.deactivate_template(record_id, conn=conn)
+            elif entity == "views":
+                catalog_mod.deactivate_content_view(record_id, conn=conn)
+            else:
+                abort(404)
+        elif entity == "content-kinds":
+            catalog_mod.update_content_kind(record_id, payload, conn=conn)
+        elif entity == "patterns":
+            catalog_mod.update_content_pattern(record_id, payload, conn=conn)
+        elif entity == "templates":
+            catalog_mod.update_template(record_id, payload, conn=conn)
+        elif entity == "views":
+            catalog_mod.update_content_view(record_id, payload, conn=conn)
+        else:
+            abort(404)
+        return jsonify({"ok": True})
+    except sqlite3.IntegrityError:
+        return _catalog_error("Code must be unique.")
+    except Exception as exc:
+        return _catalog_error(exc)
 
 
 SYNC_PUSH_PATH_SUFFIXES = (

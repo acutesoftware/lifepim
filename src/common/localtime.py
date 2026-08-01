@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 DEFAULT_LOG_TIMEZONE = "Australia/Adelaide"
@@ -13,7 +13,12 @@ def log_timezone_name():
 
 
 def log_timezone():
-    return ZoneInfo(log_timezone_name())
+    try:
+        return ZoneInfo(log_timezone_name())
+    except ZoneInfoNotFoundError:
+        if log_timezone_name() == DEFAULT_LOG_TIMEZONE:
+            return timezone(timedelta(hours=9, minutes=30), "ACST")
+        return timezone.utc
 
 
 def now_log_iso():

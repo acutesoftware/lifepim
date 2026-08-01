@@ -46,7 +46,10 @@ DEBUG_NUM_FILELISTS_TO_LOAD = 99
 import os 
 import sys
 import sqlite3
-import pandas as pd
+try:
+    import pandas as pd
+except ModuleNotFoundError:
+    pd = None
 
 from . import table_definitions as tbl_def
 
@@ -327,6 +330,8 @@ def run_job_step_CSV(conn, job_step):
     for csv_file in fl[0:DEBUG_NUM_FILELISTS_TO_LOAD]:
         tmp_tbl = get_short_table_name(csv_file)
         lg(conn, LOG_INFO, 'run_job_step_CSV : create table ' + tmp_tbl + ' from external CSV file ' + csv_file) 
+        if pd is None:
+            raise RuntimeError("pandas is required for CSV ETL jobs.")
         df = pd.read_csv(csv_file)
         df.columns = df.columns.str.strip() # strip whitespace from column headers
         df.to_sql(tmp_tbl, conn)  

@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="settings-shell settings-shell-single content-catalog-admin"
+       data-config='{{ catalog_config|tojson }}'
+       data-summary='{{ summary|tojson }}'>
+    <section class="settings-panel">
+      <nav class="settings-tabs content-catalog-tabs" aria-label="Content Catalog sections">
+        <button type="button" class="active" data-catalog-tab="content-kinds">Content Kinds</button>
+        <button type="button" data-catalog-tab="patterns">Patterns</button>
+        <button type="button" data-catalog-tab="templates">Templates</button>
+        <button type="button" data-catalog-tab="views">Views</button>
+      </nav>
+
+      <div class="content-catalog-summary" data-catalog-summary></div>
+
+      <section data-catalog-panel="content-kinds">
+        <div class="content-catalog-filters">
+          <select data-kind-filter="object_type_code"><option value="">Object Type</option></select>
+          <select data-kind-filter="canonical_tab_code"><option value="">Tab</option></select>
+          <select data-kind-filter="area_id"><option value="">Area</option></select>
+          <select data-kind-filter="mapping_status_code"><option value="">Mapping Status</option></select>
+          <select data-kind-filter="active">
+            <option value="all">All Active States</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+          </select>
+        </div>
+        {% set editor_id = 'contentKindsEditor' %}
+        {% include "widgets/admin_table_editor.html" %}
+      </section>
+
+      <section data-catalog-panel="patterns" hidden>
+        {% set editor_id = 'patternsEditor' %}
+        {% include "widgets/admin_table_editor.html" %}
+      </section>
+
+      <section data-catalog-panel="templates" hidden>
+        {% set editor_id = 'templatesEditor' %}
+        {% include "widgets/admin_table_editor.html" %}
+      </section>
+
+      <section data-catalog-panel="views" hidden>
+        {% set editor_id = 'viewsEditor' %}
+        {% include "widgets/admin_table_editor.html" %}
+      </section>
+    </section>
+  </div>
+  <script src="{{ url_for('static', filename='admin_table_editor.js', v=static_asset_version|default(0)) }}"></script>
+{% endblock %}
