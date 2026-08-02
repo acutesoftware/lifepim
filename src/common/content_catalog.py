@@ -37,6 +37,8 @@ VIEW_TYPE_CODES = ["TABLE", "LIST", "TIMELINE", "CALENDAR", "BOARD", "GALLERY", 
 NO_TAB_CODE = "__NO_TAB__"
 UNASSIGNED_AREA_ID = "__UNASSIGNED__"
 ROOT_KIND_CODES = {"NOTE", "TASK", "PROJECT", "LIST", "EVENT", "HOWTO", "PERSON", "PLACE", "OBJECT", "FILE", "DATA_ITEM", "MONEY_ITEM", "APP_ITEM", "MEDIA_ITEM", "AUDIO_ITEM", "LOG_ENTRY", "COLLECTION"}
+CONTENT_CATALOG_SAMPLE_SEED_VERSION = 1
+CONTENT_CATALOG_SAMPLE_SEED_KEY = "sample_seed_version"
 
 
 CONTENT_CATALOG_SCHEMA_SQL = """
@@ -156,6 +158,12 @@ CREATE TABLE IF NOT EXISTS lp_content_pattern (
     FOREIGN KEY (default_view_id) REFERENCES lp_content_view(content_view_id)
 );
 
+CREATE TABLE IF NOT EXISTS lp_content_catalog_meta (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS ix_lp_content_kind_parent ON lp_content_kind(parent_content_kind_id);
 CREATE INDEX IF NOT EXISTS ix_lp_content_kind_tab ON lp_content_kind(canonical_tab_code);
 CREATE INDEX IF NOT EXISTS ix_lp_content_kind_object_type ON lp_content_kind(object_type_code);
@@ -186,9 +194,12 @@ def ensure_content_catalog_schema(conn=None, seed=True):
     if conn_id not in _READY_CONN_IDS:
         areas_mod.ensure_areas_schema(conn)
         conn.executescript(CONTENT_CATALOG_SCHEMA_SQL)
+        _dedupe_default_links(conn)
+        _migrate_canonical_table_names(conn)
+        _create_default_link_indexes(conn)
         conn.commit()
         _READY_CONN_IDS.add(conn_id)
-    if seed:
+    if seed and _sample_seed_needed(conn):
         seed_content_catalog(conn)
 
 
@@ -196,11 +207,76 @@ def _content_catalog_schema_is_current(conn):
     try:
         rows = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
-            "('lp_content_kind','lp_content_kind_area','lp_content_pattern','lp_template','lp_content_kind_template','lp_content_view','lp_content_kind_view')"
+            "('lp_content_kind','lp_content_kind_area','lp_content_pattern','lp_template','lp_content_kind_template','lp_content_view','lp_content_kind_view','lp_content_catalog_meta')"
         ).fetchall()
     except Exception:
         return False
-    return len(rows) == 7
+    return len(rows) == 8
+
+
+def _dedupe_default_links(conn):
+    for table_name, target_col in [
+        ("lp_content_kind_template", "template_id"),
+        ("lp_content_kind_view", "content_view_id"),
+    ]:
+        rows = conn.execute(
+            f"SELECT content_kind_id, MIN({target_col}) AS keep_id, COUNT(1) AS cnt "
+            f"FROM {table_name} WHERE is_default = 1 GROUP BY content_kind_id HAVING cnt > 1"
+        ).fetchall()
+        for row in rows:
+            conn.execute(
+                f"UPDATE {table_name} SET is_default = CASE WHEN {target_col} = ? THEN 1 ELSE 0 END "
+                "WHERE content_kind_id = ? AND is_default = 1",
+                (row["keep_id"], row["content_kind_id"]),
+            )
+
+
+def _create_default_link_indexes(conn):
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_content_kind_default_template "
+        "ON lp_content_kind_template(content_kind_id) WHERE is_default = 1"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_content_kind_default_view "
+        "ON lp_content_kind_view(content_kind_id) WHERE is_default = 1"
+    )
+
+
+def _migrate_canonical_table_names(conn):
+    conn.execute(
+        "UPDATE lp_content_kind SET canonical_table_name = 'lp_calendar_events', updated_at = ? "
+        "WHERE canonical_table_name = 'lp_cal_events'",
+        (_utc_now(),),
+    )
+
+
+def _sample_seed_version(conn):
+    row = conn.execute("SELECT value FROM lp_content_catalog_meta WHERE key = ?", (CONTENT_CATALOG_SAMPLE_SEED_KEY,)).fetchone()
+    if not row:
+        return 0
+    try:
+        return int(row["value"])
+    except (TypeError, ValueError):
+        return 0
+
+
+def _set_sample_seed_version(conn, version=CONTENT_CATALOG_SAMPLE_SEED_VERSION):
+    conn.execute(
+        "INSERT INTO lp_content_catalog_meta(key, value, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        (CONTENT_CATALOG_SAMPLE_SEED_KEY, str(int(version)), _utc_now()),
+    )
+
+
+def _sample_seed_needed(conn):
+    if _sample_seed_version(conn) >= CONTENT_CATALOG_SAMPLE_SEED_VERSION:
+        return False
+    existing = conn.execute("SELECT 1 FROM lp_content_kind LIMIT 1").fetchone()
+    if existing:
+        _set_sample_seed_version(conn)
+        conn.commit()
+        return False
+    return True
 
 
 def normalize_code(value):
@@ -373,33 +449,33 @@ def create_content_kind(values, conn=None):
     if mapping_status not in MAPPING_STATUS_CODES:
         raise ValueError("Mapping status is invalid.")
     now = _utc_now()
-    cur = conn.execute(
-        "INSERT INTO lp_content_kind "
-        "(kind_code, parent_content_kind_id, name, plural_name, description, object_type_code, canonical_tab_code, "
-        "canonical_table_name, subtype_code, date_behaviour_code, mapping_status_code, is_active, sort_order, notes, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            code,
-            parent_id,
-            name,
-            _clean_optional(values.get("plural_name")),
-            _clean_optional(values.get("description")),
-            object_type,
-            _clean_optional(normalize_code(values.get("canonical_tab_code"))),
-            _clean_optional(values.get("canonical_table_name")),
-            _clean_optional(normalize_code(values.get("subtype_code"))),
-            date_behaviour,
-            mapping_status,
-            _bool_int(values.get("is_active", 1)),
-            _int_value(values.get("sort_order"), 0),
-            _clean_optional(values.get("notes")),
-            now,
-            now,
-        ),
-    )
-    content_kind_id = cur.lastrowid
-    set_content_kind_areas(content_kind_id, values.get("area_ids") or [], values.get("default_area_id"), conn=conn)
-    conn.commit()
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO lp_content_kind "
+            "(kind_code, parent_content_kind_id, name, plural_name, description, object_type_code, canonical_tab_code, "
+            "canonical_table_name, subtype_code, date_behaviour_code, mapping_status_code, is_active, sort_order, notes, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                code,
+                parent_id,
+                name,
+                _clean_optional(values.get("plural_name")),
+                _clean_optional(values.get("description")),
+                object_type,
+                _clean_optional(normalize_code(values.get("canonical_tab_code"))),
+                _clean_optional(values.get("canonical_table_name")),
+                _clean_optional(normalize_code(values.get("subtype_code"))),
+                date_behaviour,
+                mapping_status,
+                _bool_int(values.get("is_active", 1)),
+                _int_value(values.get("sort_order"), 0),
+                _clean_optional(values.get("notes")),
+                now,
+                now,
+            ),
+        )
+        content_kind_id = cur.lastrowid
+        set_content_kind_areas(content_kind_id, values.get("area_ids") or [], values.get("default_area_id"), conn=conn)
     return content_kind_id
 
 
@@ -419,40 +495,40 @@ def update_content_kind(content_kind_id, values, conn=None):
         raise ValueError("Date behaviour is invalid.")
     if mapping_status not in MAPPING_STATUS_CODES:
         raise ValueError("Mapping status is invalid.")
-    conn.execute(
-        "UPDATE lp_content_kind SET kind_code = ?, parent_content_kind_id = ?, name = ?, plural_name = ?, "
-        "description = ?, object_type_code = ?, canonical_tab_code = ?, canonical_table_name = ?, subtype_code = ?, "
-        "date_behaviour_code = ?, mapping_status_code = ?, is_active = ?, sort_order = ?, notes = ?, updated_at = ? "
-        "WHERE content_kind_id = ?",
-        (
-            code,
-            parent_id,
-            name,
-            _clean_optional(values.get("plural_name")),
-            _clean_optional(values.get("description")),
-            object_type,
-            _clean_optional(normalize_code(values.get("canonical_tab_code"))),
-            _clean_optional(values.get("canonical_table_name")),
-            _clean_optional(normalize_code(values.get("subtype_code"))),
-            date_behaviour,
-            mapping_status,
-            _bool_int(values.get("is_active", 1)),
-            _int_value(values.get("sort_order"), 0),
-            _clean_optional(values.get("notes")),
-            _utc_now(),
-            content_kind_id,
-        ),
-    )
-    set_content_kind_areas(content_kind_id, values.get("area_ids") or [], values.get("default_area_id"), conn=conn)
-    conn.commit()
+    with conn:
+        conn.execute(
+            "UPDATE lp_content_kind SET kind_code = ?, parent_content_kind_id = ?, name = ?, plural_name = ?, "
+            "description = ?, object_type_code = ?, canonical_tab_code = ?, canonical_table_name = ?, subtype_code = ?, "
+            "date_behaviour_code = ?, mapping_status_code = ?, is_active = ?, sort_order = ?, notes = ?, updated_at = ? "
+            "WHERE content_kind_id = ?",
+            (
+                code,
+                parent_id,
+                name,
+                _clean_optional(values.get("plural_name")),
+                _clean_optional(values.get("description")),
+                object_type,
+                _clean_optional(normalize_code(values.get("canonical_tab_code"))),
+                _clean_optional(values.get("canonical_table_name")),
+                _clean_optional(normalize_code(values.get("subtype_code"))),
+                date_behaviour,
+                mapping_status,
+                _bool_int(values.get("is_active", 1)),
+                _int_value(values.get("sort_order"), 0),
+                _clean_optional(values.get("notes")),
+                _utc_now(),
+                content_kind_id,
+            ),
+        )
+        set_content_kind_areas(content_kind_id, values.get("area_ids") or [], values.get("default_area_id"), conn=conn)
     return True
 
 
 def deactivate_content_kind(content_kind_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
-    conn.execute("UPDATE lp_content_kind SET is_active = 0, updated_at = ? WHERE content_kind_id = ?", (_utc_now(), int(content_kind_id)))
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_kind SET is_active = 0, updated_at = ? WHERE content_kind_id = ?", (_utc_now(), int(content_kind_id)))
 
 
 def remove_content_kind(content_kind_id, conn=None):
@@ -470,11 +546,11 @@ def remove_content_kind(content_kind_id, conn=None):
     if child or pattern:
         deactivate_content_kind(content_kind_id, conn=conn)
         return {"removed": False, "deactivated": True}
-    conn.execute("DELETE FROM lp_content_kind_area WHERE content_kind_id = ?", (content_kind_id,))
-    conn.execute("DELETE FROM lp_content_kind_template WHERE content_kind_id = ?", (content_kind_id,))
-    conn.execute("DELETE FROM lp_content_kind_view WHERE content_kind_id = ?", (content_kind_id,))
-    conn.execute("DELETE FROM lp_content_kind WHERE content_kind_id = ?", (content_kind_id,))
-    conn.commit()
+    with conn:
+        conn.execute("DELETE FROM lp_content_kind_area WHERE content_kind_id = ?", (content_kind_id,))
+        conn.execute("DELETE FROM lp_content_kind_template WHERE content_kind_id = ?", (content_kind_id,))
+        conn.execute("DELETE FROM lp_content_kind_view WHERE content_kind_id = ?", (content_kind_id,))
+        conn.execute("DELETE FROM lp_content_kind WHERE content_kind_id = ?", (content_kind_id,))
     return {"removed": True, "deactivated": False}
 
 
@@ -509,20 +585,28 @@ def mark_content_kind_area_default(content_kind_id, area_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     now = _utc_now()
-    conn.execute("UPDATE lp_content_kind_area SET is_default = 0, updated_at = ? WHERE content_kind_id = ?", (now, int(content_kind_id)))
-    conn.execute(
-        "UPDATE lp_content_kind_area SET is_default = 1, updated_at = ? WHERE content_kind_id = ? AND area_id = ?",
-        (now, int(content_kind_id), _clean_text(area_id)),
-    )
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_kind_area SET is_default = 0, updated_at = ? WHERE content_kind_id = ?", (now, int(content_kind_id)))
+        conn.execute(
+            "UPDATE lp_content_kind_area SET is_default = 1, updated_at = ? WHERE content_kind_id = ? AND area_id = ?",
+            (now, int(content_kind_id), _clean_text(area_id)),
+        )
 
 
-def _kind_area_rows(conn):
+def _kind_area_rows(conn, visible_area_ids=None):
+    visible_area_ids = list(visible_area_ids or [])
     label_map = _area_label_map(conn)
+    params = []
+    where = ""
+    if visible_area_ids:
+        where = "WHERE cka.area_id IN (" + ",".join(["?"] * len(visible_area_ids)) + ") "
+        params = visible_area_ids
     rows = conn.execute(
         "SELECT cka.content_kind_id, cka.area_id, cka.is_default "
         "FROM lp_content_kind_area cka "
-        "ORDER BY cka.sort_order, lower(cka.area_id)"
+        f"{where}"
+        "ORDER BY cka.sort_order, lower(cka.area_id)",
+        params,
     ).fetchall()
     by_kind = {}
     for row in rows:
@@ -532,7 +616,7 @@ def _kind_area_rows(conn):
     return by_kind
 
 
-def list_content_kinds(conn=None, filters=None, include_inactive=False):
+def list_content_kinds(conn=None, filters=None, include_inactive=False, visible_area_ids=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     filters = filters or {}
@@ -553,11 +637,22 @@ def list_content_kinds(conn=None, filters=None, include_inactive=False):
     ]:
         value = filters.get(key)
         if value not in (None, "", "all"):
-            where.append(f"{col} = ?")
-            params.append(value)
+            if key == "canonical_tab_code" and value == NO_TAB_CODE:
+                where.append("COALESCE(ck.canonical_tab_code, '') = ''")
+            else:
+                where.append(f"{col} = ?")
+                params.append(value)
     if filters.get("area_id"):
-        where.append("EXISTS (SELECT 1 FROM lp_content_kind_area a WHERE a.content_kind_id = ck.content_kind_id AND lower(a.area_id) = lower(?))")
-        params.append(filters["area_id"])
+        if filters.get("area_id") == UNASSIGNED_AREA_ID:
+            area_filter_sql = "NOT EXISTS (SELECT 1 FROM lp_content_kind_area a WHERE a.content_kind_id = ck.content_kind_id"
+            if visible_area_ids:
+                area_filter_sql += " AND a.area_id IN (" + ",".join(["?"] * len(visible_area_ids)) + ")"
+                params.extend(visible_area_ids)
+            area_filter_sql += ")"
+            where.append(area_filter_sql)
+        else:
+            where.append("EXISTS (SELECT 1 FROM lp_content_kind_area a WHERE a.content_kind_id = ck.content_kind_id AND lower(a.area_id) = lower(?))")
+            params.append(filters["area_id"])
     if filters.get("q"):
         q = f"%{filters['q'].strip()}%"
         where.append("(ck.name LIKE ? OR ck.kind_code LIKE ? OR COALESCE(ck.description,'') LIKE ? OR COALESCE(ck.notes,'') LIKE ? OR COALESCE(ck.canonical_table_name,'') LIKE ?)")
@@ -570,7 +665,7 @@ def list_content_kinds(conn=None, filters=None, include_inactive=False):
         sql += "WHERE " + " AND ".join(where) + " "
     sql += "ORDER BY ck.sort_order, lower(ck.name), ck.content_kind_id"
     rows = [dict(row) for row in conn.execute(sql, params).fetchall()]
-    by_kind = _kind_area_rows(conn)
+    by_kind = _kind_area_rows(conn, visible_area_ids=visible_area_ids)
     for row in rows:
         areas = by_kind.get(row["content_kind_id"], [])
         row["areas"] = areas
@@ -609,24 +704,24 @@ def _create_or_update_template(values, template_id=None, conn=None):
         _clean_optional(values.get("notes")),
         now,
     )
-    if template_id:
-        conn.execute(
-            "UPDATE lp_template SET template_code = ?, name = ?, description = ?, template_type_code = ?, "
-            "target_object_type = ?, target_tab_code = ?, template_content = ?, template_config = ?, is_active = ?, "
-            "sort_order = ?, notes = ?, updated_at = ? WHERE template_id = ?",
-            data + (int(template_id),),
-        )
-        result_id = int(template_id)
-    else:
-        cur = conn.execute(
-            "INSERT INTO lp_template "
-            "(template_code, name, description, template_type_code, target_object_type, target_tab_code, template_content, "
-            "template_config, is_active, sort_order, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            data[:-1] + (now, now),
-        )
-        result_id = cur.lastrowid
-    set_template_content_kinds(result_id, values.get("content_kind_ids") or [], values.get("default_content_kind_id"), conn=conn)
-    conn.commit()
+    with conn:
+        if template_id:
+            conn.execute(
+                "UPDATE lp_template SET template_code = ?, name = ?, description = ?, template_type_code = ?, "
+                "target_object_type = ?, target_tab_code = ?, template_content = ?, template_config = ?, is_active = ?, "
+                "sort_order = ?, notes = ?, updated_at = ? WHERE template_id = ?",
+                data + (int(template_id),),
+            )
+            result_id = int(template_id)
+        else:
+            cur = conn.execute(
+                "INSERT INTO lp_template "
+                "(template_code, name, description, template_type_code, target_object_type, target_tab_code, template_content, "
+                "template_config, is_active, sort_order, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                data[:-1] + (now, now),
+            )
+            result_id = cur.lastrowid
+        set_template_content_kinds(result_id, values.get("content_kind_ids") or [], values.get("default_content_kind_id"), conn=conn)
     return result_id
 
 
@@ -641,18 +736,18 @@ def update_template(template_id, values, conn=None):
 def deactivate_template(template_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
-    conn.execute("UPDATE lp_template SET is_active = 0, updated_at = ? WHERE template_id = ?", (_utc_now(), int(template_id)))
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_template SET is_active = 0, updated_at = ? WHERE template_id = ?", (_utc_now(), int(template_id)))
 
 
 def remove_template(template_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     template_id = int(template_id)
-    conn.execute("UPDATE lp_content_pattern SET default_template_id = NULL, updated_at = ? WHERE default_template_id = ?", (_utc_now(), template_id))
-    conn.execute("DELETE FROM lp_content_kind_template WHERE template_id = ?", (template_id,))
-    conn.execute("DELETE FROM lp_template WHERE template_id = ?", (template_id,))
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_pattern SET default_template_id = NULL, updated_at = ? WHERE default_template_id = ?", (_utc_now(), template_id))
+        conn.execute("DELETE FROM lp_content_kind_template WHERE template_id = ?", (template_id,))
+        conn.execute("DELETE FROM lp_template WHERE template_id = ?", (template_id,))
     return {"removed": True, "deactivated": False}
 
 
@@ -671,6 +766,12 @@ def set_template_content_kinds(template_id, content_kind_ids, default_content_ki
     if default_content_kind_id and default_content_kind_id not in cleaned:
         cleaned.append(default_content_kind_id)
     conn.execute("DELETE FROM lp_content_kind_template WHERE template_id = ?", (int(template_id),))
+    if default_content_kind_id:
+        conn.execute(
+            "UPDATE lp_content_kind_template SET is_default = 0, updated_at = ? "
+            "WHERE content_kind_id = ? AND template_id <> ?",
+            (now, default_content_kind_id, int(template_id)),
+        )
     for idx, content_kind_id in enumerate(cleaned):
         conn.execute(
             "INSERT INTO lp_content_kind_template "
@@ -694,26 +795,26 @@ def set_content_kind_templates(content_kind_id, template_ids, default_template_i
     default_template_id = _int_or_none(default_template_id)
     if default_template_id and default_template_id not in cleaned:
         cleaned.append(default_template_id)
-    conn.execute("DELETE FROM lp_content_kind_template WHERE content_kind_id = ?", (int(content_kind_id),))
-    for idx, template_id in enumerate(cleaned):
-        conn.execute(
-            "INSERT INTO lp_content_kind_template "
-            "(content_kind_id, template_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (int(content_kind_id), template_id, 1 if default_template_id == template_id else 0, idx * 10, now, now),
-        )
-    conn.commit()
+    with conn:
+        conn.execute("DELETE FROM lp_content_kind_template WHERE content_kind_id = ?", (int(content_kind_id),))
+        for idx, template_id in enumerate(cleaned):
+            conn.execute(
+                "INSERT INTO lp_content_kind_template "
+                "(content_kind_id, template_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (int(content_kind_id), template_id, 1 if default_template_id == template_id else 0, idx * 10, now, now),
+            )
 
 
 def mark_content_kind_template_default(content_kind_id, template_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     now = _utc_now()
-    conn.execute("UPDATE lp_content_kind_template SET is_default = 0, updated_at = ? WHERE content_kind_id = ?", (now, int(content_kind_id)))
-    conn.execute(
-        "UPDATE lp_content_kind_template SET is_default = 1, updated_at = ? WHERE content_kind_id = ? AND template_id = ?",
-        (now, int(content_kind_id), int(template_id)),
-    )
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_kind_template SET is_default = 0, updated_at = ? WHERE content_kind_id = ?", (now, int(content_kind_id)))
+        conn.execute(
+            "UPDATE lp_content_kind_template SET is_default = 1, updated_at = ? WHERE content_kind_id = ? AND template_id = ?",
+            (now, int(content_kind_id), int(template_id)),
+        )
 
 
 def list_templates(conn=None, include_inactive=False):
@@ -757,23 +858,23 @@ def _create_or_update_view(values, content_view_id=None, conn=None):
         _clean_optional(values.get("notes")),
         now,
     )
-    if content_view_id:
-        conn.execute(
-            "UPDATE lp_content_view SET view_code = ?, name = ?, description = ?, tab_code = ?, view_type_code = ?, "
-            "view_config = ?, is_active = ?, sort_order = ?, notes = ?, updated_at = ? WHERE content_view_id = ?",
-            data + (int(content_view_id),),
-        )
-        result_id = int(content_view_id)
-    else:
-        cur = conn.execute(
-            "INSERT INTO lp_content_view "
-            "(view_code, name, description, tab_code, view_type_code, view_config, is_active, sort_order, notes, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            data[:-1] + (now, now),
-        )
-        result_id = cur.lastrowid
-    set_view_content_kinds(result_id, values.get("content_kind_ids") or [], values.get("default_content_kind_id"), conn=conn)
-    conn.commit()
+    with conn:
+        if content_view_id:
+            conn.execute(
+                "UPDATE lp_content_view SET view_code = ?, name = ?, description = ?, tab_code = ?, view_type_code = ?, "
+                "view_config = ?, is_active = ?, sort_order = ?, notes = ?, updated_at = ? WHERE content_view_id = ?",
+                data + (int(content_view_id),),
+            )
+            result_id = int(content_view_id)
+        else:
+            cur = conn.execute(
+                "INSERT INTO lp_content_view "
+                "(view_code, name, description, tab_code, view_type_code, view_config, is_active, sort_order, notes, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                data[:-1] + (now, now),
+            )
+            result_id = cur.lastrowid
+        set_view_content_kinds(result_id, values.get("content_kind_ids") or [], values.get("default_content_kind_id"), conn=conn)
     return result_id
 
 
@@ -788,18 +889,18 @@ def update_content_view(content_view_id, values, conn=None):
 def deactivate_content_view(content_view_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
-    conn.execute("UPDATE lp_content_view SET is_active = 0, updated_at = ? WHERE content_view_id = ?", (_utc_now(), int(content_view_id)))
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_view SET is_active = 0, updated_at = ? WHERE content_view_id = ?", (_utc_now(), int(content_view_id)))
 
 
 def remove_content_view(content_view_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     content_view_id = int(content_view_id)
-    conn.execute("UPDATE lp_content_pattern SET default_view_id = NULL, updated_at = ? WHERE default_view_id = ?", (_utc_now(), content_view_id))
-    conn.execute("DELETE FROM lp_content_kind_view WHERE content_view_id = ?", (content_view_id,))
-    conn.execute("DELETE FROM lp_content_view WHERE content_view_id = ?", (content_view_id,))
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_pattern SET default_view_id = NULL, updated_at = ? WHERE default_view_id = ?", (_utc_now(), content_view_id))
+        conn.execute("DELETE FROM lp_content_kind_view WHERE content_view_id = ?", (content_view_id,))
+        conn.execute("DELETE FROM lp_content_view WHERE content_view_id = ?", (content_view_id,))
     return {"removed": True, "deactivated": False}
 
 
@@ -818,6 +919,12 @@ def set_view_content_kinds(content_view_id, content_kind_ids, default_content_ki
     if default_content_kind_id and default_content_kind_id not in cleaned:
         cleaned.append(default_content_kind_id)
     conn.execute("DELETE FROM lp_content_kind_view WHERE content_view_id = ?", (int(content_view_id),))
+    if default_content_kind_id:
+        conn.execute(
+            "UPDATE lp_content_kind_view SET is_default = 0, updated_at = ? "
+            "WHERE content_kind_id = ? AND content_view_id <> ?",
+            (now, default_content_kind_id, int(content_view_id)),
+        )
     for idx, content_kind_id in enumerate(cleaned):
         conn.execute(
             "INSERT INTO lp_content_kind_view "
@@ -841,26 +948,26 @@ def set_content_kind_views(content_kind_id, content_view_ids, default_view_id=No
     default_view_id = _int_or_none(default_view_id)
     if default_view_id and default_view_id not in cleaned:
         cleaned.append(default_view_id)
-    conn.execute("DELETE FROM lp_content_kind_view WHERE content_kind_id = ?", (int(content_kind_id),))
-    for idx, content_view_id in enumerate(cleaned):
-        conn.execute(
-            "INSERT INTO lp_content_kind_view "
-            "(content_kind_id, content_view_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (int(content_kind_id), content_view_id, 1 if default_view_id == content_view_id else 0, idx * 10, now, now),
-        )
-    conn.commit()
+    with conn:
+        conn.execute("DELETE FROM lp_content_kind_view WHERE content_kind_id = ?", (int(content_kind_id),))
+        for idx, content_view_id in enumerate(cleaned):
+            conn.execute(
+                "INSERT INTO lp_content_kind_view "
+                "(content_kind_id, content_view_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (int(content_kind_id), content_view_id, 1 if default_view_id == content_view_id else 0, idx * 10, now, now),
+            )
 
 
 def mark_content_kind_view_default(content_kind_id, content_view_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     now = _utc_now()
-    conn.execute("UPDATE lp_content_kind_view SET is_default = 0, updated_at = ? WHERE content_kind_id = ?", (now, int(content_kind_id)))
-    conn.execute(
-        "UPDATE lp_content_kind_view SET is_default = 1, updated_at = ? WHERE content_kind_id = ? AND content_view_id = ?",
-        (now, int(content_kind_id), int(content_view_id)),
-    )
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_kind_view SET is_default = 0, updated_at = ? WHERE content_kind_id = ?", (now, int(content_kind_id)))
+        conn.execute(
+            "UPDATE lp_content_kind_view SET is_default = 1, updated_at = ? WHERE content_kind_id = ? AND content_view_id = ?",
+            (now, int(content_kind_id), int(content_view_id)),
+        )
 
 
 def list_content_views(conn=None, include_inactive=False):
@@ -912,14 +1019,14 @@ def create_content_pattern(values, conn=None):
     ensure_content_catalog_schema(conn, seed=False)
     now = _utc_now()
     payload = _pattern_payload(values, conn)
-    cur = conn.execute(
-        "INSERT INTO lp_content_pattern "
-        "(pattern_code, content_kind_id, name, description, default_area_id, default_template_id, default_view_id, "
-        "creation_config, view_filter_config, is_active, sort_order, notes, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        payload + (now, now),
-    )
-    conn.commit()
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO lp_content_pattern "
+            "(pattern_code, content_kind_id, name, description, default_area_id, default_template_id, default_view_id, "
+            "creation_config, view_filter_config, is_active, sort_order, notes, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            payload + (now, now),
+        )
     return cur.lastrowid
 
 
@@ -927,28 +1034,28 @@ def update_content_pattern(content_pattern_id, values, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     payload = _pattern_payload(values, conn)
-    conn.execute(
-        "UPDATE lp_content_pattern SET pattern_code = ?, content_kind_id = ?, name = ?, description = ?, "
-        "default_area_id = ?, default_template_id = ?, default_view_id = ?, creation_config = ?, view_filter_config = ?, "
-        "is_active = ?, sort_order = ?, notes = ?, updated_at = ? WHERE content_pattern_id = ?",
-        payload + (_utc_now(), int(content_pattern_id)),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "UPDATE lp_content_pattern SET pattern_code = ?, content_kind_id = ?, name = ?, description = ?, "
+            "default_area_id = ?, default_template_id = ?, default_view_id = ?, creation_config = ?, view_filter_config = ?, "
+            "is_active = ?, sort_order = ?, notes = ?, updated_at = ? WHERE content_pattern_id = ?",
+            payload + (_utc_now(), int(content_pattern_id)),
+        )
     return True
 
 
 def deactivate_content_pattern(content_pattern_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
-    conn.execute("UPDATE lp_content_pattern SET is_active = 0, updated_at = ? WHERE content_pattern_id = ?", (_utc_now(), int(content_pattern_id)))
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE lp_content_pattern SET is_active = 0, updated_at = ? WHERE content_pattern_id = ?", (_utc_now(), int(content_pattern_id)))
 
 
 def remove_content_pattern(content_pattern_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
-    conn.execute("DELETE FROM lp_content_pattern WHERE content_pattern_id = ?", (int(content_pattern_id),))
-    conn.commit()
+    with conn:
+        conn.execute("DELETE FROM lp_content_pattern WHERE content_pattern_id = ?", (int(content_pattern_id),))
     return {"removed": True, "deactivated": False}
 
 
@@ -1135,20 +1242,27 @@ def content_catalog_matrix(filters=None, conn=None):
     row_totals = {area_id: 0 for area_id in area_ids}
     column_totals = {tab_code: 0 for tab_code in tab_order}
     status_totals = {status: 0 for status in ["CONFIRMED", "NEEDS_TEMPLATE", "NEEDS_VIEW", "NEEDS_OBJECT", "UNDECIDED"]}
-    mapping_total = 0
+    matrix_placements = 0
+    assigned_area_mappings = 0
+    unassigned_kind_placements = 0
     for row in rows:
         area_id = row["area_id"]
         tab_code = row["tab_code"]
+        total_count = int(row["total_count"] or 0)
         cell = {
             "area_id": area_id,
             "tab_code": tab_code,
-            "total": int(row["total_count"] or 0),
+            "total": total_count,
             "statuses": _status_counts_from_row(row),
         }
         cells[f"{area_id}|{tab_code}"] = cell
         row_totals[area_id] = row_totals.get(area_id, 0) + cell["total"]
         column_totals[tab_code] = column_totals.get(tab_code, 0) + cell["total"]
-        mapping_total += cell["total"]
+        matrix_placements += cell["total"]
+        if area_id == UNASSIGNED_AREA_ID:
+            unassigned_kind_placements += total_count
+        else:
+            assigned_area_mappings += total_count
         for status, count in cell["statuses"].items():
             status_totals[status] += count
     unique_sql = f"SELECT COUNT(1) AS cnt FROM lp_content_kind ck {where_sql}"
@@ -1159,7 +1273,10 @@ def content_catalog_matrix(filters=None, conn=None):
         "cells": cells,
         "totals": {
             "unique_kinds": unique_total,
-            "area_tab_mappings": mapping_total,
+            "area_tab_mappings": assigned_area_mappings,
+            "assigned_area_mappings": assigned_area_mappings,
+            "unassigned_kind_placements": unassigned_kind_placements,
+            "matrix_placements": matrix_placements,
             "statuses": status_totals,
             "columns": column_totals,
             "rows": row_totals,
@@ -1192,8 +1309,10 @@ def _template_view_maps(conn):
 def detailed_content_kinds(filters=None, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
-    rows = list_content_kinds(conn=conn, filters={"active": "all"}, include_inactive=True)
     filters = filters or {}
+    visible_areas = _visible_matrix_areas(conn, include_inactive_areas=_truthy(filters.get("include_inactive_areas")))
+    visible_area_ids = [row["area_id"] for row in visible_areas]
+    rows = list_content_kinds(conn=conn, filters={"active": "all"}, include_inactive=True, visible_area_ids=visible_area_ids)
     templates, views = _template_view_maps(conn)
 
     def matches(row):
@@ -1242,6 +1361,16 @@ def detailed_content_kinds(filters=None, conn=None):
     return result
 
 
+def _table_exists(conn, table_name):
+    if not table_name:
+        return True
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
+
+
 def content_catalog_cell_details(area_id, tab_code, filters=None, conn=None):
     filters = dict(filters or {})
     filters["area_id"] = area_id or UNASSIGNED_AREA_ID
@@ -1250,6 +1379,7 @@ def content_catalog_cell_details(area_id, tab_code, filters=None, conn=None):
 
 
 def content_catalog_report(group="by-tab", filters=None, conn=None):
+    conn = _get_conn(conn)
     rows = detailed_content_kinds(filters=filters, conn=conn)
     group = (group or "by-tab").strip().lower()
     if group == "coverage-gaps":
@@ -1261,6 +1391,7 @@ def content_catalog_report(group="by-tab", filters=None, conn=None):
                 {"label": "Needs Objects", "items": [r for r in rows if r.get("mapping_status_code") == "NEEDS_OBJECT"]},
                 {"label": "Undecided", "items": [r for r in rows if r.get("mapping_status_code") == "UNDECIDED"]},
                 {"label": "Missing Canonical Table", "items": [r for r in rows if not r.get("canonical_table_name")]},
+                {"label": "Canonical Table Does Not Exist", "items": [r for r in rows if r.get("canonical_table_name") and not _table_exists(conn, r.get("canonical_table_name"))]},
                 {"label": "No Area Mapping", "items": [r for r in rows if not r.get("area_ids")]},
                 {"label": "No Template", "items": [r for r in rows if not r.get("templates")]},
                 {"label": "No View", "items": [r for r in rows if not r.get("views")]},
@@ -1289,7 +1420,7 @@ ROOT_TABLES = {
     "TASK": "lp_tasks",
     "PROJECT": "lp_project_workspaces",
     "LIST": "lp_project_workspaces",
-    "EVENT": "lp_cal_events",
+    "EVENT": "lp_calendar_events",
     "HOWTO": "lp_howto",
     "PERSON": "lp_contacts",
     "PLACE": "lp_places",
@@ -1533,92 +1664,96 @@ SAMPLE_PATTERNS = [
 ]
 
 
-def seed_content_catalog(conn=None):
+def seed_content_catalog(conn=None, force=False):
     conn = _get_conn(conn)
+    ensure_content_catalog_schema(conn, seed=False)
+    if not force and _sample_seed_version(conn) >= CONTENT_CATALOG_SAMPLE_SEED_VERSION:
+        return
     now = _utc_now()
-    for idx, (code, name, parent, object_type, tab, subtype, date_behaviour, status) in enumerate(SAMPLE_CONTENT_KINDS):
-        if _kind_id_by_code(conn, code):
-            continue
-        parent_id = _kind_id_by_code(conn, parent)
-        conn.execute(
-            "INSERT INTO lp_content_kind "
-            "(kind_code, parent_content_kind_id, name, object_type_code, canonical_tab_code, canonical_table_name, subtype_code, "
-            "date_behaviour_code, mapping_status_code, is_active, sort_order, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
-            (code, parent_id, name, object_type, tab, ROOT_TABLES.get(code) or ROOT_TABLES.get(parent), subtype, date_behaviour, status, idx * 10, now, now),
-        )
-    for idx, (code, name, template_type, target_object, target_tab, content) in enumerate(SAMPLE_TEMPLATES):
-        if _template_id_by_code(conn, code):
-            continue
-        conn.execute(
-            "INSERT INTO lp_template "
-            "(template_code, name, template_type_code, target_object_type, target_tab_code, template_content, is_active, sort_order, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
-            (code, name, template_type, target_object, target_tab, content, idx * 10, now, now),
-        )
-    for idx, (code, name, tab, view_type, config) in enumerate(SAMPLE_VIEWS):
-        if _view_id_by_code(conn, code):
-            continue
-        conn.execute(
-            "INSERT INTO lp_content_view "
-            "(view_code, name, tab_code, view_type_code, view_config, is_active, sort_order, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)",
-            (code, name, tab, view_type, json.dumps(config, ensure_ascii=True, indent=2), idx * 10, now, now),
-        )
-    for kind_code, template_code, is_default in KIND_TEMPLATE_LINKS:
-        kind_id = _kind_id_by_code(conn, kind_code)
-        template_id = _template_id_by_code(conn, template_code)
-        if not kind_id or not template_id:
-            continue
-        has_default = conn.execute(
-            "SELECT 1 FROM lp_content_kind_template WHERE content_kind_id = ? AND is_default = 1",
-            (kind_id,),
-        ).fetchone()
-        next_default = int(is_default and not has_default)
-        conn.execute(
-            "INSERT OR IGNORE INTO lp_content_kind_template "
-            "(content_kind_id, template_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)",
-            (kind_id, template_id, next_default, now, now),
-        )
-    for kind_code, view_code, is_default in KIND_VIEW_LINKS:
-        kind_id = _kind_id_by_code(conn, kind_code)
-        view_id = _view_id_by_code(conn, view_code)
-        if not kind_id or not view_id:
-            continue
-        has_default = conn.execute(
-            "SELECT 1 FROM lp_content_kind_view WHERE content_kind_id = ? AND is_default = 1",
-            (kind_id,),
-        ).fetchone()
-        next_default = int(is_default and not has_default)
-        conn.execute(
-            "INSERT OR IGNORE INTO lp_content_kind_view "
-            "(content_kind_id, content_view_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)",
-            (kind_id, view_id, next_default, now, now),
-        )
-    for area_name, kind_codes in AREA_MAPPINGS.items():
-        area_id = _area_id_by_name_or_id(conn, area_name)
-        if not area_id:
-            continue
-        for kind_code in kind_codes:
+    with conn:
+        for idx, (code, name, parent, object_type, tab, subtype, date_behaviour, status) in enumerate(SAMPLE_CONTENT_KINDS):
+            if _kind_id_by_code(conn, code):
+                continue
+            parent_id = _kind_id_by_code(conn, parent)
+            conn.execute(
+                "INSERT INTO lp_content_kind "
+                "(kind_code, parent_content_kind_id, name, object_type_code, canonical_tab_code, canonical_table_name, subtype_code, "
+                "date_behaviour_code, mapping_status_code, is_active, sort_order, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+                (code, parent_id, name, object_type, tab, ROOT_TABLES.get(code) or ROOT_TABLES.get(parent), subtype, date_behaviour, status, idx * 10, now, now),
+            )
+        for idx, (code, name, template_type, target_object, target_tab, content) in enumerate(SAMPLE_TEMPLATES):
+            if _template_id_by_code(conn, code):
+                continue
+            conn.execute(
+                "INSERT INTO lp_template "
+                "(template_code, name, template_type_code, target_object_type, target_tab_code, template_content, is_active, sort_order, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+                (code, name, template_type, target_object, target_tab, content, idx * 10, now, now),
+            )
+        for idx, (code, name, tab, view_type, config) in enumerate(SAMPLE_VIEWS):
+            if _view_id_by_code(conn, code):
+                continue
+            conn.execute(
+                "INSERT INTO lp_content_view "
+                "(view_code, name, tab_code, view_type_code, view_config, is_active, sort_order, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)",
+                (code, name, tab, view_type, json.dumps(config, ensure_ascii=True, indent=2), idx * 10, now, now),
+            )
+        for kind_code, template_code, is_default in KIND_TEMPLATE_LINKS:
+            kind_id = _kind_id_by_code(conn, kind_code)
+            template_id = _template_id_by_code(conn, template_code)
+            if not kind_id or not template_id:
+                continue
+            has_default = conn.execute(
+                "SELECT 1 FROM lp_content_kind_template WHERE content_kind_id = ? AND is_default = 1",
+                (kind_id,),
+            ).fetchone()
+            next_default = int(is_default and not has_default)
+            conn.execute(
+                "INSERT OR IGNORE INTO lp_content_kind_template "
+                "(content_kind_id, template_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)",
+                (kind_id, template_id, next_default, now, now),
+            )
+        for kind_code, view_code, is_default in KIND_VIEW_LINKS:
+            kind_id = _kind_id_by_code(conn, kind_code)
+            view_id = _view_id_by_code(conn, view_code)
+            if not kind_id or not view_id:
+                continue
+            has_default = conn.execute(
+                "SELECT 1 FROM lp_content_kind_view WHERE content_kind_id = ? AND is_default = 1",
+                (kind_id,),
+            ).fetchone()
+            next_default = int(is_default and not has_default)
+            conn.execute(
+                "INSERT OR IGNORE INTO lp_content_kind_view "
+                "(content_kind_id, content_view_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)",
+                (kind_id, view_id, next_default, now, now),
+            )
+        for area_name, kind_codes in AREA_MAPPINGS.items():
+            area_id = _area_id_by_name_or_id(conn, area_name)
+            if not area_id:
+                continue
+            for kind_code in kind_codes:
+                kind_id = _kind_id_by_code(conn, kind_code)
+                if not kind_id:
+                    continue
+                conn.execute(
+                    "INSERT OR IGNORE INTO lp_content_kind_area "
+                    "(content_kind_id, area_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)",
+                    (kind_id, area_id, now, now),
+                )
+        for idx, (pattern_code, name, kind_code, area_name, template_code, view_code) in enumerate(SAMPLE_PATTERNS):
+            row = conn.execute("SELECT content_pattern_id FROM lp_content_pattern WHERE pattern_code = ?", (pattern_code,)).fetchone()
+            if row:
+                continue
             kind_id = _kind_id_by_code(conn, kind_code)
             if not kind_id:
                 continue
             conn.execute(
-                "INSERT OR IGNORE INTO lp_content_kind_area "
-                "(content_kind_id, area_id, is_default, sort_order, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)",
-                (kind_id, area_id, now, now),
+                "INSERT INTO lp_content_pattern "
+                "(pattern_code, content_kind_id, name, default_area_id, default_template_id, default_view_id, is_active, sort_order, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+                (pattern_code, kind_id, name, _area_id_by_name_or_id(conn, area_name), _template_id_by_code(conn, template_code), _view_id_by_code(conn, view_code), idx * 10, now, now),
             )
-    for idx, (pattern_code, name, kind_code, area_name, template_code, view_code) in enumerate(SAMPLE_PATTERNS):
-        row = conn.execute("SELECT content_pattern_id FROM lp_content_pattern WHERE pattern_code = ?", (pattern_code,)).fetchone()
-        if row:
-            continue
-        kind_id = _kind_id_by_code(conn, kind_code)
-        if not kind_id:
-            continue
-        conn.execute(
-            "INSERT INTO lp_content_pattern "
-            "(pattern_code, content_kind_id, name, default_area_id, default_template_id, default_view_id, is_active, sort_order, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
-            (pattern_code, kind_id, name, _area_id_by_name_or_id(conn, area_name), _template_id_by_code(conn, template_code), _view_id_by_code(conn, view_code), idx * 10, now, now),
-        )
-    conn.commit()
+        _set_sample_seed_version(conn)

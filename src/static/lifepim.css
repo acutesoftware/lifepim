@@ -2890,6 +2890,26 @@ button.calendar-nav {
   color: #6b7280;
 }
 
+.content-catalog-filter-banner {
+  align-items: center;
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #1f2937;
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 6px 8px;
+}
+
+.content-catalog-filter-banner button {
+  border: 1px solid #93c5fd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 3px 7px;
+}
+
 .content-catalog-filters,
 .admin-editor-toolbar {
   display: flex;

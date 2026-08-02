@@ -306,6 +306,7 @@
         if (!payload.ok) throw new Error(payload.error || "Save failed.");
         this.flash("Saved.");
         await this.load(this.config.getParams ? this.config.getParams() : {});
+        if (this.config.onSaved) await this.config.onSaved(payload, this);
       } catch (error) {
         this.setError(tr, error.message);
       }
@@ -326,6 +327,7 @@
         if (!payload.ok) throw new Error(payload.error || "Remove failed.");
         this.flash(payload.deactivated ? "Deactivated." : "Removed.");
         await this.load(this.config.getParams ? this.config.getParams() : {});
+        if (this.config.onRemoved) await this.config.onRemoved(payload, this);
       } catch (error) {
         this.setError(tr, error.message);
       }
@@ -371,7 +373,7 @@
   function initCatalog() {
     const shell = document.querySelector(".content-catalog-admin");
     if (!shell) return;
-    const config = JSON.parse(shell.dataset.config || "{}");
+    let config = JSON.parse(shell.dataset.config || "{}");
     let summary = JSON.parse(shell.dataset.summary || "{}");
     const filterEls = Array.from(shell.querySelectorAll("[data-kind-filter]"));
     const matrixFilters = Array.from(shell.querySelectorAll("[data-matrix-filter]"));
@@ -383,6 +385,7 @@
     const editorTableSelect = shell.querySelector("[data-editor-table-select]");
     const editorTableName = shell.querySelector("[data-editor-table-name]");
     const summaryStats = shell.querySelector("[data-catalog-summary-stats]");
+    const editorFilterBanner = shell.querySelector("[data-editor-filter-banner]");
     let currentMode = shell.dataset.initialMode || "matrix";
     let currentEditorTable = "content-kinds";
     let currentReportGroup = "by-tab";
@@ -471,6 +474,47 @@
     const viewOptions = () => (config.views || []).map((item) => ({ value: item.value, label: item.label }));
     const areaOptions = () => (config.areas || []).map((item) => ({ value: item.area_id, label: item.area_name || item.area_id }));
 
+    function updateColumnOptions(editor, field, options) {
+      const column = editor.config.columns.find((item) => item.field === field);
+      if (column) column.options = options;
+    }
+
+    function updateEditorOptionSources() {
+      updateColumnOptions(editors["content-kinds"], "parent_content_kind_id", kindOptions());
+      updateColumnOptions(editors["content-kinds"], "object_type_code", optionList(config.objectTypeCodes));
+      updateColumnOptions(editors["content-kinds"], "canonical_tab_code", optionList(config.tabCodes));
+      updateColumnOptions(editors["content-kinds"], "date_behaviour_code", optionList(config.dateBehaviourCodes));
+      updateColumnOptions(editors["content-kinds"], "area_ids", areaOptions());
+      updateColumnOptions(editors["content-kinds"], "default_area_id", areaOptions());
+      updateColumnOptions(editors["content-kinds"], "mapping_status_code", optionList(config.mappingStatusCodes));
+      updateColumnOptions(editors.patterns, "content_kind_id", kindOptions());
+      updateColumnOptions(editors.patterns, "default_area_id", areaOptions());
+      updateColumnOptions(editors.patterns, "default_template_id", templateOptions());
+      updateColumnOptions(editors.patterns, "default_view_id", viewOptions());
+      updateColumnOptions(editors.templates, "template_type_code", optionList(config.templateTypeCodes));
+      updateColumnOptions(editors.templates, "target_object_type", optionList(config.objectTypeCodes));
+      updateColumnOptions(editors.templates, "target_tab_code", optionList(config.tabCodes));
+      updateColumnOptions(editors.templates, "content_kind_ids", kindOptions());
+      updateColumnOptions(editors.templates, "default_content_kind_id", kindOptions());
+      updateColumnOptions(editors.views, "tab_code", optionList(config.tabCodes));
+      updateColumnOptions(editors.views, "view_type_code", optionList(config.viewTypeCodes));
+      updateColumnOptions(editors.views, "content_kind_ids", kindOptions());
+      updateColumnOptions(editors.views, "default_content_kind_id", kindOptions());
+    }
+
+    async function refreshCatalogConfig() {
+      const response = await fetch("/admin/content-catalog/api/config");
+      const payload = await response.json();
+      if (!payload.ok) return;
+      config = payload.config || config;
+      summary = payload.summary || summary;
+      updateEditorOptionSources();
+      renderSummary();
+      Object.values(editors).forEach((editor) => editor.renderRows());
+      if (currentMode === "matrix") loadMatrix();
+      if (currentMode === "report") loadReport();
+    }
+
     const editors = {
       "content-kinds": new AdminTableEditor(document.querySelector('[data-editor="contentKindsEditor"]'), {
         endpoint: "/admin/content-catalog/api/content-kinds",
@@ -494,6 +538,8 @@
           { field: "is_active", label: "Active", type: "checkbox" },
           { field: "notes", label: "Notes" },
         ],
+        onSaved: refreshCatalogConfig,
+        onRemoved: refreshCatalogConfig,
       }),
       patterns: new AdminTableEditor(document.querySelector('[data-editor="patternsEditor"]'), {
         endpoint: "/admin/content-catalog/api/patterns",
@@ -514,6 +560,8 @@
           { field: "creation_config", label: "Creation Config", json: true },
           { field: "view_filter_config", label: "View Filter Config", json: true },
         ],
+        onSaved: refreshCatalogConfig,
+        onRemoved: refreshCatalogConfig,
       }),
       templates: new AdminTableEditor(document.querySelector('[data-editor="templatesEditor"]'), {
         endpoint: "/admin/content-catalog/api/templates",
@@ -535,6 +583,8 @@
           { field: "template_content", label: "Template Content", type: "textarea", rows: 1 },
           { field: "template_config", label: "Template Config", type: "textarea", rows: 1, json: true },
         ],
+        onSaved: refreshCatalogConfig,
+        onRemoved: refreshCatalogConfig,
       }),
       views: new AdminTableEditor(document.querySelector('[data-editor="viewsEditor"]'), {
         endpoint: "/admin/content-catalog/api/views",
@@ -554,6 +604,8 @@
           { field: "description", label: "Description", type: "textarea", rows: 1 },
           { field: "view_config", label: "View Config", type: "textarea", rows: 1, json: true },
         ],
+        onSaved: refreshCatalogConfig,
+        onRemoved: refreshCatalogConfig,
       }),
     };
 
@@ -591,8 +643,24 @@
     function setEditorFilters(filters) {
       filterEls.forEach((el) => {
         const value = filters[el.dataset.kindFilter];
-        if (value !== undefined) el.value = value;
+        el.value = value !== undefined ? value : (el.dataset.kindFilter === "active" ? "all" : "");
       });
+      const labels = filters._labels || {};
+      if (editorFilterBanner && (labels.area || labels.tab)) {
+        editorFilterBanner.innerHTML = `Filtered to: Area = ${escapeHtml(labels.area || "Any")}, Tab = ${escapeHtml(labels.tab || "Any")} <button type="button" data-clear-editor-filters>Clear</button>`;
+        editorFilterBanner.hidden = false;
+      }
+      loadKinds();
+    }
+
+    function clearEditorFilters() {
+      filterEls.forEach((el) => {
+        el.value = el.dataset.kindFilter === "active" ? "all" : "";
+      });
+      if (editorFilterBanner) {
+        editorFilterBanner.hidden = true;
+        editorFilterBanner.innerHTML = "";
+      }
       loadKinds();
     }
 
@@ -616,7 +684,7 @@
     function renderMatrix(matrix) {
       const meta = shell.querySelector("[data-matrix-meta]");
       const wrap = shell.querySelector("[data-matrix-wrap]");
-      meta.textContent = `${matrix.totals.unique_kinds} unique content kinds; ${matrix.totals.area_tab_mappings} Area-Tab mappings`;
+      meta.textContent = `${matrix.totals.unique_kinds} visible Content Kinds; ${matrix.totals.assigned_area_mappings} actual Area mappings; ${matrix.totals.unassigned_kind_placements} currently unassigned; ${matrix.totals.matrix_placements} Matrix placements`;
       const header = matrix.tabs.map((tab) => `<th>${escapeHtml(tab.label)}<span>${tab.total || 0}</span></th>`).join("");
       const rows = matrix.areas.map((area) => {
         const cells = matrix.tabs.map((tab) => {
@@ -630,7 +698,7 @@
         return `<tr><th class="matrix-area">${escapeHtml(area.label)}<span>${area.total || 0}</span></th>${cells}<td class="matrix-total">${area.total || 0}</td></tr>`;
       }).join("");
       const totals = matrix.tabs.map((tab) => `<td class="matrix-total">${tab.total || 0}</td>`).join("");
-      wrap.innerHTML = `<table class="content-catalog-matrix"><thead><tr><th class="matrix-area">Area</th>${header}<th>Total</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th class="matrix-area">Total</th>${totals}<td class="matrix-total">${matrix.totals.area_tab_mappings}</td></tr></tfoot></table>`;
+      wrap.innerHTML = `<table class="content-catalog-matrix"><thead><tr><th class="matrix-area">Area</th>${header}<th>Total</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th class="matrix-area">Total</th>${totals}<td class="matrix-total">${matrix.totals.matrix_placements}</td></tr></tfoot></table>`;
     }
 
     async function openCell(button) {
@@ -662,14 +730,21 @@
       }).join("");
       body.innerHTML = `<p>${payload.rows.length} content kinds</p><button type="button" data-open-filtered-editor>Open Filtered Editor</button>${items || '<p class="settings-empty">No content kinds.</p>'}`;
       body.querySelector("[data-open-filtered-editor]").addEventListener("click", () => {
-        setMode("editor");
+        setEditorTable("content-kinds");
         setEditorFilters({
-          area_id: button.dataset.areaId === config.unassignedAreaId ? "" : button.dataset.areaId,
-          canonical_tab_code: button.dataset.tabCode === config.noTabCode ? "" : button.dataset.tabCode,
+          area_id: button.dataset.areaId,
+          canonical_tab_code: button.dataset.tabCode,
+          active: "all",
+          _labels: {
+            area: button.dataset.areaLabel,
+            tab: button.dataset.tabLabel,
+          },
         });
+        setMode("editor");
       });
       body.querySelectorAll("[data-open-kind]").forEach((itemButton) => {
         itemButton.addEventListener("click", () => {
+          setEditorTable("content-kinds");
           setMode("editor");
           editors["content-kinds"].searchInput.value = itemButton.dataset.openKind;
           editors["content-kinds"].search = itemButton.dataset.openKind.toLowerCase();
@@ -781,6 +856,13 @@
       const option = select.selectedOptions[0];
       applySummaryQuickFilter(option.dataset.summaryFilter || "", option.dataset.summaryValue || "");
     });
+    if (editorFilterBanner) {
+      editorFilterBanner.addEventListener("click", (event) => {
+        if (event.target.closest("[data-clear-editor-filters]")) {
+          clearEditorFilters();
+        }
+      });
+    }
 
     function setEditorTable(tableKey) {
       currentEditorTable = tableKey || "content-kinds";

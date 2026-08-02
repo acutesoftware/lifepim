@@ -44,6 +44,7 @@ class TestContentCatalog(unittest.TestCase):
             "lp_content_kind_template",
             "lp_content_view",
             "lp_content_kind_view",
+            "lp_content_catalog_meta",
         ]:
             self.assertIn(table_name, tables)
 
@@ -127,6 +128,42 @@ class TestContentCatalog(unittest.TestCase):
             self.conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind WHERE kind_code = 'NOTE'").fetchone()["cnt"],
             1,
         )
+
+    def test_seeded_samples_are_not_restored_after_seed_version_is_applied(self):
+        template_id = content_catalog._template_id_by_code(self.conn, "BLANK_NOTE")
+        content_catalog.remove_template(template_id, conn=self.conn)
+
+        content_catalog.ensure_content_catalog_schema(self.conn)
+
+        self.assertIsNone(content_catalog._template_id_by_code(self.conn, "BLANK_NOTE"))
+
+    def test_template_and_view_editor_paths_keep_one_default_per_kind(self):
+        note_id = content_catalog._kind_id_by_code(self.conn, "NOTE")
+        idea_template_id = content_catalog._template_id_by_code(self.conn, "IDEA_NOTE")
+        recent_notes_view_id = content_catalog._view_id_by_code(self.conn, "RECENT_NOTES")
+        journal_view_id = content_catalog._view_id_by_code(self.conn, "JOURNAL_TIMELINE")
+
+        idea_template = next(row for row in content_catalog.list_templates(conn=self.conn, include_inactive=True) if row["template_id"] == idea_template_id)
+        idea_template["content_kind_ids"] = [note_id]
+        idea_template["default_content_kind_id"] = note_id
+        content_catalog.update_template(idea_template_id, idea_template, conn=self.conn)
+
+        journal_view = next(row for row in content_catalog.list_content_views(conn=self.conn, include_inactive=True) if row["content_view_id"] == journal_view_id)
+        journal_view["content_kind_ids"] = [note_id]
+        journal_view["default_content_kind_id"] = note_id
+        content_catalog.update_content_view(journal_view_id, journal_view, conn=self.conn)
+
+        template_defaults = self.conn.execute(
+            "SELECT template_id FROM lp_content_kind_template WHERE content_kind_id = ? AND is_default = 1",
+            (note_id,),
+        ).fetchall()
+        view_defaults = self.conn.execute(
+            "SELECT content_view_id FROM lp_content_kind_view WHERE content_kind_id = ? AND is_default = 1",
+            (note_id,),
+        ).fetchall()
+        self.assertEqual([row["template_id"] for row in template_defaults], [idea_template_id])
+        self.assertEqual([row["content_view_id"] for row in view_defaults], [journal_view_id])
+        self.assertNotEqual(recent_notes_view_id, journal_view_id)
 
     def test_service_validation_and_filtering(self):
         with self.assertRaises(ValueError):
@@ -242,7 +279,8 @@ class TestContentCatalog(unittest.TestCase):
         needs_object_matrix = content_catalog.content_catalog_matrix({"mapping_status_code": "NEEDS_OBJECT"}, conn=self.conn)
 
         self.assertGreater(matrix["totals"]["unique_kinds"], 0)
-        self.assertGreaterEqual(matrix["totals"]["area_tab_mappings"], matrix["totals"]["unique_kinds"])
+        self.assertGreaterEqual(matrix["totals"]["matrix_placements"], matrix["totals"]["unique_kinds"])
+        self.assertLessEqual(matrix["totals"]["assigned_area_mappings"], matrix["totals"]["matrix_placements"])
         self.assertGreater(needs_object_matrix["totals"]["statuses"]["NEEDS_OBJECT"], 0)
         self.assertEqual(needs_object_matrix["totals"]["statuses"]["CONFIRMED"], 0)
         self.assertIn(content_catalog.UNASSIGNED_AREA_ID, [row["area_id"] for row in matrix["areas"]])
@@ -278,20 +316,26 @@ class TestContentCatalog(unittest.TestCase):
         self.assertNotIn("home", {row["area_id"] for row in matrix["areas"]})
 
     def test_cell_details_are_loaded_for_area_and_tab(self):
-        rows = content_catalog.content_catalog_cell_details("personal", "NOTES", conn=self.conn)
+        rows = content_catalog.content_catalog_cell_details("house", "GOALS", conn=self.conn)
 
         codes = {row["kind_code"] for row in rows}
-        self.assertIn("IDEA", codes)
-        idea = next(row for row in rows if row["kind_code"] == "IDEA")
-        self.assertEqual(idea["default_template"]["code"], "IDEA_NOTE")
+        self.assertIn("REPAIR_PROJECT", codes)
+        repair = next(row for row in rows if row["kind_code"] == "REPAIR_PROJECT")
+        self.assertEqual(repair["default_template"]["code"], "SMALL_HOME_REPAIR")
 
     def test_report_coverage_groups_are_generated_from_current_catalog(self):
         report = content_catalog.content_catalog_report("coverage-gaps", conn=self.conn)
 
         labels = [section["label"] for section in report["sections"]]
         self.assertIn("Needs Templates", labels)
+        self.assertIn("Canonical Table Does Not Exist", labels)
         self.assertIn("No Area Mapping", labels)
         self.assertTrue(any(section["items"] for section in report["sections"] if section["label"] == "Needs Objects"))
+
+    def test_event_seed_uses_calendar_events_as_canonical_table(self):
+        row = self.conn.execute("SELECT canonical_table_name FROM lp_content_kind WHERE kind_code = 'EVENT'").fetchone()
+
+        self.assertEqual(row["canonical_table_name"], "lp_calendar_events")
 
     def test_report_summary_filters_can_include_root_kinds(self):
         report = content_catalog.content_catalog_report(

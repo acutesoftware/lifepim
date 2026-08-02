@@ -189,8 +189,10 @@ def content_catalog_create_api(entity):
             row = next(row for row in catalog_mod.list_content_views(conn=conn, include_inactive=True) if row["content_view_id"] == record_id)
             return jsonify({"ok": True, "id": record_id, "row": row})
     except sqlite3.IntegrityError:
+        conn.rollback()
         return _catalog_error("Code must be unique.")
     except Exception as exc:
+        conn.rollback()
         return _catalog_error(exc)
     abort(404)
 
@@ -201,7 +203,7 @@ def content_catalog_update_api(entity, record_id):
     conn = db._get_conn()
     payload = _catalog_payload()
     try:
-        if payload.get("action") == "remove":
+        if payload.get("action") in {"delete", "delete_permanently"}:
             if entity == "content-kinds":
                 result = catalog_mod.remove_content_kind(record_id, conn=conn)
             elif entity == "patterns":
@@ -213,7 +215,7 @@ def content_catalog_update_api(entity, record_id):
             else:
                 abort(404)
             return jsonify({"ok": True, **result})
-        if payload.get("action") == "deactivate":
+        if payload.get("action") in {"remove", "deactivate"}:
             if entity == "content-kinds":
                 catalog_mod.deactivate_content_kind(record_id, conn=conn)
             elif entity == "patterns":
@@ -224,6 +226,7 @@ def content_catalog_update_api(entity, record_id):
                 catalog_mod.deactivate_content_view(record_id, conn=conn)
             else:
                 abort(404)
+            return jsonify({"ok": True, "removed": False, "deactivated": True})
         elif entity == "content-kinds":
             catalog_mod.update_content_kind(record_id, payload, conn=conn)
         elif entity == "patterns":
@@ -236,8 +239,10 @@ def content_catalog_update_api(entity, record_id):
             abort(404)
         return jsonify({"ok": True})
     except sqlite3.IntegrityError:
+        conn.rollback()
         return _catalog_error("Code must be unique.")
     except Exception as exc:
+        conn.rollback()
         return _catalog_error(exc)
 
 
