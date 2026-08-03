@@ -16,12 +16,10 @@
         <nav class="content-catalog-compact-tabs" aria-label="Report groups" data-report-groups hidden>
           <button type="button" class="active" data-report-group="by-tab">By Tab</button>
           <button type="button" data-report-group="by-area">By Area</button>
-          <button type="button" data-report-group="by-object-type">By Object Type</button>
-          <button type="button" data-report-group="coverage-gaps">Coverage Gaps</button>
         </nav>
         <div class="content-catalog-table-controls" data-editor-table-controls hidden>
           <label><span>Table: </span><select data-editor-table-select>
-            <option value="content-kinds" data-db-name="lp_content_kind">Content Kinds</option>
+            <option value="content-kinds" data-db-name="lp_content_kind">Catalog Items</option>
             <option value="patterns" data-db-name="lp_content_pattern">Patterns</option>
             <option value="templates" data-db-name="lp_template">Templates</option>
             <option value="views" data-db-name="lp_content_view">Views</option>
@@ -33,17 +31,9 @@
 
       <section data-mode-panel="matrix">
         <div class="content-catalog-filters matrix-filters">
-          <select data-matrix-filter="mapping_status_code"><option value="">Status</option></select>
-          <select data-matrix-filter="object_type_code"><option value="">Object Type</option></select>
-          <select data-matrix-filter="active">
-            <option value="">Active</option>
-            <option value="1">Active Only</option>
-            <option value="0">Inactive Only</option>
-          </select>
+          <select data-matrix-filter="area_id"><option value="">Area</option></select>
+          <select data-matrix-filter="tab_code"><option value="">Tab</option></select>
           <input type="search" data-matrix-filter="q" placeholder="Search">
-          <label><input type="checkbox" data-matrix-toggle="show_status_counts" checked> Show status counts</label>
-          <label><input type="checkbox" data-matrix-toggle="include_roots"> Include root kinds</label>
-          <label><input type="checkbox" data-matrix-toggle="include_inactive"> Include inactive</label>
         </div>
         <div class="content-catalog-matrix-meta" data-matrix-meta></div>
         <div class="content-catalog-matrix-wrap" data-matrix-wrap></div>
@@ -63,16 +53,9 @@
       <section data-mode-panel="editor" hidden>
         <div class="content-catalog-filter-banner" data-editor-filter-banner hidden></div>
         <section data-catalog-panel="content-kinds">
-          <div class="content-catalog-filters" hidden>
-            <select data-kind-filter="object_type_code"><option value="">Object Type</option></select>
-            <select data-kind-filter="canonical_tab_code"><option value="">Tab</option></select>
+          <div class="content-catalog-filters">
             <select data-kind-filter="area_id"><option value="">Area</option></select>
-            <select data-kind-filter="mapping_status_code"><option value="">Mapping Status</option></select>
-            <select data-kind-filter="active">
-              <option value="all">All Active States</option>
-              <option value="1">Active</option>
-              <option value="0">Inactive</option>
-            </select>
+            <select data-kind-filter="tab_code"><option value="">Tab</option></select>
           </div>
           {% set editor_id = 'contentKindsEditor' %}
           {% include "widgets/admin_table_editor.html" %}

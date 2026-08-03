@@ -66,9 +66,13 @@ The Pocket API keeps both names compatible:
 
 - Desktop-to-mobile manifest and item download responses include `area`, `area_id`, `project`, and `project_id` with the same canonical Area ID.
 - The nested `metadata` object also includes `area`, `area_id`, `project`, and `project_id`.
+- Desktop manifest generation is not Area-filtered. It returns every accessible note for the paired Desktop user, including notes whose Area has no corresponding Pocket Project filter.
+- Pocket stores downloaded Desktop notes under its visible `Notes/` or `Lists/` folders. Desktop Area metadata may appear as Pocket `project:` front matter, but the Project list is only a mobile filter and is not required for the note to exist or appear in the all-notes view.
 - Mobile-to-desktop sync accepts `area`, `area_id`, `project`, `project_id`, or `proj` in the top-level item payload or nested `metadata` payload.
 - Markdown front matter accepts `area`, `area_id`, `folder`, `sidebar_tab`, `project`, `project_id`, or `proj`.
 - Legacy `project/...` and `proj/...` values are normalized to `area/...` before they are stored in `lp_notes.area`.
+
+Short notes created on Pocket sync back to Desktop as normal markdown note pushes. Desktop writes them into the paired user's configured Pocket default note folder, or into that user's existing note folder when no Pocket default is set.
 
 ## Practical Guidance
 

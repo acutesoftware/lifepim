@@ -377,7 +377,6 @@
     let summary = JSON.parse(shell.dataset.summary || "{}");
     const filterEls = Array.from(shell.querySelectorAll("[data-kind-filter]"));
     const matrixFilters = Array.from(shell.querySelectorAll("[data-matrix-filter]"));
-    const matrixToggles = Array.from(shell.querySelectorAll("[data-matrix-toggle]"));
     const panels = Array.from(shell.querySelectorAll("[data-mode-panel]"));
     const modeLinks = Array.from(shell.querySelectorAll("[data-catalog-mode]"));
     const reportGroups = shell.querySelector("[data-report-groups]");
@@ -391,8 +390,6 @@
     let currentMode = shell.dataset.initialMode || "matrix";
     let currentEditorTable = ["content-kinds", "patterns", "templates", "views"].includes(initialTable) ? initialTable : "content-kinds";
     let currentReportGroup = "by-tab";
-    let summaryFilter = {};
-    let summarySelection = "";
 
     function selectOptions(select, values) {
       if (!select) return;
@@ -404,12 +401,10 @@
         }
       });
     }
-    selectOptions(shell.querySelector('[data-kind-filter="object_type_code"]'), config.objectTypeCodes || []);
-    selectOptions(shell.querySelector('[data-kind-filter="canonical_tab_code"]'), config.tabCodes || []);
-    selectOptions(shell.querySelector('[data-kind-filter="mapping_status_code"]'), config.mappingStatusCodes || []);
     selectOptions(shell.querySelector('[data-kind-filter="area_id"]'), (config.areas || []).map((area) => ({ value: area.area_id, label: area.area_name || area.area_id })));
-    selectOptions(shell.querySelector('[data-matrix-filter="object_type_code"]'), config.objectTypeCodes || []);
-    selectOptions(shell.querySelector('[data-matrix-filter="mapping_status_code"]'), config.mappingStatusCodes || []);
+    selectOptions(shell.querySelector('[data-kind-filter="tab_code"]'), config.tabCodes || []);
+    selectOptions(shell.querySelector('[data-matrix-filter="area_id"]'), (config.areas || []).map((area) => ({ value: area.area_id, label: area.area_name || area.area_id })));
+    selectOptions(shell.querySelector('[data-matrix-filter="tab_code"]'), config.tabCodes || []);
 
     function kindParams() {
       const params = {};
@@ -420,51 +415,24 @@
     }
 
     function matrixParams(extra) {
-      const params = Object.assign({}, summaryFilter, extra || {});
+      const params = Object.assign({}, extra || {});
       matrixFilters.forEach((el) => {
         if (el.value) params[el.dataset.matrixFilter] = el.value;
       });
-      matrixToggles.forEach((el) => {
-        if (el.checked && el.dataset.matrixToggle !== "show_status_counts") {
-          params[el.dataset.matrixToggle] = "1";
-        }
-      });
       return params;
-    }
-
-    function showStatusCounts() {
-      const el = shell.querySelector('[data-matrix-toggle="show_status_counts"]');
-      return !el || el.checked;
     }
 
     function renderSummary() {
       const box = shell.querySelector("[data-catalog-summary]");
       const statsBox = shell.querySelector("[data-catalog-summary-stats]");
-      const statusLabels = {
-        CONFIRMED: "Confirmed",
-        NEEDS_TEMPLATE: "Need Templates",
-        NEEDS_VIEW: "Need Views",
-        NEEDS_OBJECT: "Need Objects",
-        UNDECIDED: "Undecided",
-      };
       const stats = [
-        `<span class="content-catalog-summary-stat">Content kind (${summary.total || 0})</span>`,
-        `<span class="content-catalog-summary-stat">Area Tab mappings (${summary.mappings || 0})</span>`,
+        `<span class="content-catalog-summary-stat">Total (${summary.total || 0})</span>`,
+        `<span class="content-catalog-summary-stat">Complete (${summary.complete || 0})</span>`,
+        `<span class="content-catalog-summary-stat">Missing Area (${summary.missing_area || 0})</span>`,
+        `<span class="content-catalog-summary-stat">Missing Tab (${summary.missing_tab || 0})</span>`,
+        `<span class="content-catalog-summary-stat">Missing Both (${summary.missing_both || 0})</span>`,
       ];
-      const options = ['<option value="" data-summary-filter="" data-summary-value="">No quick filter</option>'];
-      const addOption = (filter, value, label, count) => {
-        const key = `${filter}|${value}`;
-        const selected = key === summarySelection ? " selected" : "";
-        options.push(`<option value="${escapeHtml(key)}" data-summary-filter="${escapeHtml(filter)}" data-summary-value="${escapeHtml(value)}"${selected}>${escapeHtml(label)} (${count || 0})</option>`);
-      };
-      Object.keys(statusLabels).forEach((code) => {
-        addOption("mapping_status_code", code, statusLabels[code], (summary.statuses || {})[code] || 0);
-      });
-      addOption("active", "0", "Inactive", summary.inactive || 0);
-      (config.tabCodes || []).forEach((code) => {
-        addOption("canonical_tab_code", code, code, (summary.tabs || {})[code] || 0);
-      });
-      box.innerHTML = `<label class="content-catalog-summary-filter"><span>Showing : </span><select data-summary-quick-filter>${options.join("")}</select></label>`;
+      box.innerHTML = `<span class="content-catalog-summary-filter">Catalog coverage</span>`;
       if (statsBox) {
         statsBox.innerHTML = stats.join("");
       }
@@ -482,13 +450,8 @@
     }
 
     function updateEditorOptionSources() {
-      updateColumnOptions(editors["content-kinds"], "parent_content_kind_id", kindOptions());
-      updateColumnOptions(editors["content-kinds"], "object_type_code", optionList(config.objectTypeCodes));
-      updateColumnOptions(editors["content-kinds"], "canonical_tab_code", optionList(config.tabCodes));
-      updateColumnOptions(editors["content-kinds"], "date_behaviour_code", optionList(config.dateBehaviourCodes));
-      updateColumnOptions(editors["content-kinds"], "area_ids", areaOptions());
-      updateColumnOptions(editors["content-kinds"], "default_area_id", areaOptions());
-      updateColumnOptions(editors["content-kinds"], "mapping_status_code", optionList(config.mappingStatusCodes));
+      updateColumnOptions(editors["content-kinds"], "area_id", areaOptions());
+      updateColumnOptions(editors["content-kinds"], "tab_code", optionList(config.tabCodes));
       updateColumnOptions(editors.patterns, "content_kind_id", kindOptions());
       updateColumnOptions(editors.patterns, "default_area_id", areaOptions());
       updateColumnOptions(editors.patterns, "default_template_id", templateOptions());
@@ -521,24 +484,14 @@
       "content-kinds": new AdminTableEditor(document.querySelector('[data-editor="contentKindsEditor"]'), {
         endpoint: "/admin/content-catalog/api/content-kinds",
         idField: "content_kind_id",
-        codeField: "kind_code",
         getParams: kindParams,
-        searchFields: ["name", "kind_code", "description", "notes", "canonical_table_name"],
-        defaults: { object_type_code: "NOTE", date_behaviour_code: "NONE", mapping_status_code: "UNDECIDED", is_active: 1, area_ids: [] },
+        searchFields: ["name", "comment"],
+        defaults: {},
         columns: [
           { field: "name", label: "Name", required: true },
-          { field: "kind_code", label: "Code", required: true, code: true },
-          { field: "parent_content_kind_id", label: "Parent", type: "select", options: kindOptions() },
-          { field: "object_type_code", label: "Object Type", type: "select", required: true, options: optionList(config.objectTypeCodes) },
-          { field: "canonical_tab_code", label: "Tab", type: "select", options: optionList(config.tabCodes) },
-          { field: "canonical_table_name", label: "Canonical Table" },
-          { field: "subtype_code", label: "Subtype", code: true },
-          { field: "date_behaviour_code", label: "Date Behaviour", type: "select", required: true, options: optionList(config.dateBehaviourCodes) },
-          { field: "area_ids", label: "Areas", type: "popup-multiselect", options: areaOptions() },
-          { field: "default_area_id", label: "Default Area", type: "select", options: areaOptions() },
-          { field: "mapping_status_code", label: "Mapping Status", type: "select", required: true, options: optionList(config.mappingStatusCodes) },
-          { field: "is_active", label: "Active", type: "checkbox" },
-          { field: "notes", label: "Notes" },
+          { field: "area_id", label: "Area", type: "select", options: areaOptions() },
+          { field: "tab_code", label: "Tab", type: "select", options: optionList(config.tabCodes) },
+          { field: "comment", label: "Comment", type: "textarea", rows: 1 },
         ],
         onSaved: refreshCatalogConfig,
         onRemoved: refreshCatalogConfig,
@@ -645,7 +598,7 @@
     function setEditorFilters(filters) {
       filterEls.forEach((el) => {
         const value = filters[el.dataset.kindFilter];
-        el.value = value !== undefined ? value : (el.dataset.kindFilter === "active" ? "all" : "");
+        el.value = value !== undefined ? value : "";
       });
       const labels = filters._labels || {};
       if (editorFilterBanner && (labels.area || labels.tab)) {
@@ -657,23 +610,13 @@
 
     function clearEditorFilters() {
       filterEls.forEach((el) => {
-        el.value = el.dataset.kindFilter === "active" ? "all" : "";
+        el.value = "";
       });
       if (editorFilterBanner) {
         editorFilterBanner.hidden = true;
         editorFilterBanner.innerHTML = "";
       }
       loadKinds();
-    }
-
-    function renderStatusLine(statuses) {
-      if (!showStatusCounts()) return "";
-      const confirmed = statuses.CONFIRMED || 0;
-      const needsTemplate = statuses.NEEDS_TEMPLATE || 0;
-      const needsView = statuses.NEEDS_VIEW || 0;
-      const needsObject = statuses.NEEDS_OBJECT || 0;
-      const undecided = statuses.UNDECIDED || 0;
-      return `<span class="matrix-cell-status">C${confirmed} T${needsTemplate} V${needsView} O${needsObject} ?${undecided}</span>`;
     }
 
     async function loadMatrix() {
@@ -686,16 +629,18 @@
     function renderMatrix(matrix) {
       const meta = shell.querySelector("[data-matrix-meta]");
       const wrap = shell.querySelector("[data-matrix-wrap]");
-      meta.textContent = `${matrix.totals.unique_kinds} visible Content Kinds; ${matrix.totals.assigned_area_mappings} actual Area mappings; ${matrix.totals.unassigned_kind_placements} currently unassigned; ${matrix.totals.matrix_placements} Matrix placements`;
+      meta.textContent = `${matrix.totals.unique_kinds} catalog items; ${matrix.totals.assigned_area_mappings} with Area; ${matrix.totals.unassigned_kind_placements} missing Area`;
       const header = matrix.tabs.map((tab) => `<th>${escapeHtml(tab.label)}<span>${tab.total || 0}</span></th>`).join("");
       const rows = matrix.areas.map((area) => {
         const cells = matrix.tabs.map((tab) => {
           const key = `${area.area_id}|${tab.code}`;
-          const cell = matrix.cells[key] || { total: 0, statuses: {} };
+          const cell = matrix.cells[key] || { total: 0, items: [] };
           if (!cell.total) {
             return '<td class="matrix-empty"></td>';
           }
-          return `<td><button type="button" class="matrix-cell" data-area-id="${escapeHtml(area.area_id)}" data-area-label="${escapeHtml(area.label)}" data-tab-code="${escapeHtml(tab.code)}" data-tab-label="${escapeHtml(tab.label)}"><strong>${cell.total}</strong>${renderStatusLine(cell.statuses || {})}</button></td>`;
+          const names = (cell.items || []).map((name) => `<span>${escapeHtml(name)}</span>`).join("");
+          const more = cell.total > (cell.items || []).length ? `<em>+ ${cell.total - cell.items.length} more</em>` : "";
+          return `<td><button type="button" class="matrix-cell" data-area-id="${escapeHtml(area.area_id)}" data-area-label="${escapeHtml(area.label)}" data-tab-code="${escapeHtml(tab.code)}" data-tab-label="${escapeHtml(tab.label)}"><strong>${cell.total}</strong>${names}${more}</button></td>`;
         }).join("");
         return `<tr><th class="matrix-area">${escapeHtml(area.label)}<span>${area.total || 0}</span></th>${cells}<td class="matrix-total">${area.total || 0}</td></tr>`;
       }).join("");
@@ -719,12 +664,11 @@
         const template = row.default_template ? row.default_template.name : "";
         const view = row.default_view ? row.default_view.name : "";
         return `<article class="drawer-kind-item">
-          <button type="button" data-open-kind="${escapeHtml(row.kind_code)}">${escapeHtml(row.name)}</button>
-          <span>${escapeHtml(row.mapping_status_code)}</span>
+          <button type="button" data-open-kind="${escapeHtml(row.content_kind_id)}">${escapeHtml(row.name)}</button>
+          <span>${escapeHtml(row.comment || "")}</span>
           <dl>
-            <dt>Code</dt><dd>${escapeHtml(row.kind_code)}</dd>
-            <dt>Parent</dt><dd>${escapeHtml(row.parent_name || "")}</dd>
-            <dt>Object</dt><dd>${escapeHtml(row.object_type_code)}</dd>
+            <dt>Area</dt><dd>${escapeHtml(row.area_name || row.area_id || "")}</dd>
+            <dt>Tab</dt><dd>${escapeHtml(row.tab_code || "")}</dd>
             <dt>Template</dt><dd>${escapeHtml(template)}</dd>
             <dt>View</dt><dd>${escapeHtml(view)}</dd>
           </dl>
@@ -735,8 +679,7 @@
         setEditorTable("content-kinds");
         setEditorFilters({
           area_id: button.dataset.areaId,
-          canonical_tab_code: button.dataset.tabCode,
-          active: "all",
+          tab_code: button.dataset.tabCode,
           _labels: {
             area: button.dataset.areaLabel,
             tab: button.dataset.tabLabel,
@@ -748,8 +691,9 @@
         itemButton.addEventListener("click", () => {
           setEditorTable("content-kinds");
           setMode("editor");
-          editors["content-kinds"].searchInput.value = itemButton.dataset.openKind;
-          editors["content-kinds"].search = itemButton.dataset.openKind.toLowerCase();
+          const row = editors["content-kinds"].rows.find((item) => idString(item.content_kind_id) === itemButton.dataset.openKind);
+          editors["content-kinds"].searchInput.value = row ? row.name : itemButton.dataset.openKind;
+          editors["content-kinds"].search = editors["content-kinds"].searchInput.value.toLowerCase();
           editors["content-kinds"].renderRows();
         });
       });
@@ -770,9 +714,8 @@
       const views = (row.views || []).map((item) => item.name).join(", ");
       return `<article class="report-kind">
         <h5>${escapeHtml(row.name)}</h5>
-        <p>Code: ${escapeHtml(row.kind_code)} | Parent: ${escapeHtml(row.parent_name || "")} | Object type: ${escapeHtml(row.object_type_code)} | Status: ${escapeHtml(row.mapping_status_code)}</p>
-        <p>Canonical table: ${escapeHtml(row.canonical_table_name || "")}</p>
-        <p>Areas: ${escapeHtml(areas)}</p>
+        <p>Area: ${escapeHtml(areas || "Unassigned")} | Tab: ${escapeHtml(row.tab_code || "No Tab")}</p>
+        <p>${escapeHtml(row.comment || "")}</p>
         <p>Templates: ${escapeHtml(templates)}</p>
         <p>Views: ${escapeHtml(views)}</p>
       </article>`;
@@ -784,58 +727,14 @@
         body.innerHTML = report.sections.map((section) => `<section class="report-section"><h4>${escapeHtml(section.label)}</h4>${section.tabs.map((tab) => `<h5>${escapeHtml(tab.label)}</h5>${tab.items.map(renderKindSummary).join("")}`).join("")}</section>`).join("");
         return;
       }
-      body.innerHTML = report.sections.map((section) => `<section class="report-section"><h4>${escapeHtml(section.label)} <span>${(section.items || []).length}</span></h4>${(section.items || []).map(renderKindSummary).join("") || '<p class="settings-empty">No items.</p>'}</section>`).join("");
+      body.innerHTML = report.sections.map((section) => `<section class="report-section"><h4>${escapeHtml(section.label)}</h4>${(section.areas || []).map((area) => `<h5>${escapeHtml(area.label)}</h5>${area.items.map(renderKindSummary).join("")}`).join("") || '<p class="settings-empty">No items.</p>'}</section>`).join("");
     }
 
     filterEls.forEach((el) => el.addEventListener("change", () => {
-      clearSummarySelection();
       loadKinds();
     }));
-    function clearSummarySelection() {
-      summarySelection = "";
-      summaryFilter = {};
-      const select = shell.querySelector("[data-summary-quick-filter]");
-      if (select) select.value = "";
-    }
-
-    function applySummaryQuickFilter(filter, value) {
-      summarySelection = filter ? `${filter}|${value}` : "";
-      summaryFilter = {};
-      if (currentMode === "matrix" || currentMode === "report") {
-        matrixFilters.forEach((el) => {
-          el.value = "";
-        });
-        if (filter) {
-          summaryFilter.include_roots = "1";
-        }
-        const matchingFilter = matrixFilters.find((el) => el.dataset.matrixFilter === filter);
-        if (matchingFilter) {
-          matchingFilter.value = value;
-        } else if (filter) {
-          summaryFilter[filter] = value;
-        }
-        if (currentMode === "matrix") loadMatrix();
-        if (currentMode === "report") loadReport();
-        return;
-      }
-      filterEls.forEach((el) => {
-        el.value = el.dataset.kindFilter === "active" ? "all" : "";
-        if (el.dataset.kindFilter === filter) {
-          el.value = value;
-        }
-      });
-      loadKinds();
-    }
 
     matrixFilters.forEach((el) => el.addEventListener("input", () => {
-      clearSummarySelection();
-      if (currentMode === "matrix") loadMatrix();
-      if (currentMode === "report") loadReport();
-    }));
-    matrixToggles.forEach((el) => el.addEventListener("change", () => {
-      if (el.dataset.matrixToggle !== "show_status_counts") {
-        clearSummarySelection();
-      }
       if (currentMode === "matrix") loadMatrix();
       if (currentMode === "report") loadReport();
     }));
@@ -851,12 +750,6 @@
         event.preventDefault();
         setMode(link.dataset.catalogMode);
       });
-    });
-    shell.querySelector("[data-catalog-summary]").addEventListener("change", (event) => {
-      const select = event.target.closest("[data-summary-quick-filter]");
-      if (!select) return;
-      const option = select.selectedOptions[0];
-      applySummaryQuickFilter(option.dataset.summaryFilter || "", option.dataset.summaryValue || "");
     });
     if (editorFilterBanner) {
       editorFilterBanner.addEventListener("click", (event) => {

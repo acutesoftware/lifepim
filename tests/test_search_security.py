@@ -119,6 +119,7 @@ class TestSearchSecurity(unittest.TestCase):
     def test_content_catalog_results_are_prioritised_in_metadata_search(self):
         self._search_as(1)
         content_catalog.ensure_content_catalog_schema(self.conn)
+        content_catalog.create_content_kind({"name": "Recipe", "tab_code": "HOW"}, conn=self.conn)
 
         results = search.search_all("Recipe")
 

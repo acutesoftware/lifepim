@@ -109,7 +109,7 @@ CONTENT_CATALOG_SEARCH_SPECS = [
         "label": "Content Catalog - Content Kind",
         "id_col": "content_kind_id",
         "title_col": "name",
-        "columns": ["kind_code", "name", "plural_name", "description", "object_type_code", "canonical_tab_code", "canonical_table_name", "subtype_code", "mapping_status_code", "notes"],
+        "columns": ["name", "area_id", "tab_code", "comment"],
         "table_key": "content-kinds",
     },
     {

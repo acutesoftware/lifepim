@@ -315,6 +315,20 @@ class TestPocketApi(unittest.TestCase):
         self.assertEqual(item_payload["project"], "pers")
         self.assertEqual(item_payload["metadata"]["project"], "pers")
 
+    def test_manifest_includes_all_desktop_notes_without_area_filters(self):
+        self._add_note(file_name="Personal.md", content="personal", area="pers")
+        self._add_note(file_name="No mobile project.md", content="desktop-only area", area="desktop/only")
+        headers = self._register_headers()
+
+        manifest_resp = self.client.get("/api/pocket/v1/sync/manifest", headers=headers)
+
+        self.assertEqual(manifest_resp.status_code, 200)
+        items = {item["relative_path"]: item for item in manifest_resp.get_json()["items"]}
+        self.assertEqual(set(items), {"Personal.md", "No mobile project.md"})
+        self.assertEqual(items["No mobile project.md"]["area"], "desktop/only")
+        self.assertEqual(items["No mobile project.md"]["project"], "desktop/only")
+        self.assertEqual(items["No mobile project.md"]["metadata"]["project_id"], "desktop/only")
+
     def test_item_download_uses_file_created_date_when_front_matter_is_missing(self):
         self._add_note(file_name="Plain.md", content="Plain body")
         headers = self._register_headers()

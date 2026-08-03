@@ -39,6 +39,8 @@ UNASSIGNED_AREA_ID = "__UNASSIGNED__"
 ROOT_KIND_CODES = {"NOTE", "TASK", "PROJECT", "LIST", "EVENT", "HOWTO", "PERSON", "PLACE", "OBJECT", "FILE", "DATA_ITEM", "MONEY_ITEM", "APP_ITEM", "MEDIA_ITEM", "AUDIO_ITEM", "LOG_ENTRY", "COLLECTION"}
 CONTENT_CATALOG_SAMPLE_SEED_VERSION = 1
 CONTENT_CATALOG_SAMPLE_SEED_KEY = "sample_seed_version"
+CONTENT_CATALOG_SCHEMA_VERSION_KEY = "content_catalog_schema_version"
+CONTENT_CATALOG_SCHEMA_VERSION = 2
 
 
 CONTENT_CATALOG_SCHEMA_SQL = """
@@ -75,24 +77,11 @@ CREATE TABLE IF NOT EXISTS lp_content_view (
 );
 
 CREATE TABLE IF NOT EXISTS lp_content_kind (
-    content_kind_id         INTEGER PRIMARY KEY,
-    kind_code               TEXT NOT NULL UNIQUE,
-    parent_content_kind_id  INTEGER,
-    name                    TEXT NOT NULL,
-    plural_name             TEXT,
-    description             TEXT,
-    object_type_code        TEXT NOT NULL,
-    canonical_tab_code      TEXT,
-    canonical_table_name    TEXT,
-    subtype_code            TEXT,
-    date_behaviour_code     TEXT NOT NULL DEFAULT 'NONE',
-    mapping_status_code     TEXT NOT NULL DEFAULT 'UNDECIDED',
-    is_active               INTEGER NOT NULL DEFAULT 1,
-    sort_order              INTEGER NOT NULL DEFAULT 0,
-    notes                   TEXT,
-    created_at              TEXT NOT NULL,
-    updated_at              TEXT NOT NULL,
-    FOREIGN KEY (parent_content_kind_id) REFERENCES lp_content_kind(content_kind_id)
+    content_kind_id INTEGER PRIMARY KEY,
+    name            TEXT NOT NULL,
+    area_id         TEXT,
+    tab_code        TEXT,
+    comment         TEXT
 );
 
 CREATE TABLE IF NOT EXISTS lp_content_kind_area (
@@ -164,10 +153,6 @@ CREATE TABLE IF NOT EXISTS lp_content_catalog_meta (
     updated_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS ix_lp_content_kind_parent ON lp_content_kind(parent_content_kind_id);
-CREATE INDEX IF NOT EXISTS ix_lp_content_kind_tab ON lp_content_kind(canonical_tab_code);
-CREATE INDEX IF NOT EXISTS ix_lp_content_kind_object_type ON lp_content_kind(object_type_code);
-CREATE INDEX IF NOT EXISTS ix_lp_content_kind_status ON lp_content_kind(mapping_status_code, is_active);
 CREATE INDEX IF NOT EXISTS ix_lp_content_kind_area_area ON lp_content_kind_area(area_id);
 CREATE INDEX IF NOT EXISTS ix_lp_content_pattern_kind ON lp_content_pattern(content_kind_id);
 """
@@ -186,6 +171,9 @@ def _get_conn(conn=None):
     return conn
 
 
+CONTENT_KIND_V2_COLUMNS = ["content_kind_id", "name", "area_id", "tab_code", "comment"]
+
+
 def ensure_content_catalog_schema(conn=None, seed=True):
     conn = _get_conn(conn)
     conn_id = id(conn)
@@ -194,13 +182,14 @@ def ensure_content_catalog_schema(conn=None, seed=True):
     if conn_id not in _READY_CONN_IDS:
         areas_mod.ensure_areas_schema(conn)
         conn.executescript(CONTENT_CATALOG_SCHEMA_SQL)
+        _migrate_content_kind_v2_if_needed(conn)
+        _create_content_kind_v2_indexes(conn)
+        _set_catalog_schema_version(conn)
         _dedupe_default_links(conn)
         _migrate_canonical_table_names(conn)
         _create_default_link_indexes(conn)
         conn.commit()
         _READY_CONN_IDS.add(conn_id)
-    if seed and _sample_seed_needed(conn):
-        seed_content_catalog(conn)
 
 
 def _content_catalog_schema_is_current(conn):
@@ -211,7 +200,147 @@ def _content_catalog_schema_is_current(conn):
         ).fetchall()
     except Exception:
         return False
-    return len(rows) == 8
+    if len(rows) != 8:
+        return False
+    try:
+        return _content_kind_schema_state(conn) == "new"
+    except Exception:
+        return False
+
+
+def _table_columns(conn, table_name):
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    except Exception:
+        return []
+    columns = []
+    for row in rows:
+        try:
+            columns.append(row["name"])
+        except (TypeError, KeyError, IndexError):
+            columns.append(row[1])
+    return columns
+
+
+def _content_kind_schema_state(conn):
+    columns = _table_columns(conn, "lp_content_kind")
+    if not columns:
+        return "missing"
+    column_set = set(columns)
+    if "kind_code" in column_set:
+        return "old"
+    if columns == CONTENT_KIND_V2_COLUMNS:
+        return "new"
+    if column_set == set(CONTENT_KIND_V2_COLUMNS):
+        return "new"
+    raise RuntimeError(f"Unrecognised lp_content_kind schema: {', '.join(columns)}")
+
+
+def _migrate_content_kind_v2_if_needed(conn):
+    state = _content_kind_schema_state(conn)
+    if state == "new":
+        return False
+    if state != "old":
+        raise RuntimeError("Cannot migrate lp_content_kind because the schema is neither old nor new.")
+    conn.executescript(
+        """
+        PRAGMA foreign_keys = OFF;
+
+        CREATE TABLE lp_content_kind_legacy_v1 AS
+        SELECT *
+        FROM lp_content_kind;
+
+        CREATE TABLE lp_content_kind_new (
+            content_kind_id INTEGER PRIMARY KEY,
+            name            TEXT NOT NULL,
+            area_id         TEXT,
+            tab_code        TEXT,
+            comment         TEXT
+        );
+
+        INSERT INTO lp_content_kind_new (
+            content_kind_id,
+            name,
+            area_id,
+            tab_code,
+            comment
+        )
+        SELECT
+            ck.content_kind_id,
+            TRIM(ck.name),
+            (
+                SELECT cka.area_id
+                FROM lp_content_kind_area cka
+                WHERE cka.content_kind_id = ck.content_kind_id
+                ORDER BY
+                    cka.is_default DESC,
+                    cka.sort_order,
+                    cka.content_kind_area_id
+                LIMIT 1
+            ) AS area_id,
+            NULLIF(TRIM(ck.canonical_tab_code), '') AS tab_code,
+            NULLIF(
+                TRIM(
+                    COALESCE(NULLIF(TRIM(ck.description), ''), '')
+                    ||
+                    CASE
+                        WHEN NULLIF(TRIM(ck.description), '') IS NOT NULL
+                         AND NULLIF(TRIM(ck.notes), '') IS NOT NULL
+                         AND TRIM(ck.description) <> TRIM(ck.notes)
+                        THEN CHAR(10)
+                        ELSE ''
+                    END
+                    ||
+                    CASE
+                        WHEN NULLIF(TRIM(ck.notes), '') IS NOT NULL
+                         AND (
+                             NULLIF(TRIM(ck.description), '') IS NULL
+                             OR TRIM(ck.notes) <> TRIM(ck.description)
+                         )
+                        THEN TRIM(ck.notes)
+                        ELSE ''
+                    END
+                ),
+                ''
+            ) AS comment
+        FROM lp_content_kind ck
+        WHERE NULLIF(TRIM(ck.name), '') IS NOT NULL;
+
+        DROP TABLE lp_content_kind;
+
+        ALTER TABLE lp_content_kind_new
+        RENAME TO lp_content_kind;
+
+        CREATE INDEX ix_lp_content_kind_area
+            ON lp_content_kind(area_id);
+
+        CREATE INDEX ix_lp_content_kind_tab
+            ON lp_content_kind(tab_code);
+
+        CREATE INDEX ix_lp_content_kind_name
+            ON lp_content_kind(name);
+
+        PRAGMA foreign_keys = ON;
+        """
+    )
+    failures = conn.execute("PRAGMA foreign_key_check").fetchall()
+    if failures:
+        raise RuntimeError(f"Content Catalog migration failed foreign_key_check with {len(failures)} error(s).")
+    return True
+
+
+def _create_content_kind_v2_indexes(conn):
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_content_kind_area ON lp_content_kind(area_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_content_kind_tab ON lp_content_kind(tab_code)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_content_kind_name ON lp_content_kind(name)")
+
+
+def _set_catalog_schema_version(conn):
+    conn.execute(
+        "INSERT INTO lp_content_catalog_meta(key, value, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        (CONTENT_CATALOG_SCHEMA_VERSION_KEY, str(CONTENT_CATALOG_SCHEMA_VERSION), _utc_now()),
+    )
 
 
 def _dedupe_default_links(conn):
@@ -243,6 +372,8 @@ def _create_default_link_indexes(conn):
 
 
 def _migrate_canonical_table_names(conn):
+    if "canonical_table_name" not in set(_table_columns(conn, "lp_content_kind")):
+        return
     conn.execute(
         "UPDATE lp_content_kind SET canonical_table_name = 'lp_calendar_events', updated_at = ? "
         "WHERE canonical_table_name = 'lp_cal_events'",
@@ -402,8 +533,8 @@ def area_options(conn=None):
 
 
 def content_kind_options(conn=None):
-    rows = list_content_kinds(conn=conn, filters={}, include_inactive=True)
-    return [{"value": row["content_kind_id"], "label": f"{row['kind_code']} - {row['name']}", "code": row["kind_code"]} for row in rows]
+    rows = list_content_kinds(conn=conn)
+    return [{"value": row["content_kind_id"], "label": row["name"]} for row in rows]
 
 
 def template_options(conn=None):
@@ -422,8 +553,6 @@ def get_admin_config(conn=None):
     return {
         "objectTypeCodes": OBJECT_TYPE_CODES,
         "tabCodes": TAB_CODES,
-        "dateBehaviourCodes": DATE_BEHAVIOUR_CODES,
-        "mappingStatusCodes": MAPPING_STATUS_CODES,
         "templateTypeCodes": TEMPLATE_TYPE_CODES,
         "viewTypeCodes": VIEW_TYPE_CODES,
         "areas": area_options(conn),
@@ -439,44 +568,14 @@ def create_content_kind(values, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     name = _require_name(values)
-    code = validate_code(values.get("kind_code") or code_from_name(name), "Kind code")
-    parent_id = _int_or_none(values.get("parent_content_kind_id"))
-    object_type = validate_code(values.get("object_type_code"), "Object type")
-    date_behaviour = normalize_code(values.get("date_behaviour_code") or "NONE")
-    mapping_status = normalize_code(values.get("mapping_status_code") or "UNDECIDED")
-    if date_behaviour not in DATE_BEHAVIOUR_CODES:
-        raise ValueError("Date behaviour is invalid.")
-    if mapping_status not in MAPPING_STATUS_CODES:
-        raise ValueError("Mapping status is invalid.")
-    now = _utc_now()
+    area_id = _validated_area_id(values.get("area_id"), conn)
+    tab_code = _validated_tab_code(values.get("tab_code"))
     with conn:
         cur = conn.execute(
-            "INSERT INTO lp_content_kind "
-            "(kind_code, parent_content_kind_id, name, plural_name, description, object_type_code, canonical_tab_code, "
-            "canonical_table_name, subtype_code, date_behaviour_code, mapping_status_code, is_active, sort_order, notes, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                code,
-                parent_id,
-                name,
-                _clean_optional(values.get("plural_name")),
-                _clean_optional(values.get("description")),
-                object_type,
-                _clean_optional(normalize_code(values.get("canonical_tab_code"))),
-                _clean_optional(values.get("canonical_table_name")),
-                _clean_optional(normalize_code(values.get("subtype_code"))),
-                date_behaviour,
-                mapping_status,
-                _bool_int(values.get("is_active", 1)),
-                _int_value(values.get("sort_order"), 0),
-                _clean_optional(values.get("notes")),
-                now,
-                now,
-            ),
+            "INSERT INTO lp_content_kind (name, area_id, tab_code, comment) VALUES (?, ?, ?, ?)",
+            (name, area_id, tab_code, _clean_optional(values.get("comment"))),
         )
-        content_kind_id = cur.lastrowid
-        set_content_kind_areas(content_kind_id, values.get("area_ids") or [], values.get("default_area_id"), conn=conn)
-    return content_kind_id
+    return cur.lastrowid
 
 
 def update_content_kind(content_kind_id, values, conn=None):
@@ -484,74 +583,58 @@ def update_content_kind(content_kind_id, values, conn=None):
     ensure_content_catalog_schema(conn, seed=False)
     content_kind_id = int(content_kind_id)
     name = _require_name(values)
-    code = validate_code(values.get("kind_code") or code_from_name(name), "Kind code")
-    parent_id = _int_or_none(values.get("parent_content_kind_id"))
-    if parent_id == content_kind_id:
-        raise ValueError("Parent cannot be self.")
-    object_type = validate_code(values.get("object_type_code"), "Object type")
-    date_behaviour = normalize_code(values.get("date_behaviour_code") or "NONE")
-    mapping_status = normalize_code(values.get("mapping_status_code") or "UNDECIDED")
-    if date_behaviour not in DATE_BEHAVIOUR_CODES:
-        raise ValueError("Date behaviour is invalid.")
-    if mapping_status not in MAPPING_STATUS_CODES:
-        raise ValueError("Mapping status is invalid.")
+    area_id = _validated_area_id(values.get("area_id"), conn)
+    tab_code = _validated_tab_code(values.get("tab_code"))
     with conn:
         conn.execute(
-            "UPDATE lp_content_kind SET kind_code = ?, parent_content_kind_id = ?, name = ?, plural_name = ?, "
-            "description = ?, object_type_code = ?, canonical_tab_code = ?, canonical_table_name = ?, subtype_code = ?, "
-            "date_behaviour_code = ?, mapping_status_code = ?, is_active = ?, sort_order = ?, notes = ?, updated_at = ? "
-            "WHERE content_kind_id = ?",
-            (
-                code,
-                parent_id,
-                name,
-                _clean_optional(values.get("plural_name")),
-                _clean_optional(values.get("description")),
-                object_type,
-                _clean_optional(normalize_code(values.get("canonical_tab_code"))),
-                _clean_optional(values.get("canonical_table_name")),
-                _clean_optional(normalize_code(values.get("subtype_code"))),
-                date_behaviour,
-                mapping_status,
-                _bool_int(values.get("is_active", 1)),
-                _int_value(values.get("sort_order"), 0),
-                _clean_optional(values.get("notes")),
-                _utc_now(),
-                content_kind_id,
-            ),
+            "UPDATE lp_content_kind SET name = ?, area_id = ?, tab_code = ?, comment = ? WHERE content_kind_id = ?",
+            (name, area_id, tab_code, _clean_optional(values.get("comment")), content_kind_id),
         )
-        set_content_kind_areas(content_kind_id, values.get("area_ids") or [], values.get("default_area_id"), conn=conn)
     return True
 
 
 def deactivate_content_kind(content_kind_id, conn=None):
-    conn = _get_conn(conn)
-    ensure_content_catalog_schema(conn, seed=False)
-    with conn:
-        conn.execute("UPDATE lp_content_kind SET is_active = 0, updated_at = ? WHERE content_kind_id = ?", (_utc_now(), int(content_kind_id)))
+    return remove_content_kind(content_kind_id, conn=conn)
 
 
 def remove_content_kind(content_kind_id, conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     content_kind_id = int(content_kind_id)
-    child = conn.execute(
-        "SELECT 1 FROM lp_content_kind WHERE parent_content_kind_id = ? LIMIT 1",
-        (content_kind_id,),
-    ).fetchone()
     pattern = conn.execute(
-        "SELECT 1 FROM lp_content_pattern WHERE content_kind_id = ? LIMIT 1",
+        "SELECT name FROM lp_content_pattern WHERE content_kind_id = ? LIMIT 1",
         (content_kind_id,),
     ).fetchone()
-    if child or pattern:
-        deactivate_content_kind(content_kind_id, conn=conn)
-        return {"removed": False, "deactivated": True}
+    if pattern:
+        raise ValueError(f"Cannot delete this catalog item because it is used by pattern '{pattern['name']}'.")
     with conn:
         conn.execute("DELETE FROM lp_content_kind_area WHERE content_kind_id = ?", (content_kind_id,))
         conn.execute("DELETE FROM lp_content_kind_template WHERE content_kind_id = ?", (content_kind_id,))
         conn.execute("DELETE FROM lp_content_kind_view WHERE content_kind_id = ?", (content_kind_id,))
         conn.execute("DELETE FROM lp_content_kind WHERE content_kind_id = ?", (content_kind_id,))
     return {"removed": True, "deactivated": False}
+
+
+def _validated_tab_code(value):
+    text = normalize_code(value)
+    if not text:
+        return None
+    if text not in TAB_CODES:
+        raise ValueError("Tab is invalid.")
+    return text
+
+
+def _validated_area_id(value, conn):
+    text = _clean_text(value)
+    if not text:
+        return None
+    row = conn.execute(
+        "SELECT 1 FROM lp_areas WHERE area_id = ? AND is_header = 0 LIMIT 1",
+        (text,),
+    ).fetchone()
+    if not row:
+        raise ValueError("Area is invalid.")
+    return text
 
 
 def set_content_kind_areas(content_kind_id, area_ids, default_area_id=None, conn=None):
@@ -622,56 +705,35 @@ def list_content_kinds(conn=None, filters=None, include_inactive=False, visible_
     filters = filters or {}
     where = []
     params = []
-    active_filter = filters.get("active")
-    if active_filter in {"1", 1, True}:
-        where.append("ck.is_active = 1")
-    elif active_filter in {"0", 0, False}:
-        where.append("ck.is_active = 0")
-    elif not include_inactive and active_filter != "all":
-        where.append("ck.is_active = 1")
-    for key, col in [
-        ("object_type_code", "ck.object_type_code"),
-        ("canonical_tab_code", "ck.canonical_tab_code"),
-        ("mapping_status_code", "ck.mapping_status_code"),
-        ("parent_content_kind_id", "ck.parent_content_kind_id"),
-    ]:
-        value = filters.get(key)
-        if value not in (None, "", "all"):
-            if key == "canonical_tab_code" and value == NO_TAB_CODE:
-                where.append("COALESCE(ck.canonical_tab_code, '') = ''")
-            else:
-                where.append(f"{col} = ?")
-                params.append(value)
+    tab_filter = filters.get("tab_code") or filters.get("canonical_tab_code")
+    if tab_filter not in (None, "", "all"):
+        if tab_filter == NO_TAB_CODE:
+            where.append("COALESCE(ck.tab_code, '') = ''")
+        else:
+            where.append("ck.tab_code = ?")
+            params.append(tab_filter)
     if filters.get("area_id"):
         if filters.get("area_id") == UNASSIGNED_AREA_ID:
-            area_filter_sql = "NOT EXISTS (SELECT 1 FROM lp_content_kind_area a WHERE a.content_kind_id = ck.content_kind_id"
-            if visible_area_ids:
-                area_filter_sql += " AND a.area_id IN (" + ",".join(["?"] * len(visible_area_ids)) + ")"
-                params.extend(visible_area_ids)
-            area_filter_sql += ")"
-            where.append(area_filter_sql)
+            where.append("COALESCE(ck.area_id, '') = ''")
         else:
-            where.append("EXISTS (SELECT 1 FROM lp_content_kind_area a WHERE a.content_kind_id = ck.content_kind_id AND lower(a.area_id) = lower(?))")
+            where.append("lower(ck.area_id) = lower(?)")
             params.append(filters["area_id"])
     if filters.get("q"):
         q = f"%{filters['q'].strip()}%"
-        where.append("(ck.name LIKE ? OR ck.kind_code LIKE ? OR COALESCE(ck.description,'') LIKE ? OR COALESCE(ck.notes,'') LIKE ? OR COALESCE(ck.canonical_table_name,'') LIKE ?)")
-        params.extend([q, q, q, q, q])
-    sql = (
-        "SELECT ck.*, p.kind_code AS parent_kind_code, p.name AS parent_name "
-        "FROM lp_content_kind ck LEFT JOIN lp_content_kind p ON p.content_kind_id = ck.parent_content_kind_id "
-    )
+        where.append("(ck.name LIKE ? OR COALESCE(ck.comment,'') LIKE ?)")
+        params.extend([q, q])
+    sql = "SELECT ck.* FROM lp_content_kind ck "
     if where:
         sql += "WHERE " + " AND ".join(where) + " "
-    sql += "ORDER BY ck.sort_order, lower(ck.name), ck.content_kind_id"
+    sql += "ORDER BY ck.content_kind_id"
     rows = [dict(row) for row in conn.execute(sql, params).fetchall()]
-    by_kind = _kind_area_rows(conn, visible_area_ids=visible_area_ids)
+    label_map = _area_label_map(conn)
     for row in rows:
-        areas = by_kind.get(row["content_kind_id"], [])
-        row["areas"] = areas
-        row["area_ids"] = [area["area_id"] for area in areas]
-        default = next((area["area_id"] for area in areas if int(area.get("is_default") or 0)), "")
-        row["default_area_id"] = default
+        area_id = row.get("area_id") or ""
+        row["area_name"] = label_map.get(area_id, area_id)
+        row["areas"] = [{"area_id": area_id, "area_name": row["area_name"], "is_default": 1}] if area_id else []
+        row["area_ids"] = [area_id] if area_id else []
+        row["default_area_id"] = area_id
     return rows
 
 
@@ -823,7 +885,7 @@ def list_templates(conn=None, include_inactive=False):
     where = "" if include_inactive else "WHERE t.is_active = 1"
     rows = [dict(row) for row in conn.execute(f"SELECT t.* FROM lp_template t {where} ORDER BY t.sort_order, lower(t.name), t.template_id").fetchall()]
     mapping_rows = conn.execute(
-        "SELECT ckt.template_id, ckt.content_kind_id, ckt.is_default, ck.kind_code, ck.name "
+        "SELECT ckt.template_id, ckt.content_kind_id, ckt.is_default, ck.name "
         "FROM lp_content_kind_template ckt JOIN lp_content_kind ck ON ck.content_kind_id = ckt.content_kind_id "
         "ORDER BY ckt.sort_order, lower(ck.name)"
     ).fetchall()
@@ -976,7 +1038,7 @@ def list_content_views(conn=None, include_inactive=False):
     where = "" if include_inactive else "WHERE v.is_active = 1"
     rows = [dict(row) for row in conn.execute(f"SELECT v.* FROM lp_content_view v {where} ORDER BY v.sort_order, lower(v.name), v.content_view_id").fetchall()]
     mapping_rows = conn.execute(
-        "SELECT ckv.content_view_id, ckv.content_kind_id, ckv.is_default, ck.kind_code, ck.name "
+        "SELECT ckv.content_view_id, ckv.content_kind_id, ckv.is_default, ck.name "
         "FROM lp_content_kind_view ckv JOIN lp_content_kind ck ON ck.content_kind_id = ckv.content_kind_id "
         "ORDER BY ckv.sort_order, lower(ck.name)"
     ).fetchall()
@@ -1065,7 +1127,7 @@ def list_content_patterns(conn=None, include_inactive=False):
     where = "" if include_inactive else "WHERE p.is_active = 1"
     label_map = _area_label_map(conn)
     rows = conn.execute(
-        "SELECT p.*, ck.kind_code, ck.name AS content_kind_name, t.template_code, t.name AS template_name, "
+        "SELECT p.*, ck.content_kind_id, ck.name AS content_kind_name, t.template_code, t.name AS template_name, "
         "v.view_code, v.name AS view_name "
         "FROM lp_content_pattern p "
         "JOIN lp_content_kind ck ON ck.content_kind_id = p.content_kind_id "
@@ -1085,19 +1147,20 @@ def catalog_summary(conn=None):
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     total = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind").fetchone()["cnt"]
-    inactive = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind WHERE is_active = 0").fetchone()["cnt"]
-    mappings = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind_area").fetchone()["cnt"]
-    status_rows = conn.execute(
-        "SELECT mapping_status_code, COUNT(1) AS cnt FROM lp_content_kind "
-        "WHERE is_active = 1 GROUP BY mapping_status_code"
-    ).fetchall()
-    tab_rows = conn.execute("SELECT canonical_tab_code, COUNT(1) AS cnt FROM lp_content_kind WHERE is_active = 1 GROUP BY canonical_tab_code").fetchall()
+    complete = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_content_kind WHERE COALESCE(TRIM(area_id), '') != '' AND COALESCE(TRIM(tab_code), '') != ''"
+    ).fetchone()["cnt"]
+    missing_area = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind WHERE COALESCE(TRIM(area_id), '') = ''").fetchone()["cnt"]
+    missing_tab = conn.execute("SELECT COUNT(1) AS cnt FROM lp_content_kind WHERE COALESCE(TRIM(tab_code), '') = ''").fetchone()["cnt"]
+    missing_both = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_content_kind WHERE COALESCE(TRIM(area_id), '') = '' AND COALESCE(TRIM(tab_code), '') = ''"
+    ).fetchone()["cnt"]
     return {
         "total": total,
-        "mappings": mappings,
-        "inactive": inactive,
-        "statuses": {row["mapping_status_code"] or "": row["cnt"] for row in status_rows},
-        "tabs": {row["canonical_tab_code"] or "": row["cnt"] for row in tab_rows},
+        "complete": complete,
+        "missing_area": missing_area,
+        "missing_tab": missing_tab,
+        "missing_both": missing_both,
     }
 
 
@@ -1105,35 +1168,23 @@ def _catalog_filter_where(filters=None, alias="ck"):
     filters = filters or {}
     where = []
     params = []
-    active_filter = filters.get("active")
-    include_inactive = _truthy(filters.get("include_inactive"))
-    if active_filter in {"1", 1, True}:
-        where.append(f"{alias}.is_active = 1")
-    elif active_filter in {"0", 0, False}:
-        where.append(f"{alias}.is_active = 0")
-    elif not include_inactive:
-        where.append(f"{alias}.is_active = 1")
-    if not _truthy(filters.get("include_roots")):
-        where.append(f"{alias}.parent_content_kind_id IS NOT NULL")
-    if filters.get("mapping_status_code"):
-        where.append(f"{alias}.mapping_status_code = ?")
-        params.append(filters.get("mapping_status_code"))
-    if filters.get("object_type_code"):
-        where.append(f"{alias}.object_type_code = ?")
-        params.append(filters.get("object_type_code"))
-    if filters.get("canonical_tab_code"):
-        if filters.get("canonical_tab_code") == NO_TAB_CODE:
-            where.append(f"COALESCE({alias}.canonical_tab_code, '') = ''")
+    tab_filter = filters.get("tab_code") or filters.get("canonical_tab_code")
+    if tab_filter:
+        if tab_filter == NO_TAB_CODE:
+            where.append(f"COALESCE({alias}.tab_code, '') = ''")
         else:
-            where.append(f"{alias}.canonical_tab_code = ?")
-            params.append(filters.get("canonical_tab_code"))
+            where.append(f"{alias}.tab_code = ?")
+            params.append(tab_filter)
+    if filters.get("area_id"):
+        if filters.get("area_id") == UNASSIGNED_AREA_ID:
+            where.append(f"COALESCE({alias}.area_id, '') = ''")
+        else:
+            where.append(f"{alias}.area_id = ?")
+            params.append(filters.get("area_id"))
     if filters.get("q"):
         q = f"%{_clean_text(filters.get('q'))}%"
-        where.append(
-            f"({alias}.name LIKE ? OR {alias}.kind_code LIKE ? OR COALESCE({alias}.description,'') LIKE ? "
-            f"OR COALESCE({alias}.notes,'') LIKE ? OR COALESCE({alias}.canonical_table_name,'') LIKE ?)"
-        )
-        params.extend([q, q, q, q, q])
+        where.append(f"({alias}.name LIKE ? OR COALESCE({alias}.comment,'') LIKE ?)")
+        params.extend([q, q])
     return where, params
 
 
@@ -1174,17 +1225,16 @@ def _area_label_map(conn, visible_areas=None):
     labels = {UNASSIGNED_AREA_ID: "Unassigned"}
     for row in visible_areas if visible_areas is not None else _visible_matrix_areas(conn):
         labels[row["area_id"]] = row["label"]
+    try:
+        rows = conn.execute(
+            "SELECT area_id, COALESCE(NULLIF(area_name, ''), area_id) AS area_name "
+            "FROM lp_areas WHERE is_header = 0 GROUP BY area_id"
+        ).fetchall()
+    except Exception:
+        rows = []
+    for row in rows:
+        labels.setdefault(row["area_id"], row["area_name"])
     return labels
-
-
-def _status_counts_from_row(row):
-    return {
-        "CONFIRMED": int(row["confirmed_count"] or 0),
-        "NEEDS_TEMPLATE": int(row["needs_template_count"] or 0),
-        "NEEDS_VIEW": int(row["needs_view_count"] or 0),
-        "NEEDS_OBJECT": int(row["needs_object_count"] or 0),
-        "UNDECIDED": int(row["undecided_count"] or 0),
-    }
 
 
 def content_catalog_matrix(filters=None, conn=None):
@@ -1201,36 +1251,18 @@ def content_catalog_matrix(filters=None, conn=None):
         area_join_params = visible_area_ids
     where_sql = "WHERE " + " AND ".join(where) if where else ""
     tab_order = TAB_CODES + [NO_TAB_CODE]
-    tab_labels = {code: code for code in TAB_CODES}
+    tab_labels = {code: _tab_label(code) for code in TAB_CODES}
     tab_labels[NO_TAB_CODE] = "No Tab"
     sql = f"""
-        WITH filtered AS (
-            SELECT ck.content_kind_id, ck.mapping_status_code, ck.canonical_tab_code
-            FROM lp_content_kind ck
-            {where_sql}
-        ),
-        mapped AS (
-            SELECT
-                f.content_kind_id,
-                COALESCE(cka.area_id, ?) AS area_id,
-                COALESCE(NULLIF(f.canonical_tab_code, ''), ?) AS tab_code,
-                f.mapping_status_code
-            FROM filtered f
-            LEFT JOIN lp_content_kind_area cka ON cka.content_kind_id = f.content_kind_id {area_join_condition}
-        )
         SELECT
-            area_id,
-            tab_code,
-            COUNT(1) AS total_count,
-            SUM(CASE WHEN mapping_status_code = 'CONFIRMED' THEN 1 ELSE 0 END) AS confirmed_count,
-            SUM(CASE WHEN mapping_status_code = 'NEEDS_TEMPLATE' THEN 1 ELSE 0 END) AS needs_template_count,
-            SUM(CASE WHEN mapping_status_code = 'NEEDS_VIEW' THEN 1 ELSE 0 END) AS needs_view_count,
-            SUM(CASE WHEN mapping_status_code = 'NEEDS_OBJECT' THEN 1 ELSE 0 END) AS needs_object_count,
-            SUM(CASE WHEN mapping_status_code = 'UNDECIDED' THEN 1 ELSE 0 END) AS undecided_count
-        FROM mapped
+            COALESCE(NULLIF(ck.area_id, ''), ?) AS area_id,
+            COALESCE(NULLIF(ck.tab_code, ''), ?) AS tab_code,
+            COUNT(1) AS total_count
+        FROM lp_content_kind ck
+        {where_sql}
         GROUP BY area_id, tab_code
     """
-    rows = conn.execute(sql, params + [UNASSIGNED_AREA_ID, NO_TAB_CODE] + area_join_params).fetchall()
+    rows = conn.execute(sql, [UNASSIGNED_AREA_ID, NO_TAB_CODE] + params).fetchall()
     label_map = _area_label_map(conn, visible_areas)
     area_ids = [row["area_id"] for row in visible_areas]
     if UNASSIGNED_AREA_ID not in area_ids:
@@ -1241,7 +1273,6 @@ def content_catalog_matrix(filters=None, conn=None):
     cells = {}
     row_totals = {area_id: 0 for area_id in area_ids}
     column_totals = {tab_code: 0 for tab_code in tab_order}
-    status_totals = {status: 0 for status in ["CONFIRMED", "NEEDS_TEMPLATE", "NEEDS_VIEW", "NEEDS_OBJECT", "UNDECIDED"]}
     matrix_placements = 0
     assigned_area_mappings = 0
     unassigned_kind_placements = 0
@@ -1253,7 +1284,7 @@ def content_catalog_matrix(filters=None, conn=None):
             "area_id": area_id,
             "tab_code": tab_code,
             "total": total_count,
-            "statuses": _status_counts_from_row(row),
+            "items": _cell_item_names(conn, area_id, tab_code, filters),
         }
         cells[f"{area_id}|{tab_code}"] = cell
         row_totals[area_id] = row_totals.get(area_id, 0) + cell["total"]
@@ -1263,8 +1294,6 @@ def content_catalog_matrix(filters=None, conn=None):
             unassigned_kind_placements += total_count
         else:
             assigned_area_mappings += total_count
-        for status, count in cell["statuses"].items():
-            status_totals[status] += count
     unique_sql = f"SELECT COUNT(1) AS cnt FROM lp_content_kind ck {where_sql}"
     unique_total = conn.execute(unique_sql, params).fetchone()["cnt"]
     return {
@@ -1277,7 +1306,6 @@ def content_catalog_matrix(filters=None, conn=None):
             "assigned_area_mappings": assigned_area_mappings,
             "unassigned_kind_placements": unassigned_kind_placements,
             "matrix_placements": matrix_placements,
-            "statuses": status_totals,
             "columns": column_totals,
             "rows": row_totals,
         },
@@ -1312,46 +1340,10 @@ def detailed_content_kinds(filters=None, conn=None):
     filters = filters or {}
     visible_areas = _visible_matrix_areas(conn, include_inactive_areas=_truthy(filters.get("include_inactive_areas")))
     visible_area_ids = [row["area_id"] for row in visible_areas]
-    rows = list_content_kinds(conn=conn, filters={"active": "all"}, include_inactive=True, visible_area_ids=visible_area_ids)
+    rows = list_content_kinds(conn=conn, filters=filters, include_inactive=True, visible_area_ids=visible_area_ids)
     templates, views = _template_view_maps(conn)
-
-    def matches(row):
-        if not _truthy(filters.get("include_inactive")) and filters.get("active") not in {"0", 0, False} and int(row.get("is_active") or 0) != 1:
-            return False
-        if filters.get("active") in {"1", 1, True} and int(row.get("is_active") or 0) != 1:
-            return False
-        if filters.get("active") in {"0", 0, False} and int(row.get("is_active") or 0) != 0:
-            return False
-        if not _truthy(filters.get("include_roots")) and row.get("parent_content_kind_id") is None:
-            return False
-        if filters.get("mapping_status_code") and row.get("mapping_status_code") != filters.get("mapping_status_code"):
-            return False
-        if filters.get("object_type_code") and row.get("object_type_code") != filters.get("object_type_code"):
-            return False
-        if filters.get("canonical_tab_code"):
-            if filters.get("canonical_tab_code") == NO_TAB_CODE:
-                if row.get("canonical_tab_code"):
-                    return False
-            elif row.get("canonical_tab_code") != filters.get("canonical_tab_code"):
-                return False
-        if filters.get("area_id"):
-            area_id = filters.get("area_id")
-            if area_id == UNASSIGNED_AREA_ID:
-                if row.get("area_ids"):
-                    return False
-            elif area_id not in row.get("area_ids", []):
-                return False
-        if filters.get("q"):
-            q = _clean_text(filters.get("q")).lower()
-            text = " ".join([row.get("name") or "", row.get("kind_code") or "", row.get("description") or "", row.get("notes") or "", row.get("canonical_table_name") or ""]).lower()
-            if q not in text:
-                return False
-        return True
-
     result = []
     for row in rows:
-        if not matches(row):
-            continue
         item = dict(row)
         item["templates"] = templates.get(row["content_kind_id"], [])
         item["views"] = views.get(row["content_kind_id"], [])
@@ -1374,7 +1366,7 @@ def _table_exists(conn, table_name):
 def content_catalog_cell_details(area_id, tab_code, filters=None, conn=None):
     filters = dict(filters or {})
     filters["area_id"] = area_id or UNASSIGNED_AREA_ID
-    filters["canonical_tab_code"] = tab_code or NO_TAB_CODE
+    filters["tab_code"] = tab_code or NO_TAB_CODE
     return detailed_content_kinds(filters=filters, conn=conn)
 
 
@@ -1382,37 +1374,42 @@ def content_catalog_report(group="by-tab", filters=None, conn=None):
     conn = _get_conn(conn)
     rows = detailed_content_kinds(filters=filters, conn=conn)
     group = (group or "by-tab").strip().lower()
-    if group == "coverage-gaps":
-        return {
-            "group": group,
-            "sections": [
-                {"label": "Needs Templates", "items": [r for r in rows if r.get("mapping_status_code") == "NEEDS_TEMPLATE"]},
-                {"label": "Needs Views", "items": [r for r in rows if r.get("mapping_status_code") == "NEEDS_VIEW"]},
-                {"label": "Needs Objects", "items": [r for r in rows if r.get("mapping_status_code") == "NEEDS_OBJECT"]},
-                {"label": "Undecided", "items": [r for r in rows if r.get("mapping_status_code") == "UNDECIDED"]},
-                {"label": "Missing Canonical Table", "items": [r for r in rows if not r.get("canonical_table_name")]},
-                {"label": "Canonical Table Does Not Exist", "items": [r for r in rows if r.get("canonical_table_name") and not _table_exists(conn, r.get("canonical_table_name"))]},
-                {"label": "No Area Mapping", "items": [r for r in rows if not r.get("area_ids")]},
-                {"label": "No Template", "items": [r for r in rows if not r.get("templates")]},
-                {"label": "No View", "items": [r for r in rows if not r.get("views")]},
-            ],
-        }
     if group == "by-area":
         sections = {}
         for row in rows:
             areas = row.get("areas") or [{"area_id": UNASSIGNED_AREA_ID, "area_name": "Unassigned"}]
             for area in areas:
                 area_label = area.get("area_name") or area.get("area_id") or "Unassigned"
-                tab_label = row.get("canonical_tab_code") or "No Tab"
+                tab_label = _tab_label(row.get("tab_code")) if row.get("tab_code") else "No Tab"
                 area_section = sections.setdefault(area_label, {})
                 area_section.setdefault(tab_label, []).append(row)
         return {"group": group, "sections": [{"label": label, "tabs": [{"label": tab, "items": items} for tab, items in sorted(tabs.items())]} for label, tabs in sorted(sections.items())]}
-    key_name = "object_type_code" if group == "by-object-type" else "canonical_tab_code"
     sections = {}
     for row in rows:
-        label = row.get(key_name) or ("No Tab" if key_name == "canonical_tab_code" else "Unspecified")
-        sections.setdefault(label, []).append(row)
-    return {"group": group, "sections": [{"label": label, "items": items} for label, items in sorted(sections.items())]}
+        tab_label = _tab_label(row.get("tab_code")) if row.get("tab_code") else "No Tab"
+        area_label = row.get("area_name") or row.get("area_id") or "Unassigned"
+        sections.setdefault(tab_label, {}).setdefault(area_label, []).append(row)
+    return {
+        "group": "by-tab",
+        "sections": [
+            {"label": tab, "areas": [{"label": area, "items": items} for area, items in sorted(areas.items())]}
+            for tab, areas in sorted(sections.items())
+        ],
+    }
+
+
+def _tab_label(tab_code):
+    if tab_code == "GOALS":
+        return "Goals / Tasks"
+    return tab_code or ""
+
+
+def _cell_item_names(conn, area_id, tab_code, filters=None):
+    filters = dict(filters or {})
+    filters["area_id"] = area_id
+    filters["tab_code"] = tab_code
+    rows = list_content_kinds(conn=conn, filters=filters)
+    return [row["name"] for row in rows[:5]]
 
 
 ROOT_TABLES = {
@@ -1665,6 +1662,9 @@ SAMPLE_PATTERNS = [
 
 
 def seed_content_catalog(conn=None, force=False):
+    # Retired with Content Catalog V2. Catalog items are now user-entered
+    # planning rows, not a generated ontology.
+    return
     conn = _get_conn(conn)
     ensure_content_catalog_schema(conn, seed=False)
     if not force and _sample_seed_version(conn) >= CONTENT_CATALOG_SAMPLE_SEED_VERSION:

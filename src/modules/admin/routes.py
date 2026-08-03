@@ -217,7 +217,8 @@ def content_catalog_update_api(entity, record_id):
             return jsonify({"ok": True, **result})
         if payload.get("action") in {"remove", "deactivate"}:
             if entity == "content-kinds":
-                catalog_mod.deactivate_content_kind(record_id, conn=conn)
+                result = catalog_mod.remove_content_kind(record_id, conn=conn)
+                return jsonify({"ok": True, **result})
             elif entity == "patterns":
                 catalog_mod.deactivate_content_pattern(record_id, conn=conn)
             elif entity == "templates":

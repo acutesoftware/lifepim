@@ -277,6 +277,8 @@ Desktop accepts supported note pushes for the paired user. Existing notes are
 updated when the server item ID, client item map, or same mobile filename can be
 matched. Mobile-only notes can be created in the user's configured Pocket
 default note folder, or in the user's existing note area when no default is set.
+Pocket-created short notes are ordinary markdown pushes in this flow; their
+Pocket `project:` front matter is accepted by Desktop as an `area` alias.
 
 When Desktop detects that a note changed on both sides, it returns a conflict
 instead of overwriting Desktop content unless the mobile payload has a
@@ -296,6 +298,13 @@ The mobile download flow is:
    hash.
 
 The download action does not upload local Pocket changes back to Desktop.
+
+Desktop does not filter the manifest by Area for Pocket. All accessible notes
+for the paired Desktop user are listed. Pocket may still call the metadata field
+Project, but Project values are only filters on the phone; a missing matching
+Project/Area filter does not prevent a Desktop note from downloading or showing
+in the all-notes view. When Desktop sends Area metadata, Pocket writes it as
+`project:` front matter for downloaded notes.
 
 ### Duplicate and Conflict Expectations
 
