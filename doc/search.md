@@ -11,6 +11,10 @@ event text, and dates.
 Metadata search does not read markdown note bodies. For notes, it searches the
 note file name and note path.
 
+Content Catalog records are included in metadata search and are shown before
+normal tab records. This makes catalog setup records quick to find while adding
+or editing catalog entries.
+
 ## Note Content
 
 Note Content searches inside markdown note bodies. It uses the cached
@@ -87,6 +91,9 @@ Current searched areas include:
 - Media: `filename`, `path`, `ext`, `media_type`
 - How: `title`, `description`
 - Calendar: `title`, `content`, `event_date`
+- Content Catalog: `lp_content_kind`, `lp_content_pattern`, `lp_template`,
+  and `lp_content_view` names, codes, descriptions, notes, config, and related
+  catalog fields
 
 Metadata search uses caps:
 
@@ -118,4 +125,3 @@ files during the search request.
 The index is rebuilt on demand from Settings. Rebuilding deletes existing rows
 from `lp_note_search_index`, reads current markdown files referenced by
 `lp_notes`, and inserts fresh cached text.
-

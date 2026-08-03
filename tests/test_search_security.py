@@ -9,6 +9,7 @@ if root_folder not in sys.path:
     sys.path.append(root_folder)
 
 from common import data
+from common import content_catalog
 from common import search
 
 
@@ -114,6 +115,18 @@ class TestSearchSecurity(unittest.TestCase):
         results = search.search_note_content("secret phrase from user one", route="notes")
 
         self.assertIn("user-one-visible.md", self._result_titles(results))
+
+    def test_content_catalog_results_are_prioritised_in_metadata_search(self):
+        self._search_as(1)
+        content_catalog.ensure_content_catalog_schema(self.conn)
+
+        results = search.search_all("Recipe")
+
+        self.assertTrue(results["primary"])
+        self.assertEqual(results["primary"][0]["route"], "content-catalog")
+        self.assertEqual(results["primary"][0]["table"], "Content Catalog - Content Kind")
+        self.assertEqual(results["primary"][0]["extra_url_params"]["mode"], "editor")
+        self.assertEqual(results["primary"][0]["extra_url_params"]["table"], "content-kinds")
 
 
 if __name__ == "__main__":

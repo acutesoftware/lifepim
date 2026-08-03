@@ -1,4 +1,5 @@
 from common import config as cfg
+from common import content_catalog
 from common import data
 from common import note_search_index
 from common.utils import get_table_def, get_tabs
@@ -101,6 +102,41 @@ SEARCH_SPECS = {
 }
 
 DEFAULT_SEARCH_ORDER = ["notes", "audio", "media", "how", "calendar"]
+
+CONTENT_CATALOG_SEARCH_SPECS = [
+    {
+        "table": "lp_content_kind",
+        "label": "Content Catalog - Content Kind",
+        "id_col": "content_kind_id",
+        "title_col": "name",
+        "columns": ["kind_code", "name", "plural_name", "description", "object_type_code", "canonical_tab_code", "canonical_table_name", "subtype_code", "mapping_status_code", "notes"],
+        "table_key": "content-kinds",
+    },
+    {
+        "table": "lp_content_pattern",
+        "label": "Content Catalog - Pattern",
+        "id_col": "content_pattern_id",
+        "title_col": "name",
+        "columns": ["pattern_code", "name", "description", "default_area_id", "creation_config", "view_filter_config", "notes"],
+        "table_key": "patterns",
+    },
+    {
+        "table": "lp_template",
+        "label": "Content Catalog - Template",
+        "id_col": "template_id",
+        "title_col": "name",
+        "columns": ["template_code", "name", "description", "template_type_code", "target_object_type", "target_tab_code", "template_content", "template_config", "notes"],
+        "table_key": "templates",
+    },
+    {
+        "table": "lp_content_view",
+        "label": "Content Catalog - View",
+        "id_col": "content_view_id",
+        "title_col": "name",
+        "columns": ["view_code", "name", "description", "tab_code", "view_type_code", "view_config", "notes"],
+        "table_key": "views",
+    },
+]
 
 
 def parse_search_terms(query):
@@ -222,6 +258,65 @@ def _search_table(route_name, terms, columns, view_route, id_param, limit=None):
                 "title": item.get(ROUTE_TITLE_FIELD.get(route_name, "")) or "",
             }
         )
+    return results, has_more
+
+
+def _search_content_catalog(terms, limit=None):
+    if not terms:
+        return [], False
+    conn = data._get_conn()
+    try:
+        content_catalog.ensure_content_catalog_schema(conn, seed=False)
+    except Exception:
+        return [], False
+    fetch_limit = int(limit) + 1 if limit else None
+    results = []
+    for spec in CONTENT_CATALOG_SEARCH_SPECS:
+        table_cols = _table_columns(conn, spec["table"])
+        if not table_cols or spec["id_col"] not in table_cols:
+            continue
+        search_cols = [col for col in spec["columns"] if col in table_cols]
+        if not search_cols:
+            continue
+        select_cols = list(dict.fromkeys([spec["id_col"], spec["title_col"]] + search_cols))
+        term_conditions = []
+        params = []
+        for term in terms:
+            like_value = f"%{term}%"
+            condition = " OR ".join([f"lower(COALESCE(c.{col}, '')) LIKE ?" for col in search_cols])
+            term_conditions.append(f"({condition})")
+            params.extend([like_value] * len(search_cols))
+        remaining = fetch_limit - len(results) if fetch_limit else None
+        if remaining is not None and remaining <= 0:
+            break
+        sql = f"SELECT {', '.join(select_cols)} FROM {spec['table']} c WHERE {' AND '.join(term_conditions)} ORDER BY lower(c.{spec['title_col']})"
+        if remaining:
+            sql += " LIMIT ?"
+            params.append(remaining)
+        rows = conn.execute(sql, params).fetchall()
+        for row in rows:
+            item = dict(row)
+            match_field = _find_match_field(item, terms, search_cols)
+            match_value = item.get(match_field) or ""
+            results.append(
+                {
+                    "table": spec["label"],
+                    "route": "content-catalog",
+                    "id": item.get(spec["id_col"]),
+                    "area": "",
+                    "match_field": match_field,
+                    "match_value": match_value,
+                    "match_snippet": _build_snippet(match_value, terms),
+                    "view_route": "admin.content_catalog_route",
+                    "id_param": "catalog_record",
+                    "record_type": "content_catalog",
+                    "title": item.get(spec["title_col"]) or "",
+                    "extra_url_params": {"mode": "editor", "table": spec["table_key"]},
+                }
+            )
+    has_more = bool(fetch_limit and len(results) > limit)
+    if has_more:
+        results = results[:limit]
     return results, has_more
 
 
@@ -438,6 +533,16 @@ def search_all(query, area=None, route=None, primary_limit=100, secondary_limit=
     visible_routes = _visible_search_routes()
     search_order = [route_name for route_name in DEFAULT_SEARCH_ORDER if not visible_routes or route_name in visible_routes]
     current_route = route if route in SEARCH_SPECS else ""
+    catalog_results, catalog_has_more = _search_content_catalog(terms, limit=secondary_limit)
+    primary.extend(catalog_results)
+    if catalog_has_more:
+        more.append(
+            {
+                "route": "home",
+                "table": "Content Catalog",
+                "view_route": "admin.content_catalog_route",
+            }
+        )
     if current_route and current_route in search_order:
         search_order.remove(current_route)
         search_order.insert(0, current_route)

@@ -386,8 +386,10 @@
     const editorTableName = shell.querySelector("[data-editor-table-name]");
     const summaryStats = shell.querySelector("[data-catalog-summary-stats]");
     const editorFilterBanner = shell.querySelector("[data-editor-filter-banner]");
+    const initialUrl = new URL(window.location.href);
+    const initialTable = initialUrl.searchParams.get("table");
     let currentMode = shell.dataset.initialMode || "matrix";
-    let currentEditorTable = "content-kinds";
+    let currentEditorTable = ["content-kinds", "patterns", "templates", "views"].includes(initialTable) ? initialTable : "content-kinds";
     let currentReportGroup = "by-tab";
     let summaryFilter = {};
     let summarySelection = "";
@@ -871,7 +873,7 @@
       }
       const selectedOption = editorTableSelect ? editorTableSelect.selectedOptions[0] : null;
       if (editorTableName) {
-        editorTableName.textContent = selectedOption ? selectedOption.textContent : "Content Kinds";
+        editorTableName.textContent = selectedOption ? selectedOption.dataset.dbName : "lp_content_kind";
       }
       shell.querySelectorAll("[data-catalog-panel]").forEach((panel) => {
         panel.hidden = panel.dataset.catalogPanel !== currentEditorTable;

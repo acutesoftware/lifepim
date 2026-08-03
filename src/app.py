@@ -508,6 +508,7 @@ def search_route():
         results = search_mod.search_all(query, area=area, route=route)
     for item in results["primary"] + results["secondary"]:
         params = {item["id_param"]: item["id"]}
+        params.update(item.get("extra_url_params") or {})
         if area:
             params["area"] = area
         item["url"] = url_for(item["view_route"], **params)
