@@ -860,10 +860,30 @@ def _direct_area_condition(scope_ids):
     return f"t.area COLLATE NOCASE IN ({placeholders})"
 
 
+def _unmapped_area_condition():
+    return (
+        "("
+        "COALESCE(TRIM(t.area), '') = '' "
+        "OR NOT EXISTS ("
+        "  SELECT 1 FROM lp_areas a "
+        "  WHERE a.owner_user_id IS ? "
+        "    AND a.status = 'active' "
+        "    AND COALESCE(a.is_header, 0) = 0 "
+        "    AND COALESCE(a.is_system, 0) = 0 "
+        "    AND ("
+        "      lower(a.area_id) = lower(TRIM(t.area)) "
+        "      OR lower(a.area_name) = lower(TRIM(t.area))"
+        "    )"
+        ")"
+        ")"
+    )
+
+
 def _notes_base_condition(area, folder_path=None):
     params = []
     if area and area.lower() == "unmapped":
-        condition = "COALESCE(t.area, '') = ''"
+        condition = _unmapped_area_condition()
+        params.append(_current_owner_user_id())
     elif area:
         scope_ids = _area_scope_ids(area)
         condition = _direct_area_condition(scope_ids)

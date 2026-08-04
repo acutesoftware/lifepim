@@ -137,15 +137,43 @@ class TestNoteCreation(unittest.TestCase):
         )
 
         note2_id, note2 = self._create_note_record("note_creation_test_filtered", area_dir, area=area_id)
+        note3_id, note3 = self._create_note_record(
+            "note_creation_test_typo_area",
+            area_dir,
+            area="cats and dogs",
+        )
+
+        cats_area_id = "cats"
+        areas_mod.area_upsert(
+            {
+                "area_id": cats_area_id,
+                "tab": "TEST",
+                "group_name": "Test",
+                "area_name": "Cats",
+            },
+            conn=self.conn,
+        )
+        note4_id, _ = self._create_note_record(
+            "note_creation_test_exact_label_area",
+            area_dir,
+            area="Cats",
+        )
 
         unmapped_notes = notes_routes._fetch_notes("unmapped")
         unmapped_ids = {n.get("id") for n in unmapped_notes}
         self.assertIn(note1_id, unmapped_ids)
+        self.assertIn(note3_id, unmapped_ids)
         self.assertNotIn(note2_id, unmapped_ids)
+        self.assertNotIn(note4_id, unmapped_ids)
+        self.assertEqual(notes_routes._count_notes("unmapped"), len(unmapped_notes))
 
         filtered_notes = notes_routes._fetch_notes(area_id)
         filtered_ids = {n.get("id") for n in filtered_notes}
         self.assertIn(note2_id, filtered_ids)
+
+        all_notes = notes_routes._fetch_notes("")
+        all_ids = {n.get("id") for n in all_notes}
+        self.assertIn(note3_id, all_ids)
 
         results = search.search_all("note_creation_test")
         note_titles = {
@@ -155,6 +183,7 @@ class TestNoteCreation(unittest.TestCase):
         }
         self.assertIn(note1.get("file_name"), note_titles)
         self.assertIn(note2.get("file_name"), note_titles)
+        self.assertIn(note3.get("file_name"), note_titles)
 
     def test_notes_area_context_resolves_display_name_to_mapped_folders(self):
         area_dir = os.path.join(self.tmpdir.name, "ue5")
