@@ -5,7 +5,10 @@ import hashlib
 import os
 import re
 import secrets
+import time
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, current_app, jsonify, request
@@ -32,6 +35,26 @@ POCKET_MAX_ATTACHMENT_BYTES = int(os.getenv("LIFEPIM_POCKET_MAX_ATTACHMENT_BYTES
 POCKET_ATTACHMENT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 POCKET_FRONT_MATTER_READ_LIMIT = 128 * 1024
 POCKET_MANIFEST_FRONT_MATTER_LIMIT = int(os.getenv("LIFEPIM_POCKET_MANIFEST_FRONT_MATTER_LIMIT", "100"))
+_POCKET_COMMIT_DEFER_DEPTH = ContextVar("pocket_commit_defer_depth", default=0)
+
+
+def _commit_pocket_changes(conn=None):
+    if _POCKET_COMMIT_DEFER_DEPTH.get() > 0:
+        return
+    (conn or data._get_conn()).commit()
+
+
+@contextmanager
+def _defer_pocket_commits():
+    token = _POCKET_COMMIT_DEFER_DEPTH.set(_POCKET_COMMIT_DEFER_DEPTH.get() + 1)
+    try:
+        yield
+        data._get_conn().commit()
+    except Exception:
+        data._get_conn().rollback()
+        raise
+    finally:
+        _POCKET_COMMIT_DEFER_DEPTH.reset(token)
 
 
 def _utc_now():
@@ -160,7 +183,7 @@ def ensure_pocket_schema(conn=None):
         ("deleted_at", "TEXT"),
     ):
         _add_column_if_missing(conn, "pocket_mobile_files", column_name, column_type)
-    conn.commit()
+    _commit_pocket_changes(conn)
 
 
 def _add_column_if_missing(conn, table_name, column_name, column_type):
@@ -188,7 +211,7 @@ def set_user_default_note_folder(user_id, folder_path, conn=None):
     folder_path = notes_routes._normalize_note_path((folder_path or "").strip())
     if not folder_path:
         conn.execute("DELETE FROM pocket_user_settings WHERE user_id = ?", (user_id,))
-        conn.commit()
+        _commit_pocket_changes(conn)
         return ""
     if not os.path.isabs(folder_path):
         raise ValueError("Pocket default note folder must be an absolute path.")
@@ -202,7 +225,7 @@ def set_user_default_note_folder(user_id, folder_path, conn=None):
         """,
         (user_id, folder_path, _utc_now_sql()),
     )
-    conn.commit()
+    _commit_pocket_changes(conn)
     return folder_path
 
 
@@ -269,7 +292,7 @@ def create_pocket_pairing_code(user_id, created_ip=""):
                 """,
                 (code_hash, user["user_id"], now_sql, (now + PAIRING_CODE_TTL).strftime("%Y-%m-%dT%H:%M:%SZ"), created_ip or ""),
             )
-            data._get_conn().commit()
+            _commit_pocket_changes()
             log_network("pocket_pairing_code_created", user_id=user["user_id"], username=user["username"], created_ip=created_ip or "")
             return {"pairing_code": raw_code, "expires_at": (now + PAIRING_CODE_TTL).strftime("%Y-%m-%dT%H:%M:%SZ")}
         except Exception:
@@ -301,7 +324,7 @@ def revoke_pocket_device(device_id, conn=None):
         "UPDATE pocket_devices SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL",
         (_utc_now_sql(), device_id),
     )
-    conn.commit()
+    _commit_pocket_changes(conn)
     return bool(cur.rowcount)
 
 
@@ -362,7 +385,7 @@ def _record_registration_attempt(was_successful, username="", pairing_code_hash=
         """,
         (_utc_now_sql(), 1 if was_successful else 0, _client_ip(), username or "", pairing_code_hash or "", device_id or "", reason or "", _user_agent()),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
     log_network(
         "pocket_registration_attempt",
         was_successful=bool(was_successful),
@@ -442,13 +465,13 @@ def _auth_device():
                 "UPDATE pocket_devices SET user_id = ? WHERE device_id = ?",
                 (user_id, device_id),
             )
-            data._get_conn().commit()
+            _commit_pocket_changes()
             row_dict["user_id"] = user_id
     data._get_conn().execute(
         "UPDATE pocket_devices SET last_seen_at = ?, last_ip = ?, user_agent = ? WHERE device_id = ?",
         (_utc_now_sql(), _client_ip(), _user_agent(), device_id),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
     log_network(
         "pocket_auth_ok",
         path=request.path,
@@ -661,7 +684,7 @@ def _upsert_item_state(entity_type, entity_id, note_path, state):
             _utc_now_sql(),
         ),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
 
 
 def _note_file_metadata(note_path):
@@ -919,7 +942,7 @@ def _item_uuid_for_note(note_id, user_id=None):
         """,
         (item_uuid, note_id, now, now),
     )
-    conn.commit()
+    _commit_pocket_changes(conn)
     return item_uuid
 
 
@@ -990,7 +1013,7 @@ def _item_uuid_for_mobile_file(mobile_file_id, user_id=None):
         """,
         (item_uuid, mobile_file_id, now, now),
     )
-    conn.commit()
+    _commit_pocket_changes(conn)
     return item_uuid
 
 
@@ -1035,7 +1058,7 @@ def _item_uuid_map_for_mobile_files(rows):
             """,
             values,
         )
-        data._get_conn().commit()
+        _commit_pocket_changes()
     return expected
 
 
@@ -1230,7 +1253,7 @@ def _delete_mobile_file_from_payload(payload_item, device):
         """,
         (now, now, mobile_file_id, device.get("user_id")),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
     if client_item_id:
         _upsert_client_item_map(device.get("device_id"), client_item_id, "mobile_file", mobile_file_id)
     item_uuid = _item_uuid_for_mobile_file(mobile_file_id, device.get("user_id"))
@@ -1321,7 +1344,7 @@ def _upsert_mobile_file_from_payload(payload_item, device):
         )
         mobile_file_id = cur.lastrowid
         created = True
-    data._get_conn().commit()
+    _commit_pocket_changes()
     client_item_id = _payload_id(payload_item)
     if client_item_id:
         _upsert_client_item_map(device.get("device_id"), client_item_id, "mobile_file", mobile_file_id)
@@ -1412,7 +1435,7 @@ def _delete_note_from_mobile(payload_item, device):
         "DELETE FROM pocket_client_item_map WHERE entity_type = 'note' AND entity_id = ?",
         (note_id,),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
     _log_pocket_user_change(
         "sync_note_delete",
         "lp_notes",
@@ -1456,7 +1479,7 @@ def _upsert_client_item_map(device_id, client_item_id, entity_type, entity_id):
         """,
         (device_id, client_item_id, entity_type, entity_id, now, now),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
 
 
 def _notes_root(user_id=None, notes=None):
@@ -2373,7 +2396,7 @@ def _save_pocket_device(device_id, raw_token, device_name, platform, username, u
             _user_agent(),
         ),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
 
 
 @pocket_api_bp.route("/health", methods=["GET"])
@@ -2439,7 +2462,7 @@ def register_device_route():
         (now, row["pairing_id"], now),
     )
     if not claimed.rowcount:
-        data._get_conn().commit()
+        _commit_pocket_changes()
         _record_registration_attempt(False, username=username, pairing_code_hash=code_hash, device_id=device_id, reason="pairing_code_already_used")
         return _json_error("authentication_failed", 401)
     _save_pocket_device(device_id, raw_token, device_name, platform, username, user_id)
@@ -2509,13 +2532,14 @@ def logout_device_route():
         "UPDATE pocket_devices SET revoked_at = ? WHERE device_id = ?",
         (_utc_now_sql(), device["device_id"]),
     )
-    data._get_conn().commit()
+    _commit_pocket_changes()
     log_network("pocket_logout_device", device_id=device["device_id"], username=device.get("username"))
     return jsonify({"ok": True})
 
 
 @pocket_api_bp.route("/sync/manifest", methods=["GET"])
 def sync_manifest_route():
+    started_at = time.perf_counter()
     device, error = require_pocket_auth()
     if error:
         return error
@@ -2636,7 +2660,7 @@ def sync_manifest_route():
                 item_count=len(items),
                 skipped_count=skipped,
             )
-    data._get_conn().commit()
+    _commit_pocket_changes()
     log_network(
         "pocket_manifest_finish",
         device_id=device["device_id"],
@@ -2651,6 +2675,7 @@ def sync_manifest_route():
         root=root,
         front_matter_included=include_front_matter,
         file_dates_included=include_file_dates,
+        elapsed_ms=int((time.perf_counter() - started_at) * 1000),
     )
     payload = {
         "generated_at": _utc_now().isoformat(),
@@ -2809,6 +2834,7 @@ def _push_one_item(payload_item, device):
 @pocket_api_bp.route("/sync/mobile-to-desktop", methods=["POST"], strict_slashes=False)
 @pocket_api_bp.route("/push", methods=["POST"], strict_slashes=False)
 def sync_push_route():
+    started_at = time.perf_counter()
     device, error = require_pocket_auth()
     if error:
         return error
@@ -2836,8 +2862,10 @@ def sync_push_route():
         item_count=len(incoming_items),
         payload_keys=sorted(payload.keys()),
         item_debug=[_payload_debug(item or {}) for item in incoming_items[:5]],
+        connect_to_start_ms=int((time.perf_counter() - started_at) * 1000),
     )
-    results = [_push_one_item(item or {}, device) for item in incoming_items]
+    with _defer_pocket_commits():
+        results = [_push_one_item(item or {}, device) for item in incoming_items]
     for result in results:
         if not result.get("ok"):
             log_network(
@@ -2861,6 +2889,7 @@ def sync_push_route():
         conflict_count=len([result for result in results if result.get("conflict")]),
         error_count=len([result for result in results if not result.get("ok") and not result.get("conflict")]),
         status_code=status,
+        elapsed_ms=int((time.perf_counter() - started_at) * 1000),
     )
     accepted = []
     for result in results:
