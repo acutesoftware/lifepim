@@ -18,8 +18,9 @@ from common.network_log import log_network
 
 logger_api_bp = Blueprint("logger_api", __name__, url_prefix="/api/logger/v1")
 
-ALLOWED_LOG_TYPES = {"movement", "phone_usage", "device", "service"}
-LOGGER_PATH_RE = re.compile(r"^(movement|phone_usage|device|service)/(\d{4}-\d{2}-\d{2})\.jsonl$")
+ALLOWED_LOG_TYPES = {"movement", "phone_usage", "device", "service", "app_catalog"}
+LOGGER_SEGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+LOGGER_DATE_RE = re.compile(r"(\d{4})[-_](\d{2})[-_](\d{2})")
 
 
 def _utc_now_sql():
@@ -122,12 +123,21 @@ def safe_device_folder(device_name, device_uuid, conn=None):
 
 def _validate_relative_path(relative_path):
     text = (relative_path or "").replace("\\", "/").strip()
-    if os.path.isabs(text) or ".." in text.split("/"):
+    parts = [part for part in text.split("/") if part]
+    if os.path.isabs(text) or text.startswith("/") or len(parts) < 2 or ".." in parts:
         raise ValueError("Invalid log path")
-    match = LOGGER_PATH_RE.match(text)
-    if not match:
+    if text != "/".join(parts) or not all(LOGGER_SEGMENT_RE.match(part) for part in parts):
         raise ValueError("Invalid log path")
-    return text, match.group(1), match.group(2)
+    filename = parts[-1]
+    lower_filename = filename.lower()
+    if not (lower_filename.endswith(".json") or lower_filename.endswith(".jsonl")):
+        raise ValueError("Invalid log path")
+    date_match = LOGGER_DATE_RE.search(filename)
+    if date_match:
+        file_date = f"{date_match.group(1)}-{date_match.group(2)}-{date_match.group(3)}"
+    else:
+        file_date = datetime.now().strftime("%Y-%m-%d")
+    return text, parts[0], file_date
 
 
 def _destination_for(relative_path, device_folder, settings=None):
@@ -358,7 +368,7 @@ def upload_route():
         if uploaded_file is None:
             raise ValueError("Missing file")
         form_log_type = (request.form.get("log_type") or log_type).strip()
-        if form_log_type != log_type or log_type not in ALLOWED_LOG_TYPES:
+        if form_log_type != log_type:
             raise ValueError("Invalid log path")
         file_size = int(request.form.get("file_size") or 0)
         bytes_received, file_status = _write_uploaded_file(uploaded_file, destination, file_size if file_size else None)
@@ -514,23 +524,20 @@ def list_raw_files(filters=None, conn=None, settings=None):
         if not os.path.isdir(device_root):
             continue
         device = devices_by_folder.get(device_folder, {"device_name": device_folder, "logger_device_id": None})
-        for log_type in sorted(ALLOWED_LOG_TYPES):
-            type_root = os.path.join(device_root, log_type)
-            if not os.path.isdir(type_root):
-                continue
-            for filename in sorted(os.listdir(type_root), reverse=True):
-                relative_path = f"{log_type}/{filename}"
+        for current_root, _dirs, filenames in os.walk(device_root):
+            for filename in sorted(filenames, reverse=True):
+                full_path = os.path.join(current_root, filename)
+                relative_path = os.path.relpath(full_path, device_root).replace(os.sep, "/")
                 try:
-                    _validate_relative_path(relative_path)
+                    relative_path, log_type, file_date = _validate_relative_path(relative_path)
                 except ValueError:
                     continue
-                full_path = os.path.join(type_root, filename)
                 if not os.path.isfile(full_path):
                     continue
                 stat = os.stat(full_path)
                 meta = meta_by_key.get((device.get("logger_device_id"), relative_path), {})
                 item = {
-                    "file_date": filename[:10],
+                    "file_date": file_date,
                     "device": device.get("device_name") or device_folder,
                     "device_folder": device_folder,
                     "log_type": log_type,

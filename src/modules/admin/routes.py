@@ -1153,6 +1153,7 @@ def logger_logs_route():
         "filename": request.args.get("filename", ""),
     }
     files = logger_api.list_raw_files(filters=filters, conn=conn, settings=logger_settings)
+    log_types = sorted(set(logger_api.ALLOWED_LOG_TYPES) | {row.get("log_type", "") for row in files if row.get("log_type")})
     selected_run_id = request.args.get("run_id", type=int)
     return render_template(
         "admin_logger.html",
@@ -1170,7 +1171,7 @@ def logger_logs_route():
         raw_files=files,
         devices=logger_api.list_devices(conn),
         filters=filters,
-        log_types=sorted(logger_api.ALLOWED_LOG_TYPES),
+        log_types=log_types,
     )
 
 

@@ -165,13 +165,26 @@ class TestLoggerApi(unittest.TestCase):
         with open(stored_path, "rb") as handle:
             self.assertEqual(handle.read(), b'{"type":"battery_state"}\n')
 
-    def test_upload_rejects_traversal_and_bad_categories(self):
+    def test_upload_accepts_safe_new_json_log_paths(self):
+        resp = self.upload("app_catalog/app_catalog_2026_08_05.json", content=b'{"type":"app_catalog_started"}\n')
+
+        self.assertEqual(resp.status_code, 200)
+        stored_path = os.path.join(logger_raw_root(), "duncan-a22", "app_catalog", "app_catalog_2026_08_05.json")
+        self.assertTrue(os.path.exists(stored_path))
+        file_row = self.conn.execute(
+            "SELECT * FROM lp_logger_sync_file WHERE relative_path = ?",
+            ("app_catalog/app_catalog_2026_08_05.json",),
+        ).fetchone()
+        self.assertEqual(file_row["log_type"], "app_catalog")
+        self.assertEqual(file_row["file_date"], "2026-08-05")
+
+    def test_upload_rejects_traversal_and_bad_paths(self):
         traversal = self.upload("../2026-08-05.jsonl")
-        bad_category = self.upload("other/2026-08-05.jsonl")
+        bad_segment = self.upload("bad segment/2026-08-05.jsonl")
         bad_extension = self.upload("movement/2026-08-05.txt")
 
         self.assertEqual(traversal.status_code, 400)
-        self.assertEqual(bad_category.status_code, 400)
+        self.assertEqual(bad_segment.status_code, 400)
         self.assertEqual(bad_extension.status_code, 400)
         self.assertEqual(os.listdir(self.tmpdir.name), [])
 
