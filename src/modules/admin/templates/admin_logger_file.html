@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <p><a href="{{ url_for('admin.logger_logs_route') }}">Back to Logger logs</a></p>
+
+  <div class="settings-panel">
+    <h4>{{ relative_path }}</h4>
+    <p><code>{{ file_path }}</code></p>
+    <p>Size: {{ file_size }} bytes. Modified: {{ modified_at }}.</p>
+    <form method="post" action="{{ url_for('admin.logger_file_open_route') }}" class="settings-form">
+      <input type="hidden" name="device_folder" value="{{ device_folder }}">
+      <input type="hidden" name="relative_path" value="{{ relative_path }}">
+      <a href="{{ url_for('admin.logger_file_view_route', device_folder=device_folder, relative_path=relative_path) }}">Reload</a>
+      <button type="submit">Open in External Editor</button>
+    </form>
+    {% if notice %}
+      <div class="settings-message">{{ notice }}</div>
+    {% endif %}
+    <pre style="white-space: pre; overflow:auto; max-height:70vh; font-family: Consolas, 'Courier New', monospace; border:1px solid #ccc; padding:12px;">{{ text }}</pre>
+  </div>
+{% endblock %}

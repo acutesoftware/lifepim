@@ -1,0 +1,141 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% set admin_tabs = [
+    ('security', 'Security', url_for('admin.admin_mapping_route', tab='security')),
+    ('folder_mapping', 'Folder Mapping', url_for('admin.admin_mapping_route', tab='folder_mapping')),
+    ('folders', 'Folders (dim_folder)', url_for('admin.admin_mapping_route', tab='folders')),
+    ('migration', 'Migration', url_for('admin.admin_mapping_route', tab='migration')),
+    ('logs', 'Logs', url_for('admin.logs_route')),
+    ('logger', 'Logger', url_for('admin.logger_logs_route'))
+  ] %}
+
+  {% if message %}<div class="settings-message">{{ message }}</div>{% endif %}
+
+  <div class="settings-shell">
+    <nav class="settings-tabs" aria-label="Admin sections">
+      {% for tab_id, tab_label, tab_url in admin_tabs %}
+        <a class="{% if tab_id == 'logger' %}active{% endif %}" href="{{ tab_url }}">{{ tab_label }}</a>
+      {% endfor %}
+    </nav>
+
+    <section class="settings-panel">
+      <h4>Logger Summary</h4>
+      <div class="tabular-scroll">
+        <table class="settings-table">
+          <tr><th>Logger Sync</th><td>{{ 'Enabled' if summary.enabled else 'Disabled' }}</td></tr>
+          <tr><th>Raw folder</th><td><code>{{ summary.raw_folder }}</code></td></tr>
+          <tr><th>Devices</th><td>{{ summary.devices }}</td></tr>
+          <tr><th>Last successful sync</th><td>{{ summary.last_successful_sync or 'Never' }}</td></tr>
+          <tr><th>Files received today</th><td>{{ summary.files_received_today }}</td></tr>
+          <tr><th>Stored files</th><td>{{ summary.stored_files }}</td></tr>
+          <tr><th>Raw data size</th><td>{{ summary.raw_data_size }} bytes</td></tr>
+        </table>
+      </div>
+
+      <form method="post" class="settings-form">
+        <button type="submit" name="action" value="open_raw_folder">Open Raw Data Folder</button>
+        <a href="{{ url_for('admin.logger_logs_route') }}">Refresh</a>
+        <a href="{{ url_for('admin.settings_route', tab='logger') }}">Open Logger Settings</a>
+      </form>
+
+      <h4>Recent Sync Activity</h4>
+      <div class="tabular-scroll admin-list-scroll">
+        <table border="1" cellpadding="5">
+          <tr>
+            <th>Date and time</th>
+            <th>Device</th>
+            <th>Status</th>
+            <th>Files attempted</th>
+            <th>Files successful</th>
+            <th>Files failed</th>
+            <th>Bytes received</th>
+            <th>Message</th>
+          </tr>
+          {% for row in runs %}
+          <tr>
+            <td><a href="{{ url_for('admin.logger_logs_route', run_id=row.logger_sync_run_id) }}">{{ row.started_at }}</a></td>
+            <td>{{ row.device_name }}</td>
+            <td>{{ row.status|capitalize }}</td>
+            <td>{{ row.files_attempted }}</td>
+            <td>{{ row.files_succeeded }}</td>
+            <td>{{ row.files_failed }}</td>
+            <td>{{ row.bytes_received }}</td>
+            <td>{{ row.message or '' }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      {% if selected_run_id %}
+        <h4>Run Files</h4>
+        <div class="tabular-scroll admin-list-scroll">
+          <table border="1" cellpadding="5">
+            <tr><th>File</th><th>Log type</th><th>Status</th><th>Size</th><th>Error</th></tr>
+            {% for row in run_files %}
+            <tr>
+              <td>{{ row.relative_path }}</td>
+              <td>{{ row.log_type }}</td>
+              <td>{{ row.status }}</td>
+              <td>{{ row.file_size }}</td>
+              <td>{{ row.error_message or '' }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% endif %}
+
+      <h4>Raw Files</h4>
+      <form method="get" class="settings-form admin-log-filter">
+        <label>
+          Device
+          <select name="device">
+            <option value="">All</option>
+            {% for device in devices %}
+              <option value="{{ device.device_folder }}" {% if filters.device == device.device_folder %}selected{% endif %}>{{ device.device_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Log type
+          <select name="log_type">
+            <option value="">All</option>
+            {% for log_type in log_types %}
+              <option value="{{ log_type }}" {% if filters.log_type == log_type %}selected{% endif %}>{{ log_type }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>File date <input type="date" name="file_date" value="{{ filters.file_date }}"></label>
+        <label>Filename <input type="text" name="filename" value="{{ filters.filename }}"></label>
+        <button type="submit">Apply</button>
+      </form>
+      <div class="tabular-scroll admin-list-scroll">
+        <table border="1" cellpadding="5">
+          <tr>
+            <th>File date</th>
+            <th>Device</th>
+            <th>Log type</th>
+            <th>Filename</th>
+            <th>Relative path</th>
+            <th>Size</th>
+            <th>Modified date</th>
+            <th>Received date</th>
+            <th>Status</th>
+          </tr>
+          {% for row in raw_files %}
+          <tr>
+            <td>{{ row.file_date }}</td>
+            <td>{{ row.device }}</td>
+            <td>{{ row.log_type }}</td>
+            <td><a href="{{ url_for('admin.logger_file_view_route', device_folder=row.device_folder, relative_path=row.relative_path) }}">{{ row.filename }}</a></td>
+            <td>{{ row.relative_path }}</td>
+            <td>{{ row.size }}</td>
+            <td>{{ row.modified_at }}</td>
+            <td>{{ row.received_at }}</td>
+            <td>{{ row.status }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+  </div>
+{% endblock %}

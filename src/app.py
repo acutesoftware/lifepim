@@ -268,6 +268,7 @@ from modules.areas.routes import areas_bp
 from modules.icons.routes import icons_bp
 from modules.projects.routes import projects_bp
 from modules.pocket_api.routes import pocket_api_bp
+from modules.logger_api.routes import logger_api_bp
 
 _dbg("Registering blueprints")
 app.register_blueprint(auth_bp)
@@ -293,6 +294,7 @@ app.register_blueprint(areas_bp, url_prefix="/areas")
 app.register_blueprint(icons_bp, url_prefix="/icons")
 app.register_blueprint(projects_bp, url_prefix="/projects")
 app.register_blueprint(pocket_api_bp)
+app.register_blueprint(logger_api_bp)
 configure_security(app)
 _dbg("Blueprints registered")
 

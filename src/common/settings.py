@@ -90,6 +90,14 @@ NOTE_DISPLAY_DEFAULTS = {
     "notes.display.notes_per_page": ("50", "Notes", "Notes per page"),
 }
 
+LOGGER_DEFAULTS = {
+    "logger_sync_enabled": ("1", "Mobile Logger", "Enable Logger sync API"),
+    "logger_raw_data_root": ("admin/logged_data/raw", "Mobile Logger", "Logger raw-data root"),
+    "logger_sync_token": ("", "Mobile Logger", "Logger sync token"),
+    "logger_max_upload_mb": ("50", "Mobile Logger", "Maximum upload size"),
+    "logger_keep_sync_logs": ("1", "Mobile Logger", "Keep Desktop sync logs"),
+}
+
 NOTE_CARD_WIDTH_DEFAULT = 50
 NOTE_CARD_WIDTH_MIN = 20
 NOTE_CARD_WIDTH_MAX = 120
@@ -134,6 +142,7 @@ def ensure_settings_schema(conn=None):
         **AUDIO_DEFAULTS,
         **MEDIA_DEFAULTS,
         **NOTE_DISPLAY_DEFAULTS,
+        **LOGGER_DEFAULTS,
     }.items():
         conn.execute(
             "INSERT OR IGNORE INTO sys_settings "
@@ -265,6 +274,61 @@ def get_note_display_settings(conn=None):
             get_setting("notes.display.notes_per_page", str(NOTE_NOTES_PER_PAGE_DEFAULT), conn)
         ),
     }
+
+
+def get_logger_settings(conn=None):
+    return {
+        "enabled": _as_bool(get_setting("logger_sync_enabled", "1", conn)),
+        "raw_data_root": normalize_logger_raw_data_root(
+            get_setting("logger_raw_data_root", "admin/logged_data/raw", conn)
+        ),
+        "sync_token": get_setting("logger_sync_token", "", conn),
+        "max_upload_mb": normalize_logger_max_upload_mb(
+            get_setting("logger_max_upload_mb", "50", conn)
+        ),
+        "keep_sync_logs": _as_bool(get_setting("logger_keep_sync_logs", "1", conn)),
+    }
+
+
+def save_logger_settings(values, conn=None):
+    conn = db._get_conn() if conn is None else conn
+    ensure_settings_schema(conn)
+    set_setting(
+        "logger_sync_enabled",
+        "1" if values.get("enabled") else "0",
+        "Mobile Logger",
+        "Enable Logger sync API",
+        conn,
+    )
+    set_setting(
+        "logger_raw_data_root",
+        normalize_logger_raw_data_root(values.get("raw_data_root")),
+        "Mobile Logger",
+        "Logger raw-data root",
+        conn,
+    )
+    if values.get("sync_token") is not None:
+        set_setting(
+            "logger_sync_token",
+            str(values.get("sync_token") or "").strip(),
+            "Mobile Logger",
+            "Logger sync token",
+            conn,
+        )
+    set_setting(
+        "logger_max_upload_mb",
+        str(normalize_logger_max_upload_mb(values.get("max_upload_mb"))),
+        "Mobile Logger",
+        "Maximum upload size",
+        conn,
+    )
+    set_setting(
+        "logger_keep_sync_logs",
+        "1" if values.get("keep_sync_logs") else "0",
+        "Mobile Logger",
+        "Keep Desktop sync logs",
+        conn,
+    )
 
 
 def save_note_display_settings(values, conn=None):
@@ -453,6 +517,15 @@ def normalize_note_sample_lines(value):
 
 def normalize_note_notes_per_page(value):
     return _clamp_int(value, NOTE_NOTES_PER_PAGE_DEFAULT, NOTE_NOTES_PER_PAGE_MIN, NOTE_NOTES_PER_PAGE_MAX)
+
+
+def normalize_logger_raw_data_root(value):
+    text = str(value or "admin/logged_data/raw").strip().strip('"').strip()
+    return text or "admin/logged_data/raw"
+
+
+def normalize_logger_max_upload_mb(value):
+    return _clamp_int(value, 50, 1, 1024)
 
 
 def _clamp_int(value, default, min_value, max_value):

@@ -229,6 +229,8 @@ def configure_security(app):
     csrf.init_app(app)
     if "pocket_api" in app.blueprints:
         csrf.exempt(app.blueprints["pocket_api"])
+    if "logger_api" in app.blueprints:
+        csrf.exempt(app.blueprints["logger_api"])
 
     @app.before_request
     def _security_before_request():
@@ -257,6 +259,8 @@ def _route_is_public():
     if endpoint.startswith("static") or endpoint.startswith("public."):
         return True
     if endpoint.startswith("pocket_api.") or request.path.startswith("/api/pocket/v1/"):
+        return True
+    if endpoint.startswith("logger_api.") or request.path.startswith("/api/logger/v1/"):
         return True
     if request.path.startswith("/static/") or request.path.startswith("/public/"):
         return True

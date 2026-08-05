@@ -6,6 +6,7 @@
     ('audio', 'Audio'),
     ('files', 'Files'),
     ('notes', 'Notes'),
+    ('logger', 'Mobile Logger'),
     ('areas', 'Edit Areas'),
     ('config', 'Config'),
     ('general', 'General')
@@ -240,6 +241,35 @@
               <span class="settings-action-note">Reads markdown files once and stores cached content for the Note Content search scope.</span>
             </div>
           </div>
+        </form>
+      {% elif active_settings_tab == 'logger' %}
+        <h4>Mobile Logger</h4>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="logger">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Logger Sync API</div>
+            <label>
+              <input type="checkbox" name="logger_sync_enabled" value="1" {% if logger_settings.enabled %}checked{% endif %}>
+              Enable Logger sync API
+            </label>
+            <label>
+              Logger raw-data root
+              <input type="text" name="logger_raw_data_root" value="{{ logger_settings.raw_data_root }}">
+            </label>
+            <label>
+              Logger sync token
+              <input type="password" name="logger_sync_token" value="" placeholder="{% if logger_settings.sync_token %}Saved - enter a new token to replace{% else %}Required{% endif %}">
+            </label>
+            <label>
+              Maximum upload size MB
+              <input type="number" name="logger_max_upload_mb" min="1" max="1024" value="{{ logger_settings.max_upload_mb or 50 }}">
+            </label>
+            <label>
+              <input type="checkbox" name="logger_keep_sync_logs" value="1" {% if logger_settings.keep_sync_logs %}checked{% endif %}>
+              Keep Desktop sync logs
+            </label>
+          </div>
+          <button type="submit">Save Logger settings</button>
         </form>
       {% elif active_settings_tab == 'config' %}
         <h4>Config</h4>

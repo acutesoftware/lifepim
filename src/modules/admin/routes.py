@@ -18,6 +18,7 @@ from common import user_paths
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr, paginate_total, build_pagination
 from modules.calendar.services import calendar_index
 from modules.pocket_api import routes as pocket_api
+from modules.logger_api import routes as logger_api
 from core import security
 
 
@@ -594,7 +595,7 @@ def settings_route():
     security.require_role("admin")
     message = request.args.get("message", "")
     active_settings_tab = (request.args.get("tab") or request.form.get("tab") or "calendar").strip().lower()
-    if active_settings_tab not in {"calendar", "media", "audio", "files", "notes", "general", "config"}:
+    if active_settings_tab not in {"calendar", "media", "audio", "files", "notes", "logger", "general", "config"}:
         active_settings_tab = "calendar"
 
     conn = db.conn if db.conn is not None else None
@@ -770,6 +771,17 @@ def settings_route():
                     message = f"Rebuilt {created} media events."
                 except Exception as exc:
                     message = f"Media event rebuild failed: {exc}"
+        elif active_settings_tab == "logger":
+            token_value = request.form.get("logger_sync_token", "")
+            logger_values = {
+                "enabled": request.form.get("logger_sync_enabled") == "1",
+                "raw_data_root": request.form.get("logger_raw_data_root"),
+                "sync_token": token_value if token_value else None,
+                "max_upload_mb": request.form.get("logger_max_upload_mb"),
+                "keep_sync_logs": request.form.get("logger_keep_sync_logs") == "1",
+            }
+            settings_mod.save_logger_settings(logger_values, conn)
+            message = "Mobile Logger settings saved."
 
     calendar_view = settings_mod.get_calendar_view_settings(conn)
     calendar_sources = calendar_index.fetch_calendar_sources(conn)
@@ -777,6 +789,7 @@ def settings_route():
     audio_settings = settings_mod.get_audio_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
     note_settings = settings_mod.get_note_display_settings(conn)
+    logger_settings = settings_mod.get_logger_settings(conn)
     config_settings = cfg.list_config_settings(conn)
     all_settings = settings_mod.list_settings(conn)
     try:
@@ -800,6 +813,7 @@ def settings_route():
         audio_settings=audio_settings,
         general_settings=general_settings,
         note_settings=note_settings,
+        logger_settings=logger_settings,
         config_settings=config_settings,
         all_settings=all_settings,
         note_index_count=note_index_count,
@@ -1071,6 +1085,112 @@ def logs_route():
         log_timezone=localtime.log_timezone_name(),
         db_file=getattr(cfg, "DB_FILE", ""),
     )
+
+
+def _read_raw_log_preview(path, byte_limit=5 * 1024 * 1024, line_limit=20000):
+    lines = []
+    bytes_read = 0
+    truncated = False
+    try:
+        with open(path, "rb") as handle:
+            for raw_line in handle:
+                if len(lines) >= line_limit or bytes_read + len(raw_line) > byte_limit:
+                    truncated = True
+                    break
+                bytes_read += len(raw_line)
+                lines.append(raw_line.decode("utf-8", errors="replace"))
+    except OSError as exc:
+        return "", f"Unable to read file: {exc}", True
+    try:
+        truncated = truncated or os.path.getsize(path) > bytes_read
+    except OSError:
+        pass
+    notice = ""
+    if truncated:
+        notice = "This file is larger than the built-in viewer limit. Only the first 20,000 lines or 5 MB are shown."
+    return "".join(lines), notice, truncated
+
+
+@admin_bp.route("/logs/logger", methods=["GET", "POST"])
+def logger_logs_route():
+    security.require_role("admin")
+    conn = db._get_conn()
+    message = ""
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "open_raw_folder":
+            raw_folder = logger_api.logger_raw_root()
+            try:
+                os.makedirs(raw_folder, exist_ok=True)
+                logger_api.open_path_in_file_browser(raw_folder)
+                message = "Opened raw data folder."
+            except Exception as exc:
+                message = f"Unable to open raw data folder: {exc}"
+    filters = {
+        "device": request.args.get("device", ""),
+        "log_type": request.args.get("log_type", ""),
+        "file_date": request.args.get("file_date", ""),
+        "filename": request.args.get("filename", ""),
+    }
+    files = logger_api.list_raw_files(filters=filters, conn=conn)
+    selected_run_id = request.args.get("run_id", type=int)
+    return render_template(
+        "admin_logger.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Admin - Logs - Logger",
+        content_html="",
+        message=message,
+        summary=logger_api.logger_summary(conn),
+        runs=logger_api.recent_sync_runs(100, conn),
+        run_files=logger_api.run_files(selected_run_id, conn) if selected_run_id else [],
+        selected_run_id=selected_run_id,
+        raw_files=files,
+        devices=logger_api.list_devices(conn),
+        filters=filters,
+        log_types=sorted(logger_api.ALLOWED_LOG_TYPES),
+    )
+
+
+@admin_bp.route("/logs/logger/file")
+def logger_file_view_route():
+    security.require_role("admin")
+    device_folder = request.args.get("device_folder", "")
+    relative_path = request.args.get("relative_path", "")
+    path = logger_api.resolve_raw_file(device_folder, relative_path)
+    if not path:
+        abort(404)
+    text, notice, truncated = _read_raw_log_preview(path)
+    stat = os.stat(path)
+    return render_template(
+        "admin_logger_file.html",
+        active_tab="admin",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Logger Raw File",
+        content_html="",
+        device_folder=device_folder,
+        relative_path=relative_path,
+        file_path=path,
+        file_size=stat.st_size,
+        modified_at=datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+        text=text,
+        notice=notice,
+        truncated=truncated,
+    )
+
+
+@admin_bp.route("/logs/logger/file/open", methods=["POST"])
+def logger_file_open_route():
+    security.require_role("admin")
+    device_folder = request.form.get("device_folder", "")
+    relative_path = request.form.get("relative_path", "")
+    path = logger_api.resolve_raw_file(device_folder, relative_path)
+    if not path:
+        abort(404)
+    logger_api.open_path_in_file_browser(path)
+    return redirect(url_for("admin.logger_file_view_route", device_folder=device_folder, relative_path=relative_path))
 
 
 @admin_bp.route("/users")
