@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import uuid
+import hashlib
 from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify, request
@@ -149,12 +150,32 @@ def _require_auth(conn=None):
     raw_token = auth_header[len("Bearer ") :].strip() if auth_header.startswith("Bearer ") else ""
     device_uuid = (request.headers.get("X-LifePIM-Logger-Device-ID") or request.form.get("device_id") or "").strip()
     device_name = (request.headers.get("X-LifePIM-Logger-Device-Name") or request.form.get("device_name") or "").strip()
-    if not expected or not raw_token or raw_token != expected or not device_uuid:
+    if not raw_token or not device_uuid:
+        log_network("logger_auth_failed", device_id=device_uuid, remote_addr=_client_ip(), path=request.path)
+        return None, _json_error("unauthorized", 401), settings
+    if expected and raw_token != expected and not _valid_pocket_device_token(conn, device_uuid, raw_token):
+        log_network("logger_auth_failed", device_id=device_uuid, remote_addr=_client_ip(), path=request.path)
+        return None, _json_error("unauthorized", 401), settings
+    if not expected and not _valid_pocket_device_token(conn, device_uuid, raw_token):
         log_network("logger_auth_failed", device_id=device_uuid, remote_addr=_client_ip(), path=request.path)
         return None, _json_error("unauthorized", 401), settings
     device = _upsert_device(device_uuid, device_name or "Logger Device", conn)
     log_network("logger_auth_ok", device_id=device_uuid, device_name=device.get("device_name"), remote_addr=_client_ip(), path=request.path)
     return device, None, settings
+
+
+def _valid_pocket_device_token(conn, device_uuid, raw_token):
+    try:
+        row = conn.execute(
+            """
+            SELECT 1 FROM pocket_devices
+            WHERE device_id = ? AND token_hash = ? AND revoked_at IS NULL
+            """,
+            (device_uuid, hashlib.sha256((raw_token or "").encode("utf-8")).hexdigest()),
+        ).fetchone()
+        return bool(row)
+    except Exception:
+        return False
 
 
 def _upsert_device(device_uuid, device_name, conn=None):

@@ -1,4 +1,5 @@
 import io
+import hashlib
 import os
 import sqlite3
 import sys
@@ -79,6 +80,49 @@ class TestLoggerApi(unittest.TestCase):
         payload = resp.get_json()
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["service"], "lifepim-logger-sync")
+
+    def test_status_accepts_pocket_device_token_from_password_login_flow(self):
+        self.conn.execute(
+            """
+            CREATE TABLE pocket_devices (
+                device_id TEXT PRIMARY KEY,
+                token_hash TEXT NOT NULL UNIQUE,
+                device_name TEXT,
+                platform TEXT,
+                username TEXT,
+                user_id INTEGER,
+                created_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                revoked_at TEXT,
+                last_ip TEXT,
+                user_agent TEXT
+            )
+            """
+        )
+        self.conn.execute(
+            """
+            INSERT INTO pocket_devices
+            (device_id, token_hash, device_name, platform, username, user_id, created_at, last_seen_at)
+            VALUES (?, ?, 'Duncan A22', 'android-logger', 'duncan', 1, '2026-08-05T00:00:00Z', '2026-08-05T00:00:00Z')
+            """,
+            (
+                "pocket-device-id",
+                hashlib.sha256(b"pocket-token").hexdigest(),
+            ),
+        )
+        self.conn.commit()
+
+        resp = self.client.get(
+            "/api/logger/v1/status",
+            headers={
+                "Authorization": "Bearer pocket-token",
+                "X-LifePIM-Logger-Device-ID": "pocket-device-id",
+                "X-LifePIM-Logger-Device-Name": "Duncan A22",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["status"], "ok")
 
     def test_upload_stores_file_under_safe_device_folder_and_records_metadata(self):
         resp = self.upload()
