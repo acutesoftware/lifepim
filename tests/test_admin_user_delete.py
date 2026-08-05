@@ -47,6 +47,7 @@ class TestAdminLogs(unittest.TestCase):
         app.add_url_rule("/search", endpoint="search_route", view_func=lambda: "")
         app.add_url_rule("/admin/", endpoint="admin.admin_mapping_route", view_func=lambda: "")
         app.add_url_rule("/admin/logs", endpoint="admin.logs_route", view_func=lambda: "")
+        app.add_url_rule("/admin/logs/logger", endpoint="admin.logger_logs_route", view_func=lambda: "")
 
         with app.test_request_context("/admin/logs"):
             html = render_template(

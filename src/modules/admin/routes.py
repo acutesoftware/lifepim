@@ -789,7 +789,11 @@ def settings_route():
     audio_settings = settings_mod.get_audio_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
     note_settings = settings_mod.get_note_display_settings(conn)
-    logger_settings = settings_mod.get_logger_settings(conn)
+    logger_settings = settings_mod.get_logger_settings(
+        conn,
+        user_id=getattr(current_user, "user_id", None),
+        username=getattr(current_user, "username", None),
+    )
     config_settings = cfg.list_config_settings(conn)
     all_settings = settings_mod.list_settings(conn)
     try:
@@ -1115,24 +1119,40 @@ def _read_raw_log_preview(path, byte_limit=5 * 1024 * 1024, line_limit=20000):
 def logger_logs_route():
     security.require_role("admin")
     conn = db._get_conn()
+    logger_settings = settings_mod.get_logger_settings(
+        conn,
+        user_id=getattr(current_user, "user_id", None),
+        username=getattr(current_user, "username", None),
+    )
     message = ""
     if request.method == "POST":
         action = request.form.get("action")
         if action == "open_raw_folder":
-            raw_folder = logger_api.logger_raw_root()
+            raw_folder = logger_api.logger_raw_root(logger_settings)
             try:
                 os.makedirs(raw_folder, exist_ok=True)
                 logger_api.open_path_in_file_browser(raw_folder)
                 message = "Opened raw data folder."
             except Exception as exc:
                 message = f"Unable to open raw data folder: {exc}"
+        elif action == "save_raw_folder":
+            logger_values = dict(logger_settings)
+            logger_values["raw_data_root"] = request.form.get("logger_raw_data_root")
+            logger_values["sync_token"] = None
+            settings_mod.save_logger_settings(logger_values, conn)
+            logger_settings = settings_mod.get_logger_settings(
+                conn,
+                user_id=getattr(current_user, "user_id", None),
+                username=getattr(current_user, "username", None),
+            )
+            message = "Logger raw data folder saved."
     filters = {
         "device": request.args.get("device", ""),
         "log_type": request.args.get("log_type", ""),
         "file_date": request.args.get("file_date", ""),
         "filename": request.args.get("filename", ""),
     }
-    files = logger_api.list_raw_files(filters=filters, conn=conn)
+    files = logger_api.list_raw_files(filters=filters, conn=conn, settings=logger_settings)
     selected_run_id = request.args.get("run_id", type=int)
     return render_template(
         "admin_logger.html",
@@ -1142,10 +1162,11 @@ def logger_logs_route():
         content_title="Admin - Logs - Logger",
         content_html="",
         message=message,
-        summary=logger_api.logger_summary(conn),
+        summary=logger_api.logger_summary(conn, settings=logger_settings),
         runs=logger_api.recent_sync_runs(100, conn),
         run_files=logger_api.run_files(selected_run_id, conn) if selected_run_id else [],
         selected_run_id=selected_run_id,
+        logger_settings=logger_settings,
         raw_files=files,
         devices=logger_api.list_devices(conn),
         filters=filters,
@@ -1156,9 +1177,15 @@ def logger_logs_route():
 @admin_bp.route("/logs/logger/file")
 def logger_file_view_route():
     security.require_role("admin")
+    conn = db._get_conn()
+    logger_settings = settings_mod.get_logger_settings(
+        conn,
+        user_id=getattr(current_user, "user_id", None),
+        username=getattr(current_user, "username", None),
+    )
     device_folder = request.args.get("device_folder", "")
     relative_path = request.args.get("relative_path", "")
-    path = logger_api.resolve_raw_file(device_folder, relative_path)
+    path = logger_api.resolve_raw_file(device_folder, relative_path, settings=logger_settings)
     if not path:
         abort(404)
     text, notice, truncated = _read_raw_log_preview(path)
@@ -1184,9 +1211,15 @@ def logger_file_view_route():
 @admin_bp.route("/logs/logger/file/open", methods=["POST"])
 def logger_file_open_route():
     security.require_role("admin")
+    conn = db._get_conn()
+    logger_settings = settings_mod.get_logger_settings(
+        conn,
+        user_id=getattr(current_user, "user_id", None),
+        username=getattr(current_user, "username", None),
+    )
     device_folder = request.form.get("device_folder", "")
     relative_path = request.form.get("relative_path", "")
-    path = logger_api.resolve_raw_file(device_folder, relative_path)
+    path = logger_api.resolve_raw_file(device_folder, relative_path, settings=logger_settings)
     if not path:
         abort(404)
     logger_api.open_path_in_file_browser(path)

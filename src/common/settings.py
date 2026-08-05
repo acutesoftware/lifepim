@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
+import os
 import sqlite3
 
 from common import data as db
+from common import user_paths
 
 
 SETTINGS_SCHEMA_SQL = """
@@ -97,6 +99,7 @@ LOGGER_DEFAULTS = {
     "logger_max_upload_mb": ("50", "Mobile Logger", "Maximum upload size"),
     "logger_keep_sync_logs": ("1", "Mobile Logger", "Keep Desktop sync logs"),
 }
+LOGGER_LEGACY_DEFAULT_RAW_DATA_ROOT = "admin/logged_data/raw"
 
 NOTE_CARD_WIDTH_DEFAULT = 50
 NOTE_CARD_WIDTH_MIN = 20
@@ -276,12 +279,37 @@ def get_note_display_settings(conn=None):
     }
 
 
-def get_logger_settings(conn=None):
+def logger_default_raw_data_root(conn=None, user_id=None, username=None):
+    conn = db._get_conn() if conn is None else conn
+    notes_root = ""
+    if user_id is None:
+        try:
+            from flask_login import current_user
+
+            if getattr(current_user, "is_authenticated", False):
+                user_id = getattr(current_user, "user_id", None)
+                username = username or getattr(current_user, "username", None)
+        except Exception:
+            user_id = None
+    if user_id is not None:
+        paths = user_paths.get_user_paths(conn, user_id)
+        if not paths.get("notes_root_path"):
+            paths = user_paths.get_or_create_user_paths(conn, user_id, username=username, create_dirs=False)
+        notes_root = paths.get("notes_root_path") or ""
+    if not notes_root:
+        notes_root = user_paths.legacy_paths_for_user(conn, user_id=user_id).get("notes_root_path") or ""
+    if not notes_root:
+        return LOGGER_LEGACY_DEFAULT_RAW_DATA_ROOT
+    return user_paths.normalize_path(os.path.join(notes_root, "logged_data", "raw"))
+
+
+def get_logger_settings(conn=None, user_id=None, username=None):
+    raw_data_root = normalize_logger_raw_data_root(get_setting("logger_raw_data_root", "", conn))
+    if not raw_data_root or raw_data_root.replace("\\", "/").lower() == LOGGER_LEGACY_DEFAULT_RAW_DATA_ROOT:
+        raw_data_root = logger_default_raw_data_root(conn, user_id=user_id, username=username)
     return {
         "enabled": _as_bool(get_setting("logger_sync_enabled", "1", conn)),
-        "raw_data_root": normalize_logger_raw_data_root(
-            get_setting("logger_raw_data_root", "admin/logged_data/raw", conn)
-        ),
+        "raw_data_root": raw_data_root,
         "sync_token": get_setting("logger_sync_token", "", conn),
         "max_upload_mb": normalize_logger_max_upload_mb(
             get_setting("logger_max_upload_mb", "50", conn)
@@ -520,8 +548,8 @@ def normalize_note_notes_per_page(value):
 
 
 def normalize_logger_raw_data_root(value):
-    text = str(value or "admin/logged_data/raw").strip().strip('"').strip()
-    return text or "admin/logged_data/raw"
+    text = str(value or "").strip().strip('"').strip()
+    return text
 
 
 def normalize_logger_max_upload_mb(value):

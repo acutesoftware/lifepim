@@ -121,6 +121,59 @@ class TestSettingsSchema(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_logger_raw_root_defaults_under_user_notes_root(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            notes_root = os.path.join("D:\\DATA_LLM", "users", "alice", "notes")
+            conn.execute(
+                """
+                CREATE TABLE users (
+                    user_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    file_root_path TEXT,
+                    notes_root_path TEXT,
+                    areas_root_path TEXT,
+                    lists_root_path TEXT
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO users (user_id, username, notes_root_path) VALUES (?, ?, ?)",
+                (7, "alice", notes_root),
+            )
+            conn.commit()
+
+            logger_settings = settings.get_logger_settings(conn, user_id=7, username="alice")
+
+            self.assertEqual(
+                logger_settings["raw_data_root"],
+                os.path.join(notes_root, "logged_data", "raw"),
+            )
+        finally:
+            conn.close()
+
+    def test_logger_raw_root_preserves_custom_saved_path(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            settings.save_logger_settings(
+                {
+                    "enabled": True,
+                    "raw_data_root": r"D:\custom\logger\raw",
+                    "sync_token": "secret",
+                    "max_upload_mb": 10,
+                    "keep_sync_logs": True,
+                },
+                conn,
+            )
+
+            logger_settings = settings.get_logger_settings(conn, user_id=7, username="alice")
+
+            self.assertEqual(logger_settings["raw_data_root"], r"D:\custom\logger\raw")
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -156,6 +156,15 @@ class TestLoggerApi(unittest.TestCase):
         ]
         self.assertEqual(statuses, ["stored", "replaced"])
 
+    def test_upload_accepts_device_logs(self):
+        resp = self.upload("device/2026-08-05.jsonl", content=b'{"type":"battery_state"}\n')
+
+        self.assertEqual(resp.status_code, 200)
+        stored_path = os.path.join(logger_raw_root(), "duncan-a22", "device", "2026-08-05.jsonl")
+        self.assertTrue(os.path.exists(stored_path))
+        with open(stored_path, "rb") as handle:
+            self.assertEqual(handle.read(), b'{"type":"battery_state"}\n')
+
     def test_upload_rejects_traversal_and_bad_categories(self):
         traversal = self.upload("../2026-08-05.jsonl")
         bad_category = self.upload("other/2026-08-05.jsonl")

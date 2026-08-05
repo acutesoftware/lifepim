@@ -18,8 +18,8 @@ from common.network_log import log_network
 
 logger_api_bp = Blueprint("logger_api", __name__, url_prefix="/api/logger/v1")
 
-ALLOWED_LOG_TYPES = {"movement", "phone_usage", "service"}
-LOGGER_PATH_RE = re.compile(r"^(movement|phone_usage|service)/(\d{4}-\d{2}-\d{2})\.jsonl$")
+ALLOWED_LOG_TYPES = {"movement", "phone_usage", "device", "service"}
+LOGGER_PATH_RE = re.compile(r"^(movement|phone_usage|device|service)/(\d{4}-\d{2}-\d{2})\.jsonl$")
 
 
 def _utc_now_sql():
@@ -94,12 +94,12 @@ def ensure_logger_schema(conn=None):
     conn.commit()
 
 
-def _settings(conn=None):
-    return settings_mod.get_logger_settings(conn)
+def _settings(conn=None, user_id=None, username=None):
+    return settings_mod.get_logger_settings(conn, user_id=user_id, username=username)
 
 
-def logger_raw_root(settings=None):
-    settings = settings or _settings()
+def logger_raw_root(settings=None, conn=None, user_id=None, username=None):
+    settings = settings or _settings(conn, user_id=user_id, username=username)
     root = settings.get("raw_data_root") or "admin/logged_data/raw"
     if os.path.isabs(root):
         return os.path.abspath(root)
@@ -424,12 +424,12 @@ def upload_route():
         return _json_error(error_message, 400, relative_path)
 
 
-def logger_summary(conn=None):
+def logger_summary(conn=None, settings=None):
     conn = data._get_conn() if conn is None else conn
     ensure_logger_schema(conn)
-    settings = _settings(conn)
+    settings = settings or _settings(conn)
     root = logger_raw_root(settings)
-    files = list_raw_files(conn=conn)
+    files = list_raw_files(conn=conn, settings=settings)
     today = datetime.now().strftime("%Y-%m-%d")
     last_success = conn.execute(
         "SELECT MAX(finished_at) AS value FROM lp_logger_sync_run WHERE status = 'success'"
@@ -487,11 +487,11 @@ def list_devices(conn=None):
     return [dict(row) for row in rows]
 
 
-def list_raw_files(filters=None, conn=None):
+def list_raw_files(filters=None, conn=None, settings=None):
     conn = data._get_conn() if conn is None else conn
     ensure_logger_schema(conn)
     filters = filters or {}
-    root = logger_raw_root()
+    root = logger_raw_root(settings)
     metadata_rows = conn.execute(
         """
         SELECT f.*
@@ -555,9 +555,10 @@ def list_raw_files(filters=None, conn=None):
     return items
 
 
-def resolve_raw_file(device_folder, relative_path):
-    destination, _log_type, _file_date = _destination_for(relative_path, device_folder, _settings())
-    root = logger_raw_root()
+def resolve_raw_file(device_folder, relative_path, settings=None):
+    settings = settings or _settings()
+    destination, _log_type, _file_date = _destination_for(relative_path, device_folder, settings)
+    root = logger_raw_root(settings)
     if os.path.commonpath([root, destination]) != root or not os.path.isfile(destination):
         return ""
     return destination

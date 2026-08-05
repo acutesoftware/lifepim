@@ -33,6 +33,11 @@
       </div>
 
       <form method="post" class="settings-form">
+        <label>
+          Logger raw-data root
+          <input type="text" name="logger_raw_data_root" value="{{ logger_settings.raw_data_root if logger_settings else summary.raw_folder }}">
+        </label>
+        <button type="submit" name="action" value="save_raw_folder">Save Raw Folder</button>
         <button type="submit" name="action" value="open_raw_folder">Open Raw Data Folder</button>
         <a href="{{ url_for('admin.logger_logs_route') }}">Refresh</a>
         <a href="{{ url_for('admin.settings_route', tab='logger') }}">Open Logger Settings</a>
