@@ -239,8 +239,6 @@ Migration does not delete markdown files on disk.
 Migration also updates area/folder mapping paths for the notes source:
 
 - rewrites matching `lp_area_folders.path_prefix` values from the old notes root to the new notes root
-- rewrites matching `map_folder_area.path_prefix` values from the old notes root to the new notes root
-- rebuilds `map_area_folder`
 
 This moves area/sidebar filtering away from old mirror paths such as:
 
@@ -375,8 +373,6 @@ Parent sidebar entries such as `fun` expand to the active areas in that group, s
 
 ### Mapping Sources
 
-There are two related mapping layers.
-
 The current Notes list/create flow uses:
 
 - `lp_areas`
@@ -385,17 +381,10 @@ The current Notes list/create flow uses:
   - The area-to-folder rules used by note area materialization, derived area display, sync fallback metadata, and new-note default folders.
   - These can be adjusted in the Notes UI when a selected sidebar area has an `lp_areas` row. The `Folders` panel can add, remove, enable/disable, and set default folders.
 
-The older folder-mapping ETL uses:
-
-- `map_folder_area`
-  - Raw mapping rules imported from the external CSV configured by `etl_rules_csv`.
-- `map_area_folder`
-  - Rebuilt cache that maps `dim_folder.folder_id` to the best matching raw mapping rule.
-
 The external CSV location is configured in `src/common/config.py`:
 
 ```python
-etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_area_folder.csv"
+area_mappings_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\area_folders.csv"
 ```
 
 That CSV expects at least:
@@ -410,23 +399,31 @@ and can also contain:
 area, tags, confidence, priority, is_primary, is_enabled, notes
 ```
 
-Run this after changing the CSV:
-
-```bat
-cd src
-ETL_MAP_FOLDERS.BAT
-```
-
-or rebuild from scratch with:
+Rebuild from scratch with:
 
 ```bat
 cd src
 ..\.venv\Scripts\python.exe init_database.py
 ```
 
-`init_database.py` also imports area/folder rows into `lp_areas` and `lp_area_folders` from the configured rules CSV through `common.areas.import_area_mappings_csv()`.
+`init_database.py` imports area/folder rows into `lp_areas` and `lp_area_folders` from the configured CSV through `common.areas.import_area_mappings_csv()`.
 
-The Admin mapping page can display `map_folder_area`, `map_area_folder`, and `dim_folder`, and can rebuild the old mapping cache. It is not currently an editor for the CSV or for `lp_area_folders`.
+Area folders are managed from the Notes folder panel for each selected area. Blank note area metadata is repaired from Settings > Notes > `Materialize note areas`.
+
+### Historical Folder Mapping ETL
+
+The original folder mapping work existed to map hard-drive folders to the left-hand-side Areas. That was needed because the old folder list was just disk paths; LifePIM needed a rule layer saying which path belonged under Health, Design, Dev, and so on.
+
+That intent has been completed in the current model:
+
+- The Area definitions are in `lp_areas`.
+- The folder-prefix rules are in `lp_area_folders`.
+- Notes use `lp_notes.area` for fast Area filtering.
+- `dim_folder` remains as a folder cache and `folder_id` target for file-backed records.
+
+`src/etl_folder_mapping.py` now only maintains `dim_folder` and backfills `folder_id`. It no longer creates or rebuilds Area membership. Re-running it is only useful when the folder cache itself is stale, for example after refreshing `all_folders.csv` or bulk-loading file-backed rows without folder IDs.
+
+For future Area mapping changes, prefer the Notes folder panel. Use the configured `area_mappings_csv` only for bulk bootstrap or a deliberate re-import after backing up the database. After adding or changing folder rules, run `Materialize note areas` only if existing notes have blank or stale `lp_notes.area` values.
 
 ### Why the Area Column Can Be Empty
 

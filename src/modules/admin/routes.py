@@ -15,7 +15,7 @@ from common import note_search_index
 from common import settings as settings_mod
 from common import content_catalog as catalog_mod
 from common import user_paths
-from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr, paginate_total, build_pagination
+from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr
 from modules.calendar.services import calendar_index
 from modules.pocket_api import routes as pocket_api
 from modules.logger_api import routes as logger_api
@@ -29,42 +29,6 @@ admin_bp = Blueprint(
     template_folder="templates",
     static_folder="static",
 )
-
-
-_REBUILD_SQL = """
-DELETE FROM map_area_folder;
-
-INSERT INTO map_area_folder (
-  folder_id, tab, grp, area, tags, confidence,
-  matched_prefix, rule_map_id, is_primary, is_enabled, updated_at
-)
-SELECT
-  f.folder_id,
-  r.tab,
-  r.grp,
-  COALESCE(r.area,''),
-  r.tags,
-  r.confidence,
-  r.path_prefix,
-  r.map_id,
-  r.is_primary,
-  r.is_enabled,
-  strftime('%Y-%m-%dT%H:%M:%fZ','now')
-FROM dim_folder f
-JOIN map_folder_area r
-  ON r.map_id = (
-      SELECT r2.map_id
-      FROM map_folder_area r2
-      WHERE r2.is_enabled=1
-        AND r2.is_primary=1
-        AND lower(f.folder_path) LIKE lower(r2.path_prefix) || '%'
-      ORDER BY LENGTH(r2.path_prefix) DESC,
-               r2.priority DESC,
-               r2.confidence DESC,
-               r2.map_id DESC
-      LIMIT 1
-  );
-"""
 
 
 @admin_bp.route("/content-catalog")
@@ -415,7 +379,7 @@ def admin_mapping_route():
     security.require_role("admin")
     message = request.args.get("message", "")
     active_admin_tab = (request.args.get("tab") or request.form.get("tab") or "security").strip().lower()
-    if active_admin_tab not in {"security", "folder_mapping", "folders", "migration"}:
+    if active_admin_tab not in {"security", "migration"}:
         active_admin_tab = "security"
 
     conn = db.conn if db.conn is not None else None
@@ -423,12 +387,7 @@ def admin_mapping_route():
 
     if request.method == "POST":
         action = request.form.get("action", "")
-        if action == "rebuild":
-            active_admin_tab = "folder_mapping"
-            conn.executescript(_REBUILD_SQL)
-            conn.commit()
-            message = "Rebuilt folder cache."
-        elif active_admin_tab == "migration":
+        if active_admin_tab == "migration":
             image_where = request.form.get("image_where", "")
             audio_where = request.form.get("audio_where", "")
             try:
@@ -462,102 +421,6 @@ def admin_mapping_route():
             except Exception as exc:
                 message = f"Media migration failed: {exc}"
 
-    per_page = 200
-    page = request.args.get("page", type=int) or 1
-    unmapped_only = request.args.get("unmapped") == "1"
-    rules = []
-    folders = []
-    counts = {}
-    rules_total = 0
-    folders_total = 0
-    page_data = paginate_total(0, 1, per_page)
-    pagination = build_pagination(url_for, "admin.admin_mapping_route", {"tab": active_admin_tab}, 1, 1)
-    try:
-        counts["map_folder_area"] = conn.execute("SELECT COUNT(1) FROM map_folder_area").fetchone()[0]
-        counts["map_area_folder"] = conn.execute("SELECT COUNT(1) FROM map_area_folder").fetchone()[0]
-        counts["dim_folder"] = conn.execute("SELECT COUNT(1) FROM dim_folder").fetchone()[0]
-        if active_admin_tab == "folder_mapping":
-            rules_total = counts["map_folder_area"]
-            page_data = paginate_total(rules_total, page, per_page)
-            offset = (page_data["page"] - 1) * per_page
-            rules = conn.execute(
-                """
-                SELECT map_id, path_prefix, tab, grp, area, tags, confidence, priority, is_primary, is_enabled
-                FROM map_folder_area
-                ORDER BY tab, grp, path_prefix
-                LIMIT ? OFFSET ?
-                """,
-                (per_page, offset),
-            ).fetchall()
-            pagination = build_pagination(
-                url_for,
-                "admin.admin_mapping_route",
-                {"tab": "folder_mapping"},
-                page_data["page"],
-                page_data["total_pages"],
-            )
-        if active_admin_tab == "folders" and unmapped_only:
-            folders_total = conn.execute(
-                """
-                SELECT COUNT(1)
-                FROM dim_folder f
-                LEFT JOIN map_area_folder mpf
-                  ON mpf.folder_id = f.folder_id
-                 AND mpf.is_primary = 1
-                 AND mpf.is_enabled = 1
-                WHERE mpf.folder_id IS NULL
-                """
-            ).fetchone()[0]
-            page_data = paginate_total(folders_total, page, per_page)
-            offset = (page_data["page"] - 1) * per_page
-            folders = conn.execute(
-                """
-                SELECT f.folder_id, f.folder_path, f.is_active, f.last_seen_at
-                FROM dim_folder f
-                LEFT JOIN map_area_folder mpf
-                  ON mpf.folder_id = f.folder_id
-                 AND mpf.is_primary = 1
-                 AND mpf.is_enabled = 1
-                WHERE mpf.folder_id IS NULL
-                ORDER BY f.folder_path
-                LIMIT ? OFFSET ?
-                """,
-                (per_page, offset),
-            ).fetchall()
-            pagination = build_pagination(
-                url_for,
-                "admin.admin_mapping_route",
-                {"tab": "folders", "unmapped": 1},
-                page_data["page"],
-                page_data["total_pages"],
-            )
-        elif active_admin_tab == "folders":
-            folders_total = counts["dim_folder"]
-            page_data = paginate_total(folders_total, page, per_page)
-            offset = (page_data["page"] - 1) * per_page
-            folders = conn.execute(
-                """
-                SELECT folder_id, folder_path, is_active, last_seen_at
-                FROM dim_folder
-                ORDER BY folder_path
-                LIMIT ? OFFSET ?
-                """,
-                (per_page, offset),
-            ).fetchall()
-            pagination = build_pagination(
-                url_for,
-                "admin.admin_mapping_route",
-                {"tab": "folders"},
-                page_data["page"],
-                page_data["total_pages"],
-            )
-    except Exception:
-        rules = []
-        folders = []
-        counts = {}
-        rules_total = 0
-        folders_total = 0
-
     filelist_image_where = media_migration.default_image_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_IMAGE_WHERE", "")
     filelist_audio_where = media_migration.default_audio_where() or cfg._CONFIG_DEFAULTS.get("FILELIST_AUDIO_WHERE", "")
 
@@ -570,22 +433,11 @@ def admin_mapping_route():
         content_html="",
         active_admin_tab=active_admin_tab,
         message=message,
-        rules=rules,
-        folders=folders,
-        rules_total=rules_total,
-        folders_total=folders_total,
-        page=page_data["page"],
-        total_pages=page_data["total_pages"],
-        pages=pagination["pages"],
-        first_url=pagination["first_url"],
-        last_url=pagination["last_url"],
-        counts=counts,
         db_file=cfg.DB_FILE,
         filelist_db=cfg.FILELIST_DB,
         filelist_image_where=filelist_image_where,
         filelist_audio_where=filelist_audio_where,
         notes_sync_root=_notes_live_root(conn),
-        unmapped_only=unmapped_only,
         now=datetime.now(),
     )
 

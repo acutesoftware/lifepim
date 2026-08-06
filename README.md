@@ -92,7 +92,7 @@ Important values include:
 - `port_num`
 - `PATH_ALIASES`
 - `etl_folders_csv`
-- `etl_rules_csv`
+- `area_mappings_csv`
 
 The current default app URL is:
 

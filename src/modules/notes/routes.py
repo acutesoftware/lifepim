@@ -29,7 +29,6 @@ from common.utils import (
     request_area_param,
 )
 from common import config as cfg
-import etl_folder_mapping as folder_etl
 from common import areas as areas_mod
 from common import projects as projects_mod
 from common import collections as collections_mod
@@ -450,196 +449,6 @@ def _table_columns(conn, table_name):
     except Exception:
         return set()
     return {row[1] for row in rows}
-
-
-def _query_write_root_candidates(conn, tab_label):
-    if not tab_label:
-        return []
-    if _table_exists(conn, "map_area_folder"):
-        columns = _table_columns(conn, "map_area_folder")
-        path_col = "path_prefix" if "path_prefix" in columns else None
-        if path_col:
-            enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
-            tags_col = "tags" if "tags" in columns else None
-            conf_col = "confidence" if "confidence" in columns else None
-            notes_col = "notes" if "notes" in columns else None
-            tags_expr = tags_col or "''"
-            conf_expr = conf_col or "1.0"
-            notes_expr = notes_col or "''"
-            where = ["tab = ?"]
-            params = [tab_label]
-            if enabled_col:
-                where.append(f"{enabled_col} = 1")
-            if tags_col:
-                where.append("lower(tags) LIKE '%canonical%'")
-                where.append("lower(tags) LIKE '%write_root%'")
-            sql = (
-                f"SELECT {path_col} as path_prefix, tab, "
-                f"{tags_expr} as tags, "
-                f"{conf_expr} as confidence, "
-                f"{notes_expr} as notes "
-                "FROM map_area_folder "
-                f"WHERE {' AND '.join(where)} "
-                "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
-            )
-            rows = conn.execute(sql, params).fetchall()
-            return [dict(row) for row in rows]
-    if _table_exists(conn, "map_folder_area"):
-        columns = _table_columns(conn, "map_folder_area")
-        if "path_prefix" not in columns or "tab" not in columns:
-            return []
-        enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
-        tags_col = "tags" if "tags" in columns else None
-        conf_col = "confidence" if "confidence" in columns else None
-        notes_col = "notes" if "notes" in columns else None
-        tags_expr = tags_col or "''"
-        conf_expr = conf_col or "1.0"
-        notes_expr = notes_col or "''"
-        where = ["tab = ?"]
-        params = [tab_label]
-        if enabled_col:
-            where.append(f"{enabled_col} = 1")
-        if tags_col:
-            where.append("lower(tags) LIKE '%canonical%'")
-            where.append("lower(tags) LIKE '%write_root%'")
-        sql = (
-            "SELECT path_prefix, tab, "
-            f"{tags_expr} as tags, "
-            f"{conf_expr} as confidence, "
-            f"{notes_expr} as notes "
-            "FROM map_folder_area "
-            f"WHERE {' AND '.join(where)} "
-            "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
-        )
-        rows = conn.execute(sql, params).fetchall()
-        return [dict(row) for row in rows]
-    if _table_exists(conn, "map_area_folder"):
-        columns = _table_columns(conn, "map_area_folder")
-        path_col = "matched_prefix" if "matched_prefix" in columns else None
-        if not path_col:
-            return []
-        enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
-        tags_col = "tags" if "tags" in columns else None
-        conf_col = "confidence" if "confidence" in columns else None
-        notes_col = "notes" if "notes" in columns else None
-        tags_expr = tags_col or "''"
-        conf_expr = conf_col or "1.0"
-        notes_expr = notes_col or "''"
-        where = ["tab = ?"]
-        params = [tab_label]
-        if enabled_col:
-            where.append(f"{enabled_col} = 1")
-        if tags_col:
-            where.append("lower(tags) LIKE '%canonical%'")
-            where.append("lower(tags) LIKE '%write_root%'")
-        sql = (
-            f"SELECT {path_col} as path_prefix, tab, "
-            f"{tags_expr} as tags, "
-            f"{conf_expr} as confidence, "
-            f"{notes_expr} as notes "
-            "FROM map_area_folder "
-            f"WHERE {' AND '.join(where)} "
-            "ORDER BY confidence DESC, LENGTH(path_prefix) ASC, path_prefix ASC"
-        )
-        rows = conn.execute(sql, params).fetchall()
-        return [dict(row) for row in rows]
-    return []
-
-
-def _lookup_tab_group(conn, tab_label):
-    label = (tab_label or "").strip()
-    if not label:
-        return ""
-    if _table_exists(conn, "map_folder_area"):
-        columns = _table_columns(conn, "map_folder_area")
-        if "grp" in columns and "tab" in columns:
-            enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
-            where = ["lower(tab) = lower(?)"]
-            params = [label]
-            if enabled_col:
-                where.append(f"{enabled_col} = 1")
-            sql = (
-                "SELECT grp FROM map_folder_area "
-                f"WHERE {' AND '.join(where)} "
-                "ORDER BY confidence DESC, LENGTH(path_prefix) DESC"
-            )
-            row = conn.execute(sql, params).fetchone()
-            return (row["grp"] or "").strip() if row else ""
-    if _table_exists(conn, "map_area_folder"):
-        columns = _table_columns(conn, "map_area_folder")
-        if "grp" in columns and "tab" in columns:
-            enabled_col = "is_enabled" if "is_enabled" in columns else ("enabled" if "enabled" in columns else None)
-            where = ["lower(tab) = lower(?)"]
-            params = [label]
-            if enabled_col:
-                where.append(f"{enabled_col} = 1")
-            sql = (
-                "SELECT grp FROM map_area_folder "
-                f"WHERE {' AND '.join(where)} "
-                "ORDER BY confidence DESC"
-            )
-            row = conn.execute(sql, params).fetchone()
-            return (row["grp"] or "").strip() if row else ""
-    return ""
-
-
-def _dedupe_candidates(rows):
-    results = []
-    seen = set()
-    for row in rows or []:
-        path_prefix = (row.get("path_prefix") or "").strip()
-        norm_path = _normalize_note_path(path_prefix)
-        if not norm_path:
-            continue
-        key = norm_path.lower()
-        if key in seen:
-            continue
-        row["path_prefix"] = norm_path
-        row["notes"] = (row.get("notes") or "").strip()
-        row["tags"] = (row.get("tags") or "").strip()
-        try:
-            row["confidence"] = float(row.get("confidence") or 0)
-        except Exception:
-            row["confidence"] = 0
-        results.append(row)
-        seen.add(key)
-    return results
-
-
-def _parent_section(label):
-    if not label or ">" not in label:
-        return ""
-    return label.split(">", 1)[0].strip()
-
-
-def _select_write_root_candidates(sidebar_label):
-    label = (sidebar_label or "").strip()
-    conn = data._get_conn()
-    if label:
-        rows = _dedupe_candidates(_query_write_root_candidates(conn, label))
-        if rows:
-            return rows, label
-        if ">" in label:
-            normalized = " ".join(label.replace(">", " ").split())
-            if normalized and normalized != label:
-                rows = _dedupe_candidates(_query_write_root_candidates(conn, normalized))
-                if rows:
-                    return rows, normalized
-    parent = _parent_section(label)
-    if parent:
-        rows = _dedupe_candidates(_query_write_root_candidates(conn, parent))
-        if rows:
-            return rows, parent
-    if label:
-        grp = _lookup_tab_group(conn, label)
-        if grp:
-            rows = _dedupe_candidates(_query_write_root_candidates(conn, grp))
-            if rows:
-                return rows, grp
-    rows = _dedupe_candidates(_query_write_root_candidates(conn, "All Areas"))
-    if rows:
-        return rows, "All Areas"
-    return [], label or parent or "All Areas"
 
 
 def _note_template(title, created_utc, sidebar_label):
@@ -3781,37 +3590,6 @@ def _rewrite_lp_area_folder_paths(conn, old_root, new_root):
     return updated
 
 
-def _rewrite_map_folder_area_paths(conn, old_root, new_root):
-    if not _table_exists(conn, "map_folder_area"):
-        return 0
-    updated = 0
-    rows = conn.execute(
-        "SELECT map_id, path_prefix, tab, grp, area, is_primary FROM map_folder_area "
-        "WHERE lower(path_prefix) = lower(?) OR lower(path_prefix) LIKE lower(?)",
-        (_normalize_note_path(old_root), _normalize_note_path(old_root) + "\\%"),
-    ).fetchall()
-    for row in rows:
-        next_path = _replace_path_prefix(row["path_prefix"], old_root, new_root)
-        if not next_path or next_path.lower() == (row["path_prefix"] or "").lower():
-            continue
-        try:
-            conn.execute(
-                "UPDATE map_folder_area SET path_prefix = ? WHERE map_id = ?",
-                (next_path, row["map_id"]),
-            )
-            updated += 1
-        except Exception:
-            conflict = conn.execute(
-                "SELECT map_id FROM map_folder_area "
-                "WHERE path_prefix = ? AND tab = ? AND grp = ? AND area = ? AND is_primary = ?",
-                (next_path, row["tab"], row["grp"], row["area"], row["is_primary"]),
-            ).fetchone()
-            if conflict:
-                conn.execute("DELETE FROM map_folder_area WHERE map_id = ?", (row["map_id"],))
-                updated += 1
-    return updated
-
-
 def _migrate_notes_mapping_roots(conn, new_root, old_roots):
     new_root = _normalize_note_path(new_root)
     rewritten = 0
@@ -3826,11 +3604,6 @@ def _migrate_notes_mapping_roots(conn, new_root, old_roots):
             candidate_roots.add(alias_notes_root)
     for old_root in sorted(candidate_roots, key=len, reverse=True):
         rewritten += _rewrite_lp_area_folder_paths(conn, old_root, new_root)
-        rewritten += _rewrite_map_folder_area_paths(conn, old_root, new_root)
-    try:
-        rewritten += folder_etl.rebuild_map_area_folder(conn)
-    except Exception:
-        pass
     return rewritten
 
 

@@ -34,7 +34,7 @@ Current bootstrap loaders still use hard-coded paths in `tests/LOAD_TESTING.py`.
 2. Robocopy NAS data into the local working copy.
 3. Refresh file/folder metadata.
 4. Refresh LifePIM tables from the working copy or live notes folders.
-5. Run folder mapping ETL.
+5. Refresh the folder cache if folder/file metadata changed.
 6. Rebuild derived media events if media changed.
 7. Start or restart LifePIM Desktop.
 
@@ -45,7 +45,7 @@ cd src
 ..\.venv\Scripts\python.exe init_database.py
 ```
 
-This is destructive. It deletes and recreates the configured `DB_FILE`, then runs the loaders and mapping ETL.
+This is destructive. It deletes and recreates the configured `DB_FILE`, then runs the loaders, folder cache refresh, and area-folder import.
 
 ## Robocopy Staging
 
@@ -90,26 +90,72 @@ Current behavior:
 
 Proposed production behavior: scan `E:\BK_fangorn` after robocopy, so the app indexes the local working copy rather than the NAS.
 
-## Folder Mapping
+## Folder Cache
 
-Run this after refreshing folder lists or changing mapping rules:
+Run this after refreshing folder lists:
 
 ```bat
 cd src
 ETL_MAP_FOLDERS.BAT
 ```
 
-Inputs currently configured in `src/common/config.py`:
+Input currently configured in `src/common/config.py`:
 
 - `E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv`
-- `E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_area_folder.csv`
 
 Tables updated:
 
 - `dim_folder`
-- `map_folder_area`
-- `map_area_folder`
 - `folder_id` on supported file-backed tables
+
+### How `etl_folder_mapping.py` Is Used
+
+`src/etl_folder_mapping.py` is still needed, but only as folder cache maintenance.
+
+Current callers:
+
+- `src/init_database.py`
+  - creates the `dim_folder` schema during destructive database rebuild
+  - runs `etl_folder_mapping.py` against `etl_folders_csv` to load known folders and backfill `folder_id`
+- `src/ETL_MAP_FOLDERS.BAT`
+  - manual wrapper for refreshing `dim_folder` and backfilling `folder_id`
+- `src/common/data.py`
+  - reuses path normalization and `dim_folder` helpers when records are added or updated
+- `src/common/media_migration.py`
+  - ensures folder support exists when media/audio rows are migrated from FileLister
+- Tests
+  - use the `dim_folder` schema helpers for isolated database setup
+
+The script is useful when:
+
+- `all_folders.csv` was refreshed from a disk scan
+- file-backed records were loaded before they had `folder_id`
+- media/audio/file imports need the `dim_folder` cache to exist
+- a test or new database needs the folder cache schema
+
+It is not needed for normal Notes Area mapping. Running it does not assign Notes to Areas and does not change `lp_area_folders`.
+
+### Original Mapping Intent
+
+The original intent was broader: map hard-drive folders to the left-hand-side Areas so clicking an Area could show the correct files/notes. That job has already been carried forward into the current schema:
+
+- `lp_areas` defines the Area/sidebar metadata.
+- `lp_area_folders` stores real disk folder prefixes for each Area.
+- `lp_notes.area` stores the materialized Area value used for fast Notes filtering.
+
+So the future refresh path is:
+
+- If folder IDs/cache are stale, run `ETL_MAP_FOLDERS.BAT`.
+- If a note's `Area` value is blank but its folder is already mapped, use Settings > Notes > `Materialize note areas`.
+- If an Area needs another folder, add it from the Notes folder panel for that Area.
+- If rebuilding from the configured bulk Area-folder CSV is really needed, back up the DB and run `common.areas.import_area_mappings_csv()` against `area_mappings_csv`; this upserts `lp_areas` and `lp_area_folders` but does not delete mappings removed from the CSV.
+
+Bulk Area-folder CSV re-import:
+
+```bat
+cd src
+..\.venv\Scripts\python.exe -c "from common import areas, config; areas.import_area_mappings_csv(config.area_mappings_csv); areas.assign_defaults_if_missing()"
+```
 
 ## Per-Tab Refresh Notes
 
@@ -122,7 +168,7 @@ Tables updated:
 | How | `lp_how` | `N:\...\DATA\notes\40-Dev\42-HOWTO` or mirrored path | Scan how-to files and upsert by file path/title. |
 | Notes | `lp_notes` | `N:\duncan\LifePIM_Data\DATA\notes` | Edit on `N:\`; refresh metadata from files. Note body remains in markdown files. |
 | Data | `lp_data` | `E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\SQL` | Scan `.db` files and update database metadata. |
-| Files | `lp_files`, folder mapping tables | `E:\BK_fangorn\user\duncan\LifePIM_Data` and index CSVs | Refresh folder/file metadata, then run folder mapping ETL. |
+| Files | `lp_files`, `dim_folder` | `E:\BK_fangorn\user\duncan\LifePIM_Data` and index CSVs | Refresh folder/file metadata, then refresh the folder cache. |
 | Media | `lp_media`, `lp_media_meta`, `lp_events`, `lp_event_items` | `P:\photo` staged to `E:\BK_fangorn\photo` | Robocopy first, scan `E:\BK_fangorn\photo`, then rebuild Media events. |
 | Audio | `lp_audio` | NAS music staged to `E:\BK_fangorn\music\Music` | Robocopy first, then scan local audio files. |
 | 3D | `lp_3d` | `E:\BK_fangorn\user\duncan\C\user\docs\designs\blender` | Scan `.blend` files and update metadata. |
@@ -130,7 +176,7 @@ Tables updated:
 | People | `lp_contacts`, contact fact tables | CSV/source DB via importer | Use importer v1. Dry-run first, then merge/snapshot into contacts. |
 | Places | `lp_places` | App-local or future CSV | No external refresh currently documented. |
 | Apps | `lp_apps` | `C:\apps` | Scan `.exe` files and update app metadata. |
-| Admin | `sys_settings`, mapping tables | App settings and mapping CSVs | Settings are app-local. Mapping refresh uses `ETL_MAP_FOLDERS.BAT`. |
+| Admin | `sys_settings` | App settings | Settings are app-local. Note area folder rules are managed from Notes. |
 | Agent | none yet | Future agent logs/tasks | No refresh process yet. |
 
 ## Current Loader Paths

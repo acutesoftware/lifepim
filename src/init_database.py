@@ -19,7 +19,7 @@ from core.security import ensure_security_schema
 def main():
     reset_database(cfg.DB_FILE)
     _run_load_testing_if_enabled()
-    _run_folder_mapping()
+    _run_folder_cache()
     _run_areas_import()
     print(f"Initialized database at {cfg.DB_FILE}")
 
@@ -110,21 +110,17 @@ def _run_load_testing_if_enabled():
     _run_load_testing()
 
 
-def _run_folder_mapping():
+def _run_folder_cache():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     script_path = os.path.join(repo_root, "src", "etl_folder_mapping.py")
     if not os.path.exists(script_path):
         print(f"etl_folder_mapping.py not found: {script_path}")
         return
     folders_csv = getattr(cfg, "etl_folders_csv", "")
-    rules_csv = getattr(cfg, "etl_rules_csv", "")
     if not os.path.exists(folders_csv):
         print(f"Folders CSV not found: {folders_csv}")
         return
-    if not os.path.exists(rules_csv):
-        print(f"Rules CSV not found: {rules_csv}")
-        return
-    print("Running folder mapping ETL...")
+    print("Running folder cache ETL...")
     subprocess.check_call(
         [
             sys.executable,
@@ -133,20 +129,18 @@ def _run_folder_mapping():
             cfg.DB_FILE,
             "--folders_csv",
             folders_csv,
-            "--rules_csv",
-            rules_csv,
         ]
     )
 
 
 def _run_areas_import():
-    rules_csv = getattr(cfg, "etl_rules_csv", "")
-    if not rules_csv or not os.path.exists(rules_csv):
-        print(f"Area rules CSV not found: {rules_csv}")
+    mappings_csv = getattr(cfg, "area_mappings_csv", "")
+    if not mappings_csv or not os.path.exists(mappings_csv):
+        print(f"Area mappings CSV not found: {mappings_csv}")
         return
     print("Importing areas + area folders...")
     try:
-        areas_mod.import_area_mappings_csv(rules_csv)
+        areas_mod.import_area_mappings_csv(mappings_csv)
         updated = areas_mod.assign_defaults_if_missing()
         if updated:
             print(f"Assigned default folders for {updated} areas.")

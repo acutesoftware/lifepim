@@ -31,7 +31,10 @@ LAN_USER_ROOT_BASE = os.getenv(
     r"N:\duncan\LifePIM_Data\DATA\lan_users",
 )
 etl_folders_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\all_folders.csv"
-etl_rules_csv = r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\map_area_folder.csv"
+area_mappings_csv = os.getenv(
+    "LIFEPIM_AREA_MAPPINGS_CSV",
+    r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\area_folders.csv",
+)
 FILELIST_DB = r"D:\TRANSFER_NAS\filelister\filelist_master.db"
 FILELIST_IMAGE_WHERE = r"WHERE folder_name IN ('Photos', 'Movies', 'TV Shows')"
 FILELIST_AUDIO_WHERE = r"WHERE folder_name = 'Music'"

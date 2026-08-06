@@ -164,10 +164,8 @@ These are the main data tables for each top tab. Some tabs also use helper table
 ### Admin
 
 - Main route: `/admin/`
-- Folder mapping tables:
-  - `dim_folder`
-  - `map_folder_area`
-  - `map_area_folder`
+- Folder cache table: `dim_folder`
+- Note area-folder rules are stored in `lp_area_folders` and managed from Notes.
 - User history table: `sys_user_log`
 - Settings table: `sys_settings`
 

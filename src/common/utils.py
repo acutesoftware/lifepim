@@ -85,25 +85,6 @@ def get_tabs():
     return [tab for tab in mod_cfg.TABS if tab.get("id") not in NORMAL_USER_HIDDEN_TABS]
 
 
-def _fetch_mapping_tabs():
-    try:
-        rows = db.get_data(
-            db.conn,
-            "map_folder_area",
-            ["tab"],
-            "is_enabled = 1 AND is_primary = 1",
-            [],
-        )
-    except Exception:
-        return []
-    tabs = []
-    for row in rows:
-        tab = (row["tab"] or "").strip()
-        if tab and tab not in tabs:
-            tabs.append(tab)
-    return tabs
-
-
 def _norm_tab_value(value):
     return "".join(ch for ch in (value or "").lower() if ch.isalnum())
 

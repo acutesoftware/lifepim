@@ -3,8 +3,6 @@
   {% set admin_tabs = [
     ('security', 'Security'),
     ('content_catalog', 'Content Catalog'),
-    ('folder_mapping', 'Folder Mapping'),
-    ('folders', 'Folders (dim_folder)'),
     ('migration', 'Migration')
   ] %}
 
@@ -31,11 +29,6 @@
     <section class="settings-panel">
       <div style="margin-bottom:8px;">
         <strong>DB:</strong> {{ db_file }}
-        {% if counts %}
-          <span style="margin-left:8px;">map_folder_area={{ counts.map_folder_area }}</span>
-          <span style="margin-left:8px;">map_area_folder={{ counts.map_area_folder }}</span>
-          <span style="margin-left:8px;">dim_folder={{ counts.dim_folder }}</span>
-        {% endif %}
       </div>
 
       {% if active_admin_tab == 'security' %}
@@ -47,80 +40,6 @@
             <p><a href="{{ url_for('auth.change_password') }}">Change your password</a></p>
           </div>
         </div>
-      {% elif active_admin_tab == 'folder_mapping' %}
-        <h4>Folder Mapping</h4>
-        <form method="post" class="settings-form" style="margin-bottom:10px;">
-          <input type="hidden" name="tab" value="folder_mapping">
-          <input type="hidden" name="action" value="rebuild">
-          <button type="submit">Rebuild mapping</button>
-        </form>
-        <p class="settings-empty">Total records: {{ rules_total }}</p>
-
-        <div class="tabular-scroll admin-list-scroll">
-          <h4>Mapping rules (map_folder_area)</h4>
-          <table border="1" cellpadding="5">
-            <tr>
-              <th>map_id</th>
-              <th>path_prefix</th>
-              <th>tab</th>
-              <th>grp</th>
-              <th>area</th>
-              <th>tags</th>
-              <th>confidence</th>
-              <th>priority</th>
-              <th>primary</th>
-              <th>enabled</th>
-            </tr>
-            {% for row in rules %}
-            <tr>
-              <td>{{ row.map_id }}</td>
-              <td>{{ row.path_prefix }}</td>
-              <td>{{ row.tab }}</td>
-              <td>{{ row.grp }}</td>
-              <td>{{ row.area }}</td>
-              <td>{{ row.tags }}</td>
-              <td>{{ row.confidence }}</td>
-              <td>{{ row.priority }}</td>
-              <td>{{ row.is_primary }}</td>
-              <td>{{ row.is_enabled }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-        {% include "widgets/wid_pagination.html" %}
-      {% else %}
-      {% if active_admin_tab == 'folders' %}
-        <h4>Folders (dim_folder)</h4>
-        <p class="settings-empty">
-          dim_folder stores the known folders used by LifePIM so records can be linked back to folder paths. The toggle switches this list between every folder and only folders without an enabled primary mapping.
-        </p>
-        <p class="settings-empty">Total records: {{ folders_total }}</p>
-        <div style="margin-bottom:6px;">
-          {% if unmapped_only %}
-            <a href="{{ url_for('admin.admin_mapping_route', tab='folders') }}">Show all folders</a>
-          {% else %}
-            <a href="{{ url_for('admin.admin_mapping_route', tab='folders', unmapped=1) }}">Show unmapped only</a>
-          {% endif %}
-        </div>
-        <div class="tabular-scroll admin-list-scroll">
-          <table border="1" cellpadding="5">
-            <tr>
-              <th>folder_id</th>
-              <th>folder_path</th>
-              <th>is_active</th>
-              <th>last_seen_at</th>
-            </tr>
-            {% for row in folders %}
-            <tr>
-              <td>{{ row.folder_id }}</td>
-              <td>{{ row.folder_path }}</td>
-              <td>{{ row.is_active }}</td>
-              <td>{{ row.last_seen_at }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-        {% include "widgets/wid_pagination.html" %}
       {% else %}
         <h4>Migration</h4>
         <div class="settings-form">
@@ -165,7 +84,6 @@
             </form>
           </div>
         </div>
-      {% endif %}
       {% endif %}
     </section>
   </div>

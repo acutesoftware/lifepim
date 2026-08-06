@@ -346,7 +346,7 @@ def main():
     print('Run order ')
     print(' 1. init_database.py')
     print(' 2. Load sample data.  python LOAD_TESTING.py')
-    print(' 3. Run ETL_MAP_FOLDERS.BAT (now also backfills folder_id).')
+    print(' 3. Run ETL_MAP_FOLDERS.BAT to refresh dim_folder and backfill folder_id.')
 
     if _load_core_records_enabled():
         load_notes()

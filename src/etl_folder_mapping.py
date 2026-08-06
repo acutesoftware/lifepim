@@ -6,6 +6,25 @@ from typing import Dict, Optional
 
 from common import config as cfg
 
+"""
+Folder cache maintenance for file-backed LifePIM records.
+
+Original intent:
+    This script used to do two jobs:
+    1. cache known hard-drive folders in dim_folder; and
+    2. map those folders to left-hand-side Areas through legacy mapping tables.
+
+Current intent:
+    Area-to-folder mapping is now stored in lp_area_folders and managed from the
+    Notes folder panel, with bulk bootstrap import handled by
+    common.areas.import_area_mappings_csv(). This script only maintains
+    dim_folder and backfills folder_id values on file-backed tables.
+
+Run it when folder metadata has been refreshed and records need folder_id
+backfill. Do not run it to repair Notes Area membership; use Settings > Notes >
+Materialize note areas for that.
+"""
+
 # ----------------------------
 # Helpers
 # ----------------------------
@@ -28,33 +47,6 @@ def norm_path(p: str) -> str:
     if len(p) > 3 and p.endswith("\\"):
         p = p.rstrip("\\")
     return p
-
-
-def get_int(d: Dict[str, str], key: str, default: int = 0) -> int:
-    v = (d.get(key) or "").strip()
-    if v == "":
-        return default
-    return int(float(v))
-
-
-def get_float(d: Dict[str, str], key: str, default: float = 1.0) -> float:
-    v = (d.get(key) or "").strip()
-    if v == "":
-        return default
-    return float(v)
-
-
-def get_text(d: Dict[str, str], key: str, default: str = "") -> str:
-    v = d.get(key)
-    return default if v is None else str(v).strip()
-
-
-def clean_tab_label(value: str) -> str:
-    cleaned = []
-    for ch in (value or ""):
-        if ch.isalnum() or ch in (" ", "/", "-", "_"):
-            cleaned.append(ch)
-    return " ".join("".join(cleaned).split())
 
 
 def _strip_drop_tables(ddl_text: str) -> str:
@@ -83,75 +75,6 @@ CREATE TABLE IF NOT EXISTS dim_folder (
   replaced_by_folder_id INTEGER NULL,
   FOREIGN KEY(replaced_by_folder_id) REFERENCES dim_folder(folder_id)
 );
-
-DROP TABLE IF EXISTS map_folder_area;
-
-CREATE TABLE IF NOT EXISTS map_folder_area (
-  map_id       INTEGER PRIMARY KEY AUTOINCREMENT,
-  path_prefix  TEXT NOT NULL,
-  tab          TEXT NOT NULL,
-  grp          TEXT NOT NULL,
-
-  -- IMPORTANT: area is NOT NULL, blank means "no area"
-  area      TEXT NOT NULL DEFAULT '',
-
-  tags         TEXT NOT NULL DEFAULT '',
-  confidence   REAL NOT NULL DEFAULT 1.0 CHECK (confidence >= 0.0 AND confidence <= 1.0),
-  priority     INTEGER NOT NULL DEFAULT 0,
-  is_primary   INTEGER NOT NULL DEFAULT 1 CHECK (is_primary IN (0,1)),
-  notes        TEXT NOT NULL DEFAULT '',
-  is_enabled   INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0,1)),
-  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  updated_at   TEXT NULL
-);
-
--- Unique rule identity (area blank is valid)
-CREATE UNIQUE INDEX IF NOT EXISTS ux_mfp_rule
-ON map_folder_area(path_prefix, tab, grp, area, is_primary);
-
-CREATE INDEX IF NOT EXISTS ix_mfp_prefix ON map_folder_area(path_prefix);
-CREATE INDEX IF NOT EXISTS ix_mfp_tab ON map_folder_area(tab);
-CREATE INDEX IF NOT EXISTS ix_mfp_area ON map_folder_area(area);
-
-CREATE TRIGGER IF NOT EXISTS trg_map_folder_area_updated
-AFTER UPDATE ON map_folder_area
-FOR EACH ROW
-BEGIN
-  UPDATE map_folder_area
-  SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-  WHERE map_id = NEW.map_id;
-END;
-
-DROP TABLE IF EXISTS map_area_folder;
-
-CREATE TABLE IF NOT EXISTS map_area_folder (
-  folder_id       INTEGER NOT NULL,
-  tab             TEXT NOT NULL,
-  grp             TEXT NOT NULL,
-
-  -- IMPORTANT: area is NOT NULL, blank means "no area"
-  area         TEXT NOT NULL DEFAULT '',
-
-  tags            TEXT NOT NULL DEFAULT '',
-  confidence      REAL NOT NULL DEFAULT 1.0 CHECK (confidence >= 0.0 AND confidence <= 1.0),
-  matched_prefix  TEXT NOT NULL,
-  rule_map_id     INTEGER NOT NULL,
-  is_primary      INTEGER NOT NULL DEFAULT 1 CHECK (is_primary IN (0,1)),
-  is_enabled      INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0,1)),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-
-  -- No COALESCE needed
-  PRIMARY KEY (folder_id, tab, grp, area, is_primary),
-
-  FOREIGN KEY(folder_id) REFERENCES dim_folder(folder_id),
-  FOREIGN KEY(rule_map_id) REFERENCES map_folder_area(map_id)
-);
-
-CREATE INDEX IF NOT EXISTS ix_mpf_folder ON map_area_folder(folder_id);
-CREATE INDEX IF NOT EXISTS ix_mpf_tab ON map_area_folder(tab);
-CREATE INDEX IF NOT EXISTS ix_mpf_grp ON map_area_folder(grp);
-CREATE INDEX IF NOT EXISTS ix_mpf_area ON map_area_folder(area);
-CREATE INDEX IF NOT EXISTS ix_mpf_rule ON map_area_folder(rule_map_id);
 
 """
 DDL_CREATE = _strip_drop_tables(DDL_RESET)
@@ -182,97 +105,6 @@ def load_folder_list_csv(conn: sqlite3.Connection, folder_list_csv: str, col: st
             upsert_dim_folder(conn, row.get(col, ""))
             n += 1
     return n
-
-
-def load_map_folder_area_csv(conn: sqlite3.Connection, rules_csv: str, clear_first: bool = True) -> int:
-    """
-    Expects columns (at minimum):
-      path_prefix, tab, group OR grp
-    Optional:
-      area, tags, confidence, priority, is_primary, is_enabled, notes
-    """
-    if clear_first:
-        conn.execute("DELETE FROM map_folder_area")
-
-    n = 0
-    with open(rules_csv, "r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-
-        # Support both "group" and "grp"
-        fieldnames = set(reader.fieldnames or [])
-        if "grp" not in fieldnames and "group" not in fieldnames:
-            raise ValueError("Rules CSV must include 'grp' or 'group' column.")
-
-        for row in reader:
-            path_prefix = norm_path(get_text(row, "path_prefix"))
-            tab = clean_tab_label(get_text(row, "tab"))
-            grp = get_text(row, "grp") or get_text(row, "group")
-            area = get_text(row, "area")
-            tags = get_text(row, "tags", "")
-            confidence = get_float(row, "confidence", 1.0)
-            priority = get_int(row, "priority", 0)
-            is_primary = get_int(row, "is_primary", 1)
-            is_enabled = get_int(row, "is_enabled", 1)
-            notes = get_text(row, "notes", "")
-
-            if not path_prefix or not tab or not grp:
-                # Skip malformed line
-                continue
-
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO map_folder_area
-                (path_prefix, tab, grp, area, tags, confidence, priority, is_primary, notes, is_enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (path_prefix, tab, grp, area, tags, confidence, priority, is_primary, notes, is_enabled),
-            )
-            n += 1
-    return n
-
-
-def rebuild_map_area_folder(conn: sqlite3.Connection, only_active_folders: bool = False) -> int:
-    conn.execute("DELETE FROM map_area_folder")
-
-    where_active = "WHERE f.is_active = 1" if only_active_folders else ""
-
-    cur = conn.execute(
-        f"""
-        INSERT INTO map_area_folder (
-            folder_id, tab, grp, area, tags, confidence,
-            matched_prefix, rule_map_id, is_primary, is_enabled, updated_at
-        )
-        SELECT
-            f.folder_id,
-            r.tab,
-            r.grp,
-            COALESCE(r.area, ''),
-            r.tags,
-            r.confidence,
-            r.path_prefix,
-            r.map_id,
-            r.is_primary,
-            r.is_enabled,
-            strftime('%Y-%m-%dT%H:%M:%fZ','now')
-        FROM dim_folder f
-        JOIN map_folder_area r
-          ON r.map_id = (
-                SELECT r2.map_id
-                FROM map_folder_area r2
-                WHERE r2.is_enabled = 1
-                  AND r2.is_primary = 1
-                  AND lower(f.folder_path) LIKE lower(r2.path_prefix) || '%'
-                ORDER BY
-                  LENGTH(r2.path_prefix) DESC,
-                  r2.priority DESC,
-                  r2.confidence DESC,
-                  r2.map_id DESC
-                LIMIT 1
-            )
-        {where_active};
-        """
-    )
-    return cur.rowcount if cur.rowcount != -1 else 0
 
 
 def _table_has_column(conn: sqlite3.Connection, tbl_name: str, col_name: str) -> bool:
@@ -421,13 +253,10 @@ def folder_id_stats(conn: sqlite3.Connection) -> Dict[str, int]:
 # Main
 # ----------------------------
 def main():
-    ap = argparse.ArgumentParser(description="LifePIM folder mapping ETL (dim_folder + map_folder_area + map_area_folder).")
+    ap = argparse.ArgumentParser(description="LifePIM folder cache ETL (dim_folder + folder_id backfill).")
     ap.add_argument("--db", required=True, help="SQLite DB file path (e.g., lifepim.db)")
     ap.add_argument("--folders_csv", required=True, help="CSV containing folders. Must have column 'folder_path' by default.")
     ap.add_argument("--folders_col", default="folder_path", help="Column name in folders_csv for folder paths (default: folder_path)")
-    ap.add_argument("--rules_csv", required=True, help="CSV mapping rules (path_prefix, tab, grp/group, ...)")
-    ap.add_argument("--no_clear_rules", action="store_true", help="Do not clear map_folder_area before insert (default clears)")
-    ap.add_argument("--only_active", action="store_true", help="Only map active folders when building map_area_folder")
     args = ap.parse_args()
 
     os.makedirs(os.path.dirname(os.path.abspath(args.db)), exist_ok=True)
@@ -439,9 +268,7 @@ def main():
 
         conn.execute("BEGIN")
         n_folders = load_folder_list_csv(conn, args.folders_csv, col=args.folders_col)
-        n_rules = load_map_folder_area_csv(conn, args.rules_csv, clear_first=(not args.no_clear_rules))
         n_backfilled = backfill_folder_ids(conn)
-        n_mapped = rebuild_map_area_folder(conn, only_active_folders=args.only_active)
         conn.commit()
 
         try:
@@ -451,8 +278,7 @@ def main():
 
         stats = folder_id_stats(conn)
         print(
-            f"OK: folders_seen={n_folders}, rules_loaded={n_rules}, "
-            f"folder_ids_updated={n_backfilled}, folders_mapped={n_mapped}"
+            f"OK: folders_seen={n_folders}, folder_ids_updated={n_backfilled}"
         )
         for key in sorted(stats.keys()):
             print(f"{key}={stats[key]}")

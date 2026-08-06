@@ -2,8 +2,6 @@
 {% block module_content %}
   {% set admin_tabs = [
     ('security', 'Security', url_for('admin.admin_mapping_route', tab='security')),
-    ('folder_mapping', 'Folder Mapping', url_for('admin.admin_mapping_route', tab='folder_mapping')),
-    ('folders', 'Folders (dim_folder)', url_for('admin.admin_mapping_route', tab='folders')),
     ('migration', 'Migration', url_for('admin.admin_mapping_route', tab='migration')),
     ('logs', 'Logs', url_for('admin.logs_route')),
     ('logger', 'Logger', url_for('admin.logger_logs_route'))
