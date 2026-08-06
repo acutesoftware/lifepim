@@ -271,6 +271,29 @@
               Keep Desktop sync logs
             </label>
           </div>
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Logger Processing</div>
+            <label>
+              Logger database path
+              <input type="text" name="logger_database_path" value="{{ logger_settings.database_path }}">
+            </label>
+            <label>
+              Mobile source path
+              <input type="text" name="logger_mobile_source_path" value="{{ logger_settings.mobile_source_path }}" placeholder="{{ logger_settings.raw_data_root }}">
+            </label>
+            <label>
+              Aggie source path
+              <input type="text" name="logger_aggie_source_path" value="{{ logger_settings.aggie_source_path }}">
+            </label>
+            <label>
+              Activity session gap seconds
+              <input type="number" name="logger_session_gap_seconds" min="1" max="3600" value="{{ logger_settings.session_gap_seconds or 60 }}">
+            </label>
+            <label>
+              Minimum activity session seconds
+              <input type="number" name="logger_minimum_session_seconds" min="0" max="3600" value="{{ logger_settings.minimum_session_seconds or 3 }}">
+            </label>
+          </div>
           <button type="submit">Save Logger settings</button>
         </form>
       {% elif active_settings_tab == 'config' %}

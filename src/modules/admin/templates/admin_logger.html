@@ -41,6 +41,154 @@
         <a href="{{ url_for('admin.settings_route', tab='logger') }}">Open Logger Settings</a>
       </form>
 
+      <h4>Logger Processing</h4>
+      {% if processing_status.error %}
+        <p class="settings-empty">Logger processing status unavailable: {{ processing_status.error }}</p>
+      {% else %}
+        <div class="tabular-scroll">
+          <table class="settings-table">
+            <tr><th>Main LifePIM DB</th><td><code>{{ processing_status.main_database_path or 'Unknown' }}</code></td></tr>
+            <tr><th>Processing DB</th><td><code>{{ processing_status.database_path }}</code></td></tr>
+            <tr><th>Database exists</th><td>{{ 'Yes' if processing_status.database_exists else 'No' }}</td></tr>
+            <tr><th>DB size</th><td>{{ processing_status.database_size_bytes }} bytes</td></tr>
+            <tr><th>Schema version</th><td>{{ processing_status.schema_version }}</td></tr>
+            <tr><th>Mobile source</th><td><code>{{ processing_status.mobile_source_path or 'Not configured' }}</code></td></tr>
+            <tr><th>Aggie source</th><td><code>{{ processing_status.aggie_source_path or 'Not configured' }}</code></td></tr>
+            <tr><th>Processing status</th><td>{{ 'Running' if processing_status.is_running else 'Idle' }}</td></tr>
+            <tr><th>Source files</th><td>{{ processing_status.sample_counts.source_files or 0 }}</td></tr>
+            <tr><th>Imported files</th><td>{{ processing_status.ingest_counts.imported or 0 }}</td></tr>
+            <tr><th>Failed files</th><td>{{ processing_status.ingest_counts.failed or 0 }}</td></tr>
+            <tr><th>Mobile samples</th><td>{{ processing_status.sample_counts.mobile_usage_samples or 0 }}</td></tr>
+            <tr><th>Desktop samples</th><td>{{ processing_status.sample_counts.desktop_samples or 0 }}</td></tr>
+            <tr><th>Activity sessions</th><td>{{ processing_status.activity_session_count }}</td></tr>
+            <tr><th>Activity range</th><td>{{ processing_status.first_activity_at or 'None' }}{% if processing_status.last_activity_at %} to {{ processing_status.last_activity_at }}{% endif %}</td></tr>
+            <tr><th>Last refresh</th><td>{{ processing_status.last_refresh.completed_at if processing_status.last_refresh else 'Never' }}</td></tr>
+            <tr><th>Last session rebuild</th><td>{{ processing_status.last_rebuild_sessions.completed_at if processing_status.last_rebuild_sessions else 'Never' }}</td></tr>
+            <tr><th>Last DB rebuild</th><td>{{ processing_status.last_rebuild_database.completed_at if processing_status.last_rebuild_database else 'Never' }}</td></tr>
+          </table>
+        </div>
+
+        <form method="post" class="settings-form">
+          <div class="settings-action-row">
+            <button type="submit" name="action" value="refresh_logger_data">Load JSON to database</button>
+            <span class="settings-action-note">Loads supported raw logger JSON/CSV files into the logger database tables. Re-running it skips unchanged files and only rebuilds sessions when imported data changed.</span>
+          </div>
+          <div class="settings-action-row">
+            <button type="submit" name="action" value="rebuild_logger_sessions">Rebuild Activity Sessions</button>
+            <span class="settings-action-note">Keeps imported samples and recalculates derived sessions using the current session thresholds.</span>
+          </div>
+          <div class="settings-action-row">
+            <button type="submit" name="action" value="rebuild_logger_database">Rebuild Logger Database</button>
+            <label class="settings-action-note">
+              <input type="checkbox" name="confirm_rebuild_database" value="1">
+              Replace the derived logger DB from raw files
+            </label>
+          </div>
+        </form>
+
+        {% if failed_files %}
+          <h4>Failed Source Files</h4>
+          <div class="tabular-scroll admin-list-scroll">
+            <table border="1" cellpadding="5">
+              <tr>
+                <th>Updated</th>
+                <th>Type</th>
+                <th>Device</th>
+                <th>File</th>
+                <th>Error</th>
+              </tr>
+              {% for row in failed_files %}
+              <tr>
+                <td>{{ row.updated_at }}</td>
+                <td>{{ row.source_type }}</td>
+                <td>{{ row.device_id or '' }}</td>
+                <td><code>{{ row.source_path }}</code></td>
+                <td>{{ row.error_message }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </div>
+        {% endif %}
+
+        <h4>Recent Processing Runs</h4>
+        <div class="tabular-scroll admin-list-scroll">
+          <table border="1" cellpadding="5">
+            <tr>
+              <th>Started</th>
+              <th>Completed</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Scanned</th>
+              <th>Imported</th>
+              <th>Skipped</th>
+              <th>Failed</th>
+              <th>Records</th>
+              <th>Sessions</th>
+              <th>Message</th>
+            </tr>
+            {% for row in processing_runs %}
+            <tr>
+              <td>{{ row.started_at }}</td>
+              <td>{{ row.completed_at or '' }}</td>
+              <td>{{ row.run_type }}</td>
+              <td>{{ row.run_status }}</td>
+              <td>{{ row.files_scanned }}</td>
+              <td>{{ row.files_imported }}</td>
+              <td>{{ row.files_skipped }}</td>
+              <td>{{ row.files_failed }}</td>
+              <td>{{ row.records_imported }}</td>
+              <td>{{ row.sessions_created }}</td>
+              <td>{{ row.message or row.error_message or '' }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+
+        <h4>Recent Activity Sessions</h4>
+        <form method="get" class="settings-form admin-log-filter">
+          <label>Device <input type="text" name="session_device" value="{{ session_filters.device }}"></label>
+          <label>
+            Platform
+            <select name="session_platform">
+              <option value="">All</option>
+              <option value="android" {% if session_filters.platform == 'android' %}selected{% endif %}>Android</option>
+              <option value="windows" {% if session_filters.platform == 'windows' %}selected{% endif %}>Windows</option>
+            </select>
+          </label>
+          <label>Application <input type="text" name="session_application" value="{{ session_filters.application }}"></label>
+          <label>Date <input type="date" name="session_date" value="{{ session_filters.date }}"></label>
+          <button type="submit">Apply</button>
+        </form>
+        <div class="tabular-scroll admin-list-scroll">
+          <table border="1" cellpadding="5">
+            <tr>
+              <th>Start</th>
+              <th>End</th>
+              <th>Device</th>
+              <th>Platform</th>
+              <th>Source type</th>
+              <th>Application</th>
+              <th>Activity</th>
+              <th>Duration</th>
+              <th>Records</th>
+            </tr>
+            {% for row in activity_sessions %}
+            <tr>
+              <td>{{ row.start_at }}</td>
+              <td>{{ row.end_at }}</td>
+              <td>{{ row.device_id }}</td>
+              <td>{{ row.platform }}</td>
+              <td>{{ row.source_type }}</td>
+              <td>{{ row.application_name }}</td>
+              <td>{{ row.activity_title }}</td>
+              <td>{{ row.duration_seconds }}</td>
+              <td>{{ row.source_record_count }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% endif %}
+
       <h4>Recent Sync Activity</h4>
       <div class="tabular-scroll admin-list-scroll">
         <table border="1" cellpadding="5">

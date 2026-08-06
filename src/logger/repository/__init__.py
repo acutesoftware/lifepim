@@ -1,0 +1,2 @@
+"""Logger data repositories."""
+

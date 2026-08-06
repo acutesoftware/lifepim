@@ -19,6 +19,9 @@ from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr
 from modules.calendar.services import calendar_index
 from modules.pocket_api import routes as pocket_api
 from modules.logger_api import routes as logger_api
+from logger.admin import view_model as logger_view_model
+from logger.exceptions import LoggerBusyError
+from logger.service import LoggerService
 from core import security
 
 
@@ -638,6 +641,11 @@ def settings_route():
                 "sync_token": token_value if token_value else None,
                 "max_upload_mb": request.form.get("logger_max_upload_mb"),
                 "keep_sync_logs": request.form.get("logger_keep_sync_logs") == "1",
+                "database_path": request.form.get("logger_database_path"),
+                "mobile_source_path": request.form.get("logger_mobile_source_path"),
+                "aggie_source_path": request.form.get("logger_aggie_source_path"),
+                "session_gap_seconds": request.form.get("logger_session_gap_seconds"),
+                "minimum_session_seconds": request.form.get("logger_minimum_session_seconds"),
             }
             settings_mod.save_logger_settings(logger_values, conn)
             message = "Mobile Logger settings saved."
@@ -1005,15 +1013,67 @@ def logger_logs_route():
                 username=getattr(current_user, "username", None),
             )
             message = "Logger raw data folder saved."
+        elif action in {"refresh_logger_data", "rebuild_logger_sessions", "rebuild_logger_database"}:
+            service = LoggerService(
+                main_conn=conn,
+                user_id=getattr(current_user, "user_id", None),
+                username=getattr(current_user, "username", None),
+            )
+            try:
+                if action == "refresh_logger_data":
+                    result = service.refresh()
+                    message = f"Logger JSON loaded to database: {result.files_imported} imported, {result.files_skipped} skipped, {result.files_failed} failed, {result.sessions_created} sessions."
+                elif action == "rebuild_logger_sessions":
+                    result = service.rebuild_sessions()
+                    message = f"Logger activity sessions rebuilt: {result.sessions_created} sessions."
+                else:
+                    if request.form.get("confirm_rebuild_database") != "1":
+                        message = "Tick the confirmation box before rebuilding the logger database."
+                    else:
+                        result = service.rebuild_database()
+                        message = f"Logger database rebuilt: {result.files_imported} imported, {result.files_failed} failed, {result.sessions_created} sessions."
+            except LoggerBusyError as exc:
+                message = str(exc)
+            except Exception as exc:
+                message = f"Logger processing failed: {exc}"
     filters = {
         "device": request.args.get("device", ""),
         "log_type": request.args.get("log_type", ""),
         "file_date": request.args.get("file_date", ""),
         "filename": request.args.get("filename", ""),
     }
+    session_filters = {
+        "device": request.args.get("session_device", ""),
+        "platform": request.args.get("session_platform", ""),
+        "application": request.args.get("session_application", ""),
+        "date": request.args.get("session_date", ""),
+    }
     files = logger_api.list_raw_files(filters=filters, conn=conn, settings=logger_settings)
     log_types = sorted(set(logger_api.ALLOWED_LOG_TYPES) | {row.get("log_type", "") for row in files if row.get("log_type")})
     selected_run_id = request.args.get("run_id", type=int)
+    logger_service = LoggerService(
+        main_conn=conn,
+        user_id=getattr(current_user, "user_id", None),
+        username=getattr(current_user, "username", None),
+    )
+    try:
+        processing_status = logger_view_model.logger_status_view(logger_service.get_status())
+        processing_runs = logger_view_model.processing_runs_view(logger_service.recent_processing_runs(25))
+        failed_files = logger_view_model.failed_files_view(logger_service.failed_files(25))
+        activity_sessions = logger_view_model.activity_sessions_view(
+            logger_service.get_recent_sessions(
+                100,
+                device_id=session_filters["device"] or None,
+                platform=session_filters["platform"] or None,
+                application_identifier=session_filters["application"] or None,
+                date=session_filters["date"] or None,
+            )
+        )
+    except Exception as exc:
+        processing_status = {"error": str(exc)}
+        processing_runs = []
+        failed_files = []
+        activity_sessions = []
     return render_template(
         "admin_logger.html",
         active_tab="admin",
@@ -1030,7 +1090,12 @@ def logger_logs_route():
         raw_files=files,
         devices=logger_api.list_devices(conn),
         filters=filters,
+        session_filters=session_filters,
         log_types=log_types,
+        processing_status=processing_status,
+        processing_runs=processing_runs,
+        failed_files=failed_files,
+        activity_sessions=activity_sessions,
     )
 
 
