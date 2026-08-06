@@ -115,10 +115,12 @@
               </select>
             </label>
           </div>
-          <button type="submit" name="action" value="rebuild_calendar_source">Rebuild source</button>
-          <button type="submit" name="action" value="rebuild_calendar_all">Rebuild all enabled</button>
-          <button type="submit" name="action" value="rebuild_calendar_item_days">Rebuild item days</button>
-          <button type="submit" name="action" value="rebuild_calendar_stats">Rebuild daily stats</button>
+          <div class="calendar-rebuild-actions">
+            <button type="submit" name="action" value="rebuild_calendar_source">Rebuild source</button>
+            <button type="submit" name="action" value="rebuild_calendar_all">Rebuild all enabled</button>
+            <button type="submit" name="action" value="rebuild_calendar_item_days">Rebuild item days</button>
+            <button type="submit" name="action" value="rebuild_calendar_stats">Rebuild daily stats</button>
+          </div>
         </form>
       {% elif active_settings_tab == 'media' %}
         <h4>Media</h4>

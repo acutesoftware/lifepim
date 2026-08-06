@@ -408,14 +408,20 @@ def admin_mapping_route():
                 cfg.refresh_config_overrides()
                 if action == "migrate_images":
                     result = media_migration.migrate_images_from_filelist(where_clause=image_where, conn=conn)
+                    stats_result = calendar_index.refresh_calendar_source("media", conn=conn, full_rebuild=True)
                     message = (
                         f"Media migrated from {result['source_table']} and {result['video_source_table']}: "
                         f"{result['total_inserted']} rows ({result['inserted']} images, "
-                        f"{result['video_inserted']} videos)."
+                        f"{result['video_inserted']} videos). "
+                        f"Calendar media stats rebuilt: {stats_result.rows_inserted} rows."
                     )
                 elif action == "migrate_audio":
                     result = media_migration.migrate_audio_from_filelist(where_clause=audio_where, conn=conn)
-                    message = f"Audio migrated from {result['source_table']}: {result['inserted']} rows."
+                    stats_result = calendar_index.refresh_calendar_source("audio", conn=conn, full_rebuild=True)
+                    message = (
+                        f"Audio migrated from {result['source_table']}: {result['inserted']} rows. "
+                        f"Calendar audio stats rebuilt: {stats_result.rows_inserted} rows."
+                    )
                 elif action == "save_media_filters":
                     message = "Media migration filters saved."
             except Exception as exc:
@@ -480,7 +486,8 @@ def settings_route():
                 calendar_index.rebuild_calendar_item_days(conn=conn)
                 message = "Rebuilt calendar item-day index."
             elif action == "rebuild_calendar_stats":
-                count = calendar_index.rebuild_calendar_day_stats(conn=conn)
+                results = calendar_index.rebuild_calendar_day_stat_baselines(conn=conn)
+                count = sum(result.rows_inserted for result in results)
                 message = f"Rebuilt calendar daily stats: {count} rows."
             else:
                 sources = {

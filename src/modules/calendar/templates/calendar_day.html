@@ -19,6 +19,7 @@
   {% include "widgets/wid_calendar_source_box.html" %}
   <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', area=area) }}">Import Events</a>
 </div>
+{% include "widgets/wid_calendar_stats_baseline.html" %}
 
 <div style="display:flex; gap:16px;">
   <div style="flex:1; max-width:180px;">

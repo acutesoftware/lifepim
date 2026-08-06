@@ -2150,7 +2150,8 @@ button.calendar-nav {
   cursor: pointer;
 }
 
-.calendar-jump-dialog {
+.calendar-jump-dialog,
+.calendar-stats-dialog {
   width: min(320px, calc(100vw - 32px));
   border: 1px solid #aaa;
   border-radius: 4px;
@@ -2159,11 +2160,17 @@ button.calendar-nav {
   background: #fff;
 }
 
-.calendar-jump-dialog::backdrop {
+.calendar-stats-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.calendar-jump-dialog::backdrop,
+.calendar-stats-dialog::backdrop {
   background: rgba(0, 0, 0, 0.24);
 }
 
-.calendar-jump-dialog h4 {
+.calendar-jump-dialog h4,
+.calendar-stats-dialog h4 {
   margin: 0 0 12px;
 }
 
@@ -2182,6 +2189,37 @@ button.calendar-nav {
 }
 
 .calendar-jump-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.calendar-stats-dialog p {
+  margin: 0 0 12px;
+  line-height: 1.35;
+}
+
+.calendar-stats-source-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.calendar-stats-source-list label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: start;
+}
+
+.calendar-stats-source-list small {
+  grid-column: 2;
+  color: #666;
+}
+
+.calendar-stats-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -2666,6 +2704,17 @@ button.calendar-nav {
 .settings-form button {
   align-self: flex-start;
   padding: 3px 8px;
+}
+
+.calendar-rebuild-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-form .calendar-rebuild-actions button {
+  align-self: auto;
 }
 
 .user-profile {

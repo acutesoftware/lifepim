@@ -55,6 +55,12 @@ SOURCE_SEEDS = [
     ("usage", "Usage", "log", "incremental", None, None, "#8c564b", "#ffffff", "activity", 100, 0, 0),
 ]
 
+DAY_STAT_SOURCE_KEYS = {"files", "media", "audio"}
+DEFAULT_RECENT_STATS_PAST_DAYS = 45
+DEFAULT_RECENT_STATS_FUTURE_DAYS = 1
+DEFAULT_RECENT_STATS_MAX_AGE_HOURS = 24
+STATS_BASELINE_CONFIG_KEY = "stats_baseline_built_at"
+
 
 @dataclass
 class RefreshResult:
@@ -374,6 +380,8 @@ def refresh_calendar_source(
             inserted = rebuild_calendar_day_stats(source_key, from_date, to_date, conn)
             result.rows_deleted = deleted
             result.rows_inserted = inserted
+            if source_key in DAY_STAT_SOURCE_KEYS and full_rebuild and not from_date and not to_date:
+                _mark_day_stats_baseline(conn, source_key, inserted)
         else:
             result.message = "No adapter for source."
         result.status = "current"
@@ -407,6 +415,93 @@ def rebuild_calendar_day_stats(
             _touch_source(conn, "usage", "current", 0, "No usage adapter available.")
     conn.commit()
     return inserted
+
+
+def refresh_recent_calendar_day_stats(
+    source_keys: Iterable[str] | None = None,
+    past_days: int = DEFAULT_RECENT_STATS_PAST_DAYS,
+    future_days: int = DEFAULT_RECENT_STATS_FUTURE_DAYS,
+    max_age_hours: int | None = DEFAULT_RECENT_STATS_MAX_AGE_HOURS,
+    today: date | str | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> list[RefreshResult]:
+    """Refresh a rolling date window for high-volume daily stat sources.
+
+    Full imports can add old-dated records and should still run a full source
+    refresh. This helper is for normal app use where recent file/media/audio
+    activity changes and old calendar dates are expected to stay stable.
+    """
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    selected = set(source_keys or DAY_STAT_SOURCE_KEYS) & DAY_STAT_SOURCE_KEYS
+    if not selected:
+        return []
+    anchor = _parse_date(today) if today else date.today()
+    if anchor is None:
+        anchor = date.today()
+    from_date = (anchor - timedelta(days=max(0, int(past_days or 0)))).strftime("%Y-%m-%d")
+    to_date = (anchor + timedelta(days=max(0, int(future_days or 0)) + 1)).strftime("%Y-%m-%d")
+    results: list[RefreshResult] = []
+    for key in sorted(selected):
+        if max_age_hours is not None and not _calendar_source_refresh_stale(conn, key, max_age_hours):
+            continue
+        results.append(refresh_calendar_source(key, from_date=from_date, to_date=to_date, full_rebuild=True, conn=conn))
+    return results
+
+
+def missing_calendar_day_stat_baselines(
+    source_keys: Iterable[str] | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> list[dict]:
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    selected = set(source_keys or DAY_STAT_SOURCE_KEYS) & DAY_STAT_SOURCE_KEYS
+    if not selected:
+        return []
+    rows = conn.execute(
+        "SELECT source_key, source_name, config_json FROM lp_calendar_sources "
+        "WHERE source_key IN (" + ",".join(["?"] * len(selected)) + ") "
+        "ORDER BY default_priority, source_name",
+        sorted(selected),
+    ).fetchall()
+    missing = []
+    updated_config = False
+    for row in rows:
+        config = _source_config(row)
+        if config.get(STATS_BASELINE_CONFIG_KEY):
+            continue
+        bounds = _day_stat_source_bounds(conn, row["source_key"])
+        if not bounds or not bounds.get("row_count"):
+            continue
+        if _day_stats_cover_source_bounds(conn, row["source_key"], bounds):
+            _mark_day_stats_baseline(conn, row["source_key"], _day_stats_row_count(conn, row["source_key"]))
+            updated_config = True
+            continue
+        missing.append(
+            {
+                "source_key": row["source_key"],
+                "source_name": row["source_name"],
+                "row_count": bounds["row_count"],
+                "min_date": bounds["min_date"],
+                "max_date": bounds["max_date"],
+            }
+        )
+    if updated_config:
+        conn.commit()
+    return missing
+
+
+def rebuild_calendar_day_stat_baselines(
+    source_keys: Iterable[str] | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> list[RefreshResult]:
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    selected = set(source_keys or DAY_STAT_SOURCE_KEYS) & DAY_STAT_SOURCE_KEYS
+    results = []
+    for key in sorted(selected):
+        results.append(refresh_calendar_source(key, conn=conn, full_rebuild=True))
+    return results
 
 
 def fetch_calendar_items_for_days(
@@ -1071,6 +1166,123 @@ def _touch_source(conn, source_key, status, count, message):
     )
 
 
+def _source_config(source_row) -> dict:
+    raw = ""
+    try:
+        raw = source_row["config_json"] or ""
+    except (KeyError, TypeError):
+        raw = ""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _save_source_config(conn, source_key, config: dict) -> None:
+    conn.execute(
+        "UPDATE lp_calendar_sources SET config_json = ? WHERE source_key = ?",
+        (json.dumps(config, sort_keys=True), source_key),
+    )
+
+
+def _mark_day_stats_baseline(conn, source_key, stat_rows) -> None:
+    row = conn.execute(
+        "SELECT config_json FROM lp_calendar_sources WHERE source_key = ?",
+        (source_key,),
+    ).fetchone()
+    config = _source_config(row)
+    bounds = _day_stat_source_bounds(conn, source_key) or {}
+    if not bounds.get("row_count"):
+        for key in (
+            STATS_BASELINE_CONFIG_KEY,
+            "stats_baseline_row_count",
+            "stats_baseline_stat_rows",
+            "stats_baseline_min_date",
+            "stats_baseline_max_date",
+        ):
+            config.pop(key, None)
+        _save_source_config(conn, source_key, config)
+        return
+    config.update(
+        {
+            STATS_BASELINE_CONFIG_KEY: _now(),
+            "stats_baseline_row_count": int(bounds.get("row_count") or 0),
+            "stats_baseline_stat_rows": int(stat_rows or 0),
+            "stats_baseline_min_date": bounds.get("min_date"),
+            "stats_baseline_max_date": bounds.get("max_date"),
+        }
+    )
+    _save_source_config(conn, source_key, config)
+
+
+def _day_stat_source_bounds(conn, source_key) -> dict | None:
+    if source_key == "files":
+        if not _table_has_cols(conn, "lp_files", {"mtime_utc"}):
+            return None
+        date_expr = "substr(mtime_utc, 1, 10)"
+        where = [f"{date_expr} IS NOT NULL", f"{date_expr} != ''"]
+        if _table_has_cols(conn, "lp_files", {"is_deleted"}):
+            where.append("COALESCE(is_deleted, 0) = 0")
+        sql = (
+            f"SELECT COUNT(1) AS row_count, MIN({date_expr}) AS min_date, MAX({date_expr}) AS max_date "
+            f"FROM lp_files WHERE {' AND '.join(where)}"
+        )
+    elif source_key == "media":
+        if not _table_has_cols(conn, "lp_media", {"mtime_utc", "media_type"}):
+            return None
+        date_expr = "substr(mtime_utc, 1, 10)"
+        where = [f"{date_expr} IS NOT NULL", f"{date_expr} != ''"]
+        sql = (
+            f"SELECT COUNT(1) AS row_count, MIN({date_expr}) AS min_date, MAX({date_expr}) AS max_date "
+            f"FROM lp_media WHERE {' AND '.join(where)}"
+        )
+    elif source_key == "audio":
+        if not _table_has_cols(conn, "lp_audio", {"date_modified"}):
+            return None
+        date_expr = "substr(date_modified, 1, 10)"
+        where = [f"{date_expr} IS NOT NULL", f"{date_expr} != ''"]
+        sql = (
+            f"SELECT COUNT(1) AS row_count, MIN({date_expr}) AS min_date, MAX({date_expr}) AS max_date "
+            f"FROM lp_audio WHERE {' AND '.join(where)}"
+        )
+    else:
+        return None
+    row = conn.execute(sql).fetchone()
+    if not row:
+        return None
+    return {
+        "row_count": int(row["row_count"] or 0),
+        "min_date": row["min_date"],
+        "max_date": row["max_date"],
+    }
+
+
+def _day_stats_row_count(conn, source_key) -> int:
+    row = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_calendar_day_stats WHERE source_key = ?",
+        (source_key,),
+    ).fetchone()
+    return int(row["cnt"] or 0) if row else 0
+
+
+def _day_stats_cover_source_bounds(conn, source_key, source_bounds) -> bool:
+    source_min = source_bounds.get("min_date")
+    source_max = source_bounds.get("max_date")
+    if not source_min or not source_max:
+        return False
+    row = conn.execute(
+        "SELECT MIN(stat_date) AS min_date, MAX(stat_date) AS max_date, COUNT(1) AS cnt "
+        "FROM lp_calendar_day_stats WHERE source_key = ?",
+        (source_key,),
+    ).fetchone()
+    if not row or not row["cnt"]:
+        return False
+    return bool(row["min_date"] and row["max_date"] and row["min_date"] <= source_min and row["max_date"] >= source_max)
+
+
 def _horizon(source_row) -> tuple[date, date]:
     today = date.today()
     past = source_row["horizon_past_days"] if source_row and source_row["horizon_past_days"] is not None else 730
@@ -1190,3 +1402,17 @@ def _nullable_int(value):
 
 def _now():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _calendar_source_refresh_stale(conn, source_key, max_age_hours) -> bool:
+    row = conn.execute(
+        "SELECT last_refresh_at FROM lp_calendar_sources WHERE source_key = ?",
+        (source_key,),
+    ).fetchone()
+    if not row or not row["last_refresh_at"]:
+        return True
+    try:
+        refreshed_at = datetime.strptime(row["last_refresh_at"], "%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError):
+        return True
+    return datetime.utcnow() - refreshed_at >= timedelta(hours=max(0, int(max_age_hours)))

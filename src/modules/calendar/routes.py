@@ -2,7 +2,7 @@ import calendar as cal
 import os
 from datetime import date, datetime, timedelta
 
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, current_app, render_template, request, redirect, url_for
 
 from common import data
 from common import areas as areas_mod
@@ -353,6 +353,21 @@ def _calendar_media_settings(conn):
     }
 
 
+def _refresh_recent_day_stats(source_keys):
+    try:
+        calendar_index.refresh_recent_calendar_day_stats(source_keys=source_keys, conn=data.conn)
+    except Exception as exc:
+        current_app.logger.warning("Calendar recent day stats refresh failed: %s", exc)
+
+
+def _calendar_stats_baseline_missing(source_keys):
+    try:
+        return calendar_index.missing_calendar_day_stat_baselines(source_keys=source_keys, conn=data.conn)
+    except Exception as exc:
+        current_app.logger.warning("Calendar day stats baseline check failed: %s", exc)
+        return []
+
+
 def _fetch_calendar_media(conn, start_day, end_day, include_media=True, include_audio=True):
     items = []
     if include_media:
@@ -657,6 +672,17 @@ def jump_route():
     return redirect(url_for("calendar.day_view_route", date=target.strftime("%Y-%m-%d"), **params))
 
 
+@calendar_bp.route("/day-stats-baseline", methods=["POST"])
+def day_stats_baseline_route():
+    source_keys = request.form.getlist("source_key")
+    next_url = (request.form.get("next_url") or "").strip()
+    if not next_url.startswith("/calendar"):
+        next_url = url_for("calendar.month_view_route")
+    if source_keys:
+        calendar_index.rebuild_calendar_day_stat_baselines(source_keys, conn=data.conn)
+    return redirect(next_url)
+
+
 @calendar_bp.route("/")
 def month_view_route():
     today = date.today()
@@ -682,6 +708,7 @@ def month_view_route():
         except (IndexError, ValueError, AttributeError):
             continue
         events_by_day.setdefault(day, []).append(event)
+    _refresh_recent_day_stats(source_keys)
     stats = calendar_index.fetch_calendar_day_stats(first_day, end_day, sources=source_keys, conn=data.conn)
     stat_days = {int(item["stat_date"].split("-")[2]) for item in stats if item.get("stat_date")}
     month_media = _fetch_image_media(data.conn, first_day, end_day, source_keys=source_keys) if day_sources["files"] else []
@@ -719,6 +746,7 @@ def month_view_route():
         day_source_params=day_source_params,
         calendar_thumbnail_limit=media_settings["thumbnail_limit"],
         calendar_thumbnail_class=media_settings["thumbnail_class"],
+        calendar_stats_baseline_missing=_calendar_stats_baseline_missing(source_keys),
         source_action_url=url_for("calendar.month_view_route"),
         source_hidden_fields=_source_hidden_fields(year=year, month=month, area=area),
         list_from=first_day,
@@ -794,6 +822,7 @@ def week_view_route():
         day_source_params=day_source_params,
         calendar_thumbnail_limit=media_settings["thumbnail_limit"],
         calendar_thumbnail_class=media_settings["thumbnail_class"],
+        calendar_stats_baseline_missing=_calendar_stats_baseline_missing(source_keys),
         source_action_url=url_for("calendar.week_view_route"),
         source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), area=area),
         list_from=week_start,
@@ -844,6 +873,7 @@ def day_view_route():
         except (IndexError, ValueError, AttributeError):
             continue
         events_by_day.setdefault(day, []).append(event)
+    _refresh_recent_day_stats(source_keys)
     month_stats = calendar_index.fetch_calendar_day_stats(month_start, month_end, sources=source_keys, conn=data.conn)
     days_with_images = {int(item["stat_date"].split("-")[2]) for item in month_stats if item.get("stat_date")}
     prev_day = anchor - timedelta(days=1)
@@ -870,6 +900,7 @@ def day_view_route():
         day_source_params=day_source_params,
         calendar_thumbnail_limit=media_settings["thumbnail_limit"],
         calendar_thumbnail_class=media_settings["thumbnail_class"],
+        calendar_stats_baseline_missing=_calendar_stats_baseline_missing(source_keys),
         source_action_url=url_for("calendar.day_view_route"),
         source_hidden_fields=_source_hidden_fields(date=anchor.strftime("%Y-%m-%d"), area=area),
         list_from=anchor,
@@ -896,6 +927,7 @@ def year_view_route():
     source_keys = day_sources["selected"]
     year_start = date(year, 1, 1)
     year_end = date(year + 1, 1, 1)
+    _refresh_recent_day_stats(source_keys)
     year_stats = calendar_index.fetch_calendar_day_stats(year_start, year_end, sources=source_keys, conn=data.conn)
     year_events = _fetch_events(area=area, start_date=year_start, end_date=year_end, source_keys=source_keys)
     event_days_by_month = {}
@@ -939,6 +971,7 @@ def year_view_route():
         area=area,
         day_sources=day_sources,
         day_source_params=day_source_params,
+        calendar_stats_baseline_missing=_calendar_stats_baseline_missing(source_keys),
         source_action_url=url_for("calendar.year_view_route"),
         source_hidden_fields=_source_hidden_fields(year=year, area=area),
         list_from=year_start,
@@ -984,6 +1017,7 @@ def summary_view_route():
             [today.strftime("%Y-%m-%d"), next_30.strftime("%Y-%m-%d")],
         ).fetchall()
         grouped[group_key] = [dict(row) for row in rows]
+    _refresh_recent_day_stats(source_keys)
     source_status = calendar_index.fetch_calendar_sources(data.conn)
     stats = calendar_index.fetch_calendar_day_stats(today, next_30, sources=source_keys, conn=data.conn)
     return render_template(
@@ -1004,6 +1038,7 @@ def summary_view_route():
         grouped=grouped,
         source_status=source_status,
         stats=stats,
+        calendar_stats_baseline_missing=_calendar_stats_baseline_missing(source_keys),
         source_action_url=url_for("calendar.summary_view_route"),
         source_hidden_fields=_source_hidden_fields(area=area),
         **_calendar_jump_context("summary", today, area, day_source_params),

@@ -1,0 +1,66 @@
+{% if calendar_stats_baseline_missing %}
+<dialog class="calendar-stats-dialog" data-calendar-stats-dialog data-calendar-stats-key="{{ calendar_stats_baseline_missing | map(attribute='source_key') | join(',') }}">
+  <form method="post" action="{{ url_for('calendar.day_stats_baseline_route') }}">
+    <input type="hidden" name="next_url" value="{{ request.full_path }}">
+    <h4>Build Historical Calendar Activity?</h4>
+    <p>
+      Calendar can build historical file/media/audio activity counts once, so old
+      months and years show activity markers without scanning source tables while browsing.
+    </p>
+    <div class="calendar-stats-source-list">
+      {% for source in calendar_stats_baseline_missing %}
+      <label>
+        <input type="checkbox" name="source_key" value="{{ source.source_key }}" checked>
+        <span>{{ source.source_name }}</span>
+        <small>{{ source.row_count }} records{% if source.min_date and source.max_date %}, {{ source.min_date }} to {{ source.max_date }}{% endif %}</small>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="calendar-stats-actions">
+      <button type="button" data-calendar-stats-dismiss>Not now</button>
+      <button type="submit">Build historical stats</button>
+    </div>
+  </form>
+</dialog>
+<script>
+(() => {
+  const script = document.currentScript;
+  const dialog = script.previousElementSibling;
+  if (!dialog || dialog.dataset.calendarStatsReady === "1") {
+    return;
+  }
+  dialog.dataset.calendarStatsReady = "1";
+  const storageKey = `calendarStatsBaselineDismissed:${dialog.dataset.calendarStatsKey || ""}`;
+  const dismissed = (() => {
+    try {
+      return window.sessionStorage.getItem(storageKey) === "1";
+    } catch (err) {
+      return false;
+    }
+  })();
+  const dismissButton = dialog.querySelector("[data-calendar-stats-dismiss]");
+  const closeDialog = () => {
+    try {
+      window.sessionStorage.setItem(storageKey, "1");
+    } catch (err) {
+      // Ignore storage failures; closing the dialog should still work.
+    }
+    if (typeof dialog.close === "function") {
+      dialog.close();
+    } else {
+      dialog.removeAttribute("open");
+    }
+  };
+  if (dismissButton) {
+    dismissButton.addEventListener("click", closeDialog);
+  }
+  if (!dismissed) {
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  }
+})();
+</script>
+{% endif %}
