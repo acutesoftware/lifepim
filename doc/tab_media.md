@@ -70,10 +70,10 @@ FILELIST_AUDIO_WHERE = r"WHERE folder_name = 'Music'"
 Open:
 
 ```text
-LifePIM Menu -> Settings -> Media
+Admin -> Migration
 ```
 
-The Settings page shows:
+The FileLister Migration section shows:
 
 - Source database path.
 - Image source `WHERE` clause.
@@ -83,6 +83,8 @@ The Settings page shows:
 - `Migrate audio from filelist`.
 
 The filters are saved as config overrides in `sys_settings`, so they can be changed without editing `config.py`.
+
+Settings -> Media is separate. It controls UI display preferences such as thumbnail size and padding, and includes a `Rebuild media events` maintenance button.
 
 ### Image and Video Migration
 
@@ -130,6 +132,10 @@ Videos are loaded into `lp_media` with `media_type = video`. Video metadata is l
 - duration in seconds.
 - frame rate.
 
+After image/video migration, the Admin route rebuilds the Calendar `media`
+daily stats source so old media indicators can appear in Calendar without a
+separate manual Calendar rebuild.
+
 ### Audio Migration
 
 The `Migrate audio from filelist` button reloads the Audio tab from `fl_audio`, joined to `filelist_output` so the audio filter can use `folder_name`.
@@ -155,6 +161,9 @@ Audio rows are loaded into `lp_audio` with:
 - date modified, derived from the audio `date` field when present.
 - artist, album, and song title.
 
+After audio migration, the Admin route rebuilds the Calendar `audio` daily
+stats source.
+
 ### WHERE Clauses
 
 The `WHERE` clauses are appended directly to the filelister source query. They must:
@@ -179,9 +188,10 @@ Media events are separate from Calendar events. They use:
 
 They do not write to `lp_calendar_events`.
 
-Current rebuild button:
+Current rebuild buttons:
 
 ```text
+Settings -> Media -> Rebuild media events
 Media tab -> Events -> Rebuild events
 ```
 

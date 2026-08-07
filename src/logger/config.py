@@ -35,9 +35,8 @@ def load_logger_config(conn=None, user_id=None, username=None) -> LoggerConfig:
     )
 
     main_db_path = _main_database_path(conn)
-    if not db_path:
-        data_dir = main_db_path.parent if main_db_path else Path(".").resolve()
-        db_path = str(data_dir / "lifepim_logger.db")
+    if not _looks_like_sqlite_path(db_path):
+        db_path = str(_default_logger_database_path(main_db_path))
     if not mobile_path:
         mobile_path = logger_settings.get("raw_data_root") or ""
     return LoggerConfig(
@@ -62,6 +61,20 @@ def _expand_path(value: str) -> Path:
     if path.is_absolute():
         return path
     return (Path(getattr(app_config, "user_folder", ".")).expanduser() / path).resolve()
+
+
+def _default_logger_database_path(main_db_path: Path | None = None) -> Path:
+    data_dir = Path(getattr(app_config, "data_folder", "") or "").expanduser()
+    if not str(data_dir):
+        data_dir = main_db_path.parent if main_db_path else Path(".").resolve()
+    return data_dir / "logger" / "logger.sqlite"
+
+
+def _looks_like_sqlite_path(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    return Path(text).suffix.lower() in {".db", ".sqlite", ".sqlite3"}
 
 
 def _main_database_path(conn=None) -> Path | None:

@@ -1,14 +1,19 @@
 import os
 import json
+from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 
 from common.utils import get_side_tabs, get_tabs, request_area_param
+from common import config as app_config
+from data.processes import ProcessService
+from data.processes.process_repository import default_logger_config
 from modules.data import catalogue
 
 
 data_bp = Blueprint("data", __name__, url_prefix="/data", template_folder="templates", static_folder="static")
 catalogue.ensure_schema()
+ProcessService()
 
 
 def _ctx(title):
@@ -53,6 +58,7 @@ def _with_area(**kwargs):
 @data_bp.route("/")
 def overview_route():
     area = _request_area()
+    process_service = ProcessService()
     return render_template(
         "data_overview.html",
         **_ctx("Data Workbench"),
@@ -60,12 +66,241 @@ def overview_route():
         counts=catalogue.overview_counts(area=area),
         recent=catalogue.recent_activity(area=area),
         attention=catalogue.attention_items(),
+        process_summary=_process_overview(process_service),
     )
+
+
+def _process_overview(service):
+    processes = service.list_processes()
+    logger_process = next((item for item in processes if item.get("process_type") == "logger_json_import"), None)
+    latest = service.list_runs(process_id=logger_process["process_id"], limit=1) if logger_process else []
+    return {
+        "enabled_count": sum(1 for item in processes if item.get("is_enabled")),
+        "logger_process": logger_process,
+        "latest_logger_run": latest[0] if latest else None,
+    }
 
 
 @data_bp.route("/sources")
 def sources_route():
     return redirect(url_for("data.database_sources_route"))
+
+
+@data_bp.route("/processes")
+def processes_route():
+    service = ProcessService()
+    process_id = request.args.get("process_id", type=int)
+    processes = service.list_processes()
+    selected = service.get_process(process_id) if process_id else (processes[0] if processes else None)
+    latest_details = None
+    recent_messages = []
+    if selected:
+        latest = service.list_runs(process_id=selected["process_id"], limit=1)
+        if latest:
+            latest_details = service.get_run_details(latest[0]["process_run_id"])
+            recent_messages = latest_details["messages"][-8:]
+    return render_template(
+        "data_processes.html",
+        **_ctx("Processes"),
+        processes=processes,
+        selected=selected,
+        latest_details=latest_details,
+        recent_messages=recent_messages,
+        process_types=service.list_process_types(),
+    )
+
+
+@data_bp.route("/processes/new", methods=["GET", "POST"])
+def process_new_route():
+    return _process_form(None)
+
+
+@data_bp.route("/processes/<int:process_id>/edit", methods=["GET", "POST"])
+def process_edit_route(process_id):
+    return _process_form(process_id)
+
+
+def _process_form(process_id):
+    service = ProcessService()
+    process = service.get_process(process_id) if process_id else None
+    config = dict((process or {}).get("configuration") or default_logger_config())
+    errors = []
+    if request.method == "POST":
+        values = _process_form_values(request.form, process)
+        if request.form.get("action") == "validate":
+            temp_id = process_id
+            if process_id:
+                service.update_process(process_id, values)
+            else:
+                temp_id = service.create_process(values)
+            validation = service.validate_process(temp_id)
+            if validation.valid:
+                return redirect(url_for("data.process_edit_route", process_id=temp_id, validated="1"))
+            errors = validation.messages
+            process = service.get_process(temp_id)
+            config = process.get("configuration") or config
+        else:
+            new_id = service.update_process(process_id, values) if process_id else service.create_process(values)
+            if request.form.get("action") == "save_run":
+                try:
+                    service.run_process(new_id)
+                except Exception as exc:
+                    return redirect(url_for("data.processes_route", process_id=new_id, error=str(exc)))
+                latest = service.list_runs(process_id=new_id, limit=1)
+                if latest:
+                    return redirect(url_for("data.process_run_detail_route", run_id=latest[0]["process_run_id"]))
+            return redirect(url_for("data.processes_route", process_id=new_id))
+    return render_template(
+        "data_process_form.html",
+        **_ctx("Edit Process" if process_id else "New Process"),
+        process=process,
+        config=config,
+        errors=errors,
+        validated=request.args.get("validated") == "1",
+    )
+
+
+def _process_form_values(form, process=None):
+    existing = dict((process or {}).get("configuration") or default_logger_config())
+    config = dict(existing)
+    config.update(
+        {
+            "source_folder": form.get("source_folder", "").strip(),
+            "file_pattern": form.get("file_pattern", "*.json").strip() or "*.json",
+            "include_subfolders": form.get("include_subfolders") == "1",
+            "database_path": form.get("database_path", "").strip(),
+            "create_database_if_missing": form.get("create_database_if_missing") == "1",
+            "create_tables_if_missing": form.get("create_tables_if_missing") == "1",
+            "duplicate_detection": form.get("duplicate_detection", "metadata_and_hash"),
+            "allow_unknown_record_types": form.get("allow_unknown_record_types") == "1",
+            "stop_on_file_error": form.get("stop_on_file_error") == "1",
+            "successful_file_action": form.get("successful_file_action", "leave"),
+            "processed_folder": form.get("processed_folder", "").strip() or None,
+        }
+    )
+    return {
+        "process_name": form.get("process_name", "").strip() or "Import LifePIM Logger JSON",
+        "process_type": (process or {}).get("process_type") or form.get("process_type") or "logger_json_import",
+        "description": form.get("description", "").strip(),
+        "is_enabled": form.get("is_enabled") == "1",
+        "configuration": config,
+    }
+
+
+@data_bp.route("/processes/<int:process_id>/<action>", methods=["POST"])
+def process_action_route(process_id, action):
+    service = ProcessService()
+    if action == "toggle":
+        process = service.get_process(process_id)
+        values = {
+            "process_name": process["process_name"],
+            "description": process.get("description") or "",
+            "is_enabled": not bool(process.get("is_enabled")),
+            "configuration": process.get("configuration") or {},
+        }
+        service.update_process(process_id, values)
+        return redirect(url_for("data.processes_route", process_id=process_id))
+    try:
+        if action == "preview":
+            result = service.preview_process(process_id)
+        elif action == "run":
+            result = service.run_process(process_id)
+        elif action == "rebuild":
+            result = service.rebuild_process(process_id)
+        else:
+            return redirect(url_for("data.processes_route", process_id=process_id))
+    except Exception as exc:
+        return redirect(url_for("data.processes_route", process_id=process_id, error=str(exc)))
+    return redirect(url_for("data.process_run_detail_route", run_id=result.process_run_id))
+
+
+@data_bp.route("/processes/<int:process_id>/open/<target>", methods=["POST"])
+def process_open_route(process_id, target):
+    service = ProcessService()
+    process = service.get_process(process_id)
+    if not process:
+        return redirect(url_for("data.processes_route"))
+    config = process.get("configuration") or {}
+    path_value = config.get("source_folder") if target == "source" else config.get("database_path")
+    path = Path(_resolve_process_path(path_value or ""))
+    if target == "database":
+        path = path.parent
+    if path:
+        try:
+            if target == "database":
+                path.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(path))
+        except Exception:
+            pass
+    return redirect(url_for("data.processes_route", process_id=process_id))
+
+
+@data_bp.route("/processes/<int:process_id>/view-logger-tables", methods=["POST"])
+def process_view_logger_tables_route(process_id):
+    service = ProcessService()
+    process = service.get_process(process_id)
+    if not process:
+        return redirect(url_for("data.processes_route"))
+    db_path = _resolve_process_path((process.get("configuration") or {}).get("database_path") or "")
+    if not db_path or not os.path.isfile(db_path):
+        return redirect(url_for("data.processes_route", process_id=process_id))
+    existing = next((source for source in catalogue.source_list("DATABASE") if os.path.normcase(os.path.abspath(source.get("root_path") or "")) == os.path.normcase(os.path.abspath(db_path))), None)
+    if existing:
+        source_id = existing["data_source_id"]
+    else:
+        source_id = catalogue.save_source(
+            None,
+            {
+                "source_name": "Logger SQLite",
+                "source_type": "SQLITE",
+                "root_path": db_path,
+                "database_name": os.path.basename(db_path),
+                "environment": "logger",
+                "area": "",
+                "scan_views": "on",
+                "scan_columns": "on",
+                "is_active": "on",
+            },
+            "DATABASE",
+        )
+    catalogue.scan_source(source_id)
+    return redirect(url_for("data.database_source_detail_route", source_id=source_id))
+
+
+def _resolve_process_path(value):
+    text = str(value or "").strip()
+    data_folder = getattr(app_config, "data_folder", "") or getattr(app_config, "user_folder", ".")
+    return str(Path(text.replace("<LIFEPIM_DATA>", data_folder)).expanduser())
+
+
+@data_bp.route("/process-runs")
+def process_runs_route():
+    service = ProcessService()
+    filters = {
+        "process_id": request.args.get("process_id", ""),
+        "status": request.args.get("status", ""),
+        "run_mode": request.args.get("run_mode", ""),
+    }
+    return render_template(
+        "data_process_runs.html",
+        **_ctx("Process Runs"),
+        runs=service.list_runs(filters=filters, limit=200),
+        processes=service.list_processes(),
+        filters=filters,
+    )
+
+
+@data_bp.route("/process-runs/<int:run_id>")
+def process_run_detail_route(run_id):
+    service = ProcessService()
+    details = service.get_run_details(run_id)
+    return render_template(
+        "data_process_run_detail.html",
+        **_ctx("Process Run"),
+        run=details["run"],
+        files=details["files"],
+        messages=details["messages"],
+    )
 
 
 @data_bp.route("/sources/databases")

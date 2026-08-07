@@ -1,84 +1,104 @@
 # LifePIM Logger Data
 
-This document describes how LifePIM Desktop handles raw Logger files, how the files are loaded into SQLite, and which logger JSON files are not imported yet.
+This document describes how LifePIM Desktop handles raw Logger files from the mobile app, and how to load those files into the logger SQLite database after the Data tab process changes.
 
-## Overview
+## Current Workflow
 
-LifePIM Logger data has two stages:
+Logger data has three stages:
 
-1. Raw file sync and storage.
-2. Desktop-side processing into typed logger tables.
+1. Sync raw files from the phone to Desktop.
+2. Run the saved Data process that imports those raw files into `logger.sqlite`.
+3. Browse the imported raw logger tables from the Data tab.
 
-Raw files remain the source of truth. The processing database can be rebuilt from those files.
+Raw files remain the source of truth. The logger SQLite database can be rebuilt from those files.
 
-The Admin page entry point is:
+## Quick Steps
 
-```text
-Admin > Logger > Load JSON to database
-```
+1. Open `Admin > Logs > Logger`.
+2. Check `Recent Sync Activity` and `Raw Files` to confirm the phone files have arrived.
+3. Check the Logger raw-data root. It should point at the folder that contains the per-device folders.
+4. Click `Preview Import`.
+5. If the preview finds files, click `Run Import`.
+6. Open the latest run from `Latest Data Process Runs` if you need file-level details.
+7. Click `Open Data Process` or go to `Data > Processes` for the canonical process screen.
+8. Click `View Logger Tables` from `Data > Processes` to register and scan the logger SQLite database in the Data catalogue.
 
-That button scans the configured raw source folders, hashes candidate files, imports new or changed files into `lifepim_logger.db`, updates app names, and rebuilds derived activity sessions only when imported data changed.
+The same import can also be started from `Data > Overview > Run Logger Import` or from `Data > Processes > Run`.
 
-## Databases
+## What Each Page Does
 
-### Main LifePIM database
+### Admin > Logs > Logger
 
-The main `lifepim.db` stores Logger sync metadata only. It does not store the high-frequency usage samples.
+Use this page for day-to-day checks:
 
-Main DB tables used by the mobile sync API:
-
-| Table | Purpose |
+| Area | Purpose |
 | --- | --- |
-| `lp_logger_device` | Known logger devices and their safe local folder names. |
-| `lp_logger_sync_run` | One row per mobile sync run. |
-| `lp_logger_sync_file` | One row per uploaded raw file. Includes relative path, log type, destination path, size, and status. |
+| Logger Summary | Shows whether sync is enabled, where raw files are stored, device count, and recent sync totals. |
+| Logger Processing | Shows processing shortcuts and older activity-session status. |
+| Latest Data Process Runs | Shows the runs created by the top-level Data process. |
+| Recent Sync Activity | Shows phone-to-desktop sync runs. |
+| Raw Files | Lists the synced files currently on disk. |
 
-These tables are maintained by `src/modules/logger_api/routes.py`.
+Important: `Raw Files` only proves that files arrived from the phone. It does not mean they have been imported into the logger database yet.
 
-### Logger processing database
+### Data > Processes
 
-Parsed logger data is stored in a separate SQLite database:
+This is the canonical place to configure and run logger import.
 
-```text
-lifepim_logger.db
-```
-
-Default location: the same folder as the actual open main `lifepim.db` connection.
-
-The Admin Logger page displays both:
+The default process is:
 
 ```text
-Main LifePIM DB
-Processing DB
+Import LifePIM Logger JSON
 ```
 
-If the main DB still shows a `SAMPLE_DATA` path, that is the current app configuration for `lifepim.db`; the logger database follows that actual open DB path unless `logger_database_path` is explicitly set.
+It imports raw JSON and JSONL files into the separate logger SQLite database. The process tracks run history, per-file results, warnings, and errors in the main LifePIM database.
 
-Logger processing DB tables:
+### Data > Process Runs
 
-| Table | Purpose |
+Use this page to inspect historical process runs. Open a run to see:
+
+| Section | Purpose |
 | --- | --- |
-| `logger_schema_version` | Logger DB schema version, independent of the main DB. |
-| `ingest_file` | One row per discovered source file, including hash, size, status, record count, first/last timestamp, and error message. |
-| `processing_run` | One row per load/rebuild action. |
-| `application_catalog` | Friendly app names and stable app identifiers. |
-| `mobile_app_usage_sample` | Parsed mobile app usage and screen events. |
-| `desktop_window_sample` | Parsed Aggie desktop window/application observations. |
-| `activity_session` | Derived sessions built from mobile and desktop samples. |
+| Run summary | Overall status and counts. |
+| File results | Which files were imported, skipped, or failed. |
+| Messages | User-facing diagnostics from the handler. |
 
 ## Configuration
 
-Settings are stored through the existing LifePIM settings system.
+The logger import process uses these key settings:
 
 | Setting | Meaning |
 | --- | --- |
-| `logger_database_path` | Optional override for `lifepim_logger.db`. Blank means place it beside the actual main `lifepim.db`. |
-| `logger_mobile_source_path` | Optional raw mobile Logger source folder. Blank means use the Logger raw-data root. |
-| `logger_aggie_source_path` | Optional Aggie desktop logger folder. |
-| `logger_session_gap_seconds` | Maximum gap between samples before starting a new session. Default: `60`. |
-| `logger_minimum_session_seconds` | Drop sessions shorter than this. Default: `3`. |
+| Source folder | Folder that contains the synced raw logger files. Usually the Logger raw-data root from Admin settings. |
+| File pattern | File matcher. Use `*.json;*.jsonl` for mobile Logger data. |
+| Include subfolders | Must be enabled for normal phone sync folders. |
+| Logger database path | Target SQLite database. Default is `<LIFEPIM_DATA>\logger\logger.sqlite`. |
+| Duplicate detection | Default is metadata and content hash. |
+| Unknown record types | Keep unknown records and warn rather than failing the whole run. |
 
-The raw sync API also has settings for raw-data root, upload token, upload size, and sync logging.
+If the default logger process has a blank source folder, LifePIM fills it from Logger settings when the process is opened or run:
+
+1. `logger_mobile_source_path`, if set.
+2. Otherwise `logger_raw_data_root`.
+
+The import process leaves source files in place by default.
+
+On this app configuration, `<LIFEPIM_DATA>` means the configured LifePIM data folder, not the source-code repository. For example, with:
+
+```text
+user_folder = D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data
+data_folder = D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\DATA
+```
+
+the logger database path resolves to:
+
+```text
+D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\DATA\logger\logger.sqlite
+```
+
+If an older page shows `D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim_logger.db`, that is the previous logger-processing database location. The top-level Data process uses `DATA\logger\logger.sqlite`.
+
+The optional `logger_database_path` setting must be a SQLite file path ending in `.db`, `.sqlite`, or `.sqlite3`. If it contains a folder path, LifePIM ignores it and uses the default `DATA\logger\logger.sqlite` location.
 
 ## Raw File Layout
 
@@ -100,312 +120,98 @@ The raw file root normally looks like:
             ...
 ```
 
-The processing scan is recursive. Device ID is currently inferred from the first folder below the configured source root, for example `samsung-sm-a226b`.
+The import process scans recursively when `Include subfolders` is enabled.
 
-Supported file extensions for discovery:
+## Databases
 
-```text
-.json
-.jsonl
-.csv
-.tsv
-.txt
-```
+### Main LifePIM Database
 
-Only some discovered files are parsed in Version 1. Unsupported raw files remain on disk and may still have main-DB sync metadata.
+The main `lifepim.db` stores operational metadata:
 
-## File Discovery Rules
-
-Discovery is implemented in:
-
-```text
-src/logger/ingest/file_discovery.py
-```
-
-Current source-type mapping:
-
-| Path/name pattern | Source type | Importer |
-| --- | --- | --- |
-| `app_catalog`, `inventory`, `installed` | `mobile_app_inventory` | `MobileAppInventoryImporter` |
-| `phone_usage`, `app_usage`, filename containing `usage` or `application` | `mobile_app_usage` | `MobileAppUsageImporter` |
-| Aggie source root, `aggie`, or `window` | `aggie_window_usage` | `AggieImporter` |
-
-Files outside these patterns are not loaded into `lifepim_logger.db` yet.
-
-## Load JSON To Database
-
-Admin action:
-
-```text
-Load JSON to database
-```
-
-Code path:
-
-```text
-src/modules/admin/routes.py
-    -> LoggerService.refresh()
-       -> discover_logger_files()
-       -> hash each file
-       -> importer for each source_type
-       -> rebuild_application_catalog()
-       -> rebuild_activity_sessions() when data changed
-```
-
-Import behavior:
-
-| Case | Behavior |
+| Table | Purpose |
 | --- | --- |
-| Same path, same hash, already imported | Skip. |
-| Same path, changed hash | Delete prior typed rows through `ingest_file` cascade, then re-import. |
-| Different path, same hash as imported file | Record a `superseded` diagnostic row and skip duplicate content. |
-| Malformed file | Keep a failed `ingest_file` row with the error message. Other files continue importing. |
-| No data changes | No duplicate samples or sessions are created. |
+| `lp_logger_device` | Known logger devices and their local folder names. |
+| `lp_logger_sync_run` | Phone-to-desktop sync runs. |
+| `lp_logger_sync_file` | Uploaded raw file metadata. |
+| `lp_process` | Saved Data process definitions. |
+| `lp_process_run` | One row per preview, incremental run, or rebuild. |
+| `lp_process_file` | Durable file-level processing state. |
+| `lp_process_run_file` | Per-run file results. |
+| `lp_process_run_message` | User-facing process messages. |
 
-The Admin page shows failed files in the `Failed Source Files` table.
+The main database does not store the high-frequency raw logger payloads.
 
-## Raw JSON Types Currently Loaded
+### Logger SQLite Database
 
-### Mobile app catalog
-
-Typical raw records:
-
-```json
-{"type":"app_catalog_started","capturedAt":"2026-08-05T04:21:00.183Z"}
-{"type":"installed_app","capturedAt":"2026-08-05T04:21:00.183Z","packageName":"ai.perplexity.app.android","appName":"Perplexity"}
-{"type":"app_catalog_finished","capturedAt":"2026-08-05T04:21:01.183Z"}
-```
-
-Importer:
+The Data process writes raw records to:
 
 ```text
-src/logger/ingest/mobile_app_inventory_importer.py
+<LIFEPIM_DATA>\logger\logger.sqlite
 ```
 
-Target table:
+Main raw tables:
 
-```text
-application_catalog
-```
-
-Field mapping:
-
-| Raw field | Target column |
+| Table | Purpose |
 | --- | --- |
-| `packageName`, `package_name`, `package`, `application_identifier` | `application_identifier`, `package_name` |
-| `appName`, `application_name`, `app_name`, `label`, `name` | `application_name` |
-| `capturedAt`, `capturedAtMillis`, timestamp variants | `first_seen_at_utc`, `last_seen_at_utc` |
-| Complete app record | `metadata_json` |
+| `raw_logger_record` | One preserved source JSON record per imported record. |
+| `raw_mobile_app_usage` | App usage and phone usage events. |
+| `raw_installed_application` | App catalogue / installed app records. |
+| `raw_location_sample` | Location-like records, when present. |
+| `raw_device_state` | Device state, screen, battery, and network-like records. |
+| `raw_unknown_record` | Records retained because no known route matched. |
 
-Records without a package name, such as `app_catalog_started` and `app_catalog_finished`, are skipped rather than treated as failures.
+The schema also still contains older derived tables such as `ingest_file`, `mobile_app_usage_sample`, `desktop_window_sample`, `application_catalog`, and `activity_session`. The current top-level Data process imports into the raw tables first. Normalisation and activity-session generation should be handled by later processing steps.
 
-### Mobile phone/app usage
+## Preview, Run, And Rebuild
 
-Typical raw records:
+### Preview Import
 
-```json
-{"type":"phone_usage_event","capturedAt":"2026-08-06T00:00:51.829Z","event":"screen_off"}
-{"type":"app_usage_event","capturedAt":"2026-08-06T00:29:10.479Z","eventTimeMillis":1785976141269,"eventType":"activity_resumed","packageName":"com.sec.android.app.launcher","appName":"One UI Home","className":"Launcher"}
-{"type":"phone_usage_snapshot","capturedAt":"2026-08-06T00:29:10.494Z","apps":[{"packageName":"com.example.app","appName":"Example","lastTimeUsedMillis":1785976142269}]}
-```
+Preview scans matching files and records a preview run. It does not create or modify the logger SQLite database and does not move source files.
 
-Importer:
+Use preview when checking whether the source folder and file pattern are correct.
 
-```text
-src/logger/ingest/mobile_app_usage_importer.py
-```
+### Run Import
 
-Target table:
+Run Import executes the saved Data process in incremental mode:
 
-```text
-mobile_app_usage_sample
-```
+1. Scans `Source folder` recursively.
+2. Matches `*.json;*.jsonl` files.
+3. Hashes files for duplicate detection.
+4. Creates the logger SQLite database and raw tables if needed.
+5. Imports new files.
+6. Skips already imported files.
+7. Keeps failed-file diagnostics in the process run.
 
-Field mapping:
-
-| Raw field | Target column |
-| --- | --- |
-| source folder, `device_id`, `device` | `device_id` |
-| `eventTimeMillis`, `lastTimeUsedMillis`, `capturedAt`, `capturedAtMillis`, timestamp variants | `observed_at_utc` |
-| `packageName`, `package_name`, `package`, `app` | `package_name` |
-| `appName`, `application_name`, `app_name`, `label`, `name` | `application_name` |
-| `className`, `activity_name`, `activity` | `activity_name` |
-| `eventType`, `event`, `type` | `event_type` |
-| `screen_state`, `screenState` | `screen_state` |
-| Unmapped fields | `extra_json` |
-
-`phone_usage_snapshot` records with an `apps` array are expanded so each app becomes a row in `mobile_app_usage_sample`.
-
-Screen-off style records are kept even when they do not have a package name, because they terminate mobile sessions.
-
-### Aggie desktop window usage
-
-Typical raw row:
-
-```text
-observed_at_utc,device_id,process_name,application_name,window_title,is_idle
-2026-08-05T01:00:00Z,desktop-1,Code.exe,Visual Studio Code,LifePIM,0
-```
-
-Importer:
-
-```text
-src/logger/ingest/aggie_importer.py
-```
-
-Target table:
-
-```text
-desktop_window_sample
-```
-
-Field mapping:
-
-| Raw field | Target column |
-| --- | --- |
-| source folder, `device_id`, `device` | `device_id` |
-| `observed_at_utc`, `timestamp_utc`, `observed_at`, `timestamp`, `datetime`, `time`, `date`, `ts` | `observed_at_utc` |
-| `process_name`, `processName`, `process`, `exe` | `process_name` |
-| `application_name`, `app_name`, `application` | `application_name` |
-| `executable_path`, `path` | `executable_path` |
-| `window_title`, `title` | `window_title` |
-| `is_idle`, `idle` | `is_idle` |
-| Unmapped fields | `extra_json` |
-
-## Derived Tables
-
-### Application catalog
-
-`application_catalog` is built from inventory rows, mobile usage rows, and desktop rows.
-
-Stable identifiers:
-
-| Platform | Identifier rule |
-| --- | --- |
-| Android | Package name. |
-| Windows | Normalized executable path, then process name, then supplied application name. |
-
-Friendly names are resolved from app inventory first where possible, then from usage/window records.
-
-### Activity sessions
-
-`activity_session` is derived from `mobile_app_usage_sample` and `desktop_window_sample`.
-
-Session rules:
-
-| Rule | Behavior |
-| --- | --- |
-| Same device and same app within `logger_session_gap_seconds` | Continue the current session. |
-| App changes | Close the previous session and start a new one. |
-| Gap exceeds threshold | Start a new session. |
-| Mobile screen-off/locked/stop/inactive event | Terminate the current mobile session. |
-| Desktop idle sample | Terminate the current desktop session. |
-| Duration below `logger_minimum_session_seconds` | Discard the session. |
-
-For one-second style samples, the end time is the last sample time plus one second, capped by the configured session gap.
-
-The deterministic session hash is based on:
-
-```text
-platform
-device_id
-source_type
-application_identifier
-start_at_utc
-end_at_utc
-```
-
-It deliberately excludes database IDs, generated timestamp, friendly app name, and activity title.
-
-## Timestamps
-
-All timestamps stored in `lifepim_logger.db` are UTC strings in canonical form:
-
-```text
-YYYY-MM-DDTHH:MM:SS.sssZ
-```
-
-The UI/reporting layer converts UTC values to local display time. The database does not store Adelaide-local timestamps.
-
-Supported timestamp inputs include:
-
-| Format | Example |
-| --- | --- |
-| ISO UTC | `2026-08-06T00:29:10.479Z` |
-| ISO with offset | `2026-08-06T09:59:10+09:30` |
-| Epoch milliseconds | `1785976150479` |
-| Epoch seconds | `1785976150` |
-
-## Rebuild Buttons
-
-### Load JSON to database
-
-Safe normal operation. Scans source folders, imports new/changed files, skips unchanged files, and rebuilds sessions only when imported data changed.
-
-### Rebuild Activity Sessions
-
-Keeps imported samples and recalculates `activity_session`.
-
-Use this after changing session thresholds or session-building rules.
+Successful import creates rows in `raw_logger_record` and one or more routed raw tables.
 
 ### Rebuild Logger Database
 
-Recreates the full `lifepim_logger.db` from raw source files using a temporary database, validates it, then swaps it into place. The previous database is retained as a timestamped backup.
+Rebuild imports all matching source files into a temporary database, then swaps it into place if the rebuild succeeds. The previous database is retained by the database replacement helper.
 
-Raw source files are not modified.
+Use rebuild when the raw logger schema or routing logic has changed and the database should be regenerated from source files.
 
-Use this if:
+## Troubleshooting
 
-| Situation | Why rebuild |
+| Symptom | Check |
 | --- | --- |
-| Importer rules changed significantly | Existing parsed rows may not reflect new rules. |
-| Logger schema changed | Full derived DB should be regenerated. |
-| Existing processing DB is suspected corrupt | Raw files remain the source of truth. |
+| Raw files show in Admin but import finds no files | Confirm the Data process `Source folder` points at the raw root and `Include subfolders` is enabled. |
+| Data tab shows `<LIFEPIM_DATA>\logger\logger.sqlite` | This is a placeholder. The resolved path is shown on `Data > Processes` as `Target database`; normally it is `<user_folder>\DATA\logger\logger.sqlite`. |
+| `.jsonl` files are not imported | Use `*.json;*.jsonl` as the file pattern. |
+| Run button fails with missing source folder | Open `Data > Processes > Edit Configuration` and set `Source folder` to the Logger raw-data root. |
+| Database exists but activity sessions stay at zero | The Data process imports raw tables only. Activity-session derivation is separate legacy/future processing. |
+| `View Logger Tables` shows no objects | Run Import first, then click `View Logger Tables` so the Data catalogue scans `logger.sqlite`. |
+| Re-running creates no new rows | This is expected when duplicate detection finds the same file metadata or content hash. |
 
-## Raw JSON Files Not Loaded Yet
+## Supported Record Routing
 
-The mobile sync API accepts these log types:
+The Data process detects record types from explicit fields, key names, and file paths.
 
-```text
-movement
-phone_usage
-device
-service
-app_catalog
-```
-
-Version 1 processing only loads app catalog, phone/app usage, and Aggie desktop window usage.
-
-The following raw JSON categories are not yet imported into typed logger tables:
-
-| Raw category | Current status | Future target |
-| --- | --- | --- |
-| `movement` JSON | Stored as raw files and sync metadata only. Not parsed. | `location_sample`, `walking_session`, `place_visit`, or similar derived tables. |
-| Device state JSON | Stored as raw files and sync metadata only. Not parsed. | `device_state_sample`, charging sessions, screen/battery summaries. |
-| Service/diagnostic JSON | Stored as raw files and sync metadata only. Not parsed. | Processing diagnostics or operational health tables. |
-| Sensor JSON such as barometer, pressure, temperature, light, accelerometer, gyroscope, magnetometer | Stored as raw files if synced, but ignored by discovery/import. | `environment_sample`, `motion_sample`, sensor time-series tables, or aggregated summaries. |
-| Notification JSON | Not imported. | `notification_event` if/when notification analysis is added. |
-| Network JSON | Not imported. | `network_sample` or network activity summaries. |
-
-These files should remain raw until there is a clear target schema and derived use case. Continuous sensor readings should normally stay as time-series data or aggregates; they should not automatically become calendar events.
-
-## Adding A New Logger Source
-
-To add another raw logger source:
-
-1. Add a typed table to `src/logger/schema.py`.
-2. Add source discovery logic in `src/logger/ingest/file_discovery.py`.
-3. Add an importer under `src/logger/ingest/`.
-4. Register the importer in `LoggerService`.
-5. Add repository/status counts if the Admin UI should show them.
-6. Add tests using temporary raw files and a temporary `lifepim_logger.db`.
-
-For sensor data, start by deciding whether the target is:
-
-| Target shape | Use when |
+| Input shape | Target table |
 | --- | --- |
-| Time-series sample table | Every observation matters, such as barometer or temperature readings. |
-| Aggregated summary table | The calendar/report only needs daily/hourly min/max/average/count. |
-| Derived interval table | The source describes a human activity interval, such as walking or charging. |
+| App usage events, phone usage snapshots, package usage rows | `raw_mobile_app_usage` |
+| Installed app / app catalogue records | `raw_installed_application` |
+| Location-like records with latitude and longitude | `raw_location_sample` |
+| Device state, screen, battery, or network-like records | `raw_device_state` |
+| Anything else | `raw_unknown_record` |
 
-Calendar integration should later consume derived interval or summary tables, not raw JSON files directly.
+Unknown records are retained so the raw database can be reprocessed later when new routes are added.

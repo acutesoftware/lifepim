@@ -70,8 +70,12 @@
 
         <form method="post" class="settings-form">
           <div class="settings-action-row">
-            <button type="submit" name="action" value="refresh_logger_data">Load JSON to database</button>
-            <span class="settings-action-note">Loads supported raw logger JSON/CSV files into the logger database tables. Re-running it skips unchanged files and only rebuilds sessions when imported data changed.</span>
+            <button type="submit" name="action" value="preview_logger_import">Preview Import</button>
+            <span class="settings-action-note">Scans configured logger JSON files through the Data process framework without writing logger records.</span>
+          </div>
+          <div class="settings-action-row">
+            <button type="submit" name="action" value="refresh_logger_data">Run Import</button>
+            <span class="settings-action-note">Runs the saved Data process and imports new raw logger JSON records into the logger database.</span>
           </div>
           <div class="settings-action-row">
             <button type="submit" name="action" value="rebuild_logger_sessions">Rebuild Activity Sessions</button>
@@ -84,7 +88,36 @@
               Replace the derived logger DB from raw files
             </label>
           </div>
+          {% if logger_process %}
+            <div class="settings-action-row">
+              <a href="{{ url_for('data.processes_route', process_id=logger_process.process_id) }}">Open Data Process</a>
+              <button type="submit" formaction="{{ url_for('data.process_open_route', process_id=logger_process.process_id, target='database') }}" formmethod="post">Open Logger Database Folder</button>
+              {% if latest_process_runs %}
+                <a href="{{ url_for('data.process_run_detail_route', run_id=latest_process_runs[0].process_run_id) }}">View Latest Run</a>
+              {% endif %}
+              <a href="{{ url_for('data.process_runs_route', process_id=logger_process.process_id) }}">View Process Runs</a>
+            </div>
+          {% endif %}
         </form>
+
+        {% if latest_process_runs %}
+          <h4>Latest Data Process Runs</h4>
+          <div class="tabular-scroll admin-list-scroll">
+            <table border="1" cellpadding="5">
+              <tr><th>Started</th><th>Mode</th><th>Status</th><th>Files</th><th>Records</th><th>Summary</th></tr>
+              {% for row in latest_process_runs %}
+              <tr>
+                <td><a href="{{ url_for('data.process_run_detail_route', run_id=row.process_run_id) }}">{{ row.started_at_utc }}</a></td>
+                <td>{{ row.run_mode }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.files_processed }} / {{ row.files_found }}</td>
+                <td>{{ row.records_written }}</td>
+                <td>{{ row.summary or row.error_message or '' }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </div>
+        {% endif %}
 
         {% if failed_files %}
           <h4>Failed Source Files</h4>

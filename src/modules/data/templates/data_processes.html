@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-shell">
+  <aside class="data-filter-panel">
+    <h4>Actions</h4>
+    <a class="data-action" href="{{ url_for('data.process_new_route') }}">New Process</a>
+    {% if selected %}
+      <a class="data-action" href="{{ url_for('data.process_edit_route', process_id=selected.process_id) }}">Edit Configuration</a>
+      <a class="data-action" href="{{ url_for('data.process_runs_route', process_id=selected.process_id) }}">View Run History</a>
+    {% endif %}
+  </aside>
+
+  <section class="data-main-panel">
+    {% if request.args.get('error') %}
+      <div class="data-form-error">{{ request.args.get('error') }}</div>
+    {% endif %}
+    <div class="data-detail-actions">
+      {% if selected and selected.handler_available %}
+        <form method="post" action="{{ url_for('data.process_action_route', process_id=selected.process_id, action='preview') }}"><button type="submit">Preview</button></form>
+        <form method="post" action="{{ url_for('data.process_action_route', process_id=selected.process_id, action='run') }}"><button type="submit">Run</button></form>
+        <form method="post" action="{{ url_for('data.process_action_route', process_id=selected.process_id, action='rebuild') }}"><button type="submit">Rebuild</button></form>
+      {% endif %}
+      {% if selected %}
+        <form method="post" action="{{ url_for('data.process_action_route', process_id=selected.process_id, action='toggle') }}"><button type="submit">{{ 'Disable' if selected.is_enabled else 'Enable' }}</button></form>
+        <form method="post" action="{{ url_for('data.process_open_route', process_id=selected.process_id, target='source') }}"><button type="submit">Open Source Folder</button></form>
+        <form method="post" action="{{ url_for('data.process_open_route', process_id=selected.process_id, target='database') }}"><button type="submit">Open Database Folder</button></form>
+        <form method="post" action="{{ url_for('data.process_view_logger_tables_route', process_id=selected.process_id) }}"><button type="submit">View Logger Tables</button></form>
+      {% endif %}
+    </div>
+
+    <table>
+      <tr><th>Process</th><th>Type</th><th>Input</th><th>Output</th><th>Enabled</th><th>Last Run</th><th>Last Status</th><th>Last Result</th></tr>
+      {% for item in processes %}
+      <tr>
+        <td><a href="{{ url_for('data.processes_route', process_id=item.process_id) }}">{{ item.process_name }}</a></td>
+        <td>{{ item.process_type_name }}{% if not item.handler_available %} (handler unavailable){% endif %}</td>
+        <td><code>{{ item.input_summary }}</code></td>
+        <td><code>{{ item.output_summary }}</code></td>
+        <td>{{ 'Yes' if item.is_enabled else 'No' }}</td>
+        <td>{{ item.last_started_at_utc or 'Never' }}</td>
+        <td>{{ item.last_status or 'Never Run' }}</td>
+        <td>{{ item.last_summary or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    {% if selected %}
+      <section class="data-panel">
+        <h4>Process Details</h4>
+        <div class="data-panels">
+          <table>
+            <tr><th>Name</th><td>{{ selected.process_name }}</td></tr>
+            <tr><th>Description</th><td>{{ selected.description }}</td></tr>
+            <tr><th>Process type</th><td>{{ selected.process_type_name }}</td></tr>
+            <tr><th>Enabled</th><td>{{ 'Yes' if selected.is_enabled else 'No' }}</td></tr>
+            <tr><th>Source folder</th><td><code>{{ selected.resolved_configuration.source_folder }}</code></td></tr>
+            <tr><th>Configured source</th><td><code>{{ selected.configuration.source_folder }}</code></td></tr>
+            <tr><th>Target database</th><td><code>{{ selected.resolved_configuration.database_path }}</code></td></tr>
+            <tr><th>Configured database</th><td><code>{{ selected.configuration.database_path }}</code></td></tr>
+            <tr><th>File pattern</th><td>{{ selected.configuration.file_pattern }}</td></tr>
+          </table>
+          <table>
+            {% if latest_details %}
+              {% set run = latest_details.run %}
+              <tr><th>Latest run</th><td>{{ run.status }}</td></tr>
+              <tr><th>Started</th><td>{{ run.started_at_utc }}</td></tr>
+              <tr><th>Finished</th><td>{{ run.finished_at_utc or '' }}</td></tr>
+              <tr><th>Files found</th><td>{{ run.files_found }}</td></tr>
+              <tr><th>Files processed</th><td>{{ run.files_processed }}</td></tr>
+              <tr><th>Files skipped</th><td>{{ run.files_skipped }}</td></tr>
+              <tr><th>Files failed</th><td>{{ run.files_failed }}</td></tr>
+              <tr><th>Records written</th><td>{{ run.records_written }}</td></tr>
+            {% else %}
+              <tr><td>No run history yet.</td></tr>
+            {% endif %}
+          </table>
+        </div>
+      </section>
+
+      <section class="data-panel">
+        <h4>Recent Messages</h4>
+        <table>
+          <tr><th>Time</th><th>Level</th><th>Code</th><th>Message</th></tr>
+          {% for msg in recent_messages %}
+            <tr><td>{{ msg.message_time_utc }}</td><td>{{ msg.message_level }}</td><td>{{ msg.message_code }}</td><td>{{ msg.message_text }}</td></tr>
+          {% else %}
+            <tr><td colspan="4">No messages.</td></tr>
+          {% endfor %}
+        </table>
+      </section>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

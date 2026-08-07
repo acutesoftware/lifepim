@@ -16,6 +16,7 @@ from common import settings as settings_mod
 from common import content_catalog as catalog_mod
 from common import user_paths
 from common.utils import get_tabs, get_side_tabs, ensure_user_log_schema, lg_usr
+from data.processes import ProcessService
 from modules.calendar.services import calendar_index
 from modules.pocket_api import routes as pocket_api
 from modules.logger_api import routes as logger_api
@@ -1013,25 +1014,33 @@ def logger_logs_route():
                 username=getattr(current_user, "username", None),
             )
             message = "Logger raw data folder saved."
-        elif action in {"refresh_logger_data", "rebuild_logger_sessions", "rebuild_logger_database"}:
-            service = LoggerService(
-                main_conn=conn,
-                user_id=getattr(current_user, "user_id", None),
-                username=getattr(current_user, "username", None),
-            )
+        elif action in {"preview_logger_import", "refresh_logger_data", "rebuild_logger_sessions", "rebuild_logger_database"}:
             try:
-                if action == "refresh_logger_data":
-                    result = service.refresh()
-                    message = f"Logger JSON loaded to database: {result.files_imported} imported, {result.files_skipped} skipped, {result.files_failed} failed, {result.sessions_created} sessions."
+                if action in {"preview_logger_import", "refresh_logger_data", "rebuild_logger_database"}:
+                    process_service = ProcessService(conn)
+                    process = process_service.get_default_logger_process()
+                    if not process:
+                        message = "No logger import process has been configured."
+                    elif action == "preview_logger_import":
+                        result = process_service.preview_process(process["process_id"], trigger_type="admin_shortcut")
+                        message = f"Logger import preview: {result.summary}"
+                    elif action == "refresh_logger_data":
+                        result = process_service.run_process(process["process_id"], trigger_type="admin_shortcut")
+                        message = f"Logger JSON loaded to database: {result.files_processed} imported, {result.files_skipped} skipped, {result.files_failed} failed."
+                    else:
+                        if request.form.get("confirm_rebuild_database") != "1":
+                            message = "Tick the confirmation box before rebuilding the logger database."
+                        else:
+                            result = process_service.rebuild_process(process["process_id"], trigger_type="admin_shortcut")
+                            message = f"Logger database rebuilt: {result.files_processed} imported, {result.files_failed} failed."
                 elif action == "rebuild_logger_sessions":
+                    service = LoggerService(
+                        main_conn=conn,
+                        user_id=getattr(current_user, "user_id", None),
+                        username=getattr(current_user, "username", None),
+                    )
                     result = service.rebuild_sessions()
                     message = f"Logger activity sessions rebuilt: {result.sessions_created} sessions."
-                else:
-                    if request.form.get("confirm_rebuild_database") != "1":
-                        message = "Tick the confirmation box before rebuilding the logger database."
-                    else:
-                        result = service.rebuild_database()
-                        message = f"Logger database rebuilt: {result.files_imported} imported, {result.files_failed} failed, {result.sessions_created} sessions."
             except LoggerBusyError as exc:
                 message = str(exc)
             except Exception as exc:
@@ -1057,6 +1066,9 @@ def logger_logs_route():
         username=getattr(current_user, "username", None),
     )
     try:
+        process_service = ProcessService(conn)
+        logger_process = process_service.get_default_logger_process()
+        latest_process_runs = process_service.list_runs(process_id=logger_process["process_id"], limit=5) if logger_process else []
         processing_status = logger_view_model.logger_status_view(logger_service.get_status())
         processing_runs = logger_view_model.processing_runs_view(logger_service.recent_processing_runs(25))
         failed_files = logger_view_model.failed_files_view(logger_service.failed_files(25))
@@ -1070,6 +1082,8 @@ def logger_logs_route():
             )
         )
     except Exception as exc:
+        logger_process = None
+        latest_process_runs = []
         processing_status = {"error": str(exc)}
         processing_runs = []
         failed_files = []
@@ -1096,6 +1110,8 @@ def logger_logs_route():
         processing_runs=processing_runs,
         failed_files=failed_files,
         activity_sessions=activity_sessions,
+        logger_process=logger_process,
+        latest_process_runs=latest_process_runs,
     )
 
 

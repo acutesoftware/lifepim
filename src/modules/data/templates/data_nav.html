@@ -5,8 +5,10 @@
     <a href="{{ url_for('data.overview_route', **data_nav_args) }}" class="{% if request.endpoint == 'data.overview_route' %}active{% endif %}">Overview</a>
     <a href="{{ url_for('data.database_sources_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.database_sources_route', 'data.database_source_detail_route', 'data.database_source_new_route', 'data.database_source_edit_route'] %}active{% endif %}">Databases</a>
     <a href="{{ url_for('data.file_sources_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.file_sources_route', 'data.file_source_detail_route', 'data.file_source_new_route', 'data.file_source_edit_route'] %}active{% endif %}">File Sources</a>
+    <a href="{{ url_for('data.processes_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.processes_route', 'data.process_new_route', 'data.process_edit_route'] %}active{% endif %}">Processes</a>
     <a href="{{ url_for('data.objects_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.objects_route', 'data.object_detail_route', 'data.object_data_route'] %}active{% endif %}">Objects</a>
     <a href="{{ url_for('data.sql_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.sql_route', 'data.sql_detail_route', 'data.sql_new_route', 'data.sql_edit_route'] %}active{% endif %}">Saved SQL</a>
+    <a href="{{ url_for('data.process_runs_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.process_runs_route', 'data.process_run_detail_route'] %}active{% endif %}">Process Runs</a>
     <a href="{{ url_for('data.tasks_route', **data_nav_args) }}" class="{% if request.endpoint in ['data.tasks_route', 'data.task_detail_route'] %}active{% endif %}">Tasks</a>
   </nav>
 </div>

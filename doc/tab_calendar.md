@@ -74,8 +74,32 @@ Settings -> Calendar includes:
 - rebuild daily stats
 - source refresh status
 
+The rebuild buttons map to these code paths:
+
+| Button | What it does | When to use |
+|---|---|---|
+| Rebuild source | Rebuilds the selected source from the dropdown. | Use when one source looks stale or its configuration changed. |
+| Rebuild all enabled | Rebuilds all enabled source projections/stats. | Use after broad Calendar source changes. |
+| Rebuild item days | Rebuilds `lp_calendar_item_days` from existing `lp_calendar_items`. | Use when event placement is wrong but source items are correct. |
+| Rebuild daily stats | Rebuilds historical `lp_calendar_day_stats` for files, media, and audio. | Use when old file/media/audio indicators are missing. |
+
 Large source refreshes should be run from Settings rather than during ordinary
 calendar navigation.
+
+## Daily Stats And Historical Baseline
+
+File, media, and audio counts are shown from `lp_calendar_day_stats`, not by
+scanning source tables during every Calendar view. Calendar navigation refreshes
+a recent rolling window for selected daily-stat sources.
+
+Old dates need a historical baseline once. If a selected daily-stat source has
+data but no baseline marker, Calendar shows a prompt asking whether to build the
+baseline. Accepting it posts to `/calendar/day-stats-baseline` and calls
+`calendar_index.rebuild_calendar_day_stat_baselines()` for the selected sources.
+
+Admin -> Migration also refreshes Calendar daily stats after FileLister media or
+audio migration, so a separate Calendar rebuild is normally not needed after
+using those migration buttons.
 
 ## Limitations
 
@@ -83,7 +107,7 @@ calendar navigation.
   people schema is introduced. Birthday events in `lp_calendar_events` are
   supported now.
 - Usage is registered as a source but has no adapter until the usage schema is
-  standardised.
+  standardised. The new logger `activity_session` table is not yet wired into
+  Calendar.
 - File/media/audio runtime grids use daily stats. Detailed source rows are only
   queried for an opened day.
-

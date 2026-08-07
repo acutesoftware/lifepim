@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-shell">
+  <aside class="data-filter-panel">
+    <h4>Filters</h4>
+    <form method="get" class="data-filter-form">
+      <label>Process
+        <select name="process_id">
+          <option value="">All</option>
+          {% for process in processes %}
+            <option value="{{ process.process_id }}" {% if filters.process_id|string == process.process_id|string %}selected{% endif %}>{{ process.process_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Status <input type="text" name="status" value="{{ filters.status }}"></label>
+      <label>Run mode <input type="text" name="run_mode" value="{{ filters.run_mode }}"></label>
+      <button type="submit">Apply</button>
+    </form>
+  </aside>
+  <section class="data-main-panel">
+    <table>
+      <tr><th>Started</th><th>Process</th><th>Mode</th><th>Trigger</th><th>Status</th><th>Files</th><th>Records</th><th>Summary</th></tr>
+      {% for run in runs %}
+      <tr>
+        <td><a href="{{ url_for('data.process_run_detail_route', run_id=run.process_run_id) }}">{{ run.started_at_utc }}</a></td>
+        <td>{{ run.process_name }}</td>
+        <td>{{ run.run_mode }}</td>
+        <td>{{ run.trigger_type }}</td>
+        <td>{{ run.status }}</td>
+        <td>{{ run.files_processed }} / {{ run.files_found }}</td>
+        <td>{{ run.records_written }}</td>
+        <td>{{ run.summary or run.error_message or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+</div>
+{% endblock %}

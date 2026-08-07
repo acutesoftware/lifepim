@@ -174,6 +174,28 @@ class TestSettingsSchema(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_logger_database_path_rejects_folder_path(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            settings.save_logger_settings(
+                {
+                    "enabled": True,
+                    "raw_data_root": r"D:\custom\logger\raw",
+                    "sync_token": "secret",
+                    "max_upload_mb": 10,
+                    "keep_sync_logs": True,
+                    "database_path": r"D:\custom\logger",
+                },
+                conn,
+            )
+
+            logger_settings = settings.get_logger_settings(conn, user_id=7, username="alice")
+
+            self.assertEqual(logger_settings["database_path"], "")
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

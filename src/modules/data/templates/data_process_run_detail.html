@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+<div class="data-detail-actions">
+  <a href="{{ url_for('data.process_runs_route') }}">Back to Runs</a>
+  <a href="{{ url_for('data.processes_route', process_id=run.process_id) }}">Open Process</a>
+</div>
+
+<section class="data-panel">
+  <h4>Run Summary</h4>
+  <div class="data-panels">
+    <table>
+      <tr><th>Process</th><td>{{ run.process_name }}</td></tr>
+      <tr><th>Type</th><td>{{ run.process_type }}</td></tr>
+      <tr><th>Started</th><td>{{ run.started_at_utc }}</td></tr>
+      <tr><th>Finished</th><td>{{ run.finished_at_utc or '' }}</td></tr>
+      <tr><th>Trigger</th><td>{{ run.trigger_type }}</td></tr>
+      <tr><th>Mode</th><td>{{ run.run_mode }}</td></tr>
+      <tr><th>Status</th><td>{{ run.status }}</td></tr>
+      <tr><th>Summary</th><td>{{ run.summary or run.error_message or '' }}</td></tr>
+    </table>
+    <table>
+      <tr><th>Files found</th><td>{{ run.files_found }}</td></tr>
+      <tr><th>Files processed</th><td>{{ run.files_processed }}</td></tr>
+      <tr><th>Files skipped</th><td>{{ run.files_skipped }}</td></tr>
+      <tr><th>Files failed</th><td>{{ run.files_failed }}</td></tr>
+      <tr><th>Records read</th><td>{{ run.records_read }}</td></tr>
+      <tr><th>Records written</th><td>{{ run.records_written }}</td></tr>
+      <tr><th>Records skipped</th><td>{{ run.records_skipped }}</td></tr>
+      <tr><th>Records failed</th><td>{{ run.records_failed }}</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="data-panel">
+  <h4>File Results</h4>
+  <div class="data-preview-grid">
+    <table>
+      <tr><th>File</th><th>Status</th><th>Detected type</th><th>Record types</th><th>Read</th><th>Written</th><th>Skipped</th><th>Failed</th><th>Message</th></tr>
+      {% for file in files %}
+      <tr>
+        <td><code>{{ file.file_name or file.source_path }}</code></td>
+        <td>{{ file.status }}</td>
+        <td>{{ file.detected_file_type or '' }}</td>
+        <td>{{ file.detected_record_types or '' }}</td>
+        <td>{{ file.records_read }}</td>
+        <td>{{ file.records_written }}</td>
+        <td>{{ file.records_skipped }}</td>
+        <td>{{ file.records_failed }}</td>
+        <td>{{ file.message or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</section>
+
+<section class="data-panel">
+  <h4>Messages</h4>
+  <table>
+    <tr><th>Time</th><th>Level</th><th>Code</th><th>Message</th><th>Context</th></tr>
+    {% for msg in messages %}
+      <tr><td>{{ msg.message_time_utc }}</td><td>{{ msg.message_level }}</td><td>{{ msg.message_code }}</td><td>{{ msg.message_text }}</td><td><code>{{ msg.context_json }}</code></td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

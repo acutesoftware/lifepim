@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+{% block module_content %}
+{% include "data_nav.html" %}
+
+{% if validated %}<div class="settings-message">Configuration valid.</div>{% endif %}
+{% if errors %}
+  <div class="data-form-error">
+    {% for error in errors %}<div>{{ error.field }}: {{ error.message }}</div>{% endfor %}
+  </div>
+{% endif %}
+
+<form method="post" class="data-form">
+  <section class="data-wizard-step">
+    <h4>General</h4>
+    <div class="data-form-grid">
+      <label>Process name <input type="text" name="process_name" value="{{ process.process_name if process else 'Import LifePIM Logger JSON' }}"></label>
+      <label>Description <textarea name="description">{{ process.description if process else 'Load raw JSON files created by the LifePIM Logger mobile app into the separate logger database.' }}</textarea></label>
+      <label class="data-checks"><span><input type="checkbox" name="is_enabled" value="1" {% if not process or process.is_enabled %}checked{% endif %}> Enabled</span></label>
+    </div>
+    <input type="hidden" name="process_type" value="logger_json_import">
+  </section>
+
+  <section class="data-wizard-step">
+    <h4>Input</h4>
+    <div class="data-form-grid">
+      <label>Source folder <input type="text" name="source_folder" value="{{ config.source_folder or '' }}"></label>
+      <label>File pattern <input type="text" name="file_pattern" value="{{ config.file_pattern or '*.json;*.jsonl' }}"></label>
+      <label class="data-checks"><span><input type="checkbox" name="include_subfolders" value="1" {% if config.include_subfolders %}checked{% endif %}> Include subfolders</span></label>
+    </div>
+  </section>
+
+  <section class="data-wizard-step">
+    <h4>Output</h4>
+    <div class="data-form-grid">
+      <label>Logger database path <input type="text" name="database_path" value="{{ config.database_path or '<LIFEPIM_DATA>\\logger\\logger.sqlite' }}"></label>
+      <label class="data-checks"><span><input type="checkbox" name="create_database_if_missing" value="1" {% if config.create_database_if_missing %}checked{% endif %}> Create database if missing</span></label>
+      <label class="data-checks"><span><input type="checkbox" name="create_tables_if_missing" value="1" {% if config.create_tables_if_missing %}checked{% endif %}> Create tables if missing</span></label>
+    </div>
+  </section>
+
+  <section class="data-wizard-step">
+    <h4>Import Behaviour</h4>
+    <div class="data-form-grid">
+      <label>Duplicate detection
+        <select name="duplicate_detection">
+          <option value="metadata_and_hash" {% if config.duplicate_detection == 'metadata_and_hash' %}selected{% endif %}>Metadata and content hash</option>
+          <option value="metadata" {% if config.duplicate_detection == 'metadata' %}selected{% endif %}>Metadata</option>
+          <option value="hash" {% if config.duplicate_detection == 'hash' %}selected{% endif %}>Content hash</option>
+        </select>
+      </label>
+      <label class="data-checks"><span><input type="checkbox" name="allow_unknown_record_types" value="1" {% if config.allow_unknown_record_types %}checked{% endif %}> Store unknown records and warn</span></label>
+      <label class="data-checks"><span><input type="checkbox" name="stop_on_file_error" value="1" {% if config.stop_on_file_error %}checked{% endif %}> Stop on individual file error</span></label>
+    </div>
+  </section>
+
+  <section class="data-wizard-step">
+    <h4>Successful File Handling</h4>
+    <div class="data-form-grid">
+      <label>After successful import
+        <select name="successful_file_action">
+          <option value="leave" {% if config.successful_file_action != 'move' %}selected{% endif %}>Leave file in place</option>
+          <option value="move" {% if config.successful_file_action == 'move' %}selected{% endif %}>Move file to processed folder</option>
+        </select>
+      </label>
+      <label>Processed folder <input type="text" name="processed_folder" value="{{ config.processed_folder or '' }}"></label>
+    </div>
+  </section>
+
+  <div class="data-form-actions">
+    <button type="submit" name="action" value="validate">Validate</button>
+    <button type="submit" name="action" value="save">Save</button>
+    <button type="submit" name="action" value="save_run">Save and Run</button>
+    <a href="{{ url_for('data.processes_route', process_id=process.process_id) if process else url_for('data.processes_route') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -320,7 +320,7 @@ def get_logger_settings(conn=None, user_id=None, username=None):
             get_setting("logger_max_upload_mb", "50", conn)
         ),
         "keep_sync_logs": _as_bool(get_setting("logger_keep_sync_logs", "1", conn)),
-        "database_path": normalize_logger_path(get_setting("logger_database_path", "", conn)),
+        "database_path": normalize_logger_database_path(get_setting("logger_database_path", "", conn)),
         "mobile_source_path": normalize_logger_path(get_setting("logger_mobile_source_path", "", conn)),
         "aggie_source_path": normalize_logger_path(get_setting("logger_aggie_source_path", "", conn)),
         "session_gap_seconds": normalize_logger_session_gap_seconds(
@@ -373,7 +373,7 @@ def save_logger_settings(values, conn=None):
     )
     set_setting(
         "logger_database_path",
-        normalize_logger_path(values.get("database_path")),
+        normalize_logger_database_path(values.get("database_path")),
         "Mobile Logger",
         "Logger processing database path",
         conn,
@@ -603,6 +603,14 @@ def normalize_logger_raw_data_root(value):
 
 def normalize_logger_path(value):
     return str(value or "").strip().strip('"').strip()
+
+
+def normalize_logger_database_path(value):
+    text = normalize_logger_path(value)
+    if not text:
+        return ""
+    _, ext = os.path.splitext(text)
+    return text if ext.lower() in {".db", ".sqlite", ".sqlite3"} else ""
 
 
 def normalize_logger_max_upload_mb(value):

@@ -179,7 +179,7 @@ class TestLoggerProcessing(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["package_name"], "ai.perplexity.app.android")
 
-    def test_default_logger_database_path_uses_open_main_database_location(self):
+    def test_default_logger_database_path_uses_data_folder_logger_database(self):
         main_db = self.root / "actual_main" / "lifepim.db"
         main_db.parent.mkdir()
         conn = sqlite3.connect(main_db)
@@ -189,7 +189,22 @@ class TestLoggerProcessing(unittest.TestCase):
         finally:
             conn.close()
 
-        self.assertEqual(config.database_path, main_db.parent / "lifepim_logger.db")
+        self.assertTrue(str(config.database_path).endswith(os.path.join("lifepim_desktop_data", "DATA", "logger", "logger.sqlite")))
+
+    def test_folder_shaped_logger_database_setting_falls_back_to_default_database(self):
+        main_db = self.root / "actual_main" / "lifepim.db"
+        main_db.parent.mkdir()
+        conn = sqlite3.connect(main_db)
+        conn.row_factory = sqlite3.Row
+        try:
+            from common import settings
+
+            settings.set_setting("logger_database_path", str(self.root / "logged_data"), conn=conn)
+            config = load_logger_config(conn)
+        finally:
+            conn.close()
+
+        self.assertTrue(str(config.database_path).endswith(os.path.join("lifepim_desktop_data", "DATA", "logger", "logger.sqlite")))
 
     def test_mobile_application_change_and_large_gap_create_new_sessions(self):
         folder = self.mobile_root / "phone-1" / "app_usage"

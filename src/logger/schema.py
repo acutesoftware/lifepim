@@ -123,6 +123,105 @@ CREATE TABLE IF NOT EXISTS activity_session (
     UNIQUE(session_hash)
 );
 
+CREATE TABLE IF NOT EXISTS raw_logger_record (
+    raw_logger_record_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    process_run_id INTEGER,
+    process_file_id INTEGER,
+    source_path TEXT NOT NULL,
+    source_file_hash TEXT,
+    source_record_index INTEGER NOT NULL,
+    record_type TEXT NOT NULL,
+    observed_at_utc TEXT,
+    device_id TEXT,
+    raw_json TEXT NOT NULL,
+    imported_at_utc TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS raw_mobile_app_usage (
+    raw_mobile_app_usage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_logger_record_id INTEGER,
+    process_run_id INTEGER,
+    process_file_id INTEGER,
+    source_path TEXT NOT NULL,
+    source_record_index INTEGER NOT NULL,
+    observed_at_utc TEXT,
+    device_id TEXT,
+    package_name TEXT,
+    application_name TEXT,
+    activity_name TEXT,
+    screen_state TEXT,
+    event_type TEXT,
+    raw_json TEXT NOT NULL,
+    imported_at_utc TEXT NOT NULL,
+    FOREIGN KEY (raw_logger_record_id) REFERENCES raw_logger_record(raw_logger_record_id)
+);
+
+CREATE TABLE IF NOT EXISTS raw_installed_application (
+    raw_installed_application_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_logger_record_id INTEGER,
+    process_run_id INTEGER,
+    process_file_id INTEGER,
+    source_path TEXT NOT NULL,
+    source_record_index INTEGER NOT NULL,
+    observed_at_utc TEXT,
+    device_id TEXT,
+    package_name TEXT,
+    application_name TEXT,
+    raw_json TEXT NOT NULL,
+    imported_at_utc TEXT NOT NULL,
+    FOREIGN KEY (raw_logger_record_id) REFERENCES raw_logger_record(raw_logger_record_id)
+);
+
+CREATE TABLE IF NOT EXISTS raw_location_sample (
+    raw_location_sample_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_logger_record_id INTEGER,
+    process_run_id INTEGER,
+    process_file_id INTEGER,
+    source_path TEXT NOT NULL,
+    source_record_index INTEGER NOT NULL,
+    observed_at_utc TEXT,
+    device_id TEXT,
+    latitude REAL,
+    longitude REAL,
+    accuracy_meters REAL,
+    provider TEXT,
+    raw_json TEXT NOT NULL,
+    imported_at_utc TEXT NOT NULL,
+    FOREIGN KEY (raw_logger_record_id) REFERENCES raw_logger_record(raw_logger_record_id)
+);
+
+CREATE TABLE IF NOT EXISTS raw_device_state (
+    raw_device_state_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_logger_record_id INTEGER,
+    process_run_id INTEGER,
+    process_file_id INTEGER,
+    source_path TEXT NOT NULL,
+    source_record_index INTEGER NOT NULL,
+    observed_at_utc TEXT,
+    device_id TEXT,
+    screen_state TEXT,
+    battery_percent REAL,
+    network_type TEXT,
+    raw_json TEXT NOT NULL,
+    imported_at_utc TEXT NOT NULL,
+    FOREIGN KEY (raw_logger_record_id) REFERENCES raw_logger_record(raw_logger_record_id)
+);
+
+CREATE TABLE IF NOT EXISTS raw_unknown_record (
+    raw_unknown_record_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_logger_record_id INTEGER,
+    process_run_id INTEGER,
+    process_file_id INTEGER,
+    source_path TEXT NOT NULL,
+    source_record_index INTEGER NOT NULL,
+    observed_at_utc TEXT,
+    device_id TEXT,
+    record_type_hint TEXT,
+    raw_json TEXT NOT NULL,
+    imported_at_utc TEXT NOT NULL,
+    FOREIGN KEY (raw_logger_record_id) REFERENCES raw_logger_record(raw_logger_record_id)
+);
+
 CREATE INDEX IF NOT EXISTS ix_ingest_file_status ON ingest_file(import_status);
 CREATE INDEX IF NOT EXISTS ix_mobile_app_usage_device_time ON mobile_app_usage_sample(device_id, observed_at_utc);
 CREATE INDEX IF NOT EXISTS ix_mobile_app_usage_package_time ON mobile_app_usage_sample(package_name, observed_at_utc);
@@ -131,6 +230,12 @@ CREATE INDEX IF NOT EXISTS ix_desktop_window_process_time ON desktop_window_samp
 CREATE INDEX IF NOT EXISTS ix_activity_session_time ON activity_session(start_at_utc, end_at_utc);
 CREATE INDEX IF NOT EXISTS ix_activity_session_device_time ON activity_session(device_id, start_at_utc);
 CREATE INDEX IF NOT EXISTS ix_activity_session_application_time ON activity_session(application_identifier, start_at_utc);
+CREATE INDEX IF NOT EXISTS ix_raw_logger_record_file ON raw_logger_record(process_file_id, source_record_index);
+CREATE INDEX IF NOT EXISTS ix_raw_logger_record_type ON raw_logger_record(record_type);
+CREATE INDEX IF NOT EXISTS ix_raw_mobile_app_usage_time ON raw_mobile_app_usage(device_id, observed_at_utc);
+CREATE INDEX IF NOT EXISTS ix_raw_installed_application_package ON raw_installed_application(package_name);
+CREATE INDEX IF NOT EXISTS ix_raw_location_sample_time ON raw_location_sample(device_id, observed_at_utc);
+CREATE INDEX IF NOT EXISTS ix_raw_device_state_time ON raw_device_state(device_id, observed_at_utc);
 """
 
 

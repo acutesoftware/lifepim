@@ -10,8 +10,13 @@ The Notes tab lists markdown files that have been imported into the `lp_notes` t
 - `path`
 - `folder_id`
 - `size`
+- `title`
+- `color`
+- `date_created`
 - `date_modified`
 - `area`
+- `important`
+- `source_note_id`
 
 The note body remains in the `.md` file on disk. Viewing or editing a note reads/writes the markdown file directly.
 
@@ -19,98 +24,74 @@ The note body remains in the `.md` file on disk. Viewing or editing a note reads
 
 Open the Notes tab from the top navigation.
 
-Use the left area/sidebar tabs to filter notes by saved area metadata. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current area folder.
+Use the left area/sidebar tabs to filter notes by saved `lp_notes.area` metadata. Use the Folders section inside the Notes view to drill into subfolders under the current notes root or current area folder.
 
-The top header of the Notes page is defined below
-BOLD TITLE : Notes ([area]) - if note area selected it just says 'Notes"
-CONTROLS: (series of buttons and dropdowns as per below)
-  LABEL : "View as : " 
-  DROP DOWN LIST : [ List | Table | Grid | Preview | Names only ]
-  LABEL : "Sort by : "
-  DROP DOWN LIST : [ Title | size | Color | Area | Date Created | Date Modified | Folder]
-  DROP DOWN LIST : [ Asc | Desc]
-  
-  BUTTON : New Note
-  LABEL : shows count of notes and num selected, eg "68 Notes  0 selected"
-  DROP DOWN LIST: disabled until ANY note selected then: 
-        - Link Selected Note to ..  (popup to Links)
-        - Delete Selected notes
-        - Move selected notes to Area (popup list of areas)
-        - Set color of selected notes to ... (popup list of colors)
+The Notes list header includes:
 
-  DROP DOWN LIST : [...]  shows a triple dot popup menu for other options
-    - option 1 = "Import Folder"
+- `View as`: Table, List, Grid, Preview, or Names only.
+- `Sort by`: filename/title, size, color, area, date created, date modified, or folder, with ascending/descending direction.
+- `New Note`.
+- Note count and selected-count toolbar.
+- `Selected` bulk-action menu, enabled after selecting one or more notes.
+- `...` menu with `Import Folder`.
 
+Bulk actions available for selected notes:
 
+- Link selected note records to another LifePIM record.
+- Delete selected notes.
+- Move selected notes to an Area.
+- Set selected note colors.
 
-For the View as list:
-- List : List of notes with circle of color at the start 
-= Table : notes with following columns
-          - Filename
-          - Color
-          - Area
-          - Size
-          - Date Created
-          - Date Modified
-          - Controls (Links) - Edit / Del
+Current list views:
 
+| View | Behavior |
+| --- | --- |
+| Table | Columns: checkbox, filename, color, area, size, date created, date modified, controls. |
+| List | One row per note with checkbox, color dot, filename, and folder path. |
+| Grid | Card layout using saved note color and text preview. |
+| Preview | Card layout using rendered markdown preview. |
+| Names only | Compact filename list. |
 
-FOLDERS PANEL
-Have a folders panel, hidden by default showing the list of actual folders when expanded.
-By default we only see a line " Folders [+]"
+The Folders panel is included above the list. For a selected Area, it shows the area folder rules and mapped folders that drive creation/sync behavior. The separate Notes folder panel is a navigation aid for drilling through actual note folders.
 
-When expanded - it shows the list of folders that are mapped to this area
-
-MAIN BODY
-The main body shows the notes list as selected - may be a table, list or grid depending on settings.
-List of notes is paginated.
-
-PAGINATION
-If the number of notes to list is too high, pagination occurs and the navigation appears at the end
-
-
+The main body is paginated.
 
 ### View a Single Note
 
 Once the user clicks on a note the Note View screen is shown : 
 
-The top header has the following controls:
-BOLD TITLE :  FileName.md  
-BREADCRUMB FOLDER NAVIGATION : root folder > subfolder > current folder
-CONTROLS : (series of buttons / drop down lists as per below)
-  LABEL : "View as :"
-  DROP DOWN LIST : [ Text | Markdown | Hex | Metadata ]
-  BUTTON : "Edit"
-  BUTTON : "Open Folder"
-  LABEL : Circle of colour (just a colored cicle)
-  DROP DOWN LIST : [List of Colors] - changing this changes the notes color
-  BUTTON : "Rename" (pops up dialog with current file asking for new name)
-  LABEL : "Area :"
-  DROP DOWN LIST : [List of Areas]
-  BUTTON : "Move" (moves Area to currently selected area)
-  BUTTON : Delete this file (asks for congirmation first then moves the file to the trash folder)
-  BUTTON : Convert to HOWTO
-  
+The note view header shows the filename, breadcrumb navigation, and controls:
 
-For the View as list:
-- Text mode : views the text as simple text file
-- Markdown : views as markdown with addition [img] tags rendered
-- Hex : view hex mode
-- Sample : Show the top 'nn' lines of the file and last 'nn' lines of the file ('nn = number of sample lines that can be set in the Settings > Note section)
-- Markdown : shows the full file metadata and file front matter
+- `View as`: Text, Markdown, Hex, Sample, or Metadata.
+- `Edit`.
+- `Open Folder`.
+- Color dot and color selector.
+- `Rename`.
+- Area selector.
+- `Assign Area`, which changes metadata/front matter without moving the file.
+- `Move File`, which moves the markdown file to the selected Area's default folder.
+- `Convert to HOWTO`.
+- `Delete this file`, which moves the file to the notes `deleted` folder and removes the DB row.
 
+The note view also includes project assignment and a links drawer for note links.
 
-MAIN BODY
-If the user is choosing to view metadata , then only the metadata and front matter is shown
+View modes:
 
- Otherwise the content of the note is shown
-
+| Mode | Behavior |
+| --- | --- |
+| Text | Shows the note body as plain text. |
+| Markdown | Renders markdown, including LifePIM `[img]...[/img]` tags. |
+| Hex | Shows a hex/ascii dump. |
+| Sample | Shows the first and last configured number of lines. |
+| Metadata | Shows database metadata, parsed front matter, and raw front matter. |
 
 ### Add Notes
 
 New notes can be created from the Notes UI. The app writes a new `.md` file into the selected area's default notes folder and inserts a matching row into `lp_notes`.
 
-The area must have a default folder configured before new-note creation can write to the correct place.
+The selected area normally needs a default folder configured in `lp_area_folders`. The new note picker uses `/notes/api/new-note-options` to find the default folder and any additional enabled folders for the selected area. If area folder mapping is not in use, the user notes root can be used as a fallback.
+
+New note creation writes front matter, populates `lp_notes.path`, `lp_notes.folder_id`, `lp_notes.area`, `lp_notes.color`, and file size/date metadata, then opens the new note.
 
 ### Edit Notes
 
@@ -121,6 +102,7 @@ Saving a note updates the markdown file on disk. The app also updates the note m
 - `size`
 - `date_modified`
 - `rec_extract_date`
+- front-matter-backed fields such as title, color, area, important, and source note id when present
 
 This means edits made through LifePIM keep the database metadata current.
 
@@ -214,13 +196,13 @@ N:\duncan\LifePIM_Data\DATA\notes
 Run:
 
 ```text
-Settings -> Notes -> Migrate notes source
+Admin -> Migration -> Migrate notes source
 ```
 
 Steps:
 
 1. Back up the SQLite database.
-2. Open `Settings -> Notes`.
+2. Open `Admin -> Migration`.
 3. Enter the new notes root.
 4. Leave `Area` blank unless every imported note should get one explicit area value.
 5. Tick `Delete existing notes and note links before importing this folder`.
@@ -454,6 +436,8 @@ Blank or unrecognized colors display as the default yellow. This is expected for
 
 Settings > Notes includes `Refresh note colors`. This is a gentle maintenance action: it reads markdown front matter once for blank-color note rows, validates the color with the same display parser, and updates only `lp_notes.color`. Existing non-blank colors are left alone by default.
 
+Settings > Notes also includes note display settings, full notes sync, note area materialization, and note content search index rebuild. Source migration is intentionally in Admin > Migration because it can replace note rows and note links.
+
 ### Notes Path Aliases
 
 New notes can be created in the correct `N:\...` folder and have `lp_notes.area` populated, while still showing no derived area if the note's `folder_id` points at an alias path. One observed example:
@@ -479,17 +463,16 @@ The UI import and migration forms do not read `FOLDER_NOTES` from `tests/LOAD_TE
 If you later reload mapping CSVs from disk and those CSVs still contain old paths such as `E:\BK_fangorn`, the old paths can come back. Update the CSVs too if the NAS path is now the permanent source of truth.
 
 
-## Note Functions
-Should be functions below on either the Note or the text selected (whichever works)
+## Future Note Functions
 
-Right click a note, or selected text or pick from [...] menu:
-Find in Note : search this note / text for a string
-Find in LifePIM : search ALL notes for a string
-Find in Wikipedia : search wikipedia for a string (search string with site:wikipedia.org)
-Find in Google : search internet for a string
+The following are ideas/backlog items, not current shipped Notes controls:
 
-Extract URL's : opens a new text window with list of URLs from this note
-Extract emails : opens a new text window with list of emails from this note
+- Find in current note.
+- Find selected text across LifePIM.
+- Search selected text in Wikipedia or Google.
+- Extract URLs from a note.
+- Extract email addresses from a note.
+- Jump to line.
+- Jump to heading.
 
-Jump to Line : jumps to line number (-1 means end of file)
-Jump to Heading : opens a new  window with list of clickable Links to headings in this note
+Current implemented search is the normal LifePIM search flow plus the note content search index maintained from Settings > Notes.
