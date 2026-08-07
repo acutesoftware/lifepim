@@ -15,8 +15,9 @@ def utc_now() -> str:
 
 
 def default_logger_database_path() -> str:
-    data_dir = Path(getattr(app_config, "data_folder", "") or getattr(app_config, "user_folder", ".")).expanduser()
-    return str(data_dir / "logger" / "logger.sqlite")
+    db_file = Path(getattr(main_data, "DB_FILE", "") or getattr(app_config, "DB_FILE", "") or "").expanduser()
+    db_dir = db_file.parent if str(db_file) else Path(getattr(app_config, "data_folder", ".")).expanduser()
+    return str(db_dir / "logger.sqlite")
 
 
 def default_logger_config() -> dict[str, Any]:
@@ -24,7 +25,7 @@ def default_logger_config() -> dict[str, Any]:
         "source_folder": "",
         "file_pattern": "*.json;*.jsonl",
         "include_subfolders": True,
-        "database_path": "<LIFEPIM_DATA>\\logger\\logger.sqlite",
+        "database_path": "<LIFEPIM_DB_DIR>\\logger.sqlite",
         "import_mode": "incremental",
         "duplicate_detection": "metadata_and_hash",
         "successful_file_action": "leave",

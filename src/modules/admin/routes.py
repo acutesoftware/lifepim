@@ -592,6 +592,7 @@ def settings_route():
                 key = f"{cfg.CONFIG_SETTING_PREFIX}{name}"
                 if request.form.get(f"reset_{name}") == "1" or request.form.get(f"use_override_{name}") != "1":
                     settings_mod.delete_setting(key, conn)
+                    cfg.delete_bootstrap_config_override(name)
                     if name in existing_override_names or request.form.get(f"reset_{name}") == "1":
                         reset_count += 1
                     continue
@@ -608,6 +609,7 @@ def settings_route():
                     name,
                     conn,
                 )
+                cfg.save_bootstrap_config_override(name, cfg.serialize_config_value(parsed_value))
                 saved_count += 1
             cfg.refresh_config_overrides()
             if errors:

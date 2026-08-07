@@ -64,10 +64,8 @@ def _expand_path(value: str) -> Path:
 
 
 def _default_logger_database_path(main_db_path: Path | None = None) -> Path:
-    data_dir = Path(getattr(app_config, "data_folder", "") or "").expanduser()
-    if not str(data_dir):
-        data_dir = main_db_path.parent if main_db_path else Path(".").resolve()
-    return data_dir / "logger" / "logger.sqlite"
+    db_dir = main_db_path.parent if main_db_path else Path(getattr(app_config, "DB_FILE", ".")).expanduser().parent
+    return db_dir / "logger.sqlite"
 
 
 def _looks_like_sqlite_path(value: str) -> bool:

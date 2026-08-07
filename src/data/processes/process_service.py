@@ -167,6 +167,9 @@ class ProcessService:
         if str(config.get("file_pattern") or "").strip() in {"", "*.json"}:
             config["file_pattern"] = "*.json;*.jsonl"
             updated = True
+        if str(config.get("database_path") or "").strip() in {"", "<LIFEPIM_DATA>\\logger\\logger.sqlite"}:
+            config["database_path"] = "<LIFEPIM_DB_DIR>\\logger.sqlite"
+            updated = True
         if updated:
             self.repository.save_process(
                 process["process_id"],
@@ -185,5 +188,8 @@ def _resolve_process_path(value: str) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
+    db_file = Path(getattr(app_config, "DB_FILE", "") or "").expanduser()
+    db_dir = str(db_file.parent) if str(db_file) else ""
     data_folder = getattr(app_config, "data_folder", "") or getattr(app_config, "user_folder", ".")
-    return str(Path(text.replace("<LIFEPIM_DATA>", data_folder)).expanduser())
+    text = text.replace("<LIFEPIM_DB_DIR>", db_dir).replace("<LIFEPIM_DATA>", data_folder)
+    return str(Path(text).expanduser())

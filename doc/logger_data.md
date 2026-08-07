@@ -72,7 +72,7 @@ The logger import process uses these key settings:
 | Source folder | Folder that contains the synced raw logger files. Usually the Logger raw-data root from Admin settings. |
 | File pattern | File matcher. Use `*.json;*.jsonl` for mobile Logger data. |
 | Include subfolders | Must be enabled for normal phone sync folders. |
-| Logger database path | Target SQLite database. Default is `<LIFEPIM_DATA>\logger\logger.sqlite`. |
+| Logger database path | Target SQLite database. Default is `<LIFEPIM_DB_DIR>\logger.sqlite`. |
 | Duplicate detection | Default is metadata and content hash. |
 | Unknown record types | Keep unknown records and warn rather than failing the whole run. |
 
@@ -83,22 +83,21 @@ If the default logger process has a blank source folder, LifePIM fills it from L
 
 The import process leaves source files in place by default.
 
-On this app configuration, `<LIFEPIM_DATA>` means the configured LifePIM data folder, not the source-code repository. For example, with:
+For logger processing, `<LIFEPIM_DB_DIR>` means the folder that contains the active main LifePIM database file. For example, with:
 
 ```text
-user_folder = D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data
-data_folder = D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\DATA
+DB_FILE = D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim.db
 ```
 
 the logger database path resolves to:
 
 ```text
-D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\DATA\logger\logger.sqlite
+D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\logger.sqlite
 ```
 
-If an older page shows `D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim_logger.db`, that is the previous logger-processing database location. The top-level Data process uses `DATA\logger\logger.sqlite`.
+If an older page shows `D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim_logger.db` or `D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\DATA\logger\logger.sqlite`, that is a previous logger-processing database location. The current default follows the main `lifepim.db` folder.
 
-The optional `logger_database_path` setting must be a SQLite file path ending in `.db`, `.sqlite`, or `.sqlite3`. If it contains a folder path, LifePIM ignores it and uses the default `DATA\logger\logger.sqlite` location.
+The optional `logger_database_path` setting must be a SQLite file path ending in `.db`, `.sqlite`, or `.sqlite3`. If it contains a folder path, LifePIM ignores it and uses the default `<LIFEPIM_DB_DIR>\logger.sqlite` location.
 
 ## Raw File Layout
 
@@ -146,7 +145,7 @@ The main database does not store the high-frequency raw logger payloads.
 The Data process writes raw records to:
 
 ```text
-<LIFEPIM_DATA>\logger\logger.sqlite
+<LIFEPIM_DB_DIR>\logger.sqlite
 ```
 
 Main raw tables:
@@ -195,7 +194,7 @@ Use rebuild when the raw logger schema or routing logic has changed and the data
 | Symptom | Check |
 | --- | --- |
 | Raw files show in Admin but import finds no files | Confirm the Data process `Source folder` points at the raw root and `Include subfolders` is enabled. |
-| Data tab shows `<LIFEPIM_DATA>\logger\logger.sqlite` | This is a placeholder. The resolved path is shown on `Data > Processes` as `Target database`; normally it is `<user_folder>\DATA\logger\logger.sqlite`. |
+| Data tab shows `<LIFEPIM_DB_DIR>\logger.sqlite` | This is a placeholder. The resolved path is shown on `Data > Processes` as `Target database`; normally it is beside the active main `lifepim.db`. |
 | `.jsonl` files are not imported | Use `*.json;*.jsonl` as the file pattern. |
 | Run button fails with missing source folder | Open `Data > Processes > Edit Configuration` and set `Source folder` to the Logger raw-data root. |
 | Database exists but activity sessions stay at zero | The Data process imports raw tables only. Activity-session derivation is separate legacy/future processing. |

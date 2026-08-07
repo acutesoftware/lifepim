@@ -552,6 +552,7 @@ def get_conn_str():
 # config.RECS_PER_PAGE override those defaults when the app reads this module.
 
 CONFIG_SETTING_PREFIX = "config."
+BOOTSTRAP_CONFIG_NAMES = {"DB_FILE", "db_name", "user_folder", "data_folder"}
 _CONFIG_DEFAULTS = {}
 _CONFIG_OVERRIDE_CACHE = {}
 _CONFIG_OVERRIDE_CACHE_LOADED = False
@@ -588,29 +589,57 @@ def _settings_db_file():
 	return value
 
 
+def _normalize_config_db_file(value):
+	if not value:
+		return ""
+	if not os.path.isabs(value):
+		value = os.path.abspath(os.path.join(os.path.dirname(__file__), value))
+	return value
+
+
+def _read_config_overrides(db_file):
+	overrides = {}
+	db_file = _normalize_config_db_file(db_file)
+	if not db_file or not os.path.exists(db_file):
+		return overrides
+	conn = sqlite3.connect(db_file)
+	try:
+		rows = conn.execute(
+			"SELECT setting_key, setting_value FROM sys_settings WHERE setting_key LIKE ?",
+			(CONFIG_SETTING_PREFIX + "%",),
+		).fetchall()
+	finally:
+		conn.close()
+	return {
+		row[0][len(CONFIG_SETTING_PREFIX):]: row[1]
+		for row in rows
+		if row[0].startswith(CONFIG_SETTING_PREFIX)
+	}
+
+
+def _db_file_from_overrides(overrides):
+	value = overrides.get("DB_FILE") or overrides.get("db_name") or ""
+	if not value:
+		return ""
+	try:
+		value = parse_config_value("DB_FILE" if "DB_FILE" in overrides else "db_name", value)
+	except Exception:
+		pass
+	return _normalize_config_db_file(str(value))
+
+
 def _ensure_override_cache():
 	global _CONFIG_OVERRIDE_CACHE_LOADED, _CONFIG_OVERRIDE_LOADING
 	if _CONFIG_OVERRIDE_CACHE_LOADED or _CONFIG_OVERRIDE_LOADING:
 		return
 	_CONFIG_OVERRIDE_LOADING = True
 	try:
-		db_file = _settings_db_file()
-		if not os.path.exists(db_file):
-			_CONFIG_OVERRIDE_CACHE_LOADED = True
-			return
-		conn = sqlite3.connect(db_file)
-		try:
-			rows = conn.execute(
-				"SELECT setting_key, setting_value FROM sys_settings WHERE setting_key LIKE ?",
-				(CONFIG_SETTING_PREFIX + "%",),
-			).fetchall()
-		finally:
-			conn.close()
-		_CONFIG_OVERRIDE_CACHE.update(
-			(row[0][len(CONFIG_SETTING_PREFIX):], row[1])
-			for row in rows
-			if row[0].startswith(CONFIG_SETTING_PREFIX)
-		)
+		bootstrap_db_file = _settings_db_file()
+		bootstrap_overrides = _read_config_overrides(bootstrap_db_file)
+		_CONFIG_OVERRIDE_CACHE.update(bootstrap_overrides)
+		active_db_file = _db_file_from_overrides(bootstrap_overrides)
+		if active_db_file and os.path.normcase(active_db_file) != os.path.normcase(_normalize_config_db_file(bootstrap_db_file)):
+			_CONFIG_OVERRIDE_CACHE.update(_read_config_overrides(active_db_file))
 	except Exception:
 		# Config must remain importable before the database/settings schema exists.
 		pass
@@ -624,6 +653,61 @@ def refresh_config_overrides():
 	_CONFIG_OVERRIDE_CACHE.clear()
 	_CONFIG_OVERRIDE_CACHE_LOADED = False
 	_ensure_override_cache()
+
+
+def _ensure_bootstrap_settings_schema(conn):
+	conn.executescript(
+		"""
+		CREATE TABLE IF NOT EXISTS sys_settings (
+			setting_key TEXT PRIMARY KEY,
+			setting_value TEXT NOT NULL,
+			category TEXT NOT NULL DEFAULT 'General',
+			label TEXT NOT NULL DEFAULT '',
+			updated_utc TEXT NOT NULL
+		);
+		"""
+	)
+
+
+def _bootstrap_conn():
+	db_file = _settings_db_file()
+	os.makedirs(os.path.dirname(db_file), exist_ok=True)
+	conn = sqlite3.connect(db_file)
+	_ensure_bootstrap_settings_schema(conn)
+	return conn
+
+
+def save_bootstrap_config_override(name, value):
+	if name not in BOOTSTRAP_CONFIG_NAMES:
+		return
+	conn = _bootstrap_conn()
+	try:
+		conn.execute(
+			"INSERT INTO sys_settings (setting_key, setting_value, category, label, updated_utc) "
+			"VALUES (?, ?, 'Config', ?, strftime('%Y-%m-%dT%H:%M:%SZ','now')) "
+			"ON CONFLICT(setting_key) DO UPDATE SET "
+			"setting_value=excluded.setting_value, category=excluded.category, "
+			"label=excluded.label, updated_utc=excluded.updated_utc",
+			(CONFIG_SETTING_PREFIX + name, str(value), name),
+		)
+		conn.commit()
+	finally:
+		conn.close()
+
+
+def delete_bootstrap_config_override(name):
+	if name not in BOOTSTRAP_CONFIG_NAMES:
+		return
+	db_file = _settings_db_file()
+	if not os.path.exists(db_file):
+		return
+	conn = sqlite3.connect(db_file)
+	try:
+		_ensure_bootstrap_settings_schema(conn)
+		conn.execute("DELETE FROM sys_settings WHERE setting_key = ?", (CONFIG_SETTING_PREFIX + name,))
+		conn.commit()
+	finally:
+		conn.close()
 
 
 def serialize_config_value(value):
@@ -679,6 +763,10 @@ def list_config_settings(conn=None):
 				}
 		except Exception:
 			saved = {}
+	_ensure_override_cache()
+	for name, value in _CONFIG_OVERRIDE_CACHE.items():
+		if name not in saved:
+			saved[name] = {"value": value, "updated_utc": ""}
 	return [
 		{
 			"name": name,

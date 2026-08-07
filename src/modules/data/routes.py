@@ -269,8 +269,10 @@ def process_view_logger_tables_route(process_id):
 
 def _resolve_process_path(value):
     text = str(value or "").strip()
+    db_file = Path(getattr(app_config, "DB_FILE", "") or "").expanduser()
+    db_dir = str(db_file.parent) if str(db_file) else ""
     data_folder = getattr(app_config, "data_folder", "") or getattr(app_config, "user_folder", ".")
-    return str(Path(text.replace("<LIFEPIM_DATA>", data_folder)).expanduser())
+    return str(Path(text.replace("<LIFEPIM_DB_DIR>", db_dir).replace("<LIFEPIM_DATA>", data_folder)).expanduser())
 
 
 @data_bp.route("/process-runs")

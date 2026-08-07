@@ -32,7 +32,7 @@
   <section class="data-wizard-step">
     <h4>Output</h4>
     <div class="data-form-grid">
-      <label>Logger database path <input type="text" name="database_path" value="{{ config.database_path or '<LIFEPIM_DATA>\\logger\\logger.sqlite' }}"></label>
+      <label>Logger database path <input type="text" name="database_path" value="{{ config.database_path or '<LIFEPIM_DB_DIR>\\logger.sqlite' }}"></label>
       <label class="data-checks"><span><input type="checkbox" name="create_database_if_missing" value="1" {% if config.create_database_if_missing %}checked{% endif %}> Create database if missing</span></label>
       <label class="data-checks"><span><input type="checkbox" name="create_tables_if_missing" value="1" {% if config.create_tables_if_missing %}checked{% endif %}> Create tables if missing</span></label>
     </div>
