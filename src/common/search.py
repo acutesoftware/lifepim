@@ -59,6 +59,7 @@ ROUTE_RECORD_TYPE = {
     "calendar": "event",
     "files": "file",
     "media": "media",
+    "apps": "app",
     "contacts": "person",
     "places": "place",
 }
@@ -69,6 +70,7 @@ ROUTE_TITLE_FIELD = {
     "calendar": "title",
     "files": "filelist_name",
     "media": "filename",
+    "apps": "title",
     "contacts": "display_name",
     "places": "name",
 }
@@ -99,9 +101,14 @@ SEARCH_SPECS = {
         "view_route": "calendar.view_event_route",
         "id_param": "event_id",
     },
+    "apps": {
+        "columns": ["title", "kind", "description", "path", "repository_url", "website_url", "language", "tags"],
+        "view_route": "apps.view_app_route",
+        "id_param": "item_id",
+    },
 }
 
-DEFAULT_SEARCH_ORDER = ["notes", "audio", "media", "how", "calendar"]
+DEFAULT_SEARCH_ORDER = ["notes", "audio", "media", "how", "calendar", "apps"]
 
 CONTENT_CATALOG_SEARCH_SPECS = [
     {
@@ -454,6 +461,8 @@ def search_note_content(query, area=None, route=None, limit=100):
 def _search_route(route_name, terms, limit):
     if route_name == "how":
         return _search_how(terms, limit=limit)
+    if route_name == "apps":
+        return _search_apps(terms, limit=limit)
     spec = SEARCH_SPECS.get(route_name)
     if not spec:
         return [], False
@@ -522,6 +531,84 @@ def _search_how(terms, limit=None):
     return results, has_more
 
 
+def _search_apps(terms, limit=None):
+    if not terms:
+        return [], False
+    conn = data._get_conn()
+    try:
+        from modules.apps.schema import ensure_apps_schema
+
+        ensure_apps_schema(conn)
+    except Exception:
+        return [], False
+    app_cols = _table_columns(conn, "lp_app")
+    action_cols = _table_columns(conn, "lp_app_action")
+    if "app_id" not in app_cols:
+        return [], False
+    search_cols = [
+        col
+        for col in ["title", "kind", "description", "path", "repository_url", "website_url", "language", "tags"]
+        if col in app_cols
+    ]
+    if not search_cols:
+        return [], False
+    term_conditions = []
+    params = []
+    action_search = {"command", "arguments", "action_name"}.issubset(action_cols)
+    for term in terms:
+        like_value = f"%{term}%"
+        parts = [f"lower(COALESCE(a.{col}, '')) LIKE ?" for col in search_cols]
+        params.extend([like_value] * len(search_cols))
+        if action_search:
+            parts.append(
+                "EXISTS (SELECT 1 FROM lp_app_action ax "
+                "WHERE ax.owner_user_id IS a.owner_user_id AND ax.app_id = a.app_id "
+                "AND (lower(COALESCE(ax.command, '')) LIKE ? "
+                "OR lower(COALESCE(ax.arguments, '')) LIKE ? "
+                "OR lower(COALESCE(ax.action_name, '')) LIKE ?))"
+            )
+            params.extend([like_value, like_value, like_value])
+        term_conditions.append("(" + " OR ".join(parts) + ")")
+    fetch_limit = int(limit) + 1 if limit else None
+    select_cols = list(dict.fromkeys(["app_id", "title", "kind"] + search_cols))
+    sql = (
+        "SELECT " + ", ".join(f"a.{col}" for col in select_cols) + ", "
+        "(SELECT group_concat(aa.area_id, ', ') FROM lp_app_area aa "
+        "WHERE aa.owner_user_id IS a.owner_user_id AND aa.app_id = a.app_id) AS area "
+        "FROM lp_app a "
+        "WHERE a.enabled = 1 AND " + " AND ".join(term_conditions) + " "
+        "ORDER BY lower(a.title), a.app_id"
+    )
+    if fetch_limit:
+        sql += " LIMIT ?"
+        params.append(fetch_limit)
+    rows = conn.execute(sql, params).fetchall()
+    has_more = bool(fetch_limit and len(rows) > limit)
+    if has_more:
+        rows = rows[:limit]
+    results = []
+    for row in rows:
+        item = dict(row)
+        match_field = _find_match_field(item, terms, search_cols)
+        match_value = item.get(match_field) or ""
+        results.append(
+            {
+                "table": "Apps",
+                "route": "apps",
+                "id": item.get("app_id"),
+                "area": item.get("area") or "",
+                "match_field": match_field,
+                "match_value": match_value,
+                "match_snippet": _build_snippet(match_value, terms),
+                "view_route": "apps.view_app_route",
+                "id_param": "item_id",
+                "record_type": "app",
+                "title": item.get("title") or "",
+            }
+        )
+    return results, has_more
+
+
 def search_all(query, area=None, route=None, primary_limit=100, secondary_limit=20):
     terms = parse_search_terms(query)
     if not terms:
@@ -547,7 +634,7 @@ def search_all(query, area=None, route=None, primary_limit=100, secondary_limit=
         search_order.remove(current_route)
         search_order.insert(0, current_route)
     elif current_route:
-        current_route = ""
+        search_order.insert(0, current_route)
     for route_name in search_order:
         limit = primary_limit if route_name == current_route else secondary_limit
         route_results, has_more = _search_route(route_name, terms, limit)
@@ -568,6 +655,8 @@ def search_all(query, area=None, route=None, primary_limit=100, secondary_limit=
                 primary.append(result)
             else:
                 secondary.append(result)
+    if route and primary:
+        primary.sort(key=lambda item: 0 if item.get("route") == route else 1)
     return {
         "primary": primary,
         "secondary": secondary,

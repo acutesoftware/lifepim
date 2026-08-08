@@ -17,13 +17,6 @@
           </a>
         {% endfor %}
       </div>
-      <form class="apps-search-form" method="get" action="{{ url_for('apps.list_apps_table_route') }}">
-        {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
-        <input type="hidden" name="saved_view" value="{{ saved_view }}">
-        <input type="hidden" name="mode" value="{{ mode }}">
-        <input type="search" name="q" value="{{ query }}" placeholder="Search apps">
-        <button type="submit">Search</button>
-      </form>
       <div class="apps-actions">
         <a class="apps-button {% if mode == 'grid' %}active{% endif %}"
            href="{{ url_for('apps.list_apps_table_route', area=area, saved_view=saved_view, mode='grid', q=query) }}">Grid</a>
