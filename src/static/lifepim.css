@@ -3595,6 +3595,7 @@ button.calendar-nav {
 }
 
 .apps-card-icon,
+.apps-list-icon,
 .apps-inspector-icon {
   display: inline-flex;
   align-items: center;
@@ -3609,14 +3610,54 @@ button.calendar-nav {
 }
 
 .apps-card-icon img,
+.apps-list-icon img,
 .apps-inspector-icon img {
   width: 22px;
   height: 22px;
   object-fit: contain;
 }
 
+.apps-list-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.apps-list-icon img {
+  width: 20px;
+  height: 20px;
+}
+
+.apps-icon-col {
+  width: 34px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.apps-table .apps-row-actions {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 4px;
+}
+
+.apps-table .apps-open-action {
+  white-space: nowrap;
+}
+
+.apps-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 !important;
+  line-height: 1;
+  font-weight: bold;
+}
+
 .apps-row-actions form,
 .apps-card-actions form,
+.apps-actions form,
 .apps-inspector-actions form {
   margin: 0;
 }

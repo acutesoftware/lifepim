@@ -3,7 +3,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
@@ -21,6 +21,7 @@ from modules.apps.importers import (
 from modules.apps.importers.base import AppImportCandidate, SOURCE_DESKTOP, SOURCE_DEV_FOLDER
 from modules.apps.importers.service import normalize_duplicate_value
 from modules.apps.importers.windows_shortcuts import ShortcutInfo
+from modules.apps.importers import windows_shortcuts
 
 
 class TestAppImporters(unittest.TestCase):
@@ -246,6 +247,71 @@ class TestAppImporters(unittest.TestCase):
         self.assertEqual(app["icon"], "/static/app_icons/executable-app.ico")
         self.assertEqual(app["icon_image_url"], "/static/app_icons/executable-app.ico")
         self.assertIn("executable-app.ico", app["import_metadata"])
+
+    def test_refresh_missing_executable_icons_backfills_blank_icons(self):
+        app_id = apps_model.create_app(
+            {
+                "title": "Blank Icon App",
+                "kind": "Application",
+                "path": r"C:\Tools\BlankIcon.exe",
+                "actions": [
+                    {
+                        "action_name": "Open",
+                        "action_type": "EXECUTABLE",
+                        "command": r"C:\Tools\BlankIcon.exe",
+                        "is_default": 1,
+                    }
+                ],
+            },
+            conn=self.conn,
+            owner_user_id=1,
+        )
+        manual_id = apps_model.create_app(
+            {
+                "title": "Manual Icon App",
+                "kind": "Application",
+                "icon": "M",
+                "path": r"C:\Tools\ManualIcon.exe",
+                "actions": [
+                    {
+                        "action_name": "Open",
+                        "action_type": "EXECUTABLE",
+                        "command": r"C:\Tools\ManualIcon.exe",
+                        "is_default": 1,
+                    }
+                ],
+            },
+            conn=self.conn,
+            owner_user_id=1,
+        )
+
+        with patch(
+            "modules.apps.importers.exe_icons.get_executable_icon_value",
+            return_value="/static/app_icons/blank-icon.ico",
+        ):
+            updated = apps_model.refresh_missing_executable_icons(conn=self.conn, owner_user_id=1)
+
+        self.assertEqual(updated, 1)
+        self.assertEqual(apps_model.app_get(app_id, conn=self.conn, owner_user_id=1)["icon"], "/static/app_icons/blank-icon.ico")
+        self.assertEqual(apps_model.app_get(manual_id, conn=self.conn, owner_user_id=1)["icon"], "M")
+
+    def test_powershell_shortcut_resolver_reads_lnk_metadata(self):
+        completed = Mock()
+        completed.returncode = 0
+        completed.stdout = (
+            '{"TargetPath":"C:\\\\Tools\\\\App.exe","Arguments":"--flag",'
+            '"WorkingDirectory":"C:\\\\Tools","IconLocation":"C:\\\\Tools\\\\App.exe,0"}'
+        )
+        completed.stderr = ""
+
+        with patch.object(windows_shortcuts.subprocess, "run", return_value=completed):
+            info = windows_shortcuts._resolve_lnk_with_powershell(r"C:\Users\me\Desktop\App.lnk")
+
+        self.assertTrue(info.is_valid)
+        self.assertEqual(info.target, r"C:\Tools\App.exe")
+        self.assertEqual(info.arguments, "--flag")
+        self.assertEqual(info.working_directory, r"C:\Tools")
+        self.assertEqual(info.icon, r"C:\Tools\App.exe,0")
 
 
 if __name__ == "__main__":

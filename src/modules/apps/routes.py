@@ -47,6 +47,7 @@ def _args_with(**updates):
         "sort": request.values.get("sort", ""),
         "dir": request.values.get("dir", ""),
         "page": request.values.get("page", ""),
+        "message": request.values.get("message", ""),
     }
     values.update(updates)
     return {key: value for key, value in values.items() if value not in (None, "")}
@@ -99,6 +100,7 @@ def _action_values(form):
 
 
 def _render_apps_index(area, item=None, launch_error="", message=""):
+    message = message or request.values.get("message", "")
     apps_model.ensure_apps_schema()
     saved_view = request.values.get("saved_view", "all")
     mode = request.values.get("mode", "grid")
@@ -410,6 +412,12 @@ def edit_app_route(item_id):
 def delete_app_route(item_id):
     apps_model.delete_app(item_id)
     return redirect(url_for("apps.list_apps_table_route", **_args_with()))
+
+
+@apps_bp.route("/refresh-icons", methods=["POST"])
+def refresh_icons_route():
+    updated = apps_model.refresh_missing_executable_icons()
+    return redirect(url_for("apps.list_apps_table_route", **_args_with(message=f"{updated} app icons refreshed.")))
 
 
 @apps_bp.route("/import", methods=["GET", "POST"])

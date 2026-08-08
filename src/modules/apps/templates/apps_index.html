@@ -24,6 +24,16 @@
            href="{{ url_for('apps.list_apps_table_route', area=area, saved_view=saved_view, mode='list', q=query) }}">List</a>
         <a class="apps-button" href="{{ url_for('apps.add_app_route', area=area) }}">+ Add</a>
         <a class="apps-button" href="{{ url_for('apps.import_apps_route', area=area) }}">Import</a>
+        <form method="post" action="{{ url_for('apps.refresh_icons_route') }}">
+          <input type="hidden" name="area" value="{{ area or '' }}">
+          <input type="hidden" name="saved_view" value="{{ saved_view }}">
+          <input type="hidden" name="mode" value="{{ mode }}">
+          <input type="hidden" name="q" value="{{ query }}">
+          <input type="hidden" name="sort" value="{{ sort_col }}">
+          <input type="hidden" name="dir" value="{{ sort_dir }}">
+          <input type="hidden" name="page" value="{{ page }}">
+          <button type="submit" class="apps-button">Refresh Icons</button>
+        </form>
       </div>
     </div>
 
@@ -34,6 +44,7 @@
             <table class="apps-table">
               <thead>
                 <tr>
+                  <th class="apps-icon-col">Icon</th>
                   {% for col, label in [('title', 'Name'), ('kind', 'Kind'), ('area_label', 'Areas'), ('path', 'Location / Command'), ('last_used_date', 'Last Used'), ('favorite', 'Favorite')] %}
                     <th>
                       {% if col in ['title', 'kind', 'last_used_date', 'favorite'] %}
@@ -51,6 +62,15 @@
                 {% for item in items %}
                   {% set target = item.default_action.command if item.default_action else item.path %}
                   <tr class="{% if selected_app and selected_app.app_id == item.app_id %}focused{% endif %}">
+                    <td class="apps-icon-col">
+                      <span class="apps-list-icon">
+                        {% if item.icon_image_url %}
+                          <img src="{{ item.icon_image_url }}" alt="">
+                        {% else %}
+                          {{ item.kind_icon }}
+                        {% endif %}
+                      </span>
+                    </td>
                     <td><a href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query) }}">{{ item.title }}</a></td>
                     <td>{{ item.kind }}</td>
                     <td>{{ item.area_label }}</td>
@@ -58,8 +78,8 @@
                     <td>{{ item.last_used_date or '' }}</td>
                     <td>{{ 'Yes' if item.favorite else '' }}</td>
                     <td class="apps-row-actions">
-                      <a href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
-                      <a href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}">Edit</a>
+                      <a class="apps-open-action" href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
+                      <a class="apps-icon-action" href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}" title="Edit" aria-label="Edit {{ item.title }}">&#9998;</a>
                       <form method="post"
                             action="{{ url_for('apps.delete_app_route', item_id=item.app_id) }}"
                             onsubmit='return confirm({{ ("Delete " ~ item.title ~ "?")|tojson }});'>
@@ -70,12 +90,12 @@
                         <input type="hidden" name="sort" value="{{ sort_col }}">
                         <input type="hidden" name="dir" value="{{ sort_dir }}">
                         <input type="hidden" name="page" value="{{ page }}">
-                        <button type="submit" class="apps-danger-button">Delete</button>
+                        <button type="submit" class="apps-danger-button apps-icon-action" title="Delete" aria-label="Delete {{ item.title }}">x</button>
                       </form>
                     </td>
                   </tr>
                 {% else %}
-                  <tr><td colspan="7">No apps found.</td></tr>
+                  <tr><td colspan="8">No apps found.</td></tr>
                 {% endfor %}
               </tbody>
             </table>

@@ -540,6 +540,52 @@ def delete_app(app_id, conn=None, owner_user_id=None):
     return True
 
 
+def refresh_missing_executable_icons(conn=None, owner_user_id=None):
+    from modules.apps.importers.exe_icons import get_executable_icon_value
+    from modules.apps.importers.windows_shortcuts import resolve_shortcut
+
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    rows = conn.execute(
+        "SELECT a.app_id, a.path, "
+        "(SELECT ax.command FROM lp_app_action ax WHERE ax.owner_user_id IS a.owner_user_id "
+        "AND ax.app_id = a.app_id ORDER BY ax.is_default DESC, ax.sort_order, ax.app_action_id LIMIT 1) AS command, "
+        "(SELECT ax.action_type FROM lp_app_action ax WHERE ax.owner_user_id IS a.owner_user_id "
+        "AND ax.app_id = a.app_id ORDER BY ax.is_default DESC, ax.sort_order, ax.app_action_id LIMIT 1) AS action_type "
+        "FROM lp_app a "
+        "WHERE a.owner_user_id IS ? AND a.enabled = 1 AND COALESCE(a.icon, '') = ''",
+        (owner_user_id,),
+    ).fetchall()
+    updated = 0
+    now = _utc_now()
+    for row in rows:
+        target = _clean_text(row["command"]) or _clean_text(row["path"])
+        action_type = _clean_text(row["action_type"]).upper()
+        exe_path = ""
+        if target.lower().endswith(".exe"):
+            exe_path = target
+        elif target.lower().endswith(".lnk"):
+            info = resolve_shortcut(target)
+            if info.is_valid and (info.target or "").lower().endswith(".exe"):
+                exe_path = info.target
+        elif action_type == "EXECUTABLE":
+            exe_path = target
+        if not exe_path:
+            continue
+        icon = get_executable_icon_value(exe_path)
+        if not icon:
+            continue
+        cur = conn.execute(
+            "UPDATE lp_app SET icon = ?, modified_date = ?, rec_extract_date = ? "
+            "WHERE owner_user_id IS ? AND app_id = ? AND COALESCE(icon, '') = ''",
+            (icon, now, now, owner_user_id, row["app_id"]),
+        )
+        updated += max(cur.rowcount or 0, 0)
+    conn.commit()
+    return updated
+
+
 def set_app_areas(app_id, area_ids, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_apps_schema(conn)
