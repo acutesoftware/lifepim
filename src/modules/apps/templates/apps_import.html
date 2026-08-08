@@ -1,0 +1,173 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="apps-page apps-import-page">
+    {% if error %}
+      <div class="apps-launch-error">{{ error }}</div>
+    {% endif %}
+    {% for scan_error in scan_errors %}
+      <div class="apps-launch-error">{{ scan_error }}</div>
+    {% endfor %}
+    {% if import_result %}
+      <div class="settings-message">
+        Import complete. {{ import_result.imported_count }} Apps imported.
+        {{ import_result.skipped_existing_count }} existing Apps skipped.
+      </div>
+    {% endif %}
+
+    <div class="apps-toolbar">
+      <div class="apps-view-tabs">
+        {% for source_id, source_label in source_choices %}
+          <a class="{% if source == source_id %}active{% endif %}"
+             href="{{ url_for('apps.import_apps_route', area=area, source=source_id) }}">{{ source_label }}</a>
+        {% endfor %}
+      </div>
+      <div class="apps-actions">
+        <a class="apps-button" href="{{ url_for('apps.list_apps_table_route', area=area) }}">Back to Apps</a>
+      </div>
+    </div>
+
+    <form method="post" class="apps-import-form">
+      <input type="hidden" name="source" value="{{ source }}">
+      <input type="hidden" name="candidates_json" value='{{ candidates_json|e }}'>
+
+      <section class="apps-import-config">
+        {% if source == 'dev_folders' %}
+          <label>
+            Root Folder
+            <span class="apps-path-row">
+              <input id="apps-import-root" type="text" name="root_folder" value="{{ root_folder }}">
+              <button type="button" class="apps-path-picker" data-target="#apps-import-root" data-kind="folder" title="Browse folder">[...]</button>
+            </span>
+          </label>
+          <label>
+            Default Area
+            <select name="default_area_id">
+              <option value="">Unassigned</option>
+              {% for option in area_options %}
+                <option value="{{ option.area_id }}" {% if default_area == option.area_id %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Default Kind
+            <select name="default_kind">
+              {% for kind in kind_options %}
+                <option value="{{ kind }}" {% if default_kind == kind %}selected{% endif %}>{{ kind }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit" name="intent" value="scan">Scan</button>
+        {% elif source == 'taskbar' %}
+          <input type="hidden" name="default_area_id" value="{{ default_area }}">
+          <button type="submit" name="intent" value="scan">Scan Taskbar</button>
+        {% else %}
+          <input type="hidden" name="default_area_id" value="{{ default_area }}">
+          <button type="submit" name="intent" value="scan">Scan Desktop</button>
+        {% endif %}
+        <span class="apps-browse-status" aria-live="polite"></span>
+      </section>
+
+      {% for message in scan_messages %}
+        <div class="apps-empty">{{ message }}</div>
+      {% endfor %}
+
+      {% if candidates %}
+        <div class="apps-import-summary">
+          {{ new_count }} new items found. {{ selected_count }} selected.
+        </div>
+        <div class="apps-import-actions">
+          <button type="button" data-import-select="all">Select All</button>
+          <button type="button" data-import-select="none">Select None</button>
+          <button type="submit" name="intent" value="import">Import Selected</button>
+        </div>
+        <div class="tabular-scroll">
+          <table class="apps-table apps-import-table">
+            <thead>
+              <tr>
+                <th>Select</th>
+                <th>Status</th>
+                <th>Name</th>
+                <th>Kind</th>
+                <th>Area</th>
+                <th>Target / Location</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for candidate in candidates %}
+                {% set can_import = candidate.status == 'NEW' %}
+                <tr class="apps-import-row apps-import-status-{{ candidate.status|lower }}">
+                  <td>
+                    <input type="hidden" name="candidate_id" value="{{ candidate.candidate_id }}">
+                    <input class="apps-import-select" type="checkbox" name="candidate_selected" value="{{ candidate.candidate_id }}"
+                           {% if candidate.selected and can_import %}checked{% endif %}
+                           {% if not can_import %}disabled{% endif %}>
+                  </td>
+                  <td>{{ candidate.status }}</td>
+                  <td>
+                    <strong>{{ candidate.name }}</strong>
+                    {% if candidate.description %}<small>{{ candidate.description }}</small>{% endif %}
+                    {% if candidate.metadata.error %}<small>{{ candidate.metadata.error }}</small>{% endif %}
+                  </td>
+                  <td>
+                    <select name="candidate_kind">
+                      {% for kind in kind_options %}
+                        <option value="{{ kind }}" {% if candidate.kind == kind %}selected{% endif %}>{{ kind }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td>
+                    <select name="candidate_area_id">
+                      <option value="">Unassigned</option>
+                      {% for option in area_options %}
+                        <option value="{{ option.area_id }}" {% if candidate.area_id == option.area_id %}selected{% endif %}>{{ option.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td class="apps-import-target">{{ candidate.target }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.querySelector(".apps-import-form");
+      if (!form) return;
+      const status = form.querySelector(".apps-browse-status");
+      form.querySelectorAll(".apps-path-picker").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = form.querySelector(button.dataset.target || "");
+          if (!target) return;
+          if (status) status.textContent = "Opening picker...";
+          try {
+            const response = await fetch("{{ url_for('apps.browse_path_route') }}?target=" + encodeURIComponent(button.dataset.kind || "folder"));
+            const payload = await response.json();
+            if (!response.ok || payload.error) {
+              throw new Error(payload.error || "Browse failed");
+            }
+            if (payload.path) {
+              target.value = payload.path;
+              if (status) status.textContent = "Selected";
+            } else if (status) {
+              status.textContent = "No path selected";
+            }
+          } catch (error) {
+            if (status) status.textContent = error.message;
+          }
+        });
+      });
+      form.querySelectorAll("[data-import-select]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const checked = button.dataset.importSelect === "all";
+          form.querySelectorAll(".apps-import-select:not(:disabled)").forEach((box) => {
+            box.checked = checked;
+          });
+        });
+      });
+    })();
+  </script>
+{% endblock %}

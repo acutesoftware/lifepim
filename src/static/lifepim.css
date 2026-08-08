@@ -3449,6 +3449,7 @@ button.calendar-nav {
 .apps-actions,
 .apps-view-tabs,
 .apps-row-actions,
+.apps-card-actions,
 .apps-inspector-actions,
 .apps-edit-actions {
   display: flex;
@@ -3468,6 +3469,7 @@ button.calendar-nav {
 .apps-view-tabs a,
 .apps-button,
 .apps-inspector-actions a,
+.apps-card-actions a,
 .apps-row-actions a,
 .apps-edit-actions a {
   color: #223;
@@ -3492,6 +3494,12 @@ button.calendar-nav {
 .apps-edit-form select,
 .apps-edit-form textarea,
 .apps-edit-form button,
+.apps-import-form input,
+.apps-import-form select,
+.apps-import-form button,
+.apps-row-actions button,
+.apps-card-actions button,
+.apps-inspector-actions button,
 .apps-actions-table input,
 .apps-actions-table select {
   font-size: 11px;
@@ -3558,13 +3566,22 @@ button.calendar-nav {
 }
 
 .apps-card {
-  min-height: 84px;
+  min-height: 104px;
   border: 1px solid #d8dde5;
   border-radius: 6px;
   background: #fff;
   color: #222;
-  text-decoration: none;
   padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.apps-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #222;
+  text-decoration: none;
   display: grid;
   grid-template-rows: 28px auto auto;
   gap: 4px;
@@ -3589,6 +3606,33 @@ button.calendar-nav {
   background: #eef3f8;
   font-weight: bold;
   font-size: 11px;
+}
+
+.apps-card-icon img,
+.apps-inspector-icon img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.apps-row-actions form,
+.apps-card-actions form,
+.apps-inspector-actions form {
+  margin: 0;
+}
+
+.apps-danger-button {
+  color: #7a1d1d;
+  border: 1px solid #d6a2a2;
+  background: #fff4f4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.apps-danger-button:hover,
+.apps-danger-button:focus {
+  background: #ffe6e6;
+  border-color: #b86d6d;
 }
 
 .apps-card-title,
@@ -3689,6 +3733,69 @@ button.calendar-nav {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.apps-import-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apps-import-config,
+.apps-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.apps-import-config label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+  font-size: 12px;
+}
+
+.apps-import-config label:first-child {
+  flex: 1 1 320px;
+}
+
+.apps-import-summary {
+  color: #444;
+  font-size: 11px;
+}
+
+.apps-import-table td {
+  vertical-align: top;
+}
+
+.apps-import-table select {
+  width: 100%;
+  min-width: 140px;
+}
+
+.apps-import-table small {
+  display: block;
+  margin-top: 2px;
+  color: #666;
+}
+
+.apps-import-target {
+  overflow-wrap: anywhere;
+}
+
+.apps-import-status-exists td {
+  color: #666;
+}
+
+.apps-import-status-invalid td {
+  color: #7a1d1d;
+  background: #fff8f8;
 }
 
 .apps-form-grid {

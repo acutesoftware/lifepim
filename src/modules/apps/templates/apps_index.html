@@ -23,6 +23,7 @@
         <a class="apps-button {% if mode == 'list' %}active{% endif %}"
            href="{{ url_for('apps.list_apps_table_route', area=area, saved_view=saved_view, mode='list', q=query) }}">List</a>
         <a class="apps-button" href="{{ url_for('apps.add_app_route', area=area) }}">+ Add</a>
+        <a class="apps-button" href="{{ url_for('apps.import_apps_route', area=area) }}">Import</a>
       </div>
     </div>
 
@@ -59,6 +60,18 @@
                     <td class="apps-row-actions">
                       <a href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
                       <a href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}">Edit</a>
+                      <form method="post"
+                            action="{{ url_for('apps.delete_app_route', item_id=item.app_id) }}"
+                            onsubmit='return confirm({{ ("Delete " ~ item.title ~ "?")|tojson }});'>
+                        <input type="hidden" name="area" value="{{ area or '' }}">
+                        <input type="hidden" name="saved_view" value="{{ saved_view }}">
+                        <input type="hidden" name="mode" value="{{ mode }}">
+                        <input type="hidden" name="q" value="{{ query }}">
+                        <input type="hidden" name="sort" value="{{ sort_col }}">
+                        <input type="hidden" name="dir" value="{{ sort_dir }}">
+                        <input type="hidden" name="page" value="{{ page }}">
+                        <button type="submit" class="apps-danger-button">Delete</button>
+                      </form>
                     </td>
                   </tr>
                 {% else %}
@@ -70,12 +83,38 @@
         {% else %}
           <div class="apps-grid">
             {% for item in items %}
-              <a class="apps-card {% if selected_app and selected_app.app_id == item.app_id %}focused{% endif %}"
-                 href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query) }}">
-                <span class="apps-card-icon">{{ item.kind_icon }}</span>
-                <span class="apps-card-title">{{ item.title }}</span>
-                <span class="apps-card-sub">{{ item.kind }}{% if item.area_label %} | {{ item.area_label }}{% endif %}</span>
-              </a>
+              <div class="apps-card {% if selected_app and selected_app.app_id == item.app_id %}focused{% endif %}">
+                <a class="apps-card-main"
+                   href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query) }}">
+                  <span class="apps-card-icon">
+                    {% if item.icon_image_url %}
+                      <img src="{{ item.icon_image_url }}" alt="">
+                    {% else %}
+                      {{ item.kind_icon }}
+                    {% endif %}
+                  </span>
+                  <span class="apps-card-title">{{ item.title }}</span>
+                  <span class="apps-card-sub">{{ item.kind }}{% if item.area_label %} | {{ item.area_label }}{% endif %}</span>
+                </a>
+                <div class="apps-card-actions">
+                  {% if item.default_action %}
+                    <a href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
+                  {% endif %}
+                  <a href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}">Edit</a>
+                  <form method="post"
+                        action="{{ url_for('apps.delete_app_route', item_id=item.app_id) }}"
+                        onsubmit='return confirm({{ ("Delete " ~ item.title ~ "?")|tojson }});'>
+                    <input type="hidden" name="area" value="{{ area or '' }}">
+                    <input type="hidden" name="saved_view" value="{{ saved_view }}">
+                    <input type="hidden" name="mode" value="{{ mode }}">
+                    <input type="hidden" name="q" value="{{ query }}">
+                    <input type="hidden" name="sort" value="{{ sort_col }}">
+                    <input type="hidden" name="dir" value="{{ sort_dir }}">
+                    <input type="hidden" name="page" value="{{ page }}">
+                    <button type="submit" class="apps-danger-button">Delete</button>
+                  </form>
+                </div>
+              </div>
             {% else %}
               <div class="apps-empty">No apps found.</div>
             {% endfor %}
@@ -87,7 +126,13 @@
       <aside class="apps-inspector">
         {% if selected_app %}
           <div class="apps-inspector-heading">
-            <div class="apps-inspector-icon">{{ selected_app.kind_icon }}</div>
+            <div class="apps-inspector-icon">
+              {% if selected_app.icon_image_url %}
+                <img src="{{ selected_app.icon_image_url }}" alt="">
+              {% else %}
+                {{ selected_app.kind_icon }}
+              {% endif %}
+            </div>
             <div>
               <div class="apps-inspector-title">{{ selected_app.title }}</div>
               <div class="apps-inspector-sub">{{ selected_app.kind }}</div>
@@ -98,6 +143,18 @@
               <a class="apps-primary-action" href="{{ url_for('apps.launch_app_route', item_id=selected_app.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
             {% endif %}
             <a href="{{ url_for('apps.edit_app_route', item_id=selected_app.app_id, area=area) }}">Edit</a>
+            <form method="post"
+                  action="{{ url_for('apps.delete_app_route', item_id=selected_app.app_id) }}"
+                  onsubmit='return confirm({{ ("Delete " ~ selected_app.title ~ "?")|tojson }});'>
+              <input type="hidden" name="area" value="{{ area or '' }}">
+              <input type="hidden" name="saved_view" value="{{ saved_view }}">
+              <input type="hidden" name="mode" value="{{ mode }}">
+              <input type="hidden" name="q" value="{{ query }}">
+              <input type="hidden" name="sort" value="{{ sort_col }}">
+              <input type="hidden" name="dir" value="{{ sort_dir }}">
+              <input type="hidden" name="page" value="{{ page }}">
+              <button type="submit" class="apps-danger-button">Delete</button>
+            </form>
           </div>
           <dl class="apps-meta">
             <dt>Areas</dt><dd>{{ selected_app.area_label or 'None' }}</dd>

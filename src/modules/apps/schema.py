@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS lp_app (
     version         TEXT,
     tags            TEXT,
     comments        TEXT,
+    import_source   TEXT,
+    import_source_path TEXT,
+    imported_date   TEXT,
+    import_metadata TEXT,
     last_used_date  TEXT,
     usage_count     INTEGER NOT NULL DEFAULT 0,
     created_date    TEXT NOT NULL,
@@ -194,7 +198,7 @@ def ensure_apps_schema(conn=None):
 
 def _apps_schema_is_current(conn):
     return (
-        {"app_id", "title", "kind", "favorite", "last_used_date"}.issubset(_table_columns(conn, "lp_app"))
+        {"app_id", "title", "kind", "favorite", "last_used_date", "import_source", "import_source_path", "imported_date", "import_metadata"}.issubset(_table_columns(conn, "lp_app"))
         and {"app_id", "area_id"}.issubset(_table_columns(conn, "lp_app_area"))
         and {"app_id", "action_name", "action_type", "is_default"}.issubset(_table_columns(conn, "lp_app_action"))
         and not _table_exists(conn, "lp_apps")
@@ -217,6 +221,10 @@ def _migrate_apps_schema(conn):
         "version": "TEXT",
         "tags": "TEXT",
         "comments": "TEXT",
+        "import_source": "TEXT",
+        "import_source_path": "TEXT",
+        "imported_date": "TEXT",
+        "import_metadata": "TEXT",
         "last_used_date": "TEXT",
         "usage_count": "INTEGER NOT NULL DEFAULT 0",
         "created_date": "TEXT",
@@ -432,8 +440,9 @@ def create_app(values, conn=None, owner_user_id=None):
     cur = conn.execute(
         "INSERT INTO lp_app "
         "(owner_user_id, title, kind, description, icon, favorite, enabled, path, repository_url, website_url, "
-        "language, version, tags, comments, usage_count, created_date, modified_date, user_name, rec_extract_date) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
+        "language, version, tags, comments, import_source, import_source_path, imported_date, import_metadata, "
+        "usage_count, created_date, modified_date, user_name, rec_extract_date) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
         (
             owner_user_id,
             title,
@@ -449,6 +458,10 @@ def create_app(values, conn=None, owner_user_id=None):
             _clean_text(values.get("version")),
             _clean_text(values.get("tags")),
             _clean_text(values.get("comments")),
+            _clean_text(values.get("import_source")),
+            _clean_text(values.get("import_source_path")),
+            _clean_text(values.get("imported_date")),
+            _clean_text(values.get("import_metadata")),
             now,
             now,
             _current_user_name(),
@@ -727,7 +740,8 @@ def _app_row(row, conn=None, owner_user_id=None):
         return None
     app = dict(row)
     app["id"] = app["app_id"]
-    app["kind_icon"] = app.get("icon") or _default_icon(app.get("kind"))
+    app["icon_image_url"] = _icon_image_url(app.get("icon"))
+    app["kind_icon"] = "" if app["icon_image_url"] else (app.get("icon") or _default_icon(app.get("kind")))
     app["areas"] = list_app_areas(app["app_id"], conn=conn, owner_user_id=owner_user_id)
     app["area_ids"] = [area["area_id"] for area in app["areas"]]
     app["area_label"] = ", ".join(area.get("area_name") or area.get("area_id") or "" for area in app["areas"])
@@ -736,6 +750,15 @@ def _app_row(row, conn=None, owner_user_id=None):
     app["collections"] = collections_mod.record_collections("app", app["app_id"], domain="apps", conn=conn, owner_user_id=owner_user_id)
     app["collection_ids"] = [entry["collection_id"] for entry in app["collections"]]
     return app
+
+
+def _icon_image_url(icon):
+    text = _clean_text(icon)
+    if text.startswith("/static/"):
+        return text
+    if text.startswith("static/"):
+        return "/" + text
+    return ""
 
 
 def _default_icon(kind):

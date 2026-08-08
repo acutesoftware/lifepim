@@ -1,8 +1,18 @@
+import json
+
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
-from common.utils import build_pagination, get_side_tabs, get_tabs, paginate_total, request_area_param
+from common.utils import build_pagination, get_side_tabs, get_tabs, lg_usr, paginate_total, request_area_param
 from common import config as cfg
 from modules.apps import schema as apps_model
+from modules.apps.importers import (
+    AppImportCandidate,
+    DesktopAppImporter,
+    DevFolderAppImporter,
+    TaskbarAppImporter,
+    import_selected_candidates,
+    mark_candidate_duplicates,
+)
 
 
 apps_bp = Blueprint(
@@ -36,6 +46,7 @@ def _args_with(**updates):
         "q": request.values.get("q", ""),
         "sort": request.values.get("sort", ""),
         "dir": request.values.get("dir", ""),
+        "page": request.values.get("page", ""),
     }
     values.update(updates)
     return {key: value for key, value in values.items() if value not in (None, "")}
@@ -150,6 +161,118 @@ def _render_apps_index(area, item=None, launch_error="", message=""):
         launch_error=launch_error,
         message=message,
     )
+
+
+def _import_source_choices():
+    return (
+        ("dev_folders", "Dev Folders"),
+        ("taskbar", "Taskbar"),
+        ("desktop", "Desktop"),
+    )
+
+
+def _default_import_area(source, area):
+    if area and area.lower() not in {"all", "all areas", "any", "unmapped"}:
+        return area
+    if source == "dev_folders":
+        for option in apps_model.area_options():
+            option_id = (option.get("area_id") or "").strip()
+            label = (option.get("label") or "").strip().lower()
+            if option_id.lower() in {"dev", "development"} or label == "development":
+                return option_id
+    return ""
+
+
+def _scan_import_candidates(source, form):
+    default_area = (form.get("default_area_id") or "").strip()
+    if source == "dev_folders":
+        importer = DevFolderAppImporter(
+            form.get("root_folder", ""),
+            default_area_id=default_area,
+            default_kind=form.get("default_kind") or "Development Project",
+        )
+    elif source == "taskbar":
+        importer = TaskbarAppImporter(default_area_id=default_area)
+    else:
+        importer = DesktopAppImporter(default_area_id=default_area)
+    scan_result = importer.scan()
+    mark_candidate_duplicates(scan_result.candidates)
+    _log_import_errors(source, scan_result.errors)
+    return scan_result
+
+
+def _candidate_json(candidates):
+    return json.dumps([candidate.as_dict() for candidate in candidates], sort_keys=True)
+
+
+def _candidates_from_form(form):
+    try:
+        rows = json.loads(form.get("candidates_json") or "[]")
+    except json.JSONDecodeError:
+        rows = []
+    candidates = [AppImportCandidate.from_dict(row) for row in rows]
+    selected = set(form.getlist("candidate_selected"))
+    kinds = dict(zip(form.getlist("candidate_id"), form.getlist("candidate_kind")))
+    areas = dict(zip(form.getlist("candidate_id"), form.getlist("candidate_area_id")))
+    for candidate in candidates:
+        candidate.selected = candidate.candidate_id in selected
+        if candidate.candidate_id in kinds:
+            candidate.kind = kinds[candidate.candidate_id]
+        if candidate.candidate_id in areas:
+            candidate.area_id = areas[candidate.candidate_id]
+    return candidates
+
+
+def _render_import(source=None, candidates=None, scan_messages=None, scan_errors=None, import_result=None, error=""):
+    area = _area()
+    source = source or request.values.get("source") or "dev_folders"
+    if source not in {choice[0] for choice in _import_source_choices()}:
+        source = "dev_folders"
+    default_area = request.values.get("default_area_id") or _default_import_area(source, area)
+    default_kind = request.values.get("default_kind") or "Development Project"
+    root_folder = request.values.get("root_folder") or ""
+    candidates = candidates or []
+    selected_area_ids = [default_area] + [candidate.area_id for candidate in candidates if candidate.area_id]
+    new_count = sum(1 for candidate in candidates if candidate.status == "NEW")
+    selected_count = sum(1 for candidate in candidates if candidate.status == "NEW" and candidate.selected)
+    return render_template(
+        "apps_import.html",
+        active_tab="apps",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Apps > Import",
+        content_html="",
+        area=area,
+        source=source,
+        source_choices=_import_source_choices(),
+        root_folder=root_folder,
+        default_area=default_area,
+        default_kind=default_kind,
+        kind_options=apps_model.APP_KIND_OPTIONS,
+        area_options=apps_model.area_options(selected_area_ids),
+        candidates=candidates,
+        candidates_json=_candidate_json(candidates),
+        scan_messages=scan_messages or [],
+        scan_errors=scan_errors or [],
+        import_result=import_result,
+        error=error,
+        new_count=new_count,
+        selected_count=selected_count,
+    )
+
+
+def _log_import_errors(source, errors):
+    for error in errors or []:
+        try:
+            lg_usr(
+                action="app_import_error",
+                entity_type="lp_app",
+                context_type="apps_import",
+                context_id=source,
+                extra={"error": error},
+            )
+        except Exception:
+            pass
 
 
 @apps_bp.route("/")
@@ -285,11 +408,32 @@ def edit_app_route(item_id):
 
 @apps_bp.route("/delete/<int:item_id>", methods=["GET", "POST"])
 def delete_app_route(item_id):
-    area = _area()
     apps_model.delete_app(item_id)
-    return redirect(url_for("apps.list_apps_table_route", area=area))
+    return redirect(url_for("apps.list_apps_table_route", **_args_with()))
 
 
 @apps_bp.route("/import", methods=["GET", "POST"])
 def import_apps_route():
-    return add_app_route()
+    source = request.values.get("source") or "dev_folders"
+    if request.method == "POST":
+        intent = request.form.get("intent") or "scan"
+        if intent == "scan":
+            scan_result = _scan_import_candidates(source, request.form)
+            return _render_import(
+                source=source,
+                candidates=scan_result.candidates,
+                scan_messages=scan_result.messages,
+                scan_errors=scan_result.errors,
+            )
+        if intent == "import":
+            candidates = _candidates_from_form(request.form)
+            result = import_selected_candidates(candidates)
+            mark_candidate_duplicates(candidates)
+            _log_import_errors(source, result.errors)
+            return _render_import(
+                source=source,
+                candidates=candidates,
+                import_result=result,
+                scan_errors=result.errors,
+            )
+    return _render_import(source=source)
