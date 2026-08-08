@@ -70,7 +70,7 @@ table_def = [
 	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['path', 'filename', 'ext', 'media_type', 'size_bytes', 'mtime_utc', 'ctime_utc', 'hash']},
 	{'name':'lp_audio', 'route':'audio', 'display_name':'Audio', 'col_list':['file_name','path', 'folder_id', 'file_type', 'size', 'date_modified', 'duration', 'artist', 'album', 'song', 'area']},
 	{'name':'lp_3d', 'route':'3d', 'display_name':'3D', 'col_list':['file_name','path', 'folder_id', 'size', 'date_modified', 'area']},
-	{'name':'lp_apps', 'route':'apps', 'display_name':'Apps', 'col_list':['file_path', 'folder_id', 'title','icon', 'area']},
+	{'name':'lp_app', 'route':'apps', 'display_name':'Apps', 'col_list':['title', 'kind', 'description', 'icon', 'favorite', 'enabled', 'path', 'repository_url', 'website_url', 'language', 'version', 'tags', 'comments', 'last_used_date', 'usage_count']},
 
 	{'name':'lp_goals', 'route':'goals', 'display_name':'Goals', 'col_list':['parent_goal_id', 'title','description', 'goal_date', 'remind_date', 'area']},
 	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'area']},

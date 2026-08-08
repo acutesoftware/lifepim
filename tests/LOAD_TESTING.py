@@ -34,7 +34,6 @@ if test_type == 'Light':
     FOLDER_DATA = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\SQL"
     FOLDER_FILES = r"E:\BK_fangorn\user\duncan\LifePIM_Data\index"
     FOLDER_3D = r"E:\BK_fangorn\user\duncan\C\user\docs\designs\blender"
-    FOLDER_APPS = r"C:\apps\UE_5.6"
 else:
     FOLDER_AUDIO = r"E:\BK_fangorn\music\Music"
     FOLDER_MEDIA = r"E:\BK_fangorn\photo"
@@ -46,8 +45,6 @@ else:
     FOLDER_DATA = r"E:\BK_fangorn\user\duncan\LifePIM_Data\DATA\SQL"
     FOLDER_FILES = r"E:\BK_fangorn\user\duncan\LifePIM_Data"
     FOLDER_3D = r"E:\BK_fangorn\user\duncan\C\user\docs\designs\blender"
-    FOLDER_APPS = r"C:\apps"
-
     """
     Notes loaded: 2066
     Tasks loaded: 283
@@ -59,7 +56,6 @@ else:
     Media loaded: 9943
     Audio loaded: 17563
     3D loaded: 0
-    Apps loaded: 747
     """
 
 def _iter_files(folder_path, extensions=None):
@@ -320,23 +316,6 @@ def load_3d(folder_path=FOLDER_3D, area=AREA_LOAD_TEST):
     return count
 
 
-def load_apps(folder_path=FOLDER_APPS, area=AREA_LOAD_TEST):
-    tbl = _get_tbl("apps")
-    count = 0
-    for full_path in _iter_files(folder_path, extensions=(".exe",)):
-        title = os.path.splitext(os.path.basename(full_path))[0]
-        values_map = {
-            "file_path": full_path,
-            "title": title,
-            "icon": "",
-            "area": area,
-        }
-        if _add_record(tbl, values_map):
-            count += 1
-    print(f"Apps loaded: {count}")
-    return count
-
-
 def _load_core_records_enabled():
     return os.getenv(LOAD_CORE_RECORDS_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -361,7 +340,6 @@ def main():
     load_media()
     load_audio()
     load_3d()
-    load_apps()
 
 
 if __name__ == "__main__":

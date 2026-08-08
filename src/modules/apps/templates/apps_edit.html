@@ -1,14 +1,178 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div>
-    <a href="{{ url_for('apps.list_apps_table_route', area=area) }}">Back to Apps</a>
-  </div>
+  {% if error %}
+    <div class="apps-launch-error">{{ error }}</div>
+  {% endif %}
 
-  <form method="POST">
-    {% for col in col_list %}
-    <label>{{ col.replace('_', ' ') }}:</label><br>
-    <input type="text" name="{{ col }}" value="{{ item[col] if item else '' }}"><br><br>
-    {% endfor %}
-    <button type="submit">Save</button>
+  <form method="post" class="apps-edit-form">
+    <div class="apps-form-grid">
+      <label>
+        Name
+        <input type="text" name="title" value="{{ item.title if item else '' }}" required>
+      </label>
+      <label>
+        Kind
+        {% set selected_kind = item.kind if item else 'Application' %}
+        <select name="kind">
+          {% for kind in kind_options %}
+            <option value="{{ kind }}" {% if selected_kind == kind %}selected{% endif %}>{{ kind }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="project-icon-field">
+        Icon
+        <span class="icon-input-row">
+          <input id="app-icon-input" class="icon-small-input" type="text" name="icon" value="{{ item.icon if item else '' }}" maxlength="16">
+          <button type="button" class="icon-picker-button" data-icon-picker-target="app-icon-input" data-icon-picker-mode="replace">[..]</button>
+        </span>
+      </label>
+      <label>
+        Language
+        <input type="text" name="language" value="{{ item.language if item else '' }}">
+      </label>
+      <label>
+        Version
+        <input type="text" name="version" value="{{ item.version if item else '' }}">
+      </label>
+      <label class="apps-checkbox-label">
+        <input type="checkbox" name="favorite" value="1" {% if item and item.favorite %}checked{% endif %}>
+        Favorite
+      </label>
+      <label class="apps-checkbox-label">
+        <input type="checkbox" name="enabled" value="1" {% if not item or item.enabled %}checked{% endif %}>
+        Enabled
+      </label>
+    </div>
+
+    <label class="apps-wide-field">
+      Description
+      <textarea name="description" rows="3">{{ item.description if item else '' }}</textarea>
+    </label>
+
+    <div class="apps-form-grid apps-form-wide">
+      <label>
+        Path
+        <span class="apps-path-row">
+          <input id="app-main-path" type="text" name="path" value="{{ item.path if item else '' }}">
+          <button type="button" class="apps-path-picker" data-target="#app-main-path" data-kind="file" title="Browse">[...]</button>
+        </span>
+      </label>
+      <label>
+        Repository URL
+        <input type="url" name="repository_url" value="{{ item.repository_url if item else '' }}">
+      </label>
+      <label>
+        Website URL
+        <input type="url" name="website_url" value="{{ item.website_url if item else '' }}">
+      </label>
+      <label>
+        Tags
+        <input type="text" name="tags" value="{{ item.tags if item else '' }}">
+      </label>
+    </div>
+
+    <fieldset class="project-area-select">
+      <legend>Areas</legend>
+      {% for option in area_options %}
+        <label>
+          <input type="checkbox" name="area_ids" value="{{ option.area_id }}" {% if option.selected %}checked{% endif %}>
+          <span>{{ option.icon or '' }} {{ option.label }} <small>{{ option.area_id }}</small></span>
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    <section class="apps-action-editor">
+      <div class="apps-edit-section-title">Actions</div>
+      <div class="tabular-scroll">
+        <table class="apps-actions-table">
+          <thead>
+            <tr>
+              <th>Default</th>
+              <th>Action</th>
+              <th>Type</th>
+              <th>Target / Command</th>
+              <th>Working Directory</th>
+              <th>Arguments</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for action in actions %}
+              {% set idx = loop.index0 %}
+              <tr>
+                <td><input type="radio" name="default_action_idx" value="{{ idx }}" {% if action.is_default or (not item and loop.first) %}checked{% endif %}></td>
+                <td><input type="text" name="action_name" value="{{ action.action_name or '' }}" placeholder="Open"></td>
+                <td>
+                  {% set selected_action_type = action.action_type or 'SYSTEM_DEFAULT' %}
+                  <select name="action_type">
+                    {% for action_type in action_type_options %}
+                      <option value="{{ action_type }}" {% if selected_action_type == action_type %}selected{% endif %}>{{ action_type }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td>
+                  <span class="apps-path-row">
+                    <input id="app-action-command-{{ idx }}" type="text" name="action_command" value="{{ action.command or '' }}">
+                    <button type="button" class="apps-path-picker" data-target="#app-action-command-{{ idx }}" data-kind="file" title="Browse">[...]</button>
+                  </span>
+                </td>
+                <td>
+                  <span class="apps-path-row">
+                    <input id="app-action-working-directory-{{ idx }}" type="text" name="action_working_directory" value="{{ action.working_directory or '' }}">
+                    <button type="button" class="apps-path-picker" data-target="#app-action-working-directory-{{ idx }}" data-kind="folder" title="Browse folder">[...]</button>
+                  </span>
+                </td>
+                <td><input type="text" name="action_arguments" value="{{ action.arguments or '' }}"></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <label class="apps-wide-field">
+      Comments
+      <textarea name="comments" rows="3">{{ item.comments if item else '' }}</textarea>
+    </label>
+
+    <div class="apps-edit-actions">
+      <button type="submit">Save App</button>
+      <a href="{{ url_for('apps.list_apps_table_route', area=area) }}">Back to Apps</a>
+      {% if item %}
+        <a href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area) }}">View</a>
+      {% endif %}
+      <span class="apps-browse-status" aria-live="polite"></span>
+    </div>
   </form>
+
+  <script>
+    (function () {
+      const form = document.querySelector(".apps-edit-form");
+      if (!form) return;
+      const status = form.querySelector(".apps-browse-status");
+
+      form.querySelectorAll(".apps-path-picker").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = form.querySelector(button.dataset.target || "");
+          if (!target) return;
+          if (status) status.textContent = "Opening picker...";
+          try {
+            const response = await fetch("{{ url_for('apps.browse_path_route') }}?target=" + encodeURIComponent(button.dataset.kind || "file"));
+            const payload = await response.json();
+            if (!response.ok || payload.error) {
+              throw new Error(payload.error || "Browse failed");
+            }
+            if (payload.path) {
+              target.value = payload.path;
+              target.dispatchEvent(new Event("input", { bubbles: true }));
+              if (status) status.textContent = "Selected";
+            } else if (status) {
+              status.textContent = "No path selected";
+            }
+          } catch (error) {
+            if (status) status.textContent = error.message;
+          }
+        });
+      });
+    })();
+  </script>
 {% endblock %}

@@ -1,0 +1,148 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="apps-page">
+    {% if message %}
+      <div class="settings-message">{{ message }}</div>
+    {% endif %}
+    {% if launch_error %}
+      <div class="apps-launch-error">{{ launch_error }}</div>
+    {% endif %}
+
+    <div class="apps-toolbar">
+      <div class="apps-view-tabs">
+        {% for view_id, view_label in saved_views %}
+          <a class="{% if saved_view == view_id %}active{% endif %}"
+             href="{{ url_for('apps.list_apps_table_route', area=area, saved_view=view_id, mode=mode, q=query) }}">
+            {{ view_label }}
+          </a>
+        {% endfor %}
+      </div>
+      <form class="apps-search-form" method="get" action="{{ url_for('apps.list_apps_table_route') }}">
+        {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+        <input type="hidden" name="saved_view" value="{{ saved_view }}">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <input type="search" name="q" value="{{ query }}" placeholder="Search apps">
+        <button type="submit">Search</button>
+      </form>
+      <div class="apps-actions">
+        <a class="apps-button {% if mode == 'grid' %}active{% endif %}"
+           href="{{ url_for('apps.list_apps_table_route', area=area, saved_view=saved_view, mode='grid', q=query) }}">Grid</a>
+        <a class="apps-button {% if mode == 'list' %}active{% endif %}"
+           href="{{ url_for('apps.list_apps_table_route', area=area, saved_view=saved_view, mode='list', q=query) }}">List</a>
+        <a class="apps-button" href="{{ url_for('apps.add_app_route', area=area) }}">+ Add</a>
+      </div>
+    </div>
+
+    <div class="apps-shell">
+      <section class="apps-main-panel">
+        {% if mode == 'list' %}
+          <div class="tabular-scroll">
+            <table class="apps-table">
+              <thead>
+                <tr>
+                  {% for col, label in [('title', 'Name'), ('kind', 'Kind'), ('area_label', 'Areas'), ('path', 'Location / Command'), ('last_used_date', 'Last Used'), ('favorite', 'Favorite')] %}
+                    <th>
+                      {% if col in ['title', 'kind', 'last_used_date', 'favorite'] %}
+                        {% set next_dir = 'desc' if sort_col == col and sort_dir == 'asc' else 'asc' %}
+                        <a href="{{ url_for('apps.list_apps_table_route', area=area, saved_view=saved_view, mode=mode, q=query, sort=col, dir=next_dir) }}">{{ label }}</a>
+                      {% else %}
+                        {{ label }}
+                      {% endif %}
+                    </th>
+                  {% endfor %}
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in items %}
+                  {% set target = item.default_action.command if item.default_action else item.path %}
+                  <tr class="{% if selected_app and selected_app.app_id == item.app_id %}focused{% endif %}">
+                    <td><a href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query) }}">{{ item.title }}</a></td>
+                    <td>{{ item.kind }}</td>
+                    <td>{{ item.area_label }}</td>
+                    <td>{{ target }}</td>
+                    <td>{{ item.last_used_date or '' }}</td>
+                    <td>{{ 'Yes' if item.favorite else '' }}</td>
+                    <td class="apps-row-actions">
+                      <a href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
+                      <a href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}">Edit</a>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="7">No apps found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="apps-grid">
+            {% for item in items %}
+              <a class="apps-card {% if selected_app and selected_app.app_id == item.app_id %}focused{% endif %}"
+                 href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query) }}">
+                <span class="apps-card-icon">{{ item.kind_icon }}</span>
+                <span class="apps-card-title">{{ item.title }}</span>
+                <span class="apps-card-sub">{{ item.kind }}{% if item.area_label %} | {{ item.area_label }}{% endif %}</span>
+              </a>
+            {% else %}
+              <div class="apps-empty">No apps found.</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% include "widgets/wid_pagination.html" %}
+      </section>
+
+      <aside class="apps-inspector">
+        {% if selected_app %}
+          <div class="apps-inspector-heading">
+            <div class="apps-inspector-icon">{{ selected_app.kind_icon }}</div>
+            <div>
+              <div class="apps-inspector-title">{{ selected_app.title }}</div>
+              <div class="apps-inspector-sub">{{ selected_app.kind }}</div>
+            </div>
+          </div>
+          <div class="apps-inspector-actions">
+            {% if selected_app.default_action %}
+              <a class="apps-primary-action" href="{{ url_for('apps.launch_app_route', item_id=selected_app.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
+            {% endif %}
+            <a href="{{ url_for('apps.edit_app_route', item_id=selected_app.app_id, area=area) }}">Edit</a>
+          </div>
+          <dl class="apps-meta">
+            <dt>Areas</dt><dd>{{ selected_app.area_label or 'None' }}</dd>
+            <dt>Path</dt><dd>{{ selected_app.path or '' }}</dd>
+            <dt>Repository</dt><dd>{{ selected_app.repository_url or '' }}</dd>
+            <dt>Website</dt><dd>{{ selected_app.website_url or '' }}</dd>
+            <dt>Language</dt><dd>{{ selected_app.language or '' }}</dd>
+            <dt>Last Used</dt><dd>{{ selected_app.last_used_date or '' }}</dd>
+            <dt>Usage</dt><dd>{{ selected_app.usage_count or 0 }}</dd>
+            <dt>Tags</dt><dd>{{ selected_app.tags or '' }}</dd>
+          </dl>
+          <div class="apps-inspector-section">
+            <div class="apps-filter-title">Actions</div>
+            <ul class="apps-action-list">
+              {% for action in selected_app.actions %}
+                <li>
+                  <a href="{{ url_for('apps.launch_app_action_route', item_id=selected_app.app_id, action_id=action.app_action_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">
+                    {{ action.action_name }}
+                  </a>
+                  <span>{{ action.action_type }}</span>
+                  {% if action.is_default %}<strong>Default</strong>{% endif %}
+                  <small>{{ action.command }}</small>
+                </li>
+              {% else %}
+                <li>No actions configured.</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% if selected_app.description %}
+            <div class="apps-inspector-section">
+              <div class="apps-filter-title">Description</div>
+              <p>{{ selected_app.description }}</p>
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="apps-empty">Select an app to inspect it.</div>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
+{% endblock %}

@@ -51,12 +51,6 @@ images,area,List,DROPDOWNLIST,80,DROPDOWNLIST
 files,id,id,Label,20,HIDDEN
 files,nme,Text,Label,80,TEXTBOX
 files,area,List,DROPDOWNLIST,80,DROPDOWNLIST
-apps,id,id,Label,20,HIDDEN
-apps,area,List,DROPDOWNLIST,80,DROPDOWNLIST
-apps,app_name,Text,Label,80,TEXTBOX
-apps,app_desc,Text,Label,80,TEXTBOX
-apps,app_launch_url,Text,Label,80,TEXTBOX
-apps,app_notes,Note,Label,200,TEXTAREA
 data_tables,id,id,Label,20,HIDDEN
 data_tables,table_name,Text,Label,80,TEXTBOX
 data_tables,color,Color,Label,20,TEXTBOX

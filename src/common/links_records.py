@@ -47,7 +47,7 @@ def search_records(query, types=None, limit=20):
     if "album" in types:
         _extend(_search_albums(terms, remaining))
     if "app" in types:
-        _extend(_search_generic_config_table("apps", "app", terms, remaining))
+        _extend(_search_apps(terms, remaining))
     if "3d" in types:
         _extend(_search_generic_config_table("3d", "3d", terms, remaining))
     return results
@@ -122,7 +122,7 @@ def _table_for_type(type_id):
     if type_id == "album":
         return {"name": "lp_albums", "pk": "album_id"}
     if type_id == "app":
-        return get_table_def("apps")
+        return {"name": "lp_app", "pk": "app_id"}
     if type_id == "3d":
         return get_table_def("3d")
     if type_id == "project":
@@ -301,6 +301,29 @@ def _search_albums(terms, limit):
     ]
 
 
+def _search_apps(terms, limit):
+    conn = data._get_conn()
+    if not _table_exists(conn, "lp_app"):
+        return []
+    cols = ["app_id", "title", "kind", "path", "repository_url", "website_url", "language", "tags"]
+    rows = _search_table(
+        "lp_app",
+        cols,
+        ["title", "kind", "description", "path", "repository_url", "website_url", "language", "tags"],
+        terms,
+        limit,
+    )
+    return [
+        _summary_from_values(
+            "app",
+            row["app_id"],
+            row.get("title"),
+            row.get("kind") or row.get("path") or row.get("website_url"),
+        )
+        for row in rows
+    ]
+
+
 def _search_generic_config_table(route_id, type_id, terms, limit):
     tbl = get_table_def(route_id)
     if not tbl:
@@ -370,7 +393,7 @@ def _summary_fields(type_id, row):
     if type_id == "album":
         return row.get("title"), row.get("album_type") or row.get("description")
     if type_id == "app":
-        return row.get("title"), row.get("file_path")
+        return row.get("title"), row.get("kind") or row.get("path") or row.get("website_url")
     if type_id == "3d":
         return row.get("file_name"), row.get("path")
     if type_id == "project":

@@ -14,6 +14,7 @@ from common.media_schema import ensure_media_schema
 from common.settings import ensure_settings_schema
 from lifepim.importer.schema import ensure_import_schema
 from modules.calendar.services.calendar_index import run_calendar_migration
+from modules.apps.schema import ensure_apps_schema
 from modules.how.schema import ensure_how_schema
 from core.security import ensure_security_schema
 def main():
@@ -52,6 +53,7 @@ def reset_database(db_file):
     ensure_import_schema(db_conn)
     ensure_settings_schema(db_conn)
     db.ensure_notes_schema(db_conn)
+    ensure_apps_schema(db_conn)
     run_calendar_migration(db_conn)
     ensure_how_schema(db_conn)
     ensure_security_schema(db_conn)
@@ -63,6 +65,8 @@ def reset_database(db_file):
 def create_table(db_conn, tbl):
     # {'name':'lp_notes', 'display_name':'Notes', 'col_list':['file_name','path','size','date_modified','area']},
     # also include standard columns
+    if tbl.get("route") == "apps":
+        return
     col_defs = []
     for col in tbl["col_list"]:
         col_type = "TEXT"
@@ -77,7 +81,7 @@ def create_table(db_conn, tbl):
         f"{', '.join(col_defs)})"
     )
     db_conn.execute(sql)
-    if tbl.get("route") in {"notes", "media", "audio", "3d", "files", "apps"}:
+    if tbl.get("route") in {"notes", "media", "audio", "3d", "files"}:
         db_conn.execute(
             f"CREATE INDEX IF NOT EXISTS ix_{tbl['name']}_folder_id ON {tbl['name']}(folder_id)"
         )

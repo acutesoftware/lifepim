@@ -113,9 +113,6 @@ def _table_has_column(conn: sqlite3.Connection, tbl_name: str, col_name: str) ->
 
 
 def _derive_folder_path(route_name: str, row: sqlite3.Row) -> str:
-    if route_name == "apps":
-        file_path = row["file_path"] or ""
-        return os.path.dirname(file_path) if file_path else ""
     if route_name == "notes":
         path_value = (row["path"] or "").strip()
         file_name = (row["file_name"] or "").strip()
@@ -150,7 +147,6 @@ def backfill_folder_ids(conn: sqlite3.Connection) -> int:
         ("lp_audio", "audio", ["id", "folder_id", "path", "file_name"]),
         ("lp_3d", "3d", ["id", "folder_id", "path", "file_name"]),
         ("lp_files", "files", ["id", "folder_id", "path"]),
-        ("lp_apps", "apps", ["id", "folder_id", "file_path"]),
     ]
     updated = 0
     path_to_id = {}
@@ -235,7 +231,6 @@ def folder_id_stats(conn: sqlite3.Connection) -> Dict[str, int]:
         "lp_audio",
         "lp_3d",
         "lp_files",
-        "lp_apps",
     ]
     for tbl_name in file_tables:
         if not _table_has_column(conn, tbl_name, "folder_id"):

@@ -270,7 +270,6 @@ def ensure_folder_schema(conn=None):
         "lp_audio",
         "lp_3d",
         "lp_files",
-        "lp_apps",
     ]
     for tbl_name in folder_tables:
         add_column_if_missing(conn, tbl_name, "folder_id", "INTEGER")
@@ -324,9 +323,6 @@ def _normalize_note_folder_path(path_value):
 
 
 def _derive_folder_path(route_name, values_map):
-    if route_name == "apps":
-        file_path = values_map.get("file_path") or ""
-        return os.path.dirname(file_path) if file_path else ""
     if route_name == "notes":
         path_value = (values_map.get("path") or "").strip()
         file_name = (values_map.get("file_name") or "").strip()
@@ -439,7 +435,7 @@ def get_mapped_rows(conn, tbl_name, col_list, tab=None, limit=None, offset=None,
     params = []
     order_clause = order_by or "t.id DESC"
     route_name = _route_for_table(tbl_name)
-    if route_name in {"notes", "media", "audio", "3d", "files", "apps"}:
+    if route_name in {"notes", "media", "audio", "3d", "files"}:
         from common import areas as areas_mod
 
         areas_mod.ensure_areas_schema(conn)
@@ -501,7 +497,7 @@ def count_mapped_rows(conn, tbl_name, tab=None):
     conn = _get_conn() if conn is None else conn
     params = []
     route_name = _route_for_table(tbl_name)
-    if route_name in {"notes", "media", "audio", "3d", "files", "apps"}:
+    if route_name in {"notes", "media", "audio", "3d", "files"}:
         from common import areas as areas_mod
 
         areas_mod.ensure_areas_schema(conn)
@@ -710,7 +706,7 @@ def _log_user_change(conn, action, tbl_name, record_id, before=None, after=None)
 
 def _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id):
     route_name = _route_for_table(tbl_name)
-    if route_name not in {"notes", "media", "audio", "3d", "files", "apps"}:
+    if route_name not in {"notes", "media", "audio", "3d", "files"}:
         return
     values_map = dict(zip(col_list, value_list))
     update_folder_id_for_record(conn, tbl_name, route_name, record_id, values_map)

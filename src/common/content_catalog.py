@@ -1423,7 +1423,7 @@ ROOT_TABLES = {
     "PLACE": "lp_places",
     "FILE": "lp_files",
     "DATA_ITEM": "lp_data_objects",
-    "APP_ITEM": "lp_apps",
+    "APP_ITEM": "lp_app",
     "MEDIA_ITEM": "lp_media",
     "AUDIO_ITEM": "lp_audio",
 }

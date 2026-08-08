@@ -1,11 +1,8 @@
-import os
-from urllib.parse import urlparse
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
-from flask import Blueprint, render_template, request, url_for, redirect, abort, send_from_directory
-
-from common import data as db
-from common.utils import get_side_tabs, get_table_def, get_tabs, paginate_total, build_pagination, request_area_param
+from common.utils import build_pagination, get_side_tabs, get_tabs, paginate_total, request_area_param
 from common import config as cfg
+from modules.apps import schema as apps_model
 
 
 apps_bp = Blueprint(
@@ -17,65 +14,142 @@ apps_bp = Blueprint(
 )
 
 
-def _get_tbl():
-    return get_table_def("apps")
+SAVED_VIEWS = (
+    ("all", "All"),
+    ("favorites", "Favorites"),
+    ("recent", "Recent"),
+    ("projects", "Projects"),
+    ("scripts", "Scripts"),
+    ("applications", "Applications"),
+)
 
 
-def _fetch_items(area=None, sort_col=None, sort_dir=None, limit=None, offset=None):
-    tbl = _get_tbl()
-    if not tbl:
-        return []
-    cols = ["id"] + tbl["col_list"]
-    order_map = {
-        "file_path": "t.file_path",
-        "title": "t.title",
-        "icon": "t.icon",
-        "area": "t.area",
+def _area():
+    return request_area_param(include_form=True, include_id=True) or None
+
+
+def _args_with(**updates):
+    values = {
+        "area": _area(),
+        "saved_view": request.values.get("saved_view", "all"),
+        "mode": request.values.get("mode", "grid"),
+        "q": request.values.get("q", ""),
+        "sort": request.values.get("sort", ""),
+        "dir": request.values.get("dir", ""),
     }
-    sort_key = order_map.get(sort_col or "title", "t.title")
-    sort_dir = sort_dir or "asc"
-    order_by = f"{sort_key} {sort_dir}"
-    rows = db.get_mapped_rows(
-        db.conn,
-        tbl["name"],
-        cols,
-        tab=area,
-        limit=limit,
+    values.update(updates)
+    return {key: value for key, value in values.items() if value not in (None, "")}
+
+
+def _form_values(form, area):
+    area_ids = form.getlist("area_ids")
+    if not area_ids and area:
+        area_ids = [area]
+    return {
+        "title": form.get("title", "").strip(),
+        "kind": form.get("kind", "").strip(),
+        "description": form.get("description", "").strip(),
+        "icon": form.get("icon", "").strip(),
+        "favorite": form.get("favorite"),
+        "enabled": form.get("enabled", "1"),
+        "path": form.get("path", "").strip(),
+        "repository_url": form.get("repository_url", "").strip(),
+        "website_url": form.get("website_url", "").strip(),
+        "language": form.get("language", "").strip(),
+        "version": form.get("version", "").strip(),
+        "tags": form.get("tags", "").strip(),
+        "comments": form.get("comments", "").strip(),
+        "area_ids": area_ids,
+        "actions": _action_values(form),
+    }
+
+
+def _action_values(form):
+    rows = []
+    default_idx = form.get("default_action_idx", "")
+    names = form.getlist("action_name")
+    types = form.getlist("action_type")
+    commands = form.getlist("action_command")
+    workdirs = form.getlist("action_working_directory")
+    args = form.getlist("action_arguments")
+    for idx, name in enumerate(names):
+        rows.append(
+            {
+                "action_name": name,
+                "action_type": types[idx] if idx < len(types) else "",
+                "command": commands[idx] if idx < len(commands) else "",
+                "working_directory": workdirs[idx] if idx < len(workdirs) else "",
+                "arguments": args[idx] if idx < len(args) else "",
+                "sort_order": idx * 10,
+                "is_default": str(idx) == str(default_idx),
+            }
+        )
+    return rows
+
+
+def _render_apps_index(area, item=None, launch_error="", message=""):
+    apps_model.ensure_apps_schema()
+    saved_view = request.values.get("saved_view", "all")
+    mode = request.values.get("mode", "grid")
+    query = request.values.get("q", "").strip()
+    sort_col = request.args.get("sort") or "title"
+    sort_dir = request.args.get("dir") or "asc"
+    page = request.args.get("page", type=int) or 1
+    per_page = cfg.RECS_PER_PAGE
+    total = apps_model.app_count(area_id=area, view_filter=saved_view, query=query)
+    page_data = paginate_total(total, page, per_page)
+    page = page_data["page"]
+    offset = (page - 1) * per_page
+    items = apps_model.app_list(
+        area_id=area,
+        view_filter=saved_view,
+        query=query,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        limit=per_page,
         offset=offset,
-        order_by=order_by,
     )
-    return [dict(row) for row in rows]
-
-
-def _sort_items(items, sort_col, sort_dir):
-    reverse = sort_dir == "desc"
-    return sorted(items, key=lambda i: (i.get(sort_col) or ""), reverse=reverse)
-
-
-def _fetch_item(item_id):
-    tbl = _get_tbl()
-    if not tbl:
-        return None
-    rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [item_id])
-    return dict(rows[0]) if rows else None
-
-
-def _is_web_url(value):
-    parsed = urlparse(value or "")
-    return parsed.scheme.lower() in {"http", "https"}
-
-
-def _is_html_file(path_value):
-    return os.path.splitext(path_value or "")[1].lower() in {".html", ".htm"}
-
-
-def _app_display_title(path_value):
-    base = os.path.basename(path_value)
-    name, ext = os.path.splitext(base)
-    if ext.lower() in {".html", ".htm"} and name.lower() == "index":
-        folder_name = os.path.basename(os.path.dirname(path_value))
-        return folder_name or name
-    return name or base
+    if not item and items:
+        item = items[0]
+    pagination = build_pagination(
+        url_for,
+        "apps.list_apps_table_route",
+        {
+            "area": area,
+            "saved_view": saved_view,
+            "mode": mode,
+            "q": query,
+            "sort": sort_col,
+            "dir": sort_dir,
+        },
+        page,
+        page_data["total_pages"],
+    )
+    return render_template(
+        "apps_index.html",
+        active_tab="apps",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Apps ({area or 'All'})",
+        content_html="",
+        area=area,
+        items=items,
+        total=total,
+        selected_app=item,
+        saved_views=SAVED_VIEWS,
+        saved_view=saved_view,
+        mode=mode,
+        query=query,
+        sort_col=sort_col,
+        sort_dir=sort_dir,
+        page=page,
+        total_pages=page_data["total_pages"],
+        pages=pagination["pages"],
+        first_url=pagination["first_url"],
+        last_url=pagination["last_url"],
+        launch_error=launch_error,
+        message=message,
+    )
 
 
 @apps_bp.route("/")
@@ -85,269 +159,137 @@ def list_apps_route():
 
 @apps_bp.route("/table")
 def list_apps_table_route():
-    area = request_area_param() or None
-    sort_col = request.args.get("sort") or "title"
-    sort_dir = request.args.get("dir") or "asc"
-    page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
-    offset = (page - 1) * per_page
-    items = _fetch_items(area, sort_col, sort_dir, limit=per_page, offset=offset)
-    page_data = paginate_total(total, page, per_page)
-    page = page_data["page"]
-    total_pages = page_data["total_pages"]
-    pagination = build_pagination(
-        url_for,
-        "apps.list_apps_table_route",
-        {"area": area, "sort": sort_col, "dir": sort_dir},
-        page,
-        total_pages,
-    )
-    tbl = _get_tbl()
-    col_list = tbl["col_list"] if tbl else []
-    return render_template(
-        "apps_list_table.html",
-        active_tab="apps",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Apps ({area or 'All'})",
-        content_html="",
-        items=items,
-        col_list=col_list,
-        area=area,
-        sort_col=sort_col,
-        sort_dir=sort_dir,
-        page=page,
-        total_pages=total_pages,
-        pages=pagination["pages"],
-        first_url=pagination["first_url"],
-        last_url=pagination["last_url"],
-    )
+    return _render_apps_index(_area())
 
 
 @apps_bp.route("/list")
 def list_apps_list_route():
-    area = request_area_param() or None
-    page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
-    offset = (page - 1) * per_page
-    items = _fetch_items(area, limit=per_page, offset=offset)
-    page_data = paginate_total(total, page, per_page)
-    page = page_data["page"]
-    total_pages = page_data["total_pages"]
-    pagination = build_pagination(
-        url_for,
-        "apps.list_apps_list_route",
-        {"area": area},
-        page,
-        total_pages,
-    )
-    return render_template(
-        "apps_list_list.html",
-        active_tab="apps",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Apps ({area or 'All'})",
-        content_html="",
-        items=items,
-        area=area,
-        page=page,
-        total_pages=total_pages,
-        pages=pagination["pages"],
-        first_url=pagination["first_url"],
-        last_url=pagination["last_url"],
-    )
+    return redirect(url_for("apps.list_apps_table_route", **_args_with(mode="list")))
 
 
 @apps_bp.route("/cards")
 def list_apps_cards_route():
-    area = request_area_param() or None
-    page = request.args.get("page", type=int) or 1
-    per_page = cfg.RECS_PER_PAGE
-    total = db.count_mapped_rows(db.conn, _get_tbl()["name"], tab=area)
-    offset = (page - 1) * per_page
-    items = _fetch_items(area, limit=per_page, offset=offset)
-    page_data = paginate_total(total, page, per_page)
-    page = page_data["page"]
-    total_pages = page_data["total_pages"]
-    pagination = build_pagination(
-        url_for,
-        "apps.list_apps_cards_route",
-        {"area": area},
-        page,
-        total_pages,
-    )
-    card_values = [[i.get("title"), i.get("file_path"), url_for("apps.launch_app_route", item_id=i.get("id"), area=area)] for i in items]
-    return render_template(
-        "apps_list_cards.html",
-        active_tab="apps",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Apps ({area or 'All'})",
-        content_html="",
-        items=items,
-        card_values=card_values,
-        area=area,
-        page=page,
-        total_pages=total_pages,
-        pages=pagination["pages"],
-        first_url=pagination["first_url"],
-        last_url=pagination["last_url"],
-    )
+    return redirect(url_for("apps.list_apps_table_route", **_args_with(mode="grid")))
 
 
 @apps_bp.route("/view/<int:item_id>")
 def view_app_route(item_id):
-    area = request_area_param() or None
-    item = _fetch_item(item_id)
+    area = _area()
+    item = apps_model.app_get(item_id)
     if not item:
-        return list_apps_table_route()
-    return render_template(
-        "apps_view.html",
-        active_tab="apps",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=item.get("title", "App"),
-        content_html="",
-        item=item,
-        area=area,
-    )
+        abort(404)
+    return _render_apps_index(area, item=item)
 
 
 @apps_bp.route("/launch/<int:item_id>")
 def launch_app_route(item_id):
-    area = request_area_param() or None
-    item = _fetch_item(item_id)
-    if not item:
-        abort(404)
-
-    file_path = (item.get("file_path") or "").strip()
-    if not file_path:
-        abort(404)
-    if _is_web_url(file_path):
-        return redirect(file_path)
-    if _is_html_file(file_path):
-        return redirect(url_for("apps.run_local_html_route", item_id=item_id))
-    if not os.path.exists(file_path):
-        return render_template(
-            "apps_view.html",
-            active_tab="apps",
-            tabs=get_tabs(),
-            side_tabs=get_side_tabs(),
-            content_title=item.get("title", "App"),
-            content_html="",
-            item=item,
-            area=area,
-            launch_error=f"File not found: {file_path}",
-        )
-
+    area = _area()
     try:
-        os.startfile(file_path)
-    except OSError as exc:
-        return render_template(
-            "apps_view.html",
-            active_tab="apps",
-            tabs=get_tabs(),
-            side_tabs=get_side_tabs(),
-            content_title=item.get("title", "App"),
-            content_html="",
-            item=item,
-            area=area,
-            launch_error=f"Could not launch file: {exc}",
-        )
-    return redirect(url_for("apps.view_app_route", item_id=item_id, area=area))
+        apps_model.launch_action(item_id)
+    except Exception as exc:
+        item = apps_model.app_get(item_id)
+        return _render_apps_index(area, item=item, launch_error=str(exc))
+    return redirect(url_for("apps.view_app_route", item_id=item_id, **_args_with()))
 
 
-@apps_bp.route("/run/<int:item_id>/", defaults={"rel_path": None})
-@apps_bp.route("/run/<int:item_id>/<path:rel_path>")
-def run_local_html_route(item_id, rel_path):
-    item = _fetch_item(item_id)
-    if not item:
-        abort(404)
-
-    file_path = os.path.abspath((item.get("file_path") or "").strip())
-    if not _is_html_file(file_path) or not os.path.isfile(file_path):
-        abort(404)
-
-    base_dir = os.path.dirname(file_path)
-    target_rel = rel_path or os.path.basename(file_path)
-    return send_from_directory(base_dir, target_rel)
+@apps_bp.route("/action/<int:action_id>/launch/<int:item_id>")
+def launch_app_action_route(item_id, action_id):
+    area = _area()
+    try:
+        apps_model.launch_action(item_id, action_id=action_id)
+    except Exception as exc:
+        item = apps_model.app_get(item_id)
+        return _render_apps_index(area, item=item, launch_error=str(exc))
+    return redirect(url_for("apps.view_app_route", item_id=item_id, **_args_with()))
 
 
-@apps_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
-def edit_app_route(item_id):
-    area = request_area_param() or None
-    tbl = _get_tbl()
-    item = _fetch_item(item_id)
-    if request.method == "POST" and tbl:
-        values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
-        db.update_record(db.conn, tbl["name"], item_id, tbl["col_list"], values)
-        return redirect(url_for("apps.view_app_route", item_id=item_id, area=area))
+@apps_bp.route("/add", methods=["GET", "POST"])
+def add_app_route():
+    area = _area()
+    error = ""
+    if request.method == "POST":
+        try:
+            app_id = apps_model.create_app(_form_values(request.form, area))
+            return redirect(url_for("apps.view_app_route", item_id=app_id, area=area))
+        except Exception as exc:
+            error = str(exc)
+    return _render_edit(None, area, error=error)
+
+
+def _render_edit(item, area, error=""):
+    selected_area_ids = item.get("area_ids", []) if item else ([area] if area else [])
+    actions = list(item.get("actions", [])) if item else []
+    for _ in range(3):
+        actions.append({})
     return render_template(
         "apps_edit.html",
         active_tab="apps",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title="Edit App",
+        content_title="Edit App" if item else "Add App",
         content_html="",
         item=item,
         area=area,
-        col_list=tbl["col_list"] if tbl else [],
+        error=error,
+        kind_options=apps_model.APP_KIND_OPTIONS,
+        action_type_options=apps_model.ACTION_TYPE_OPTIONS,
+        area_options=apps_model.area_options(selected_area_ids),
+        actions=actions,
     )
 
 
-@apps_bp.route("/delete/<int:item_id>")
+@apps_bp.route("/browse-path")
+def browse_path_route():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        target = (request.args.get("target") or "file").lower()
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        if target == "folder":
+            path = filedialog.askdirectory(title="Select folder")
+        else:
+            path = filedialog.askopenfilename(
+                title="Select app target",
+                filetypes=[
+                    ("Launchable files", "*.exe *.bat *.cmd *.ps1 *.py *.pyw *.sql *.db *.sqlite *.sqlite3 *.lnk *.html *.htm"),
+                    ("Python files", "*.py *.pyw"),
+                    ("Executables", "*.exe *.bat *.cmd *.lnk"),
+                    ("All files", "*.*"),
+                ],
+            )
+        root.destroy()
+        return jsonify({"path": path or ""})
+    except Exception as exc:
+        return jsonify({"path": "", "error": str(exc)}), 500
+
+
+@apps_bp.route("/edit/<int:item_id>", methods=["GET", "POST"])
+def edit_app_route(item_id):
+    area = _area()
+    item = apps_model.app_get(item_id)
+    if not item:
+        abort(404)
+    error = ""
+    if request.method == "POST":
+        try:
+            apps_model.update_app(item_id, _form_values(request.form, area))
+            return redirect(url_for("apps.view_app_route", item_id=item_id, area=area))
+        except Exception as exc:
+            error = str(exc)
+            item = apps_model.app_get(item_id) or item
+    return _render_edit(item, area, error=error)
+
+
+@apps_bp.route("/delete/<int:item_id>", methods=["GET", "POST"])
 def delete_app_route(item_id):
-    area = request_area_param() or None
-    tbl = _get_tbl()
-    if tbl:
-        db.delete_record(db.conn, tbl["name"], item_id)
+    area = _area()
+    apps_model.delete_app(item_id)
     return redirect(url_for("apps.list_apps_table_route", area=area))
 
 
 @apps_bp.route("/import", methods=["GET", "POST"])
 def import_apps_route():
-    area = request_area_param() or ""
-    tbl = _get_tbl()
-    imported = None
-    error = ""
-    if request.method == "POST" and tbl:
-        folder_path = request.form.get("apps_folder", "").strip()
-        if not folder_path:
-            error = "No folder provided."
-        elif not os.path.isdir(folder_path):
-            error = "Folder not found."
-        else:
-            count = 0
-            launchable_exts = {".exe", ".bat", ".cmd", ".lnk", ".html", ".htm"}
-            for root, _, files in os.walk(folder_path):
-                for name in files:
-                    ext = os.path.splitext(name)[1].lower()
-                    if ext not in launchable_exts:
-                        continue
-                    full_path = os.path.join(root, name)
-                    if not os.path.isfile(full_path):
-                        continue
-                    title = _app_display_title(full_path)
-                    values = [
-                        full_path,
-                        title,
-                        "",
-                        area,
-                    ]
-                    record_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
-                    if record_id:
-                        count += 1
-            imported = count
-    return render_template(
-        "apps_import.html",
-        active_tab="apps",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title="Import Apps Folder",
-        content_html="",
-        area=area,
-        imported=imported,
-        error=error,
-    )
+    return add_app_route()
