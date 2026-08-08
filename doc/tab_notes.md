@@ -154,6 +154,38 @@ Use this when adding another notes folder without deleting existing notes.
 
 Do not import the same folder twice unless duplicate rows are acceptable.
 
+
+### Modify Notes outside of LifEPIM
+
+If you add or remove notes in other apps (logging programs, or other text editors), you can refresh the LifePIM metadata via
+
+```
+    Admin -> Settings -> Notes -> Sync notes
+```
+
+That sync will recursively scan .md files, update metadata, and add new files. 
+
+Note that this only counts “missing on disk” notes; it does not delete those stale lp_notes rows. So Explorer deletion can leave dead note entries in LifePIM. 
+
+
+#### Useful related buttons:
+
+```
+    Admin -> Settings -> Notes -> Sync notes
+```
+Refresh metadata and add new markdown files.
+
+```
+    Notes -> select Area -> Folders panel -> Sync
+```
+Sync just that mapped area folder.
+
+```
+    Admin -> Settings -> Notes -> Rebuild note search index
+```
+Refresh cached note content search. Sync already indexes scanned files, but rebuild is useful after broader external changes.
+
+
 ## Sync Notes
 
 Use sync when markdown files were added or edited outside LifePIM and the database metadata needs to catch up.
