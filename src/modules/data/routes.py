@@ -23,6 +23,8 @@ def _ctx(title):
         "side_tabs": get_side_tabs(),
         "content_title": title,
         "content_html": "",
+        "source_type_label": catalogue.source_type_label,
+        "source_location": catalogue.source_location,
     }
 
 
@@ -57,17 +59,7 @@ def _with_area(**kwargs):
 
 @data_bp.route("/")
 def overview_route():
-    area = _request_area()
-    process_service = ProcessService()
-    return render_template(
-        "data_overview.html",
-        **_ctx("Data Workbench"),
-        area=area,
-        counts=catalogue.overview_counts(area=area),
-        recent=catalogue.recent_activity(area=area),
-        attention=catalogue.attention_items(),
-        process_summary=_process_overview(process_service),
-    )
+    return redirect(url_for("data.database_sources_route", **_with_area()))
 
 
 def _process_overview(service):
@@ -305,31 +297,27 @@ def process_run_detail_route(run_id):
     )
 
 
+@data_bp.route("/databases")
 @data_bp.route("/sources/databases")
 def database_sources_route():
     area = _request_area()
     return render_template(
         "data_sources.html",
-        **_ctx("Database Sources"),
+        **_ctx("Databases"),
         section="databases",
         area=area,
-        sources=catalogue.source_list("DATABASE", {"area": area} if area else None),
+        sources=catalogue.data_source_list({"area": area} if area else None),
+        summary=catalogue.source_summary(area=area),
     )
 
 
 @data_bp.route("/sources/files")
 def file_sources_route():
-    area = _request_area()
-    return render_template(
-        "data_sources.html",
-        **_ctx("File Sources"),
-        section="files",
-        area=area,
-        sources=catalogue.source_list("FILE_SOURCE", {"area": area} if area else None),
-    )
+    return redirect(url_for("data.database_sources_route", **_with_area()))
 
 
 @data_bp.route("/sources/database/new", methods=["GET", "POST"])
+@data_bp.route("/databases/new", methods=["GET", "POST"])
 def database_source_new_route():
     return _source_form(None, "DATABASE")
 
@@ -340,10 +328,13 @@ def database_source_browse_sqlite_route():
         import tkinter as tk
         from tkinter import filedialog
 
-        source_type = (request.args.get("type") or "SQLITE").upper()
+        source_type = catalogue.normalize_source_type(request.args.get("type") or "SQLITE")
         if source_type == "CSV":
             title = "Select CSV data file"
             filetypes = [("CSV files", "*.csv"), ("All files", "*.*")]
+        elif source_type == "CSV_FOLDER":
+            title = "Select CSV folder"
+            filetypes = None
         elif source_type == "EXCEL":
             title = "Select Excel workbook"
             filetypes = [("Excel workbooks", "*.xls *.xlsx *.xlsm"), ("All files", "*.*")]
@@ -353,10 +344,13 @@ def database_source_browse_sqlite_route():
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
-        path = filedialog.askopenfilename(
-            title=title,
-            filetypes=filetypes,
-        )
+        if source_type == "CSV_FOLDER":
+            path = filedialog.askdirectory(title=title)
+        else:
+            path = filedialog.askopenfilename(
+                title=title,
+                filetypes=filetypes,
+            )
         root.destroy()
         return jsonify({"path": path or ""})
     except Exception as exc:
@@ -365,17 +359,18 @@ def database_source_browse_sqlite_route():
 
 @data_bp.route("/sources/file/new", methods=["GET", "POST"])
 def file_source_new_route():
-    return _source_form(None, "FILE_SOURCE")
+    return redirect(url_for("data.database_source_new_route", **_with_area()))
 
 
 @data_bp.route("/sources/database/<int:source_id>/edit", methods=["GET", "POST"])
+@data_bp.route("/databases/<int:source_id>/edit", methods=["GET", "POST"])
 def database_source_edit_route(source_id):
     return _source_form(source_id, "DATABASE")
 
 
 @data_bp.route("/sources/file/<int:source_id>/edit", methods=["GET", "POST"])
 def file_source_edit_route(source_id):
-    return _source_form(source_id, "FILE_SOURCE")
+    return redirect(url_for("data.database_source_edit_route", source_id=source_id, **_with_area()))
 
 
 def _source_form(source_id, kind):
@@ -383,14 +378,15 @@ def _source_form(source_id, kind):
     error = ""
     if request.method == "POST":
         form = _prepare_database_source_form(request.form) if kind == "DATABASE" else request.form
-        source_type = (form.get("source_type") or "").upper()
-        if kind == "DATABASE" and source_type in {"SQLITE", "CSV", "EXCEL"}:
+        source_type = catalogue.normalize_source_type(form.get("source_type") or "")
+        if kind == "DATABASE" and source_type in {"SQLITE", "CSV", "EXCEL", "CSV_FOLDER"}:
             data_path = form.get("root_path") or form.get("database_name") or ""
-            if not data_path or not os.path.isfile(data_path):
-                error = f"Select a valid {source_type.replace('_', ' ')} file before saving."
+            path_valid = os.path.isdir(data_path) if source_type == "CSV_FOLDER" else os.path.isfile(data_path)
+            if not data_path or not path_valid:
+                error = f"Select a valid {source_type.replace('_', ' ').title()} {'folder' if source_type == 'CSV_FOLDER' else 'file'} before saving."
                 return render_template(
                     "data_source_form.html",
-                    **_ctx("Add Database Source" if not source_id else "Edit Database Source"),
+                    **_ctx("Add Database" if not source_id else "Edit Database"),
                     source=source,
                     kind=kind,
                     source_types=catalogue.DB_SOURCE_TYPES,
@@ -399,11 +395,11 @@ def _source_form(source_id, kind):
                     submitted=form,
                 )
         new_id = catalogue.save_source(source_id, form, kind)
-        if kind == "DATABASE" and source_type in {"SQLITE", "CSV", "EXCEL"}:
+        if kind == "DATABASE" and source_type in {"SQLITE", "CSV", "EXCEL", "CSV_FOLDER"}:
             catalogue.scan_source(new_id)
         endpoint = "data.database_source_detail_route" if kind == "DATABASE" else "data.file_source_detail_route"
         return redirect(url_for(endpoint, source_id=new_id, **_with_area()))
-    title = ("Edit " if source_id else "Add ") + ("Database Source" if kind == "DATABASE" else "File Source")
+    title = ("Edit " if source_id else "Add ") + ("Database" if kind == "DATABASE" else "File Source")
     return render_template(
         "data_source_form.html",
         **_ctx(title),
@@ -418,11 +414,12 @@ def _source_form(source_id, kind):
 
 def _prepare_database_source_form(form):
     values = form.to_dict(flat=True) if hasattr(form, "to_dict") else dict(form)
-    source_type = (values.get("source_type") or "").strip().upper()
+    source_type = catalogue.normalize_source_type(values.get("source_type") or "")
+    values["source_type"] = source_type
     connection_string = (values.get("db_connection_string") or "").strip()
     local_path = (values.get("local_database_path") or "").strip()
 
-    if source_type in {"SQLITE", "DUCKDB", "CSV", "EXCEL"} and local_path:
+    if source_type in {"SQLITE", "DUCKDB", "CSV", "CSV_FOLDER", "EXCEL"} and local_path:
         values["root_path"] = local_path
         if not values.get("database_name"):
             values["database_name"] = os.path.basename(local_path)
@@ -464,38 +461,24 @@ def _connection_string_value(connection_string, key):
 
 @data_bp.route("/object/<int:object_id>/data")
 def object_data_route(object_id):
-    obj = catalogue.object_get(object_id)
-    if not obj:
-        return redirect(url_for("data.objects_route"))
-    preview = {"columns": [], "rows": []}
-    error = ""
-    try:
-        preview = catalogue.preview_object_rows(object_id, limit=200)
-    except Exception as exc:
-        error = str(exc)
-    return render_template(
-        "data_object_data.html",
-        **_ctx(f"Data Preview: {obj.get('display_name') or obj['object_name']}"),
-        obj=obj,
-        preview=preview,
-        error=error,
-    )
+    return redirect(url_for("data.table_detail_route", object_id=object_id, tab="preview", **_with_area()))
 
 
 @data_bp.route("/sources/database/<int:source_id>")
+@data_bp.route("/databases/<int:source_id>")
 def database_source_detail_route(source_id):
     return _source_detail(source_id, "DATABASE")
 
 
 @data_bp.route("/sources/file/<int:source_id>")
 def file_source_detail_route(source_id):
-    return _source_detail(source_id, "FILE_SOURCE")
+    return redirect(url_for("data.database_source_detail_route", source_id=source_id, **_with_area()))
 
 
 def _source_detail(source_id, kind):
     source = catalogue.source_get(source_id)
     if not source:
-        return redirect(url_for("data.database_sources_route" if kind == "DATABASE" else "data.file_sources_route"))
+        return redirect(url_for("data.database_sources_route"))
     objects = catalogue.object_list({"source_id": str(source_id)})
     recent_tasks = [task for task in catalogue.tasks(limit=50) if task.get("data_source_id") == source_id][:10]
     return render_template("data_source_detail.html", **_ctx(source["source_name"]), area=_request_area(), source=source, objects=objects, tasks=recent_tasks)
@@ -505,9 +488,22 @@ def _source_detail(source_id, kind):
 def source_delete_route(source_id):
     source = catalogue.source_get(source_id)
     catalogue.delete_source(source_id)
-    if source and source["source_kind"] == "FILE_SOURCE":
-        return redirect(url_for("data.file_sources_route", **_with_area()))
     return redirect(url_for("data.database_sources_route", **_with_area()))
+
+
+@data_bp.route("/sources/<int:source_id>/open", methods=["POST"])
+def source_open_route(source_id):
+    source = catalogue.source_get(source_id)
+    location = catalogue.source_location(source)
+    path = Path(location).expanduser() if location else None
+    if path:
+        try:
+            if path.is_file():
+                path = path.parent
+            os.startfile(str(path))
+        except Exception:
+            pass
+    return redirect(url_for("data.database_source_detail_route", source_id=source_id, **_with_area()))
 
 
 @data_bp.route("/sources/<int:source_id>/test", methods=["POST"])
@@ -518,10 +514,11 @@ def source_test_route(source_id):
 
 @data_bp.route("/sources/<int:source_id>/scan", methods=["POST"])
 def source_scan_route(source_id):
-    task_id = catalogue.scan_source(source_id)
-    return redirect(url_for("data.task_detail_route", task_id=task_id, **_with_area()))
+    catalogue.scan_source(source_id)
+    return redirect(url_for("data.database_source_detail_route", source_id=source_id, **_with_area()))
 
 
+@data_bp.route("/tables")
 @data_bp.route("/objects")
 def objects_route():
     area = _request_area()
@@ -530,41 +527,40 @@ def objects_route():
         for key in [
             "q",
             "source_id",
-            "object_type",
-            "catalogue_level",
-            "environment",
             "area",
-            "profile_status",
-            "quality_status",
-            "favourite",
-            "hidden",
-            "active",
+            "source_type",
         ]
     }
     if area and not filters.get("area"):
         filters["area"] = area
     return render_template(
         "data_objects.html",
-        **_ctx("Data Objects"),
-        objects=catalogue.object_list(filters),
+        **_ctx("Tables"),
+        objects=catalogue.table_list(filters),
         filters=filters,
         area=area,
         sources=catalogue.source_list(None, {"area": area} if area else None),
-        object_types=catalogue.OBJECT_TYPES,
-        catalogue_levels=catalogue.CATALOGUE_LEVELS,
-        environments=catalogue.distinct_values("d_data_source", "environment"),
+        source_types=catalogue.distinct_values("d_data_source", "source_type"),
         area_options=_area_options(),
     )
 
 
-@data_bp.route("/object/<int:object_id>", methods=["GET", "POST"])
+@data_bp.route("/tables/<int:object_id>", methods=["GET", "POST"], endpoint="table_detail_route")
+@data_bp.route("/object/<int:object_id>", methods=["GET", "POST"], endpoint="object_detail_route")
 def object_detail_route(object_id):
     if request.method == "POST":
         catalogue.save_object_metadata(object_id, request.form)
-        return redirect(url_for("data.object_detail_route", object_id=object_id, **_with_area()))
+        return redirect(url_for("data.table_detail_route", object_id=object_id, tab="details", **_with_area()))
     obj = catalogue.object_get(object_id)
     if not obj:
         return redirect(url_for("data.objects_route"))
+    preview = {"columns": [], "rows": []}
+    preview_error = ""
+    if request.args.get("tab", "preview") == "preview":
+        try:
+            preview = catalogue.preview_object_rows(object_id, limit=100)
+        except Exception as exc:
+            preview_error = str(exc)
     related_sql = [
         item
         for item in catalogue.sql_list()
@@ -576,6 +572,11 @@ def object_detail_route(object_id):
         obj=obj,
         columns=catalogue.object_columns(object_id),
         related_sql=related_sql,
+        related_records=catalogue.object_related_records(object_id),
+        related_tasks=catalogue.object_tasks(object_id),
+        preview=preview,
+        preview_error=preview_error,
+        active_data_tab=request.args.get("tab", "preview"),
         levels=catalogue.CATALOGUE_LEVELS,
         area_options=_area_options(),
         area=_request_area(),

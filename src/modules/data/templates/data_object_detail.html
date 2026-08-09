@@ -2,32 +2,120 @@
 {% block module_content %}
 {% include "data_nav.html" %}
 
-<div class="data-detail-actions">
-  {% if obj.source_type in ['SQLITE', 'CSV', 'EXCEL'] and obj.object_type in ['TABLE', 'VIEW', 'CSV_TABLE', 'EXCEL_SHEET'] %}
-  <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id, area=current_area) if current_area else url_for('data.object_data_route', object_id=obj.data_object_id) }}">View data</a>
-  {% endif %}
-  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='REGISTERED', area=current_area) if current_area else url_for('data.object_level_route', object_id=obj.data_object_id, level='REGISTERED') }}"><button>Promote to Registered</button></form>
-  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='MANAGED', area=current_area) if current_area else url_for('data.object_level_route', object_id=obj.data_object_id, level='MANAGED') }}"><button>Promote to Managed</button></form>
-  <form method="post" action="{{ url_for('data.object_level_route', object_id=obj.data_object_id, level='DISCOVERED', area=current_area) if current_area else url_for('data.object_level_route', object_id=obj.data_object_id, level='DISCOVERED') }}"><button>Demote</button></form>
-  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='favourite', area=current_area) if current_area else url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='favourite') }}"><button>{{ 'Unfavourite' if obj.is_favourite else 'Favourite' }}</button></form>
-  <form method="post" action="{{ url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='hidden', area=current_area) if current_area else url_for('data.object_toggle_route', object_id=obj.data_object_id, flag='hidden') }}"><button>{{ 'Unhide' if obj.is_hidden else 'Hide' }}</button></form>
-  <form method="post" action="{{ url_for('data.object_profile_route', object_id=obj.data_object_id, area=current_area) if current_area else url_for('data.object_profile_route', object_id=obj.data_object_id) }}"><button>Profile now</button></form>
+<div class="data-breadcrumb">
+  <a href="{{ url_for('data.database_sources_route', area=current_area) if current_area else url_for('data.database_sources_route') }}">Databases</a>
+  <span>/</span>
+  <a href="{{ url_for('data.database_source_detail_route', source_id=obj.data_source_id, area=current_area) if current_area else url_for('data.database_source_detail_route', source_id=obj.data_source_id) }}">{{ obj.source_name }}</a>
+  <span>/</span>
+  <span>{{ obj.display_name or obj.object_name }}</span>
 </div>
 
+<section class="data-source-hero">
+  <div>
+    <h3>{{ obj.display_name or obj.object_name }}</h3>
+    <div class="data-muted">{{ obj.source_name }} / {{ obj.object_type.replace('_', ' ').title() }}</div>
+  </div>
+  <div class="data-source-meta">
+    <div><span>Rows</span><strong>{{ obj.row_count if obj.row_count is not none else 'Unknown' }}</strong></div>
+    <div><span>Columns</span><strong>{{ obj.column_count if obj.column_count is not none else columns|length }}</strong></div>
+    <div><span>Last scanned</span><strong>{{ obj.last_scanned_at or 'Never' }}</strong></div>
+    <div><span>Source type</span><strong>{{ source_type_label(obj.source_type) }}</strong></div>
+  </div>
+</section>
+
+{% set tab = active_data_tab if active_data_tab in ['preview', 'columns', 'links', 'details'] else 'preview' %}
 <div class="data-tabs-lite">
-  <a href="#overview">Overview</a><a href="#columns">Columns</a><a href="#profile">Profile</a><a href="#sql">SQL</a><a href="#activity">Activity</a>
+  <a class="{% if tab == 'preview' %}active{% endif %}" href="{{ url_for('data.table_detail_route', object_id=obj.data_object_id, tab='preview', area=current_area) if current_area else url_for('data.table_detail_route', object_id=obj.data_object_id, tab='preview') }}">Preview</a>
+  <a class="{% if tab == 'columns' %}active{% endif %}" href="{{ url_for('data.table_detail_route', object_id=obj.data_object_id, tab='columns', area=current_area) if current_area else url_for('data.table_detail_route', object_id=obj.data_object_id, tab='columns') }}">Columns</a>
+  <a class="{% if tab == 'links' %}active{% endif %}" href="{{ url_for('data.table_detail_route', object_id=obj.data_object_id, tab='links', area=current_area) if current_area else url_for('data.table_detail_route', object_id=obj.data_object_id, tab='links') }}">Links</a>
+  <a class="{% if tab == 'details' %}active{% endif %}" href="{{ url_for('data.table_detail_route', object_id=obj.data_object_id, tab='details', area=current_area) if current_area else url_for('data.table_detail_route', object_id=obj.data_object_id, tab='details') }}">Details</a>
 </div>
 
-<section id="overview" class="data-panel">
-  <h4>Overview</h4>
+{% if tab == 'preview' %}
+<section class="data-panel">
+  {% if preview_error %}
+  <div class="data-form-error">{{ preview_error }}</div>
+  {% else %}
+  <div class="data-preview-summary">Showing top {{ preview.rows|length }} rows, maximum 100.</div>
+  <div class="tabular-scroll data-preview-grid">
+    <table>
+      <tr>
+        <th>#</th>
+        {% for col in preview.columns %}
+        <th>{{ col }}</th>
+        {% endfor %}
+      </tr>
+      {% for row in preview.rows %}
+      <tr>
+        <td class="data-row-number">{{ loop.index }}</td>
+        {% for value in row %}
+        <td>{{ value if value != '' else 'NULL' }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% elif tab == 'columns' %}
+<section class="data-panel">
+  <div class="tabular-scroll">
+    <table>
+      <tr><th>Column</th><th>Data Type</th><th>Nullable</th><th>Primary Key</th><th>Other Metadata</th></tr>
+      {% for col in columns %}
+      <tr>
+        <td>{{ col.column_name }}</td>
+        <td>{{ col.data_type or col.source_data_type }}</td>
+        <td>{{ 'Yes' if col.is_nullable else 'No' }}</td>
+        <td>{{ 'Yes' if col.is_primary_key else 'No' }}</td>
+        <td>{{ col.description or col.metadata_json or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</section>
+{% elif tab == 'links' %}
+<section class="data-panel">
+  <h4>LifePIM Links</h4>
+  <table>
+    <tr><th>Type</th><th>Name</th><th>Relationship</th><th>Direction</th></tr>
+    {% for link in related_records %}
+    {% set summary = link.summary or {} %}
+    <tr>
+      <td>{{ link.type }}</td>
+      <td>{% if summary.open_url %}<a href="{{ summary.open_url }}">{{ summary.title or link.label or link.id }}</a>{% else %}{{ summary.title or link.label or link.id }}{% endif %}</td>
+      <td>{{ link.link_type }}</td>
+      <td>{{ link.direction }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h4>Saved SQL</h4>
+  <table>
+    <tr><th>Name</th><th>Purpose</th><th>Last run</th></tr>
+    {% for item in related_sql %}
+    <tr><td><a href="{{ url_for('data.sql_detail_route', sql_id=item.saved_sql_id, area=current_area) if current_area else url_for('data.sql_detail_route', sql_id=item.saved_sql_id) }}">{{ item.sql_name }}</a></td><td>{{ item.purpose }}</td><td>{{ item.last_run_at }}</td></tr>
+    {% endfor %}
+  </table>
+
+  <h4>Data Tasks</h4>
+  <table>
+    <tr><th>Task</th><th>Status</th><th>Finished</th><th>Result</th></tr>
+    {% for task in related_tasks %}
+    <tr><td><a href="{{ url_for('data.task_detail_route', task_id=task.data_task_id) }}">{{ task.task_name }}</a></td><td>{{ task.status }}</td><td>{{ task.finished_at }}</td><td>{{ task.result_summary }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% else %}
+<section class="data-panel">
   <form method="post" class="data-form">
     <input type="hidden" name="_existing" value="1">
     <div class="data-form-grid">
-      <label>Object name<input readonly value="{{ obj.object_name }}"></label>
+      <label>Table<input readonly value="{{ obj.object_name }}"></label>
       <label>Display name<input name="display_name" value="{{ obj.display_name }}"></label>
+      <label>Database<input readonly value="{{ obj.source_name }}"></label>
+      <label>Type<input readonly value="{{ obj.object_type }}"></label>
       <label>Full name/path<input readonly value="{{ obj.full_name or obj.full_path }}"></label>
-      <label>Object type<input readonly value="{{ obj.object_type }}"></label>
-      <label>Source<input readonly value="{{ obj.source_name }}"></label>
       <label>Schema or folder<input readonly value="{{ obj.schema_name or obj.parent_path }}"></label>
       <label>Area
         <select name="area">
@@ -45,8 +133,6 @@
         </select>
       </label>
       <label>Tags<input name="tags" value="{{ obj.tags }}"></label>
-      <label>Profile mode<input name="profile_mode" value="{{ obj.profile_mode }}"></label>
-      <label>Content index mode<input name="content_index_mode" value="{{ obj.content_index_mode }}"></label>
       <label>Refresh policy<input name="refresh_policy" value="{{ obj.refresh_policy }}"></label>
     </div>
     <div class="data-checks">
@@ -57,46 +143,16 @@
     <label>Description<textarea name="description" rows="3">{{ obj.description }}</textarea></label>
     <label>Purpose<textarea name="purpose" rows="3">{{ obj.purpose }}</textarea></label>
     <label>Notes<textarea name="notes" rows="4">{{ obj.notes }}</textarea></label>
-    <button type="submit">Save metadata</button>
+    <input type="hidden" name="profile_mode" value="{{ obj.profile_mode }}">
+    <input type="hidden" name="content_index_mode" value="{{ obj.content_index_mode }}">
+    <button type="submit">Save Details</button>
   </form>
   <table>
     <tr><th>Row count</th><td>{{ obj.row_count }}</td><th>Size</th><td>{{ obj.size_bytes }}</td></tr>
     <tr><th>Last seen</th><td>{{ obj.last_seen_at }}</td><th>Last scanned</th><td>{{ obj.last_scanned_at }}</td></tr>
     <tr><th>Last profiled</th><td>{{ obj.last_profiled_at }}</td><th>Source modified</th><td>{{ obj.source_modified_at }}</td></tr>
+    <tr><th>Metadata</th><td colspan="3"><pre>{{ obj.metadata_json }}</pre></td></tr>
   </table>
 </section>
-
-<section id="columns" class="data-panel">
-  <h4>Columns</h4>
-  <table>
-    <tr><th>Position</th><th>Name</th><th>Data type</th><th>Nullable</th><th>PK</th><th>Description</th><th>Profile</th></tr>
-    {% for col in columns %}
-    <tr><td>{{ col.ordinal_position }}</td><td>{{ col.column_name }}</td><td>{{ col.data_type }}</td><td>{{ col.is_nullable }}</td><td>{{ col.is_primary_key }}</td><td>{{ col.description }}</td><td>{{ col.profile_status }}</td></tr>
-    {% endfor %}
-  </table>
-</section>
-
-<section id="profile" class="data-panel">
-  <h4>Profile</h4>
-  <table>
-    <tr><th>Status</th><td>{{ obj.profile_status or 'Not collected' }}</td></tr>
-    <tr><th>Quality</th><td>{{ obj.quality_status or 'Not collected' }}</td></tr>
-    <tr><th>Metadata</th><td><pre>{{ obj.metadata_json }}</pre></td></tr>
-  </table>
-</section>
-
-<section id="sql" class="data-panel">
-  <h4>Saved SQL</h4>
-  <table>
-    <tr><th>Name</th><th>Purpose</th><th>Last run</th></tr>
-    {% for item in related_sql %}
-    <tr><td><a href="{{ url_for('data.sql_detail_route', sql_id=item.saved_sql_id, area=current_area) if current_area else url_for('data.sql_detail_route', sql_id=item.saved_sql_id) }}">{{ item.sql_name }}</a></td><td>{{ item.purpose }}</td><td>{{ item.last_run_at }}</td></tr>
-    {% endfor %}
-  </table>
-</section>
-
-<section id="activity" class="data-panel">
-  <h4>Activity</h4>
-  <p>Discovery and metadata timestamps are shown in the overview panel. Detailed history will build from task records as scanners expand.</p>
-</section>
+{% endif %}
 {% endblock %}

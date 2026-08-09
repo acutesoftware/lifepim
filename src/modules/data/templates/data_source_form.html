@@ -10,7 +10,7 @@
   {% endif %}
 
   <section class="data-wizard-step">
-    <h4>1. Choose database type</h4>
+      <h4>1. Choose database type</h4>
     <div class="data-connector-grid">
       {% for source_type in source_types %}
       <label class="data-connector-card">
@@ -44,11 +44,11 @@
       </label>
     </div>
 
-    <div class="data-connector-panel" data-types="SQLITE CSV EXCEL DUCKDB">
-      <h4 class="data-panel-subtitle">Local data file</h4>
+    <div class="data-connector-panel" data-types="SQLITE CSV CSV_FOLDER EXCEL DUCKDB PARQUET_FOLDER">
+      <h4 class="data-panel-subtitle">Local data location</h4>
       <div class="data-form-grid">
-        <label>File path
-          <input name="local_database_path" class="data-local-db-path" value="{{ submitted.local_database_path if submitted else (source.root_path if source and source.source_type in ['SQLITE', 'CSV', 'EXCEL', 'DUCKDB'] else '') }}" placeholder="Browse to select a data file">
+        <label>File or folder path
+          <input name="local_database_path" class="data-local-db-path" value="{{ submitted.local_database_path if submitted else (source.root_path if source and source.source_type in ['SQLITE', 'CSV', 'CSV_FOLDER', 'EXCEL', 'DUCKDB', 'PARQUET_FOLDER'] else '') }}" placeholder="Browse to select a data location">
         </label>
         <div class="data-browse-row">
           <button type="button" class="data-server-file-picker">Browse...</button>
@@ -57,7 +57,9 @@
       </div>
       <p class="data-field-note" data-file-note="SQLITE">For SQLite, selecting the file is enough. LifePIM saves the source, opens it read-only, scans tables and columns, and stores the metadata.</p>
       <p class="data-field-note" data-file-note="CSV" hidden>For CSV, selecting the file is enough. LifePIM scans the header and stores it as one data object with columns.</p>
+      <p class="data-field-note" data-file-note="CSV_FOLDER" hidden>For a CSV folder, each CSV file is treated as a table in this database.</p>
       <p class="data-field-note" data-file-note="EXCEL" hidden>For Excel, selecting the workbook is enough. LifePIM scans each worksheet as a separate data object.</p>
+      <p class="data-field-note" data-file-note="PARQUET_FOLDER" hidden>Parquet folders can be registered now; table discovery can be added without changing this UI.</p>
     </div>
 
     <div class="data-connector-panel" data-types="FABRIC_SQL">

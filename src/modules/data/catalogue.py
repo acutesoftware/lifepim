@@ -10,7 +10,7 @@ import pandas as pd
 from common import data as db
 
 
-DB_SOURCE_TYPES = ["SQLITE", "CSV", "EXCEL", "DUCKDB", "SQL_SERVER", "ORACLE", "FABRIC_SQL", "ODBC"]
+DB_SOURCE_TYPES = ["SQLITE", "CSV_FOLDER", "EXCEL", "CSV", "DUCKDB", "SQL_SERVER", "PARQUET_FOLDER", "ORACLE", "FABRIC_SQL", "ODBC"]
 FILE_SOURCE_TYPES = ["CSV", "PARQUET", "TEXT", "JSON", "SPREADSHEET", "MIXED", "OTHER"]
 CATALOGUE_LEVELS = ["DISCOVERED", "REGISTERED", "MANAGED"]
 OBJECT_TYPES = [
@@ -380,11 +380,67 @@ def source_list(kind=None, filters=None):
     return items
 
 
+def data_source_list(filters=None):
+    return source_list(None, filters)
+
+
+def table_list(filters=None):
+    filters = dict(filters or {})
+    if not filters.get("active"):
+        filters["active"] = "1"
+    return object_list(filters)
+
+
+def source_summary(area=None):
+    area_clause = "WHERE area = ?" if area else ""
+    area_params = (area,) if area else ()
+    last_row = row(
+        f"""
+        SELECT MAX(last_scan_completed_at) AS last_scanned
+        FROM d_data_source
+        {area_clause}
+        """,
+        area_params,
+    )
+    source_filter = f"WHERE {'area = ? AND ' if area else ''}is_active = 1"
+    source_params = (area,) if area else ()
+    table_filter = f"WHERE {'o.area = ? AND ' if area else ''}o.is_active = 1"
+    table_params = (area,) if area else ()
+    return {
+        "source_count": scalar(f"SELECT COUNT(1) FROM d_data_source {source_filter}", source_params),
+        "table_count": scalar(f"SELECT COUNT(1) FROM d_data_object o {table_filter}", table_params),
+        "last_scanned": (last_row or {}).get("last_scanned") or "",
+    }
+
+
 def source_get(source_id):
     item = row("SELECT * FROM d_data_source WHERE data_source_id = ?", (source_id,))
     if item:
         item["tags"] = tag_string("source", source_id)
     return item
+
+
+def source_location(source):
+    if not source:
+        return ""
+    return source.get("root_path") or source.get("database_name") or source.get("host_name") or ""
+
+
+def source_type_label(source_type):
+    value = (source_type or "").strip().upper()
+    labels = {
+        "SQLITE": "SQLite",
+        "DUCKDB": "DuckDB",
+        "SQL_SERVER": "SQL Server",
+        "SQLSERVER": "SQL Server",
+        "CSV": "CSV",
+        "CSV_FOLDER": "CSV Folder",
+        "EXCEL": "Excel",
+        "PARQUET_FOLDER": "Parquet Folder",
+        "FABRIC_SQL": "Fabric SQL",
+        "ODBC": "ODBC",
+    }
+    return labels.get(value, value.replace("_", " ").title())
 
 
 def save_source(source_id, form, kind):
@@ -416,7 +472,7 @@ def _source_values(form, kind):
     return {
         "source_name": form.get("source_name", "").strip(),
         "source_kind": kind,
-        "source_type": form.get("source_type", "").strip(),
+        "source_type": normalize_source_type(form.get("source_type", "")),
         "host_name": form.get("host_name", "").strip(),
         "port": _int_or_none(form.get("port")),
         "database_name": form.get("database_name", "").strip(),
@@ -441,6 +497,24 @@ def _source_values(form, kind):
         "notes": form.get("notes", "").strip(),
         "is_active": _checked(form, "is_active", default=True),
     }
+
+
+def normalize_source_type(source_type):
+    value = (source_type or "").strip().upper().replace("-", "_")
+    aliases = {
+        "SQLSERVER": "SQL_SERVER",
+        "SQLITE_DATABASE": "SQLITE",
+        "CSV_FILE": "CSV",
+        "CSV_DIR": "CSV_FOLDER",
+        "CSV_DIRECTORY": "CSV_FOLDER",
+        "CSVFOLDER": "CSV_FOLDER",
+        "EXCEL_WORKBOOK": "EXCEL",
+        "XLSX": "EXCEL",
+        "PARQUET_DIR": "PARQUET_FOLDER",
+        "PARQUET_DIRECTORY": "PARQUET_FOLDER",
+        "PARQUETFOLDER": "PARQUET_FOLDER",
+    }
+    return aliases.get(value, value)
 
 
 def delete_source(source_id):
@@ -482,6 +556,7 @@ def object_list(filters):
     for key, col in [
         ("source_id", "o.data_source_id"),
         ("object_type", "o.object_type"),
+        ("source_type", "s.source_type"),
         ("catalogue_level", "o.catalogue_level"),
         ("environment", "s.environment"),
         ("area", "o.area"),
@@ -490,6 +565,8 @@ def object_list(filters):
     ]:
         value = filters.get(key)
         if value:
+            if key == "source_type":
+                value = normalize_source_type(value)
             clauses.append(f"{col} = ?")
             params.append(value)
     for key, col in [("favourite", "o.is_favourite"), ("hidden", "o.is_hidden"), ("active", "o.is_active")]:
@@ -534,6 +611,45 @@ def object_get(object_id):
 
 def object_columns(object_id):
     return rows("SELECT * FROM d_data_column WHERE data_object_id = ? ORDER BY ordinal_position, column_name", (object_id,))
+
+
+def object_related_records(object_id):
+    try:
+        from common import data as common_data
+        from common import links as link_model
+        from common import links_records
+
+        link_model.ensure_links_schema(common_data._get_conn())
+        outgoing = link_model.list_outgoing(common_data._get_conn(), "data_table", object_id)
+        incoming = link_model.list_incoming(common_data._get_conn(), "data_table", object_id)
+        related = []
+        for link in outgoing:
+            summary = links_records.get_record_summary(link.get("dst_type"), link.get("dst_id"))
+            related.append(
+                {
+                    "direction": "outgoing",
+                    "type": link.get("dst_type"),
+                    "id": link.get("dst_id"),
+                    "link_type": link.get("link_type"),
+                    "label": link.get("label"),
+                    "summary": summary,
+                }
+            )
+        for link in incoming:
+            summary = links_records.get_record_summary(link.get("src_type"), link.get("src_id"))
+            related.append(
+                {
+                    "direction": "incoming",
+                    "type": link.get("src_type"),
+                    "id": link.get("src_id"),
+                    "link_type": link.get("link_type"),
+                    "label": link.get("label"),
+                    "summary": summary,
+                }
+            )
+        return related
+    except Exception:
+        return []
 
 
 def save_object_metadata(object_id, form):
@@ -726,6 +842,9 @@ def tasks(limit=None, filters=None):
             "(s.area = ? OR o.area = ? OR ss.area = ?)"
         )
         params.extend([filters["area"]] * 3)
+    if filters.get("object_id"):
+        clauses.append("t.data_object_id = ?")
+        params.append(filters["object_id"])
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     sql = """
         SELECT t.*, s.source_name, s.area AS source_area,
@@ -742,6 +861,10 @@ def tasks(limit=None, filters=None):
         sql += " LIMIT ?"
         return rows(sql, params + [limit])
     return rows(sql, params)
+
+
+def object_tasks(object_id, limit=20):
+    return tasks(limit=limit, filters={"object_id": str(object_id)})
 
 
 def task_get(task_id):
@@ -802,7 +925,8 @@ def test_database_connection(source_id):
     task_id = create_task("Test database connection", "TEST_DATABASE_CONNECTION", source_id=source_id)
     start_task(task_id)
     try:
-        if not source or source["source_type"] != "SQLITE":
+        source_type = normalize_source_type(source["source_type"] if source else "")
+        if not source or source_type != "SQLITE":
             raise ValueError("Only SQLite connection tests are implemented in Phase 1.")
         path = source.get("root_path") or source.get("database_name")
         if not path or not os.path.isfile(path):
@@ -820,13 +944,16 @@ def scan_source(source_id):
     source = source_get(source_id)
     if not source:
         return None
-    if source["source_kind"] == "DATABASE":
-        if source["source_type"] == "SQLITE":
-            return scan_sqlite_source(source_id)
-        if source["source_type"] in {"CSV", "EXCEL"}:
-            return scan_tabular_file_source(source_id)
+    source_type = normalize_source_type(source.get("source_type"))
+    if source_type == "SQLITE":
         return scan_sqlite_source(source_id)
-    return scan_file_source(source_id)
+    if source_type in {"CSV", "EXCEL"}:
+        return scan_tabular_file_source(source_id)
+    if source_type == "CSV_FOLDER":
+        return scan_csv_folder_source(source_id)
+    if source["source_kind"] == "FILE_SOURCE":
+        return scan_file_source(source_id)
+    return scan_sqlite_source(source_id)
 
 
 def scan_sqlite_source(source_id):
@@ -840,7 +967,7 @@ def scan_sqlite_source(source_id):
         (started, source_id),
     )
     try:
-        if source["source_type"] != "SQLITE":
+        if normalize_source_type(source["source_type"]) != "SQLITE":
             raise ValueError("Only SQLite metadata scans are implemented in Phase 1.")
         path = source.get("root_path") or source.get("database_name")
         if not path or not os.path.isfile(path):
@@ -927,7 +1054,7 @@ def scan_tabular_file_source(source_id):
         path = source.get("root_path") or ""
         if not path or not os.path.isfile(path):
             raise FileNotFoundError(path or "No data file path configured.")
-        source_type = source.get("source_type")
+        source_type = normalize_source_type(source.get("source_type"))
         stat = os.stat(path)
         if source_type == "CSV":
             count = _scan_csv_source(source_id, source, path, stat)
@@ -963,18 +1090,82 @@ def scan_tabular_file_source(source_id):
     return task_id
 
 
-def _scan_csv_source(source_id, source, path, stat):
+def scan_csv_folder_source(source_id):
+    source = source_get(source_id)
+    task_id = create_task("Scan CSV folder", "SCAN_DATABASE_METADATA", source_id=source_id)
+    start_task(task_id)
+    started = now()
+    c = conn()
+    c.execute(
+        "UPDATE d_data_source SET last_scan_started_at = ?, last_scan_status = 'RUNNING' WHERE data_source_id = ?",
+        (started, source_id),
+    )
+    try:
+        root = source.get("root_path") or ""
+        if not root or not os.path.isdir(root):
+            raise FileNotFoundError(root or "No CSV folder path configured.")
+        include_patterns = parse_patterns(source.get("include_patterns")) or ["*.csv"]
+        exclude_patterns = parse_patterns(source.get("exclude_patterns")) + parse_patterns(source.get("ignore_rules"))
+        recursive = bool(source.get("recursive_scan"))
+        count = 0
+        for dirpath, dirnames, filenames in os.walk(root):
+            if not recursive:
+                dirnames[:] = []
+            for filename in filenames:
+                full_path = os.path.join(dirpath, filename)
+                rel_path = os.path.relpath(full_path, root).replace("\\", "/")
+                if not _matches_any(filename, rel_path, include_patterns):
+                    continue
+                if exclude_patterns and _matches_any(filename, rel_path, exclude_patterns):
+                    continue
+                try:
+                    stat = os.stat(full_path)
+                    _scan_csv_source(source_id, source, full_path, stat, root_path=root)
+                    count += 1
+                except Exception:
+                    continue
+        completed = now()
+        c.execute(
+            """
+            UPDATE d_data_source
+            SET last_scan_completed_at = ?, last_scan_status = 'COMPLETED',
+                last_scan_message = ?, updated_at = ?
+            WHERE data_source_id = ?
+            """,
+            (completed, f"Scanned {count} CSV table(s).", completed, source_id),
+        )
+        c.commit()
+        finish_task(task_id, "COMPLETED", result_summary=f"Scanned {count} CSV table(s).")
+    except Exception as exc:
+        completed = now()
+        c.execute(
+            """
+            UPDATE d_data_source
+            SET last_scan_completed_at = ?, last_scan_status = 'FAILED',
+                last_scan_message = ?, updated_at = ?
+            WHERE data_source_id = ?
+            """,
+            (completed, str(exc), completed, source_id),
+        )
+        c.commit()
+        finish_task(task_id, "FAILED", result_summary="CSV folder scan failed.", error_message=str(exc))
+    return task_id
+
+
+def _scan_csv_source(source_id, source, path, stat, root_path=None):
     frame, encoding = _read_csv_frame(path, nrows=200)
     row_count = _csv_row_count(path)
+    display_name = os.path.basename(path)
+    full_name = os.path.relpath(path, root_path).replace("\\", "/") if root_path else display_name
     object_id = upsert_object(
         source_id,
-        object_name=os.path.basename(path),
+        object_name=display_name,
         object_type="CSV_TABLE",
         database_name=source.get("database_name") or os.path.basename(path),
         schema_name="",
         parent_path=os.path.dirname(path),
         area=source.get("area") or "",
-        full_name=os.path.basename(path),
+        full_name=full_name,
         full_path=os.path.abspath(path),
         row_count=row_count,
         column_count=len(frame.columns),
@@ -1065,27 +1256,28 @@ def _read_csv_frame(path, nrows=None):
 
 
 def object_can_preview(obj):
-    return obj and obj.get("source_type") in {"SQLITE", "CSV", "EXCEL"} and obj.get("object_type") in {"TABLE", "VIEW", "CSV_TABLE", "EXCEL_SHEET"}
+    return obj and normalize_source_type(obj.get("source_type")) in {"SQLITE", "CSV", "CSV_FOLDER", "EXCEL"} and obj.get("object_type") in {"TABLE", "VIEW", "CSV_TABLE", "EXCEL_SHEET"}
 
 
-def preview_object_rows(object_id, limit=200):
+def preview_object_rows(object_id, limit=100):
     obj = object_get(object_id)
     if not object_can_preview(obj):
         raise ValueError("This object type does not support row preview yet.")
-    limit = max(1, min(int(limit or 200), 200))
+    limit = max(1, min(int(limit or 100), 100))
     source = source_get(obj["data_source_id"])
-    path = source.get("root_path") or source.get("database_name") or obj.get("full_path")
+    source_type = normalize_source_type(source["source_type"])
+    path = obj.get("full_path") if source_type == "CSV_FOLDER" else (source.get("root_path") or source.get("database_name") or obj.get("full_path"))
     if not path or not os.path.isfile(path):
         raise FileNotFoundError(path or "No source file path configured.")
-    if source["source_type"] == "SQLITE":
+    if source_type == "SQLITE":
         return preview_sqlite_rows(path, obj["object_name"], limit)
-    if source["source_type"] == "CSV":
+    if source_type in {"CSV", "CSV_FOLDER"}:
         frame, _encoding = _read_csv_frame(path, nrows=limit)
         return dataframe_preview(frame)
-    if source["source_type"] == "EXCEL":
+    if source_type == "EXCEL":
         frame = pd.read_excel(path, sheet_name=obj["object_name"], nrows=limit)
         return dataframe_preview(frame)
-    raise ValueError(f"Preview is not implemented for {source['source_type']}.")
+    raise ValueError(f"Preview is not implemented for {source_type}.")
 
 
 def preview_sqlite_rows(path, table_name, limit=200):
@@ -1426,9 +1618,12 @@ def parse_patterns(value):
 
 
 def default_patterns_for_type(source_type):
+    source_type = normalize_source_type(source_type)
     mapping = {
         "CSV": ["*.csv"],
+        "CSV_FOLDER": ["*.csv"],
         "PARQUET": ["*.parquet"],
+        "PARQUET_FOLDER": ["*.parquet"],
         "TEXT": ["*.txt", "*.md"],
         "JSON": ["*.json"],
         "SPREADSHEET": ["*.xlsx", "*.xls", "*.ods"],

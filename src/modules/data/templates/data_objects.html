@@ -6,8 +6,8 @@
   <aside class="data-filter-panel">
     <form method="get" class="data-filter-form">
       {% if current_area %}<input type="hidden" name="area" value="{{ current_area }}">{% endif %}
-      <label>Search<input name="q" value="{{ filters.q }}"></label>
-      <label>Source
+      <label>Search<input name="q" value="{{ filters.q }}" placeholder="table or column name"></label>
+      <label>Database
         <select name="source_id">
           <option value="">Any</option>
           {% for source in sources %}
@@ -15,43 +15,13 @@
           {% endfor %}
         </select>
       </label>
-      <label>Object type
-        <select name="object_type">
+      <label>Source type
+        <select name="source_type">
           <option value="">Any</option>
-          {% for item in object_types %}
-          <option value="{{ item }}" {% if filters.object_type == item %}selected{% endif %}>{{ item }}</option>
+          {% for item in source_types %}
+          <option value="{{ item }}" {% if filters.source_type == item %}selected{% endif %}>{{ source_type_label(item) }}</option>
           {% endfor %}
         </select>
-      </label>
-      <label>Catalogue level
-        <select name="catalogue_level">
-          <option value="">Any</option>
-          {% for item in catalogue_levels %}
-          <option value="{{ item }}" {% if filters.catalogue_level == item %}selected{% endif %}>{{ item }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Environment
-        <select name="environment">
-          <option value="">Any</option>
-          {% for item in environments %}
-          <option value="{{ item }}" {% if filters.environment == item %}selected{% endif %}>{{ item }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Area
-        <select name="area">
-          <option value="">Any</option>
-          {% for option in area_options %}
-          <option value="{{ option.id }}" {% if filters.area == option.id %}selected{% endif %}>{{ option.label }} ({{ option.id }})</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Favourite
-        <select name="favourite"><option value="">Any</option><option value="1" {% if filters.favourite == '1' %}selected{% endif %}>Yes</option><option value="0" {% if filters.favourite == '0' %}selected{% endif %}>No</option></select>
-      </label>
-      <label>Hidden
-        <select name="hidden"><option value="">Any</option><option value="0" {% if filters.hidden == '0' %}selected{% endif %}>Visible</option><option value="1" {% if filters.hidden == '1' %}selected{% endif %}>Hidden</option></select>
       </label>
       <button type="submit">Apply</button>
       <a href="{{ url_for('data.objects_route', area=current_area) if current_area else url_for('data.objects_route') }}">Reset</a>
@@ -59,37 +29,28 @@
   </aside>
 
   <section class="data-main-panel">
-    <table>
-      <tr>
-        <th>Fav</th><th>Object name</th><th>Type</th><th>Source</th><th>Schema/folder</th><th>Area</th><th>Rows</th><th>Cols</th><th>Size</th><th>Last seen</th><th>Level</th><th>Profile</th><th>Quality</th><th>Tags</th><th>Actions</th>
-      </tr>
-      {% for obj in objects %}
-      {% set is_previewable = obj.source_type in ['SQLITE', 'CSV', 'EXCEL'] and obj.object_type in ['TABLE', 'VIEW', 'CSV_TABLE', 'EXCEL_SHEET'] %}
-      <tr>
-        <td>{{ '*' if obj.is_favourite else '' }}</td>
-        <td>
-          <a href="{{ url_for('data.object_data_route', object_id=obj.data_object_id, area=current_area) if is_previewable and current_area else (url_for('data.object_data_route', object_id=obj.data_object_id) if is_previewable else (url_for('data.object_detail_route', object_id=obj.data_object_id, area=current_area) if current_area else url_for('data.object_detail_route', object_id=obj.data_object_id))) }}">
-            {{ obj.display_name or obj.object_name }}
-          </a>
-        </td>
-        <td>{{ obj.object_type }}</td>
-        <td>{{ obj.source_name }}</td>
-        <td>{{ obj.schema_name or obj.parent_path }}</td>
-        <td>{{ obj.area }}</td>
-        <td>{{ obj.row_count if obj.row_count is not none else '' }}</td>
-        <td>{{ obj.column_count if obj.column_count is not none else '' }}</td>
-        <td>{{ obj.size_bytes if obj.size_bytes is not none else '' }}</td>
-        <td>{{ obj.last_seen_at }}</td>
-        <td>{{ obj.catalogue_level }}</td>
-        <td>{{ obj.profile_status }}</td>
-        <td>{{ obj.quality_status }}</td>
-        <td>{{ obj.tags }}</td>
-        <td class="data-actions-cell">
-          <a href="{{ url_for('data.object_detail_route', object_id=obj.data_object_id, area=current_area) if current_area else url_for('data.object_detail_route', object_id=obj.data_object_id) }}">{{ 'Metadata' if is_previewable else 'View' }}</a>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+    <div class="tabular-scroll">
+      <table>
+        <tr>
+          <th>Table</th>
+          <th>Database</th>
+          <th>Type</th>
+          <th>Rows</th>
+          <th>Modified / Last Scanned</th>
+          <th>Description</th>
+        </tr>
+        {% for obj in objects %}
+        <tr>
+          <td><a href="{{ url_for('data.table_detail_route', object_id=obj.data_object_id, area=current_area) if current_area else url_for('data.table_detail_route', object_id=obj.data_object_id) }}">{{ obj.display_name or obj.object_name }}</a></td>
+          <td><a href="{{ url_for('data.database_source_detail_route', source_id=obj.data_source_id, area=current_area) if current_area else url_for('data.database_source_detail_route', source_id=obj.data_source_id) }}">{{ obj.source_name }}</a></td>
+          <td>{{ obj.object_type.replace('_', ' ').title() }}</td>
+          <td>{{ obj.row_count if obj.row_count is not none else '' }}</td>
+          <td>{{ obj.source_modified_at or obj.last_scanned_at or obj.last_seen_at }}</td>
+          <td>{{ obj.description or '' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
   </section>
 </div>
 {% endblock %}
