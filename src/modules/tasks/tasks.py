@@ -1,230 +1,254 @@
+from flask import Blueprint, abort, make_response, redirect, render_template, request, url_for
 
-from flask import Blueprint, render_template, request, redirect, url_for, make_response
-
-from common import data
-from common import areas as areas_mod
-from common import projects as projects_mod
-from utils import importer
-from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items, build_pagination, request_area_param
 from common import config as cfg
+from common import projects as projects_mod
+from common.utils import build_pagination, get_side_tabs, get_tabs, paginate_total, request_area_param
+from modules.apps import schema as apps_model
+from modules.tasks import schema as tasks_model
+from utils import importer
 
 
-tasks_bp = Blueprint('tasks', __name__, url_prefix="/tasks",
-                     template_folder='templates', static_folder='static')
+tasks_bp = Blueprint("tasks", __name__, url_prefix="/tasks", template_folder="templates", static_folder="static")
+
+TASK_VIEWS = (
+    ("all", "All"),
+    ("today", "Today"),
+    ("upcoming", "Upcoming"),
+    ("templates", "Templates"),
+    ("completed", "Completed"),
+)
 
 
-"""
-@tasks_bp.route('/')
-def list_tasks():
-    items = data.get_table_list('tasks')
-    print('hello tasks!')
-    return render_template('tasks_list.html', column_names=['Name', 'Detail'], col_values=items)
-"""
+def _area():
+    return request_area_param(include_form=True, include_id=True) or None
 
 
-@tasks_bp.route('/')
+def _args_with(**updates):
+    values = {
+        "area": _area(),
+        "view": request.values.get("view", "all"),
+        "q": request.values.get("q", ""),
+        "page": request.values.get("page", ""),
+        "message": request.values.get("message", ""),
+    }
+    values.update(updates)
+    return {key: value for key, value in values.items() if value not in (None, "")}
+
+
+def _form_task_values(form, existing=None):
+    action_id = form.get("app_action_id", type=int)
+    action = apps_model.app_action_get(action_id) if action_id else None
+    parameter_values = {}
+    if action:
+        parameter_values = apps_model.parameter_values_from_form(form, action.get("parameter_schema_json"), prefix="param_")
+    return {
+        "title": form.get("title", "").strip(),
+        "content": form.get("content", "").strip(),
+        "area": request_area_param(existing.get("area") if existing else "", include_form=True) or "",
+        "start_date": form.get("start_date", "").strip(),
+        "due_date": form.get("due_date", "").strip(),
+        "status": form.get("status", (existing or {}).get("status") or "open"),
+        "task_kind": form.get("task_kind", (existing or {}).get("task_kind") or "task"),
+        "app_action_id": action_id,
+        "parameter_values": parameter_values,
+    }
+
+
+def _selected_action_context(task=None, selected_action_id=None):
+    action_id = selected_action_id or (task or {}).get("app_action_id")
+    action = apps_model.app_action_get(action_id) if action_id else None
+    existing_values = (task or {}).get("parameter_values") or {}
+    schema_json = action.get("parameter_schema_json") if action else ""
+    return {
+        "selected_action": action,
+        "parameter_schema": apps_model.parameter_schema_from_json(schema_json),
+        "parameter_values": apps_model.default_parameter_values(schema_json, existing_values),
+    }
+
+
+def _render_edit(task, area, error="", selected_action_id=None):
+    context = _selected_action_context(task, selected_action_id)
+    return render_template(
+        "tasks_edit.html",
+        active_tab="tasks",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Edit Task" if task else "Add Task",
+        content_html="",
+        task=task,
+        area=area,
+        error=error,
+        status_options=tasks_model.TASK_STATUSES,
+        kind_options=tasks_model.TASK_KINDS,
+        action_options=apps_model.app_action_options(),
+        selected_action=context["selected_action"],
+        parameter_schema=context["parameter_schema"],
+        parameter_values=context["parameter_values"],
+        project_options=projects_mod.project_list(statuses=("planned", "active")),
+        record_projects=projects_mod.record_projects("task", task["id"]) if task else [],
+    )
+
+
+@tasks_bp.route("/", methods=["GET", "POST"])
 def list_tasks_route():
-    area = request_area_param() or None
-    sort_col = request.args.get("sort") or request.cookies.get("tasks_sort_col") or "title"
-    sort_dir = request.args.get("dir") or request.cookies.get("tasks_sort_dir") or "asc"
-    tbl = get_table_def("tasks")
-    if not tbl:
-        task_list = []
-        col_list = []
-    else:
-        cols = ["id"] + tbl["col_list"]
-        col_list = tbl["col_list"]
-        condition = "1=1"
-        params = []
-        if area:
-            condition = "lower(area) = lower(?)"
-            params = [area]
-        rows = data.get_data(data.conn, tbl["name"], cols, condition, params)
-        task_list = [dict(row) for row in rows]
-    task_list = _sort_tasks(task_list, sort_col, sort_dir)
+    area = _area()
+    if request.method == "POST":
+        title = request.form.get("quick_title", "").strip()
+        if title:
+            task_id = tasks_model.quick_add(title, area=area or "")
+            return redirect(url_for("tasks.edit_task_route", task_id=task_id, message="Task added."))
+    tasks_model.ensure_tasks_schema()
+    view_filter = request.values.get("view", "all")
+    if view_filter not in {view_id for view_id, _ in TASK_VIEWS}:
+        view_filter = "all"
+    query = request.values.get("q", "").strip()
     page = request.args.get("page", type=int) or 1
-    page_data = paginate_items(task_list, page, cfg.RECS_PER_PAGE)
-    task_list = page_data["items"]
+    per_page = cfg.RECS_PER_PAGE
+    total = tasks_model.task_count(area_id=area, view_filter=view_filter, query=query)
+    page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
-    total_pages = page_data["total_pages"]
+    tasks = tasks_model.task_list(
+        area_id=area,
+        view_filter=view_filter,
+        query=query,
+        limit=per_page,
+        offset=(page - 1) * per_page,
+    )
     pagination = build_pagination(
         url_for,
         "tasks.list_tasks_route",
-        {"area": area, "sort": sort_col, "dir": sort_dir},
+        {"area": area, "view": view_filter, "q": query},
         page,
-        total_pages,
+        page_data["total_pages"],
     )
     resp = make_response(
         render_template(
-        "tasks_list.html",
-        active_tab="tasks",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Tasks ({area or 'All'})",
-        content_html="",
-        tasks=task_list,
-        area=area,
-        col_list=col_list,
-        sort_col=sort_col,
-        sort_dir=sort_dir,
-        page=page,
-        total_pages=total_pages,
-        pages=pagination["pages"],
-        first_url=pagination["first_url"],
-        last_url=pagination["last_url"],
+            "tasks_list.html",
+            active_tab="tasks",
+            tabs=get_tabs(),
+            side_tabs=get_side_tabs(),
+            content_title=f"Tasks ({area or 'All'})",
+            content_html="",
+            tasks=tasks,
+            area=area,
+            task_views=TASK_VIEWS,
+            view_filter=view_filter,
+            query=query,
+            message=request.values.get("message", ""),
+            page=page,
+            total_pages=page_data["total_pages"],
+            pages=pagination["pages"],
+            first_url=pagination["first_url"],
+            last_url=pagination["last_url"],
+        )
     )
-    )
-    resp.set_cookie("tasks_sort_col", sort_col)
-    resp.set_cookie("tasks_sort_dir", sort_dir)
     return resp
 
 
-@tasks_bp.route('/add', methods=["GET", "POST"])
+@tasks_bp.route("/add", methods=["GET", "POST"])
 def add_task_route():
-    tbl = get_table_def("tasks")
-    area = request_area_param() or ""
+    area = _area() or ""
+    preselect_action_id = request.args.get("app_action_id", type=int)
     error = ""
-    project_options = projects_mod.project_list(statuses=("planned", "active"))
-    if area:
+    if request.method == "POST":
         try:
-            if not areas_mod.area_default_folder_get(area):
-                error = "No default folder set for this area. Set a default folder before creating tasks."
-        except ValueError as exc:
+            values = _form_task_values(request.form)
+            task_id = tasks_model.create_task(values)
+            project_id = request.form.get("project_id", type=int)
+            if project_id:
+                projects_mod.assign_item_to_project(
+                    project_id,
+                    "task",
+                    task_id,
+                    item_title=values["title"],
+                    is_primary=1 if request.form.get("project_is_primary") == "1" else 0,
+                )
+            return redirect(url_for("tasks.edit_task_route", task_id=task_id, message="Task saved."))
+        except Exception as exc:
             error = str(exc)
-    if request.method == "POST" and tbl:
-        if error:
-            return render_template(
-                "tasks_edit.html",
-                active_tab="tasks",
-                tabs=get_tabs(),
-                side_tabs=get_side_tabs(),
-                content_title="Add Task",
-                task=None,
-                area=area,
-                error=error,
-                project_options=project_options,
-                record_projects=[],
-            )
-        values = [
-            request.form.get("title", "").strip(),
-            request.form.get("content", "").strip(),
-            request_area_param(area, include_form=True) or area,
-            request.form.get("start_date", "").strip(),
-            request.form.get("due_date", "").strip(),
-        ]
-        task_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
-        project_id = request.form.get("project_id", type=int)
-        if task_id and project_id:
-            projects_mod.assign_item_to_project(
-                project_id,
-                "task",
-                task_id,
-                item_title=values[0],
-                is_primary=1 if request.form.get("project_is_primary") == "1" else 0,
-            )
-        return redirect(url_for("tasks.list_tasks_route", area=area))
-    return render_template(
-        "tasks_edit.html",
-        active_tab="tasks",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title="Add Task",
-        task=None,
-        area=area,
-        error=error,
-        project_options=project_options,
-        record_projects=[],
-    )
+            preselect_action_id = request.form.get("app_action_id", type=int)
+    return _render_edit(None, area, error=error, selected_action_id=preselect_action_id)
 
 
-@tasks_bp.route('/edit/<int:task_id>', methods=["GET", "POST"])
+@tasks_bp.route("/edit/<int:task_id>", methods=["GET", "POST"])
 def edit_task_route(task_id):
-    tbl = get_table_def("tasks")
-    task = None
-    project_options = projects_mod.project_list(statuses=("planned", "active"))
-    record_projects = projects_mod.record_projects("task", task_id)
-    if tbl:
-        rows = data.get_data(data.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [task_id])
-        if rows:
-            task = dict(rows[0])
-    if request.method == "POST" and tbl:
-        values = [
-            request.form.get("title", "").strip(),
-            request.form.get("content", "").strip(),
-            request_area_param("General", include_form=True) or "General",
-            request.form.get("start_date", "").strip(),
-            request.form.get("due_date", "").strip(),
-        ]
-        data.update_record(data.conn, tbl["name"], task_id, tbl["col_list"], values)
-        project_id = request.form.get("project_id", type=int)
-        if project_id:
-            projects_mod.assign_item_to_project(
-                project_id,
-                "task",
-                task_id,
-                item_title=values[0],
-                is_primary=1 if request.form.get("project_is_primary") == "1" else 0,
-            )
-        return redirect(url_for("tasks.list_tasks_route"))
-    return render_template(
-        "tasks_edit.html",
-        active_tab="tasks",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title="Edit Task",
-        task=task,
-        area=task.get("area") if task else "",
-        project_options=project_options,
-        record_projects=record_projects,
-    )
+    task = tasks_model.task_get(task_id)
+    if not task:
+        abort(404)
+    selected_action_id = request.args.get("app_action_id", type=int)
+    error = ""
+    if request.method == "POST":
+        try:
+            values = _form_task_values(request.form, existing=task)
+            tasks_model.update_task(task_id, values)
+            project_id = request.form.get("project_id", type=int)
+            if project_id:
+                projects_mod.assign_item_to_project(
+                    project_id,
+                    "task",
+                    task_id,
+                    item_title=values["title"],
+                    is_primary=1 if request.form.get("project_is_primary") == "1" else 0,
+                )
+            return redirect(url_for("tasks.edit_task_route", task_id=task_id, message="Task saved."))
+        except Exception as exc:
+            error = str(exc)
+            task = tasks_model.task_get(task_id) or task
+            return _render_edit(task, task.get("area") or "", error=error, selected_action_id=request.form.get("app_action_id", type=int))
+    return _render_edit(task, task.get("area") or "", error=error, selected_action_id=selected_action_id)
 
 
-@tasks_bp.route('/delete/<int:task_id>')
+@tasks_bp.route("/delete/<int:task_id>", methods=["POST", "GET"])
 def delete_task_route(task_id):
-    tbl = get_table_def("tasks")
-    if tbl:
-        data.delete_record(data.conn, tbl["name"], task_id)
-    return redirect(url_for("tasks.list_tasks_route"))
+    tasks_model.delete_task(task_id)
+    return redirect(url_for("tasks.list_tasks_route", **_args_with()))
 
 
-def _sort_tasks(tasks, sort_col, sort_dir):
-    if not sort_col:
-        return tasks
-    reverse = sort_dir == "desc"
-    return sorted(tasks, key=lambda t: (t.get(sort_col) or ""), reverse=reverse)
+@tasks_bp.route("/done/<int:task_id>", methods=["POST"])
+def mark_done_route(task_id):
+    tasks_model.set_status(task_id, "done")
+    return redirect(request.referrer or url_for("tasks.list_tasks_route", **_args_with(message="Task marked done.")))
 
 
-@tasks_bp.route('/import', methods=["GET", "POST"])
+@tasks_bp.route("/reopen/<int:task_id>", methods=["POST"])
+def reopen_task_route(task_id):
+    tasks_model.set_status(task_id, "open")
+    return redirect(request.referrer or url_for("tasks.list_tasks_route", **_args_with(message="Task reopened.")))
+
+
+@tasks_bp.route("/run/<int:task_id>", methods=["POST"])
+def run_task_route(task_id):
+    try:
+        action = tasks_model.run_task(task_id)
+        message = f"{action.get('action_name') or 'App Action'} launched."
+        return redirect(url_for("tasks.edit_task_route", task_id=task_id, message=message))
+    except Exception as exc:
+        return redirect(url_for("tasks.edit_task_route", task_id=task_id, message=str(exc)))
+
+
+@tasks_bp.route("/template/<int:template_id>/create", methods=["POST", "GET"])
+def create_from_template_route(template_id):
+    try:
+        task_id = tasks_model.create_task_from_template(template_id)
+        return redirect(url_for("tasks.edit_task_route", task_id=task_id, message="Task created from template."))
+    except Exception as exc:
+        return redirect(url_for("tasks.list_tasks_route", **_args_with(view="templates", message=str(exc))))
+
+
+@tasks_bp.route("/import", methods=["GET", "POST"])
 def import_tasks_route():
-    area = request_area_param() or ""
-    tbl = get_table_def("tasks")
+    area = _area() or ""
     csv_path = ""
     headers = []
     mappings = {}
     imported = None
-    error = ""
+    error = "Task import still uses the generic CSV mapper; imported rows become open human Tasks unless mapped otherwise."
     if request.method == "POST":
         csv_path = request.form.get("csv_path", "").strip()
         upload = request.files.get("csv_file")
         if upload and upload.filename:
             csv_path = importer.save_upload(upload)
-        action = request.form.get("action", "load")
         headers = importer.read_csv_headers(csv_path)
-        if action == "import" and tbl:
-            mappings = {col: request.form.get(f"map_{col}", "") for col in tbl["col_list"]}
-            map_list = []
-            for col in tbl["col_list"]:
-                choice = mappings.get(col, "")
-                if choice == "{curr_area_selected}":
-                    choice = area
-                map_list.append(choice)
-            try:
-                importer.set_token("curr_area_selected", area)
-                imported = importer.import_to_table(tbl["name"], csv_path, map_list)
-            except Exception as exc:
-                error = str(exc)
-        else:
-            mappings = {col: "" for col in (tbl["col_list"] if tbl else [])}
     return render_template(
         "tasks_import.html",
         active_tab="tasks",
@@ -233,7 +257,7 @@ def import_tasks_route():
         content_title="Import Tasks",
         content_html="",
         area=area,
-        table_def=tbl,
+        table_def={"col_list": [col for col in tasks_model.TASK_COLUMNS if col not in {"id", "owner_user_id", "user_name", "rec_extract_date"}]},
         csv_path=csv_path,
         csv_headers=headers,
         mappings=mappings,

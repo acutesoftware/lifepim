@@ -99,7 +99,10 @@
             {% for action in actions %}
               {% set idx = loop.index0 %}
               <tr>
-                <td><input type="radio" name="default_action_idx" value="{{ idx }}" {% if action.is_default or (not item and loop.first) %}checked{% endif %}></td>
+                <td>
+                  <input type="hidden" name="app_action_id" value="{{ action.app_action_id or '' }}">
+                  <input type="radio" name="default_action_idx" value="{{ idx }}" {% if action.is_default or (not item and loop.first) %}checked{% endif %}>
+                </td>
                 <td><input type="text" name="action_name" value="{{ action.action_name or '' }}" placeholder="Open"></td>
                 <td>
                   {% set selected_action_type = action.action_type or 'SYSTEM_DEFAULT' %}
@@ -122,6 +125,57 @@
                   </span>
                 </td>
                 <td><input type="text" name="action_arguments" value="{{ action.arguments or '' }}"></td>
+              </tr>
+              <tr class="apps-action-parameters-row">
+                <td></td>
+                <td colspan="5">
+                  <details {% if action.parameter_schema and action.parameter_schema.parameters %}open{% endif %}>
+                    <summary>Execution Parameters</summary>
+                    <div class="apps-action-policy">
+                      <label>
+                        <input type="checkbox" name="action_agent_allowed" value="{{ idx }}" {% if action.agent_allowed %}checked{% endif %}>
+                        Agent allowed
+                      </label>
+                      <label>
+                        <input type="checkbox" name="action_requires_confirmation" value="{{ idx }}" {% if action.requires_confirmation is not defined or action.requires_confirmation %}checked{% endif %}>
+                        Requires confirmation
+                      </label>
+                    </div>
+                    <table class="apps-parameter-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Label</th>
+                          <th>Type</th>
+                          <th>Required</th>
+                          <th>Default</th>
+                          <th>Options</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% set params = action.parameter_schema.parameters if action.parameter_schema else [] %}
+                        {% for param in params + [{}, {}, {}] %}
+                          {% set pidx = loop.index0 %}
+                          <tr>
+                            <td><input type="text" name="param_name_{{ idx }}" value="{{ param.name or '' }}" placeholder="input_file"></td>
+                            <td><input type="text" name="param_label_{{ idx }}" value="{{ param.label or '' }}"></td>
+                            <td>
+                              {% set selected_type = param.type or 'text' %}
+                              <select name="param_type_{{ idx }}">
+                                {% for parameter_type in parameter_type_options %}
+                                  <option value="{{ parameter_type }}" {% if selected_type == parameter_type %}selected{% endif %}>{{ parameter_type }}</option>
+                                {% endfor %}
+                              </select>
+                            </td>
+                            <td><input type="checkbox" name="param_required_{{ idx }}" value="{{ pidx }}" {% if param.required %}checked{% endif %}></td>
+                            <td><input type="text" name="param_default_{{ idx }}" value="{{ param.default or '' }}"></td>
+                            <td><input type="text" name="param_options_{{ idx }}" value="{{ (param.options or [])|join(', ') }}"></td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </details>
+                </td>
               </tr>
             {% endfor %}
           </tbody>

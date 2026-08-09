@@ -89,6 +89,45 @@ Launching an App through LifePIM updates:
 
 Those fields drive the Recent saved view.
 
+### Parameterized Actions
+
+An App Action can optionally define runtime parameters in
+`lp_app_action.parameter_schema_json`. Supported parameter types are:
+
+```text
+text
+integer
+number
+boolean
+file
+folder
+select
+```
+
+Parameter names must be simple identifiers such as `input_file` or
+`table_name`. Select parameters must define their allowed options.
+
+The existing `arguments` field acts as a simple argument template when
+parameters are present. Placeholders use `{name}` syntax only:
+
+```text
+--input "{input_file}" --database "{database}" --table "{table_name}"
+```
+
+LifePIM validates required values, select options, and unknown placeholders
+before launching. It does not evaluate code, shell substitutions, expressions,
+loops, conditions, or Jinja templates.
+
+Actions also store execution-policy metadata:
+
+- `agent_allowed`: whether the action is considered safe for future unattended
+  Agent use.
+- `requires_confirmation`: whether an automated caller should require user
+  confirmation.
+
+These fields are metadata only. They do not implement a scheduler or Agent
+runtime.
+
 ## Add and Edit
 
 Use:
@@ -123,9 +162,32 @@ Actions are edited as child rows. Each row has:
 - target / command
 - working directory
 - arguments
+- execution parameters
+- agent allowed
+- requires confirmation
 
 If no action is explicitly marked as default, LifePIM makes the first action the
 default when saving.
+
+Existing App Action IDs are preserved across normal edits. Saving an App updates
+existing action rows, inserts new rows, and deletes only actions removed by the
+user. If a Task uses an action, LifePIM refuses to delete that action or its App
+until the Task binding is changed.
+
+## Tasks That Use Apps
+
+Tasks can bind directly to one `lp_app_action` through
+`lp_tasks.app_action_id`. The Task supplies runtime values in
+`lp_tasks.parameters_json`; the App Action owns the parameter definition and
+argument template.
+
+The App inspector shows related Tasks that use its actions. Each App Action also
+offers `Create Task`, which opens the normal Tasks add screen with that action
+preselected.
+
+Running a parameterized action directly from Apps shows a small parameter form.
+Running the same action from a Task uses the same validation and launch helper.
+Launching does not mark any Task complete.
 
 ## App Kinds
 
@@ -472,6 +534,9 @@ Important `lp_app_action` fields:
 - `command`
 - `working_directory`
 - `arguments`
+- `parameter_schema_json`
+- `agent_allowed`
+- `requires_confirmation`
 - `sort_order`
 - `is_default`
 

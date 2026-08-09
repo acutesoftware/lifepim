@@ -1,42 +1,131 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  {% if error %}
-    <p style="color:#b00020;">{{ error }}</p>
+  {% set message = request.values.get('message', '') %}
+  {% if message %}
+    <div class="settings-message">{{ message }}</div>
   {% endif %}
-  <form method="POST">
-    <label>Title:</label><br>
-    <input type="text" name="title" value="{{ task.title if task else '' }}" required><br>
-    <label>Area:</label><br>
-    <input type="text" name="area" value="{{ task.area if task else area }}"><br>
-    <label>Start Date:</label><br>
-    <input type="date" name="start_date" value="{{ task.start_date if task else '' }}"><br>
-    <label>Due Date:</label><br>
-    <input type="date" name="due_date" value="{{ task.due_date if task else '' }}"><br>
-    <label>Details:</label><br>
-    <textarea name="content" rows="6" cols="60" class="mention-enabled"
-              {% if task %}data-record-type="task" data-record-id="{{ task.id }}"{% endif %}>{{ task.content if task else '' }}</textarea><br><br>
+  {% if error %}
+    <div class="apps-launch-error">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" class="apps-edit-form">
+    <div class="apps-form-grid">
+      <label>
+        Title
+        <input type="text" name="title" value="{{ task.title if task else '' }}" required>
+      </label>
+      <label>
+        Status
+        {% set selected_status = task.status if task else 'open' %}
+        <select name="status">
+          {% for status in status_options %}
+            <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Kind
+        {% set selected_kind = task.task_kind if task else 'task' %}
+        <select name="task_kind">
+          {% for kind in kind_options %}
+            <option value="{{ kind }}" {% if selected_kind == kind %}selected{% endif %}>{{ kind }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Area
+        <input type="text" name="area" value="{{ task.area if task else area }}">
+      </label>
+      <label>
+        Start
+        <input type="date" name="start_date" value="{{ task.start_date if task else '' }}">
+      </label>
+      <label>
+        Due
+        <input type="date" name="due_date" value="{{ task.due_date if task else '' }}">
+      </label>
+    </div>
+
+    <label class="apps-wide-field">
+      Details
+      <textarea name="content" rows="6" class="mention-enabled"
+                {% if task %}data-record-type="task" data-record-id="{{ task.id }}"{% endif %}>{{ task.content if task else '' }}</textarea>
+    </label>
+
+    <section class="apps-action-editor">
+      <div class="apps-edit-section-title">Run With</div>
+      <label class="apps-wide-field">
+        App Action
+        {% set selected_action_id = selected_action.app_action_id if selected_action else (task.app_action_id if task else '') %}
+        <select name="app_action_id" id="task-app-action-select">
+          <option value="">None / Human Task</option>
+          {% for option in action_options %}
+            <option value="{{ option.app_action_id }}" {% if selected_action_id == option.app_action_id %}selected{% endif %}>
+              {{ option.app_title }} -> {{ option.action_name }}
+            </option>
+          {% endfor %}
+          {% if task and task.missing_app_action %}
+            <option value="{{ task.app_action_id }}" selected>Missing App Action</option>
+          {% endif %}
+        </select>
+      </label>
+
+      {% if task and task.missing_app_action %}
+        <div class="apps-launch-error">Missing App Action. Choose another App Action or set Run With to None.</div>
+      {% endif %}
+
+      {% if selected_action and parameter_schema.parameters %}
+        <div class="apps-edit-section-title">Parameters</div>
+        {% set parameter_prefix = 'param_' %}
+        {% include "widgets/action_parameter_fields.html" %}
+      {% endif %}
+    </section>
+
     {% if not task and project_options %}
-      <label>Project:</label><br>
-      <select name="project_id">
-        <option value="">No Project</option>
-        {% for option in project_options %}
-          <option value="{{ option.project_id }}">{{ option.icon or 'P' }} {{ option.name }}</option>
-        {% endfor %}
-      </select>
-      <label><input type="checkbox" name="project_is_primary" value="1"> Primary Project</label><br><br>
+      <label class="apps-wide-field">
+        Project
+        <select name="project_id">
+          <option value="">No Project</option>
+          {% for option in project_options %}
+            <option value="{{ option.project_id }}">{{ option.icon or 'P' }} {{ option.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="apps-checkbox-label"><input type="checkbox" name="project_is_primary" value="1"> Primary Project</label>
     {% elif task and project_options %}
-      <label>Assign to Project:</label><br>
-      <select name="project_id">
-        <option value="">No change</option>
-        {% for option in project_options %}
-          <option value="{{ option.project_id }}">{{ option.icon or 'P' }} {{ option.name }}</option>
-        {% endfor %}
-      </select>
-      <label><input type="checkbox" name="project_is_primary" value="1"> Primary Project</label><br><br>
+      <label class="apps-wide-field">
+        Assign to Project
+        <select name="project_id">
+          <option value="">No change</option>
+          {% for option in project_options %}
+            <option value="{{ option.project_id }}">{{ option.icon or 'P' }} {{ option.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="apps-checkbox-label"><input type="checkbox" name="project_is_primary" value="1"> Primary Project</label>
     {% endif %}
-    <button type="submit">Save</button>
+
+    <div class="apps-edit-actions">
+      <button type="submit">Save Task</button>
+      <a href="{{ url_for('tasks.list_tasks_route', area=area) }}">Back to Tasks</a>
+    </div>
   </form>
+
   {% if task %}
+    <div class="apps-edit-actions">
+      {% if task.app_action_id and not task.missing_app_action and task.task_kind == 'task' %}
+        <form method="post" action="{{ url_for('tasks.run_task_route', task_id=task.id) }}"><button type="submit">Run</button></form>
+      {% endif %}
+      {% if task.status == 'open' and task.task_kind == 'task' %}
+        <form method="post" action="{{ url_for('tasks.mark_done_route', task_id=task.id) }}"><button type="submit">Mark Done</button></form>
+      {% elif task.status == 'done' %}
+        <form method="post" action="{{ url_for('tasks.reopen_task_route', task_id=task.id) }}"><button type="submit">Reopen</button></form>
+      {% endif %}
+      {% if task.task_kind == 'template' %}
+        <form method="post" action="{{ url_for('tasks.create_from_template_route', template_id=task.id) }}"><button type="submit">Create Task</button></form>
+      {% endif %}
+    </div>
+
     {% set project_assign_record_type = "task" %}
     {% set project_assign_record_id = task.id %}
     {% set project_assign_record_title = task.title %}
@@ -48,4 +137,20 @@
     {% set link_mode = "outgoing" %}
     {% include "widgets/links_drawer.html" %}
   {% endif %}
+
+  <script>
+    (function () {
+      const select = document.getElementById("task-app-action-select");
+      if (!select) return;
+      select.addEventListener("change", function () {
+        const url = new URL(window.location.href);
+        if (select.value) {
+          url.searchParams.set("app_action_id", select.value);
+        } else {
+          url.searchParams.delete("app_action_id");
+        }
+        window.location.href = url.toString();
+      });
+    })();
+  </script>
 {% endblock %}

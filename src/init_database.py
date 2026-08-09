@@ -16,6 +16,7 @@ from lifepim.importer.schema import ensure_import_schema
 from modules.calendar.services.calendar_index import run_calendar_migration
 from modules.apps.schema import ensure_apps_schema
 from modules.how.schema import ensure_how_schema
+from modules.tasks.schema import ensure_tasks_schema
 from core.security import ensure_security_schema
 def main():
     reset_database(cfg.DB_FILE)
@@ -38,7 +39,7 @@ def reset_database(db_file):
         os.remove(db_file)
     db_conn = sqlite3.connect(db_file)
     for tbl in cfg.table_def:
-        if tbl.get("name") == "lp_media":
+        if tbl.get("name") in {"lp_media", "lp_tasks"}:
             continue
         create_table(db_conn, tbl)
     db_conn.executescript(folder_etl.DDL_RESET)
@@ -54,6 +55,7 @@ def reset_database(db_file):
     ensure_settings_schema(db_conn)
     db.ensure_notes_schema(db_conn)
     ensure_apps_schema(db_conn)
+    ensure_tasks_schema(db_conn)
     run_calendar_migration(db_conn)
     ensure_how_schema(db_conn)
     ensure_security_schema(db_conn)

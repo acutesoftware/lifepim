@@ -196,10 +196,26 @@
                   </a>
                   <span>{{ action.action_type }}</span>
                   {% if action.is_default %}<strong>Default</strong>{% endif %}
+                  {% if action.parameter_schema_json %}<strong>Params</strong>{% endif %}
                   <small>{{ action.command }}</small>
+                  <a href="{{ url_for('tasks.add_task_route', area=area, app_action_id=action.app_action_id) }}">Create Task</a>
                 </li>
               {% else %}
                 <li>No actions configured.</li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div class="apps-inspector-section">
+            <div class="apps-filter-title">Related Tasks</div>
+            <ul class="apps-action-list">
+              {% for task in related_tasks %}
+                <li>
+                  <a href="{{ url_for('tasks.edit_task_route', task_id=task.id) }}">{{ task.title }}</a>
+                  <span>{{ task.status }}</span>
+                  <small>{{ task.action_name or 'Missing App Action' }}</small>
+                </li>
+              {% else %}
+                <li>No Tasks use this App yet.</li>
               {% endfor %}
             </ul>
           </div>

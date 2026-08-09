@@ -1,4 +1,6 @@
+import json
 import os
+import re
 import shlex
 import sqlite3
 import subprocess
@@ -37,6 +39,19 @@ ACTION_TYPE_OPTIONS = (
     "OPEN_URL",
     "SYSTEM_DEFAULT",
 )
+
+PARAMETER_TYPE_OPTIONS = (
+    "text",
+    "integer",
+    "number",
+    "boolean",
+    "file",
+    "folder",
+    "select",
+)
+
+PARAMETER_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 PROJECT_KINDS = {"Development Project", "Repository"}
 SCRIPT_KINDS = {"Script", "Command", "SQL Script", "Utility"}
@@ -107,6 +122,9 @@ CREATE TABLE IF NOT EXISTS lp_app_action (
     command          TEXT,
     working_directory TEXT,
     arguments        TEXT,
+    parameter_schema_json TEXT,
+    agent_allowed    INTEGER NOT NULL DEFAULT 0,
+    requires_confirmation INTEGER NOT NULL DEFAULT 1,
     sort_order       INTEGER NOT NULL DEFAULT 100,
     is_default       INTEGER NOT NULL DEFAULT 0,
     created_utc      TEXT NOT NULL,
@@ -200,7 +218,7 @@ def _apps_schema_is_current(conn):
     return (
         {"app_id", "title", "kind", "favorite", "last_used_date", "import_source", "import_source_path", "imported_date", "import_metadata"}.issubset(_table_columns(conn, "lp_app"))
         and {"app_id", "area_id"}.issubset(_table_columns(conn, "lp_app_area"))
-        and {"app_id", "action_name", "action_type", "is_default"}.issubset(_table_columns(conn, "lp_app_action"))
+        and {"app_id", "action_name", "action_type", "is_default", "parameter_schema_json", "agent_allowed", "requires_confirmation"}.issubset(_table_columns(conn, "lp_app_action"))
         and not _table_exists(conn, "lp_apps")
     )
 
@@ -241,6 +259,18 @@ def _migrate_apps_schema(conn):
     conn.execute("UPDATE lp_app SET usage_count = 0 WHERE usage_count IS NULL")
     conn.execute("UPDATE lp_app SET created_date = ? WHERE COALESCE(created_date, '') = ''", (now,))
     conn.execute("UPDATE lp_app SET modified_date = ? WHERE COALESCE(modified_date, '') = ''", (now,))
+    if _table_exists(conn, "lp_app_action"):
+        action_cols = _table_columns(conn, "lp_app_action")
+        action_additions = {
+            "parameter_schema_json": "TEXT",
+            "agent_allowed": "INTEGER NOT NULL DEFAULT 0",
+            "requires_confirmation": "INTEGER NOT NULL DEFAULT 1",
+        }
+        for col_name, col_type in action_additions.items():
+            if col_name not in action_cols:
+                conn.execute(f"ALTER TABLE lp_app_action ADD COLUMN {col_name} {col_type}")
+        conn.execute("UPDATE lp_app_action SET agent_allowed = 0 WHERE agent_allowed IS NULL")
+        conn.execute("UPDATE lp_app_action SET requires_confirmation = 1 WHERE requires_confirmation IS NULL")
 
 
 def normalize_kind(value):
@@ -251,6 +281,76 @@ def normalize_kind(value):
 def normalize_action_type(value):
     text = _clean_text(value).upper()
     return text if text in ACTION_TYPE_OPTIONS else "SYSTEM_DEFAULT"
+
+
+def normalize_parameter_schema(value):
+    if isinstance(value, dict):
+        raw = value
+    else:
+        text = _clean_text(value)
+        if not text:
+            return ""
+        try:
+            raw = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Parameter schema is not valid JSON: {exc.msg}.")
+    if not isinstance(raw, dict):
+        raise ValueError("Parameter schema must be a JSON object.")
+    params = raw.get("parameters") or []
+    if not isinstance(params, list):
+        raise ValueError("Parameter schema parameters must be a list.")
+    seen = set()
+    cleaned = []
+    for idx, param in enumerate(params, start=1):
+        if not isinstance(param, dict):
+            raise ValueError(f"Parameter {idx} must be an object.")
+        name = _clean_text(param.get("name"))
+        if not name:
+            continue
+        if not PARAMETER_NAME_RE.match(name):
+            raise ValueError(f"Parameter name '{name}' must be a simple identifier.")
+        if name in seen:
+            raise ValueError(f"Parameter name '{name}' is duplicated.")
+        seen.add(name)
+        param_type = _clean_text(param.get("type")).lower() or "text"
+        if param_type not in PARAMETER_TYPE_OPTIONS:
+            raise ValueError(f"Parameter '{name}' has unsupported type '{param_type}'.")
+        options = param.get("options") or []
+        if isinstance(options, str):
+            options = [part.strip() for part in options.replace("\n", ",").split(",") if part.strip()]
+        if param_type == "select":
+            if not isinstance(options, list) or not options:
+                raise ValueError(f"Select parameter '{name}' must define options.")
+            options = [_clean_text(option) for option in options if _clean_text(option)]
+            if not options:
+                raise ValueError(f"Select parameter '{name}' must define options.")
+        else:
+            options = []
+        cleaned.append(
+            {
+                "name": name,
+                "label": _clean_text(param.get("label")) or name.replace("_", " ").title(),
+                "type": param_type,
+                "required": 1 if _is_truthy(param.get("required")) else 0,
+                "default": "" if param.get("default") is None else str(param.get("default")),
+                "options": options,
+            }
+        )
+    if not cleaned:
+        return ""
+    return json.dumps({"version": 1, "parameters": cleaned}, ensure_ascii=True, separators=(",", ":"))
+
+
+def parameter_schema_from_json(value):
+    normalized = normalize_parameter_schema(value)
+    return json.loads(normalized) if normalized else {"version": 1, "parameters": []}
+
+
+def action_has_parameters(action):
+    try:
+        return bool(parameter_schema_from_json(action.get("parameter_schema_json")).get("parameters"))
+    except Exception:
+        return bool(_clean_text(action.get("parameter_schema_json")))
 
 
 def area_options(selected_area_ids=None, conn=None, owner_user_id=None):
@@ -530,6 +630,12 @@ def delete_app(app_id, conn=None, owner_user_id=None):
     before = app_get(app_id, conn=conn, owner_user_id=owner_user_id)
     if not before:
         return False
+    usage_count = task_count_for_app(app_id, conn=conn, owner_user_id=owner_user_id)
+    if usage_count:
+        raise ValueError(
+            f"This App has actions used by {usage_count} Tasks and cannot be deleted. "
+            "Remove or change those Task bindings first."
+        )
     for entry in collections_mod.record_collections("app", app_id, domain="apps", conn=conn, owner_user_id=owner_user_id):
         collections_mod.remove_item_from_collection(entry["collection_item_id"], conn=conn, owner_user_id=owner_user_id)
     conn.execute("DELETE FROM lp_app_action WHERE owner_user_id IS ? AND app_id = ?", (owner_user_id, app_id))
@@ -624,45 +730,95 @@ def set_app_actions(app_id, actions, conn=None, owner_user_id=None):
     ensure_apps_schema(conn)
     owner_user_id = _owner_user_id(owner_user_id)
     now = _utc_now()
+    current_rows = conn.execute(
+        "SELECT * FROM lp_app_action WHERE owner_user_id IS ? AND app_id = ?",
+        (owner_user_id, app_id),
+    ).fetchall()
+    current_ids = {int(row["app_action_id"]) for row in current_rows}
     cleaned = []
     for idx, action in enumerate(actions or []):
         name = _clean_text(action.get("action_name"))
         command = _clean_text(action.get("command"))
         if not name and not command:
             continue
+        action_id = _clean_int(action.get("app_action_id"))
         cleaned.append(
             {
+                "app_action_id": action_id if action_id in current_ids else None,
                 "action_name": name or "Open",
                 "action_type": normalize_action_type(action.get("action_type")),
                 "command": command,
                 "working_directory": _clean_text(action.get("working_directory")),
                 "arguments": _clean_text(action.get("arguments")),
+                "parameter_schema_json": normalize_parameter_schema(action.get("parameter_schema_json") or action.get("parameter_schema")),
+                "agent_allowed": 1 if _is_truthy(action.get("agent_allowed")) else 0,
+                "requires_confirmation": 0 if action.get("requires_confirmation") in (0, False, "0", "false", "off", "no") else 1,
                 "sort_order": _clean_int(action.get("sort_order"), idx * 10) or idx * 10,
                 "is_default": 1 if _is_truthy(action.get("is_default")) else 0,
             }
         )
     if cleaned and not any(action["is_default"] for action in cleaned):
         cleaned[0]["is_default"] = 1
-    conn.execute("DELETE FROM lp_app_action WHERE owner_user_id IS ? AND app_id = ?", (owner_user_id, app_id))
-    for action in cleaned:
+    submitted_ids = {action["app_action_id"] for action in cleaned if action.get("app_action_id")}
+    delete_ids = current_ids - submitted_ids
+    for action_id in sorted(delete_ids):
+        usage_count = task_count_for_action(action_id, conn=conn, owner_user_id=owner_user_id)
+        if usage_count:
+            raise ValueError(
+                f"This action is used by {usage_count} Tasks and cannot be deleted. "
+                "Remove or change those Task bindings first."
+            )
         conn.execute(
-            "INSERT INTO lp_app_action "
-            "(owner_user_id, app_id, action_name, action_type, command, working_directory, arguments, sort_order, is_default, created_utc, updated_utc) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                owner_user_id,
-                app_id,
-                action["action_name"],
-                action["action_type"],
-                action["command"],
-                action["working_directory"],
-                action["arguments"],
-                action["sort_order"],
-                action["is_default"],
-                now,
-                now,
-            ),
+            "DELETE FROM lp_app_action WHERE owner_user_id IS ? AND app_id = ? AND app_action_id = ?",
+            (owner_user_id, app_id, action_id),
         )
+    for action in cleaned:
+        if action.get("app_action_id"):
+            conn.execute(
+                "UPDATE lp_app_action SET action_name = ?, action_type = ?, command = ?, working_directory = ?, "
+                "arguments = ?, parameter_schema_json = ?, agent_allowed = ?, requires_confirmation = ?, "
+                "sort_order = ?, is_default = ?, updated_utc = ? "
+                "WHERE owner_user_id IS ? AND app_id = ? AND app_action_id = ?",
+                (
+                    action["action_name"],
+                    action["action_type"],
+                    action["command"],
+                    action["working_directory"],
+                    action["arguments"],
+                    action["parameter_schema_json"],
+                    action["agent_allowed"],
+                    action["requires_confirmation"],
+                    action["sort_order"],
+                    action["is_default"],
+                    now,
+                    owner_user_id,
+                    app_id,
+                    action["app_action_id"],
+                ),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO lp_app_action "
+                "(owner_user_id, app_id, action_name, action_type, command, working_directory, arguments, "
+                "parameter_schema_json, agent_allowed, requires_confirmation, sort_order, is_default, created_utc, updated_utc) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    owner_user_id,
+                    app_id,
+                    action["action_name"],
+                    action["action_type"],
+                    action["command"],
+                    action["working_directory"],
+                    action["arguments"],
+                    action["parameter_schema_json"],
+                    action["agent_allowed"],
+                    action["requires_confirmation"],
+                    action["sort_order"],
+                    action["is_default"],
+                    now,
+                    now,
+                ),
+            )
 
 
 def set_app_collections(app_id, collection_ids, conn=None, owner_user_id=None):
@@ -706,6 +862,69 @@ def list_app_actions(app_id, conn=None, owner_user_id=None):
     return [dict(row) for row in rows]
 
 
+def app_action_get(action_id, conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    row = conn.execute(
+        "SELECT ax.*, a.title AS app_title, a.kind AS app_kind "
+        "FROM lp_app_action ax "
+        "JOIN lp_app a ON a.owner_user_id IS ax.owner_user_id AND a.app_id = ax.app_id "
+        "WHERE ax.owner_user_id IS ? AND ax.app_action_id = ?",
+        (owner_user_id, action_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def app_action_options(conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    rows = conn.execute(
+        "SELECT ax.app_action_id, ax.action_name, ax.parameter_schema_json, a.app_id, a.title AS app_title "
+        "FROM lp_app_action ax "
+        "JOIN lp_app a ON a.owner_user_id IS ax.owner_user_id AND a.app_id = ax.app_id "
+        "WHERE ax.owner_user_id IS ? AND a.enabled = 1 "
+        "ORDER BY lower(a.title), ax.is_default DESC, ax.sort_order, lower(ax.action_name)",
+        (owner_user_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def task_count_for_action(action_id, conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    if not _table_exists(conn, "lp_tasks") or "app_action_id" not in _table_columns(conn, "lp_tasks"):
+        return 0
+    params = [action_id]
+    where = "app_action_id = ?"
+    if "owner_user_id" in _table_columns(conn, "lp_tasks"):
+        where += " AND owner_user_id IS ?"
+        params.append(owner_user_id)
+    row = conn.execute(f"SELECT COUNT(1) AS cnt FROM lp_tasks WHERE {where}", params).fetchone()
+    return row["cnt"] if row else 0
+
+
+def task_count_for_app(app_id, conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    if not _table_exists(conn, "lp_tasks") or "app_action_id" not in _table_columns(conn, "lp_tasks"):
+        return 0
+    params = [owner_user_id, app_id]
+    owner_clause = ""
+    if "owner_user_id" in _table_columns(conn, "lp_tasks"):
+        owner_clause = "AND t.owner_user_id IS ?"
+        params.append(owner_user_id)
+    row = conn.execute(
+        "SELECT COUNT(1) AS cnt FROM lp_tasks t "
+        "JOIN lp_app_action ax ON ax.app_action_id = t.app_action_id "
+        "WHERE ax.owner_user_id IS ? AND ax.app_id = ? " + owner_clause,
+        params,
+    ).fetchone()
+    return row["cnt"] if row else 0
+
+
 def area_counts(conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_apps_schema(conn)
@@ -720,7 +939,7 @@ def area_counts(conn=None, owner_user_id=None):
     return {row["area_id"]: row["item_count"] for row in rows}
 
 
-def launch_action(app_id, action_id=None, conn=None, owner_user_id=None):
+def launch_action(app_id, action_id=None, parameter_values=None, conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_apps_schema(conn)
     owner_user_id = _owner_user_id(owner_user_id)
@@ -738,6 +957,12 @@ def launch_action(app_id, action_id=None, conn=None, owner_user_id=None):
         action = app["actions"][0]
     if not action:
         raise ValueError("No launch action is configured.")
+    action = dict(action)
+    action["arguments"] = render_argument_template(
+        action.get("arguments"),
+        action.get("parameter_schema_json"),
+        parameter_values or {},
+    )
     _execute_action(action)
     now = _utc_now()
     conn.execute(
@@ -747,6 +972,100 @@ def launch_action(app_id, action_id=None, conn=None, owner_user_id=None):
     )
     conn.commit()
     return action
+
+
+def validate_parameter_values(parameter_schema_json, values):
+    schema = parameter_schema_from_json(parameter_schema_json)
+    values = values or {}
+    cleaned = {}
+    for param in schema.get("parameters", []):
+        name = param["name"]
+        raw_value = values.get(name)
+        if raw_value in (None, ""):
+            raw_value = param.get("default", "")
+        if param.get("required") and raw_value in (None, ""):
+            raise ValueError(f"Parameter '{param.get('label') or name}' is required.")
+        param_type = param.get("type") or "text"
+        if param_type == "boolean":
+            cleaned[name] = bool(_is_truthy(raw_value))
+            continue
+        if raw_value in (None, ""):
+            cleaned[name] = ""
+            continue
+        if param_type == "integer":
+            try:
+                cleaned[name] = int(raw_value)
+            except (TypeError, ValueError):
+                raise ValueError(f"Parameter '{param.get('label') or name}' must be an integer.")
+        elif param_type == "number":
+            try:
+                cleaned[name] = float(raw_value)
+            except (TypeError, ValueError):
+                raise ValueError(f"Parameter '{param.get('label') or name}' must be a number.")
+        elif param_type == "select":
+            text = str(raw_value)
+            if text not in (param.get("options") or []):
+                raise ValueError(f"Parameter '{param.get('label') or name}' must be one of: {', '.join(param.get('options') or [])}.")
+            cleaned[name] = text
+        else:
+            cleaned[name] = str(raw_value)
+    return cleaned
+
+
+def default_parameter_values(parameter_schema_json, existing_values=None):
+    schema = parameter_schema_from_json(parameter_schema_json)
+    existing_values = existing_values or {}
+    values = {}
+    for param in schema.get("parameters", []):
+        name = param["name"]
+        values[name] = existing_values[name] if name in existing_values else param.get("default", "")
+    return values
+
+
+def parameter_values_from_form(form, parameter_schema_json, prefix="param_"):
+    schema = parameter_schema_from_json(parameter_schema_json)
+    values = {}
+    for param in schema.get("parameters", []):
+        name = param["name"]
+        field_name = prefix + name
+        if param.get("type") == "boolean":
+            values[name] = 1 if form.get(field_name) else 0
+        else:
+            values[name] = form.get(field_name, "")
+    return values
+
+
+def render_argument_template(arguments, parameter_schema_json, parameter_values):
+    arguments = _clean_text(arguments)
+    schema = parameter_schema_from_json(parameter_schema_json)
+    if not schema.get("parameters") and not parameter_values:
+        return arguments
+    if not arguments:
+        validate_parameter_values(parameter_schema_json, parameter_values)
+        return ""
+    values = validate_parameter_values(parameter_schema_json, parameter_values)
+    allowed = {param["name"] for param in schema.get("parameters", [])}
+    placeholders = set(PLACEHOLDER_RE.findall(arguments))
+    unknown = sorted(placeholders - allowed)
+    if unknown:
+        raise ValueError(f"Unknown argument placeholder(s): {', '.join(unknown)}.")
+
+    def replace(match):
+        value = values.get(match.group(1), "")
+        return str(value)
+
+    return PLACEHOLDER_RE.sub(replace, arguments)
+
+
+def split_arguments(arguments):
+    parts = shlex.split(_clean_text(arguments), posix=False) if _clean_text(arguments) else []
+    stripped = []
+    for part in parts:
+        if len(part) >= 2 and part[0] == part[-1] and part[0] in {"'", '"'}:
+            stripped.append(part[1:-1])
+        else:
+            stripped.append(part)
+    return stripped
 
 
 def _execute_action(action):
@@ -773,7 +1092,7 @@ def _execute_action(action):
         os.startfile(target)
         return
     if action_type == "EXECUTABLE":
-        cmd = [target] + (shlex.split(arguments, posix=False) if arguments else [])
+        cmd = [target] + split_arguments(arguments)
         subprocess.Popen(cmd, cwd=cwd or None)
         return
     if action_type == "COMMAND":
@@ -784,7 +1103,7 @@ def _execute_action(action):
         webbrowser.open(target)
         return
     if not os.path.exists(target) and arguments:
-        subprocess.Popen([target] + shlex.split(arguments, posix=False), cwd=cwd or None)
+        subprocess.Popen([target] + split_arguments(arguments), cwd=cwd or None)
         return
     os.startfile(target)
 

@@ -5,6 +5,7 @@ from flask import Blueprint, abort, jsonify, redirect, render_template, request,
 from common.utils import build_pagination, get_side_tabs, get_tabs, lg_usr, paginate_total, request_area_param
 from common import config as cfg
 from modules.apps import schema as apps_model
+from modules.tasks import schema as tasks_model
 from modules.apps.importers import (
     AppImportCandidate,
     DesktopAppImporter,
@@ -79,24 +80,55 @@ def _form_values(form, area):
 def _action_values(form):
     rows = []
     default_idx = form.get("default_action_idx", "")
+    ids = form.getlist("app_action_id")
     names = form.getlist("action_name")
     types = form.getlist("action_type")
     commands = form.getlist("action_command")
     workdirs = form.getlist("action_working_directory")
     args = form.getlist("action_arguments")
+    agent_allowed = set(form.getlist("action_agent_allowed"))
+    requires_confirmation = set(form.getlist("action_requires_confirmation"))
     for idx, name in enumerate(names):
         rows.append(
             {
+                "app_action_id": ids[idx] if idx < len(ids) else "",
                 "action_name": name,
                 "action_type": types[idx] if idx < len(types) else "",
                 "command": commands[idx] if idx < len(commands) else "",
                 "working_directory": workdirs[idx] if idx < len(workdirs) else "",
                 "arguments": args[idx] if idx < len(args) else "",
+                "parameter_schema_json": _parameter_schema_from_action_form(form, idx),
+                "agent_allowed": str(idx) in agent_allowed,
+                "requires_confirmation": str(idx) in requires_confirmation,
                 "sort_order": idx * 10,
                 "is_default": str(idx) == str(default_idx),
             }
         )
     return rows
+
+
+def _parameter_schema_from_action_form(form, idx):
+    parameters = []
+    names = form.getlist(f"param_name_{idx}")
+    labels = form.getlist(f"param_label_{idx}")
+    types = form.getlist(f"param_type_{idx}")
+    defaults = form.getlist(f"param_default_{idx}")
+    options = form.getlist(f"param_options_{idx}")
+    required = set(form.getlist(f"param_required_{idx}"))
+    for param_idx, name in enumerate(names):
+        if not (name or "").strip():
+            continue
+        parameters.append(
+            {
+                "name": name,
+                "label": labels[param_idx] if param_idx < len(labels) else "",
+                "type": types[param_idx] if param_idx < len(types) else "text",
+                "required": str(param_idx) in required,
+                "default": defaults[param_idx] if param_idx < len(defaults) else "",
+                "options": options[param_idx] if param_idx < len(options) else "",
+            }
+        )
+    return {"version": 1, "parameters": parameters}
 
 
 def _render_apps_index(area, item=None, launch_error="", message=""):
@@ -124,6 +156,7 @@ def _render_apps_index(area, item=None, launch_error="", message=""):
     )
     if not item and items:
         item = items[0]
+    related_tasks = tasks_model.related_tasks_for_app(item["app_id"]) if item else []
     pagination = build_pagination(
         url_for,
         "apps.list_apps_table_route",
@@ -162,6 +195,7 @@ def _render_apps_index(area, item=None, launch_error="", message=""):
         last_url=pagination["last_url"],
         launch_error=launch_error,
         message=message,
+        related_tasks=related_tasks,
     )
 
 
@@ -310,6 +344,10 @@ def view_app_route(item_id):
 def launch_app_route(item_id):
     area = _area()
     try:
+        item = apps_model.app_get(item_id)
+        action = (item or {}).get("default_action")
+        if action and apps_model.action_has_parameters(action):
+            return _render_run(item, action)
         apps_model.launch_action(item_id)
     except Exception as exc:
         item = apps_model.app_get(item_id)
@@ -321,6 +359,9 @@ def launch_app_route(item_id):
 def launch_app_action_route(item_id, action_id):
     area = _area()
     try:
+        action = apps_model.app_action_get(action_id)
+        if action and apps_model.action_has_parameters(action):
+            return _render_run(apps_model.app_get(item_id), action)
         apps_model.launch_action(item_id, action_id=action_id)
     except Exception as exc:
         item = apps_model.app_get(item_id)
@@ -344,8 +385,10 @@ def add_app_route():
 def _render_edit(item, area, error=""):
     selected_area_ids = item.get("area_ids", []) if item else ([area] if area else [])
     actions = list(item.get("actions", [])) if item else []
+    for action in actions:
+        action["parameter_schema"] = apps_model.parameter_schema_from_json(action.get("parameter_schema_json"))
     for _ in range(3):
-        actions.append({})
+        actions.append({"parameter_schema": {"version": 1, "parameters": []}})
     return render_template(
         "apps_edit.html",
         active_tab="apps",
@@ -360,7 +403,61 @@ def _render_edit(item, area, error=""):
         action_type_options=apps_model.ACTION_TYPE_OPTIONS,
         area_options=apps_model.area_options(selected_area_ids),
         actions=actions,
+        parameter_type_options=apps_model.PARAMETER_TYPE_OPTIONS,
     )
+
+
+def _render_run(item, action, error=""):
+    schema = apps_model.parameter_schema_from_json(action.get("parameter_schema_json"))
+    values = apps_model.default_parameter_values(action.get("parameter_schema_json"))
+    return render_template(
+        "apps_run.html",
+        active_tab="apps",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Run: {action.get('action_name') or item.get('title')}",
+        content_html="",
+        item=item,
+        action=action,
+        parameter_schema=schema,
+        parameter_values=values,
+        error=error,
+        area=_area(),
+    )
+
+
+@apps_bp.route("/action/<int:action_id>/run/<int:item_id>", methods=["GET", "POST"])
+def run_app_action_route(item_id, action_id):
+    item = apps_model.app_get(item_id)
+    action = apps_model.app_action_get(action_id)
+    if not item or not action or action.get("app_id") != item_id:
+        abort(404)
+    if request.method == "POST":
+        try:
+            values = apps_model.parameter_values_from_form(request.form, action.get("parameter_schema_json"), prefix="param_")
+            apps_model.launch_action(item_id, action_id=action_id, parameter_values=values)
+            return redirect(url_for("apps.view_app_route", item_id=item_id, **_args_with(message=f"{action.get('action_name') or 'App Action'} launched.")))
+        except Exception as exc:
+            schema = apps_model.parameter_schema_from_json(action.get("parameter_schema_json"))
+            values = apps_model.default_parameter_values(
+                action.get("parameter_schema_json"),
+                apps_model.parameter_values_from_form(request.form, action.get("parameter_schema_json"), prefix="param_"),
+            )
+            return render_template(
+                "apps_run.html",
+                active_tab="apps",
+                tabs=get_tabs(),
+                side_tabs=get_side_tabs(),
+                content_title=f"Run: {action.get('action_name') or item.get('title')}",
+                content_html="",
+                item=item,
+                action=action,
+                parameter_schema=schema,
+                parameter_values=values,
+                error=str(exc),
+                area=_area(),
+            )
+    return _render_run(item, action)
 
 
 @apps_bp.route("/browse-path")
@@ -410,7 +507,11 @@ def edit_app_route(item_id):
 
 @apps_bp.route("/delete/<int:item_id>", methods=["GET", "POST"])
 def delete_app_route(item_id):
-    apps_model.delete_app(item_id)
+    try:
+        apps_model.delete_app(item_id)
+    except Exception as exc:
+        item = apps_model.app_get(item_id)
+        return _render_apps_index(_area(), item=item, launch_error=str(exc))
     return redirect(url_for("apps.list_apps_table_route", **_args_with()))
 
 

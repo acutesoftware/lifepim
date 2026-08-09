@@ -207,21 +207,26 @@ Relationships:
 - **Default Runner:** Human or LifePIM Agent
 - **Agent Allowed:** Yes/No
 
-A particular execution then becomes a Task occurrence or run.
+A particular piece of work then becomes an ordinary Task occurrence.
 
 Example:
 
 **Load Logger JSON — 2026-08-09 20:15**
 
-- Runner: LifePIM Agent
-- Status: Success
-- Started: 20:15:04
-- Finished: 20:15:12
-- Records loaded: 18,422
+- Status: Open, Done, or Cancelled
+- Due date: when the user expects to perform it
+- App Action: the executable binding, if LifePIM knows how to run it
+- Parameters: the concrete values for this occurrence
 
 The Task Template describes the reusable operation.
 
-The Task occurrence records that the operation actually happened.
+The ordinary Task occurrence is the work item.
+
+Task Templates and ordinary Task occurrences may share the same Task storage
+model. Execution history/logging is not automatically a Tasks-owned concept. Do
+not introduce `lp_task_run` or a parallel process/run subsystem unless a future
+generic LifePIM activity/execution design establishes a canonical home for that
+information.
 
 ---
 
@@ -704,6 +709,9 @@ The following decisions were specifically clarified and should be treated as cur
 16. “Processes” or “Data Processing” may exist later as a useful **view**, but not necessarily as a new canonical entity.
 17. Do not add a top-level ETL tab unless future requirements genuinely cannot be represented through existing LifePIM concepts.
 18. Prefer **relationships and views over new entity types**.
+19. Task Templates and ordinary Task occurrences may use the same `lp_tasks`
+    table; do not infer a Task-owned run history subsystem from conceptual
+    occurrence language.
 
 ---
 

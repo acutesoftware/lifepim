@@ -1,0 +1,26 @@
+{% set param_prefix = parameter_prefix|default('param_') %}
+{% if parameter_schema and parameter_schema.parameters %}
+  <div class="action-parameter-fields">
+    {% for param in parameter_schema.parameters %}
+      {% set value = parameter_values.get(param.name, param.default or '') if parameter_values else (param.default or '') %}
+      <label class="action-parameter-field">
+        <span>{{ param.label or param.name }}{% if param.required %} *{% endif %}</span>
+        {% if param.type == 'select' %}
+          <select name="{{ param_prefix }}{{ param.name }}">
+            {% for option in param.options %}
+              <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        {% elif param.type == 'boolean' %}
+          <input type="checkbox" name="{{ param_prefix }}{{ param.name }}" value="1" {% if value in [1, true, '1', 'true', 'on', 'yes'] %}checked{% endif %}>
+        {% elif param.type == 'integer' %}
+          <input type="number" step="1" name="{{ param_prefix }}{{ param.name }}" value="{{ value }}">
+        {% elif param.type == 'number' %}
+          <input type="number" step="any" name="{{ param_prefix }}{{ param.name }}" value="{{ value }}">
+        {% else %}
+          <input type="text" name="{{ param_prefix }}{{ param.name }}" value="{{ value }}">
+        {% endif %}
+      </label>
+    {% endfor %}
+  </div>
+{% endif %}

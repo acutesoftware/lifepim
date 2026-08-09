@@ -12,6 +12,11 @@ LINK_TYPE_VOCAB = [
     "emails",
     "located_at",
     "depends_on",
+    "uses",
+    "follows",
+    "reads",
+    "writes",
+    "produces",
 ]
 
 LINK_FIELDS = [
@@ -293,6 +298,10 @@ def allowed_link_types(src_type, dst_type):
         allowed.add("attachment")
     if src_type == "task" and dst_type == "task":
         allowed.add("depends_on")
+    if src_type == "task" and dst_type in {"app", "how"}:
+        allowed.update({"uses", "follows"})
+    if src_type == "task" and dst_type in {"file", "media", "audio", "data", "money"}:
+        allowed.update({"reads", "writes", "produces"})
     if src_type == "task" and _is_person(dst_type):
         allowed.add("assigned_to")
     if _is_place(dst_type) and (src_type in {"event", "task"} or _is_person(src_type)):

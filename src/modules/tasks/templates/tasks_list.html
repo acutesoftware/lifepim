@@ -1,40 +1,94 @@
 {% extends "layout.html" %}
 {% block module_content %}
-<h1>Tasks</h1>
-  <a href="{{ url_for('tasks.add_task_route', area=area) }}">ホ Add Task</a>
-  <a href="{{ url_for('tasks.import_tasks_route', area=area) }}">Import Tasks</a>
+  <div class="tasks-page">
+    {% if message %}
+      <div class="settings-message">{{ message }}</div>
+    {% endif %}
 
-{% set link_list_type = "task" %}
-{% set link_list_context_id = "tasks_list" %}
-{% set link_table_id = "tasks-table" %}
-{% include "widgets/links_bulk_toolbar.html" %}
+    <div class="apps-toolbar">
+      <div class="apps-view-tabs">
+        {% for view_id, view_label in task_views %}
+          <a class="{% if view_filter == view_id %}active{% endif %}"
+             href="{{ url_for('tasks.list_tasks_route', area=area, view=view_id, q=query) }}">{{ view_label }}</a>
+        {% endfor %}
+      </div>
+      <div class="apps-actions">
+        <a class="apps-button" href="{{ url_for('tasks.add_task_route', area=area) }}">+ Add Task</a>
+        <a class="apps-button" href="{{ url_for('tasks.import_tasks_route', area=area) }}">Import</a>
+      </div>
+    </div>
 
-<div class="tabular-scroll">
-<table border="1" cellpadding="5" id="tasks-table">
-  <tr>
-    <th><input type="checkbox" class="link-select-all"></th>
-    {% for col in col_list %}
-    {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
-    <th>
-      <a href="{{ url_for('tasks.list_tasks_route', area=area, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
-      {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    {% endfor %}
-    <th>Actions</th>
-  </tr>
-  {% for task in tasks %}
-  <tr class="link-draggable" data-record-type="task" data-record-id="{{ task.id }}" data-record-title="{{ task.title }}">
-    <td><input type="checkbox" class="link-select" data-record-type="task" data-record-id="{{ task.id }}" data-record-title="{{ task.title }}"></td>
-    {% for col in col_list %}
-    <td>{{ task[col] }}</td>
-    {% endfor %}
-    <td>
-      <a href="{{ url_for('tasks.edit_task_route', task_id=task.id) }}">Edit</a> |
-      <a href="{{ url_for('tasks.delete_task_route', task_id=task.id) }}" onclick="return confirm('Delete task?');">Del</a>
-    </td>
-  </tr>
-  {% endfor %}
-</table>
-{% include "widgets/wid_pagination.html" %}
-</div>
+    <form method="post" class="tasks-quick-add">
+      <input type="text" name="quick_title" placeholder="+ Add task" required>
+      <button type="submit">Add</button>
+    </form>
+
+    <form method="get" class="tasks-search">
+      <input type="hidden" name="area" value="{{ area or '' }}">
+      <input type="hidden" name="view" value="{{ view_filter }}">
+      <input type="search" name="q" value="{{ query }}" placeholder="Search...">
+      <button type="submit">Search</button>
+    </form>
+
+    {% set link_list_type = "task" %}
+    {% set link_list_context_id = "tasks_list" %}
+    {% set link_table_id = "tasks-table" %}
+    {% include "widgets/links_bulk_toolbar.html" %}
+
+    <div class="tabular-scroll">
+      <table class="apps-table" id="tasks-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" class="link-select-all"></th>
+            <th></th>
+            <th>Task</th>
+            <th>Due</th>
+            <th>Area</th>
+            <th>Run With</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in tasks %}
+            <tr class="link-draggable" data-record-type="task" data-record-id="{{ task.id }}" data-record-title="{{ task.title }}">
+              <td><input type="checkbox" class="link-select" data-record-type="task" data-record-id="{{ task.id }}" data-record-title="{{ task.title }}"></td>
+              <td>
+                {% if task.status == 'open' and task.task_kind == 'task' %}
+                  <form method="post" action="{{ url_for('tasks.mark_done_route', task_id=task.id) }}">
+                    <button type="submit" title="Mark done">[ ]</button>
+                  </form>
+                {% elif task.status == 'done' %}
+                  [x]
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('tasks.edit_task_route', task_id=task.id) }}">{{ task.title }}</a>
+                {% if task.task_kind == 'template' %}<small>Template</small>{% endif %}
+              </td>
+              <td>{{ task.due_date or '-' }}</td>
+              <td>{{ task.area or '' }}</td>
+              <td>{{ task.run_with_label if task.app_action_id else '' }}</td>
+              <td>{{ task.status }}</td>
+              <td class="apps-row-actions">
+                {% if task.app_action_id and not task.missing_app_action and task.task_kind == 'task' %}
+                  <form method="post" action="{{ url_for('tasks.run_task_route', task_id=task.id) }}"><button type="submit">Run</button></form>
+                {% endif %}
+                {% if task.task_kind == 'template' %}
+                  <form method="post" action="{{ url_for('tasks.create_from_template_route', template_id=task.id) }}"><button type="submit">Create Task</button></form>
+                {% endif %}
+                <a href="{{ url_for('tasks.edit_task_route', task_id=task.id) }}">Edit</a>
+                <form method="post" action="{{ url_for('tasks.delete_task_route', task_id=task.id) }}" onsubmit="return confirm('Delete task?');">
+                  <button type="submit" class="apps-danger-button">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8">No tasks found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% include "widgets/wid_pagination.html" %}
+    </div>
+  </div>
 {% endblock %}

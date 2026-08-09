@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  {% if error %}
+    <div class="apps-launch-error">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="apps-edit-form" action="{{ url_for('apps.run_app_action_route', item_id=item.app_id, action_id=action.app_action_id, area=area) }}">
+    <h1>Run: {{ action.action_name }}</h1>
+    <p>{{ item.title }}{% if action.requires_confirmation %} | confirmation required{% endif %}</p>
+    {% set parameter_prefix = 'param_' %}
+    {% include "widgets/action_parameter_fields.html" %}
+    <div class="apps-edit-actions">
+      <button type="submit">Run</button>
+      <a href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area) }}">Back to App</a>
+    </div>
+  </form>
+{% endblock %}
