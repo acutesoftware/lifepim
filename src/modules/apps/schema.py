@@ -542,43 +542,55 @@ def delete_app(app_id, conn=None, owner_user_id=None):
 
 def refresh_missing_executable_icons(conn=None, owner_user_id=None):
     from modules.apps.importers.exe_icons import get_executable_icon_value
+    from modules.apps.importers.icon_media import materialize_app_icon_value
     from modules.apps.importers.windows_shortcuts import resolve_shortcut
 
     conn = _get_conn(conn)
     ensure_apps_schema(conn)
     owner_user_id = _owner_user_id(owner_user_id)
     rows = conn.execute(
-        "SELECT a.app_id, a.path, "
+        "SELECT a.app_id, a.path, a.icon, "
         "(SELECT ax.command FROM lp_app_action ax WHERE ax.owner_user_id IS a.owner_user_id "
         "AND ax.app_id = a.app_id ORDER BY ax.is_default DESC, ax.sort_order, ax.app_action_id LIMIT 1) AS command, "
         "(SELECT ax.action_type FROM lp_app_action ax WHERE ax.owner_user_id IS a.owner_user_id "
         "AND ax.app_id = a.app_id ORDER BY ax.is_default DESC, ax.sort_order, ax.app_action_id LIMIT 1) AS action_type "
         "FROM lp_app a "
-        "WHERE a.owner_user_id IS ? AND a.enabled = 1 AND COALESCE(a.icon, '') = ''",
+        "WHERE a.owner_user_id IS ? AND a.enabled = 1 "
+        "AND (COALESCE(a.icon, '') = '' OR a.icon LIKE '/static/app_icons/%' OR a.icon LIKE 'static/app_icons/%')",
         (owner_user_id,),
     ).fetchall()
     updated = 0
     now = _utc_now()
     for row in rows:
-        target = _clean_text(row["command"]) or _clean_text(row["path"])
-        action_type = _clean_text(row["action_type"]).upper()
-        exe_path = ""
-        if target.lower().endswith(".exe"):
-            exe_path = target
-        elif target.lower().endswith(".lnk"):
-            info = resolve_shortcut(target)
-            if info.is_valid and (info.target or "").lower().endswith(".exe"):
-                exe_path = info.target
-        elif action_type == "EXECUTABLE":
-            exe_path = target
-        if not exe_path:
-            continue
-        icon = get_executable_icon_value(exe_path)
+        current_icon = _clean_text(row["icon"])
+        icon = ""
+        if current_icon:
+            media_icon = materialize_app_icon_value(current_icon, conn=conn)
+            if media_icon != current_icon or current_icon.startswith(("/media/", "media/")):
+                icon = media_icon
         if not icon:
+            target = _clean_text(row["command"]) or _clean_text(row["path"])
+            action_type = _clean_text(row["action_type"]).upper()
+            exe_path = ""
+            if target.lower().endswith(".exe"):
+                exe_path = target
+            elif target.lower().endswith(".lnk"):
+                info = resolve_shortcut(target)
+                if info.is_valid and (info.target or "").lower().endswith(".exe"):
+                    exe_path = info.target
+            elif action_type == "EXECUTABLE":
+                exe_path = target
+            if not exe_path:
+                continue
+            extracted = get_executable_icon_value(exe_path)
+            icon = materialize_app_icon_value(extracted, conn=conn) if extracted else ""
+            if not icon:
+                continue
+        if icon == current_icon:
             continue
         cur = conn.execute(
             "UPDATE lp_app SET icon = ?, modified_date = ?, rec_extract_date = ? "
-            "WHERE owner_user_id IS ? AND app_id = ? AND COALESCE(icon, '') = ''",
+            "WHERE owner_user_id IS ? AND app_id = ?",
             (icon, now, now, owner_user_id, row["app_id"]),
         )
         updated += max(cur.rowcount or 0, 0)
@@ -800,9 +812,9 @@ def _app_row(row, conn=None, owner_user_id=None):
 
 def _icon_image_url(icon):
     text = _clean_text(icon)
-    if text.startswith("/static/"):
+    if text.startswith("/static/") or text.startswith("/media/"):
         return text
-    if text.startswith("static/"):
+    if text.startswith("static/") or text.startswith("media/"):
         return "/" + text
     return ""
 

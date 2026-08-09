@@ -225,6 +225,23 @@ class TestAppImporters(unittest.TestCase):
         self.assertEqual(app["icon_image_url"], "/static/app_icons/icon-app.ico")
         self.assertEqual(app["kind_icon"], "")
 
+    def test_media_icon_value_renders_as_image_url(self):
+        app_id = apps_model.create_app(
+            {
+                "title": "Media Icon App",
+                "kind": "Application",
+                "icon": "/media/file/42",
+                "path": r"C:\Tools\MediaIconApp.exe",
+            },
+            conn=self.conn,
+            owner_user_id=1,
+        )
+
+        app = apps_model.app_get(app_id, conn=self.conn, owner_user_id=1)
+
+        self.assertEqual(app["icon_image_url"], "/media/file/42")
+        self.assertEqual(app["kind_icon"], "")
+
     def test_import_executable_extracts_icon_at_import_time(self):
         candidate = AppImportCandidate(
             candidate_id="exe",
@@ -247,6 +264,45 @@ class TestAppImporters(unittest.TestCase):
         self.assertEqual(app["icon"], "/static/app_icons/executable-app.ico")
         self.assertEqual(app["icon_image_url"], "/static/app_icons/executable-app.ico")
         self.assertIn("executable-app.ico", app["import_metadata"])
+
+    def test_import_executable_copies_static_icon_to_media(self):
+        icon_name = "test-app-import-media.ico"
+        static_dir = os.path.join(root_folder, "static", "app_icons")
+        static_icon = os.path.join(static_dir, icon_name)
+        candidate = AppImportCandidate(
+            candidate_id="exe-media",
+            source_type=SOURCE_DESKTOP,
+            name="Executable Media App",
+            kind="Application",
+            target=r"C:\Tools\ExecutableMediaApp.exe",
+            source_path=r"C:\Users\me\Desktop\Executable Media App.lnk",
+            selected=True,
+            action_type="EXECUTABLE",
+        )
+
+        with tempfile.TemporaryDirectory() as media_root:
+            os.makedirs(static_dir, exist_ok=True)
+            with open(static_icon, "wb") as handle:
+                handle.write(b"icon-bytes")
+            try:
+                with patch("modules.apps.importers.icon_media._data_folder", return_value=os.path.abspath(media_root)), patch(
+                    "modules.apps.importers.service.get_executable_icon_value",
+                    return_value=f"/static/app_icons/{icon_name}",
+                ):
+                    result = import_selected_candidates([candidate], conn=self.conn, owner_user_id=1)
+            finally:
+                os.remove(static_icon)
+
+            app = apps_model.app_get(result.created_app_ids[0], conn=self.conn, owner_user_id=1)
+            self.assertRegex(app["icon"], r"^/media/file/\d+$")
+            self.assertEqual(app["icon_image_url"], app["icon"])
+            self.assertIn("media_icon", app["import_metadata"])
+            media_id = int(app["icon"].rsplit("/", 1)[1])
+            media = self.conn.execute("SELECT * FROM lp_media WHERE media_id = ?", (media_id,)).fetchone()
+            self.assertIsNotNone(media)
+            self.assertEqual(media["media_type"], "image")
+            self.assertTrue(media["path"].startswith(os.path.join(media_root, "Media", "imported", "icons")))
+            self.assertTrue(os.path.exists(media["path"]))
 
     def test_refresh_missing_executable_icons_backfills_blank_icons(self):
         app_id = apps_model.create_app(
@@ -294,6 +350,46 @@ class TestAppImporters(unittest.TestCase):
         self.assertEqual(updated, 1)
         self.assertEqual(apps_model.app_get(app_id, conn=self.conn, owner_user_id=1)["icon"], "/static/app_icons/blank-icon.ico")
         self.assertEqual(apps_model.app_get(manual_id, conn=self.conn, owner_user_id=1)["icon"], "M")
+
+    def test_refresh_icons_moves_existing_static_icon_to_media(self):
+        icon_name = "test-app-refresh-media.ico"
+        static_dir = os.path.join(root_folder, "static", "app_icons")
+        static_icon = os.path.join(static_dir, icon_name)
+        app_id = apps_model.create_app(
+            {
+                "title": "Static Icon App",
+                "kind": "Application",
+                "icon": f"/static/app_icons/{icon_name}",
+                "path": r"C:\Tools\StaticIconApp.exe",
+                "actions": [
+                    {
+                        "action_name": "Open",
+                        "action_type": "EXECUTABLE",
+                        "command": r"C:\Tools\StaticIconApp.exe",
+                        "is_default": 1,
+                    }
+                ],
+            },
+            conn=self.conn,
+            owner_user_id=1,
+        )
+
+        with tempfile.TemporaryDirectory() as media_root:
+            os.makedirs(static_dir, exist_ok=True)
+            with open(static_icon, "wb") as handle:
+                handle.write(b"refresh-icon-bytes")
+            try:
+                with patch("modules.apps.importers.icon_media._data_folder", return_value=os.path.abspath(media_root)):
+                    updated = apps_model.refresh_missing_executable_icons(conn=self.conn, owner_user_id=1)
+            finally:
+                os.remove(static_icon)
+
+            app = apps_model.app_get(app_id, conn=self.conn, owner_user_id=1)
+            self.assertEqual(updated, 1)
+            self.assertRegex(app["icon"], r"^/media/file/\d+$")
+            media_id = int(app["icon"].rsplit("/", 1)[1])
+            media = self.conn.execute("SELECT * FROM lp_media WHERE media_id = ?", (media_id,)).fetchone()
+            self.assertTrue(media["path"].startswith(os.path.join(media_root, "Media", "imported", "icons")))
 
     def test_powershell_shortcut_resolver_reads_lnk_metadata(self):
         completed = Mock()

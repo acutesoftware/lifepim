@@ -5,6 +5,7 @@ from urllib.parse import urlsplit, urlunsplit
 from modules.apps import schema as apps_model
 from .base import AppImportResult, STATUS_EXISTS, STATUS_INVALID, STATUS_NEW
 from .exe_icons import get_executable_icon_value
+from .icon_media import materialize_app_icon_value
 
 
 def normalize_duplicate_value(value, *, is_url=False):
@@ -122,7 +123,7 @@ def import_selected_candidates(candidates, conn=None, owner_user_id=None):
 
 def _create_candidate_app(candidate, conn=None, owner_user_id=None):
     now = apps_model._utc_now()
-    icon = _candidate_icon(candidate)
+    icon = _candidate_icon(candidate, conn=conn)
     metadata_json = json.dumps(candidate.metadata or {}, sort_keys=True)
     description = candidate.description or _description_from_metadata(candidate.metadata)
     values = {
@@ -162,13 +163,17 @@ def _description_from_metadata(metadata):
     return ""
 
 
-def _candidate_icon(candidate):
+def _candidate_icon(candidate, conn=None):
     icon = candidate.icon or ""
     if (candidate.action_type or "").upper() == "EXECUTABLE":
         extracted = get_executable_icon_value(candidate.target)
         if extracted:
             candidate.metadata["extracted_icon"] = extracted
-            return extracted
+            icon = extracted
+    media_icon = materialize_app_icon_value(icon, conn=conn)
+    if media_icon and media_icon != icon:
+        candidate.metadata["media_icon"] = media_icon
+        return media_icon
     return icon
 
 
