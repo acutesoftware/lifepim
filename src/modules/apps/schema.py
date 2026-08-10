@@ -4,6 +4,7 @@ import re
 import shlex
 import sqlite3
 import subprocess
+import sys
 import webbrowser
 from datetime import datetime, timezone
 
@@ -205,11 +206,13 @@ def ensure_apps_schema(conn=None):
     conn = _get_conn(conn)
     conn_id = id(conn)
     if conn_id in _APPS_SCHEMA_READY_CONN_IDS and _apps_schema_is_current(conn):
+        ensure_file_inventory_app(conn)
         return
     areas_mod.ensure_areas_schema(conn)
     collections_mod.ensure_collections_schema(conn)
     conn.executescript(APPS_SCHEMA_SQL)
     _migrate_apps_schema(conn)
+    ensure_file_inventory_app(conn)
     conn.commit()
     _APPS_SCHEMA_READY_CONN_IDS.add(conn_id)
 
@@ -271,6 +274,113 @@ def _migrate_apps_schema(conn):
                 conn.execute(f"ALTER TABLE lp_app_action ADD COLUMN {col_name} {col_type}")
         conn.execute("UPDATE lp_app_action SET agent_allowed = 0 WHERE agent_allowed IS NULL")
         conn.execute("UPDATE lp_app_action SET requires_confirmation = 1 WHERE requires_confirmation IS NULL")
+
+
+def ensure_file_inventory_app(conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    now = _utc_now()
+    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "apps", "files", "scan.py"))
+    workdir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    schema = {
+        "version": 1,
+        "parameters": [
+            {"name": "source_id", "label": "Source ID", "type": "integer", "required": True, "default": "1"},
+            {"name": "scope", "label": "Scope", "type": "text", "required": False, "default": "/"},
+            {
+                "name": "mode",
+                "label": "Mode",
+                "type": "select",
+                "required": True,
+                "default": "AUTO",
+                "options": ["AUTO", "FULL", "INCREMENTAL", "SCOPED"],
+            },
+        ],
+    }
+    row = conn.execute(
+        "SELECT app_id FROM lp_app WHERE owner_user_id IS ? AND import_source = 'lifepim_builtin' "
+        "AND import_source_path = 'apps.files.scan'",
+        (owner_user_id,),
+    ).fetchone()
+    values = (
+        owner_user_id,
+        "LifePIM File Inventory Scanner",
+        "Script",
+        "Scans configured filesystem sources into the LifePIM File Inventory database.",
+        "F",
+        0,
+        1,
+        script_path,
+        "",
+        "",
+        "Python",
+        "",
+        "files,file-inventory,scanner",
+        "Built-in replacement for the legacy FileLister batch process.",
+        "lifepim_builtin",
+        "apps.files.scan",
+        now,
+        "{}",
+        now,
+        now,
+        _current_user_name(),
+        now,
+    )
+    if row:
+        app_id = int(row["app_id"])
+        conn.execute(
+            "UPDATE lp_app SET owner_user_id = ?, title = ?, kind = ?, description = ?, icon = ?, "
+            "favorite = ?, enabled = ?, path = ?, repository_url = ?, website_url = ?, language = ?, "
+            "version = ?, tags = ?, comments = ?, import_source = ?, import_source_path = ?, "
+            "imported_date = ?, import_metadata = ?, modified_date = ?, rec_extract_date = ? "
+            "WHERE app_id = ?",
+            values[:18] + (now, now, app_id),
+        )
+    else:
+        cur = conn.execute(
+            "INSERT INTO lp_app "
+            "(owner_user_id, title, kind, description, icon, favorite, enabled, path, repository_url, "
+            "website_url, language, version, tags, comments, import_source, import_source_path, "
+            "imported_date, import_metadata, created_date, modified_date, user_name, rec_extract_date) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            values,
+        )
+        app_id = int(cur.lastrowid)
+    action_values = (
+        "Run File Scan",
+        "EXECUTABLE",
+        sys.executable,
+        workdir,
+        '-m apps.files.scan --source-id {source_id} --scope "{scope}" --mode {mode} --json',
+        normalize_parameter_schema(schema),
+        1,
+        1,
+        0,
+        1,
+        now,
+    )
+    action_row = conn.execute(
+        "SELECT app_action_id FROM lp_app_action WHERE owner_user_id IS ? AND app_id = ? AND action_name = 'Run File Scan'",
+        (owner_user_id, app_id),
+    ).fetchone()
+    if action_row:
+        conn.execute(
+            "UPDATE lp_app_action SET action_name = ?, action_type = ?, command = ?, working_directory = ?, "
+            "arguments = ?, parameter_schema_json = ?, agent_allowed = ?, requires_confirmation = ?, "
+            "sort_order = ?, is_default = ?, updated_utc = ? "
+            "WHERE app_action_id = ?",
+            action_values + (action_row["app_action_id"],),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO lp_app_action "
+            "(owner_user_id, app_id, action_name, action_type, command, working_directory, arguments, "
+            "parameter_schema_json, agent_allowed, requires_confirmation, sort_order, is_default, created_utc, updated_utc) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (owner_user_id, app_id) + action_values[:-1] + (now, now),
+        )
+    conn.commit()
+    return app_id
 
 
 def normalize_kind(value):

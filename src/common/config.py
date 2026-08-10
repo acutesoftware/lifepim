@@ -36,6 +36,7 @@ area_mappings_csv = os.getenv(
     r"E:\BK_fangorn\user\duncan\LifePIM_Data\configuration\area_folders.csv",
 )
 FILELIST_DB = r"D:\TRANSFER_NAS\filelister\filelist_master.db"
+FILE_INVENTORY_DB = os.path.join(user_folder, "files.db")
 FILELIST_IMAGE_WHERE = r"WHERE folder_name IN ('Photos', 'Movies', 'TV Shows')"
 FILELIST_AUDIO_WHERE = r"WHERE folder_name = 'Music'"
 PATH_ALIASES = [
