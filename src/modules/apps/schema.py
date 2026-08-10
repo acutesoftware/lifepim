@@ -285,8 +285,7 @@ def ensure_file_inventory_app(conn=None, owner_user_id=None):
     schema = {
         "version": 1,
         "parameters": [
-            {"name": "source_id", "label": "Source ID", "type": "integer", "required": True, "default": "1"},
-            {"name": "scope", "label": "Scope", "type": "text", "required": False, "default": "/"},
+            {"name": "root_path", "label": "Root folder", "type": "folder", "required": True, "default": ""},
             {
                 "name": "mode",
                 "label": "Mode",
@@ -351,7 +350,7 @@ def ensure_file_inventory_app(conn=None, owner_user_id=None):
         "EXECUTABLE",
         sys.executable,
         workdir,
-        '-m apps.files.scan --source-id {source_id} --scope "{scope}" --mode {mode} --json',
+        '-m apps.files.scan "{root_path}" --mode {mode} --json',
         normalize_parameter_schema(schema),
         1,
         1,

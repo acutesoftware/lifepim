@@ -246,3 +246,16 @@ def scan_files(source_id: int, scope: str = "/", mode: str = "AUTO", db_path: st
         return scanner.scan(source_id, scope=scope, mode=mode)
     finally:
         scanner.close()
+
+
+def scan_folder(root_path: str, mode: str = "AUTO", db_path: str | None = None, source_name: str = "") -> ScanResult:
+    root_path = os.path.abspath(os.path.expanduser(os.path.expandvars((root_path or "").strip().strip('"'))))
+    if not root_path:
+        raise ValueError("Root folder is required.")
+    conn = inventory_db.connect(db_path)
+    try:
+        name = source_name or os.path.basename(os.path.normpath(root_path)) or root_path
+        source_id = inventory_db.create_or_update_source(conn, name, root_path, enabled=True)
+    finally:
+        conn.close()
+    return scan_files(source_id, scope="/", mode=mode, db_path=db_path)

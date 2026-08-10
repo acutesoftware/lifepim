@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 
 from apps.files.inventory_db import connect, create_or_update_source, list_sources
 from apps.files.scanner import scan_files
@@ -11,10 +12,11 @@ from apps.files.scanner import scan_files
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="LifePIM File Inventory scanner.")
+    parser.add_argument("folder", nargs="?", default="", help="Folder to scan. This is the normal way to run the scanner.")
     parser.add_argument("--db", default="", help="File Inventory SQLite database path.")
-    parser.add_argument("--source-id", type=int, default=None, help="Configured file source id.")
-    parser.add_argument("--source-name", default="", help="Create/update source name when root is supplied.")
-    parser.add_argument("--root-path", default="", help="Create/update source root path.")
+    parser.add_argument("--source-id", type=int, default=None, help="Advanced: scan an existing configured source id.")
+    parser.add_argument("--source-name", default="", help="Advanced: override the generated source name.")
+    parser.add_argument("--root-path", default="", help="Folder to scan. Equivalent to positional folder.")
     parser.add_argument("--scope", default="/", help="Relative scan scope under the source root.")
     parser.add_argument("--mode", default="AUTO", choices=["AUTO", "FULL", "INCREMENTAL", "SCOPED", "auto", "full", "incremental", "scoped"])
     parser.add_argument("--list-sources", action="store_true", help="List configured sources and exit.")
@@ -27,16 +29,17 @@ def main(argv=None) -> int:
             rows = [dict(row) for row in list_sources(conn)]
             print(json.dumps(rows, indent=2, sort_keys=True) if args.json else rows)
             return 0
+        root_path = args.root_path or args.folder
         source_id = args.source_id
-        if args.root_path:
+        if root_path:
             source_id = create_or_update_source(
                 conn,
-                args.source_name or args.root_path,
-                args.root_path,
+                args.source_name or os.path.basename(os.path.normpath(root_path)) or root_path,
+                root_path,
                 enabled=True,
             )
         if not source_id:
-            parser.error("--source-id or --root-path is required")
+            parser.error("folder path is required")
         conn.close()
         result = scan_files(source_id, scope=args.scope, mode=args.mode.upper(), db_path=args.db or None)
     finally:

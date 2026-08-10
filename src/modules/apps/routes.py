@@ -422,6 +422,38 @@ def _render_run(item, action, error=""):
         parameter_schema=schema,
         parameter_values=values,
         error=error,
+        scan_result=None,
+        area=_area(),
+    )
+
+
+def _is_file_inventory_scan_action(item, action):
+    return (
+        (item or {}).get("import_source_path") == "apps.files.scan"
+        and (action or {}).get("action_name") == "Run File Scan"
+    )
+
+
+def _run_file_inventory_scan_from_form(item, action):
+    from apps.files.scanner import scan_folder
+
+    values = apps_model.parameter_values_from_form(request.form, action.get("parameter_schema_json"), prefix="param_")
+    cleaned = apps_model.validate_parameter_values(action.get("parameter_schema_json"), values)
+    result = scan_folder(cleaned.get("root_path") or "", mode=cleaned.get("mode") or "AUTO")
+    schema = apps_model.parameter_schema_from_json(action.get("parameter_schema_json"))
+    return render_template(
+        "apps_run.html",
+        active_tab="apps",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Run: {action.get('action_name') or item.get('title')}",
+        content_html="",
+        item=item,
+        action=action,
+        parameter_schema=schema,
+        parameter_values=apps_model.default_parameter_values(action.get("parameter_schema_json"), values),
+        error="" if result.status == "SUCCESS" else "; ".join(result.error_messages),
+        scan_result=result.as_dict(),
         area=_area(),
     )
 
@@ -434,6 +466,8 @@ def run_app_action_route(item_id, action_id):
         abort(404)
     if request.method == "POST":
         try:
+            if _is_file_inventory_scan_action(item, action):
+                return _run_file_inventory_scan_from_form(item, action)
             values = apps_model.parameter_values_from_form(request.form, action.get("parameter_schema_json"), prefix="param_")
             apps_model.launch_action(item_id, action_id=action_id, parameter_values=values)
             return redirect(url_for("apps.view_app_route", item_id=item_id, **_args_with(message=f"{action.get('action_name') or 'App Action'} launched.")))
@@ -455,6 +489,7 @@ def run_app_action_route(item_id, action_id):
                 parameter_schema=schema,
                 parameter_values=values,
                 error=str(exc),
+                scan_result=None,
                 area=_area(),
             )
     return _render_run(item, action)

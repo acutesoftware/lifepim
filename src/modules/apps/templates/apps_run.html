@@ -14,4 +14,29 @@
       <a href="{{ url_for('apps.view_app_route', item_id=item.app_id, area=area) }}">Back to App</a>
     </div>
   </form>
+
+  {% if scan_result %}
+    <div class="apps-scan-result">
+      <h4>Scan Result</h4>
+      <table border="1" cellpadding="5">
+        <tr><th>Scan ID</th><td>{{ scan_result.scan_id }}</td></tr>
+        <tr><th>Status</th><td>{{ scan_result.status }}</td></tr>
+        <tr><th>Provider</th><td>{{ scan_result.provider }}</td></tr>
+        <tr><th>Files seen</th><td>{{ scan_result.files_seen }}</td></tr>
+        <tr><th>New</th><td>{{ scan_result.new }}</td></tr>
+        <tr><th>Changed</th><td>{{ scan_result.changed }}</td></tr>
+        <tr><th>Deleted</th><td>{{ scan_result.deleted }}</td></tr>
+        <tr><th>Reactivated</th><td>{{ scan_result.reactivated }}</td></tr>
+        <tr><th>Unchanged</th><td>{{ scan_result.unchanged }}</td></tr>
+        <tr><th>Errors</th><td>{{ scan_result.errors }}</td></tr>
+      </table>
+      {% if scan_result.error_messages %}
+        <ul>
+          {% for message in scan_result.error_messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endif %}
 {% endblock %}

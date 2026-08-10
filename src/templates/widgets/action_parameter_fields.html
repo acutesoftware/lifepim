@@ -17,10 +17,30 @@
           <input type="number" step="1" name="{{ param_prefix }}{{ param.name }}" value="{{ value }}">
         {% elif param.type == 'number' %}
           <input type="number" step="any" name="{{ param_prefix }}{{ param.name }}" value="{{ value }}">
+        {% elif param.type in ['file', 'folder'] %}
+          <span class="action-path-field">
+            <input type="text" name="{{ param_prefix }}{{ param.name }}" value="{{ value }}">
+            <button type="button" class="action-path-browse" data-target="{{ param.type }}" data-input="{{ param_prefix }}{{ param.name }}">Browse</button>
+          </span>
         {% else %}
           <input type="text" name="{{ param_prefix }}{{ param.name }}" value="{{ value }}">
         {% endif %}
       </label>
     {% endfor %}
   </div>
+  <script>
+    document.querySelectorAll('.action-path-browse').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const input = document.querySelector(`[name="${button.dataset.input}"]`);
+        if (!input) {
+          return;
+        }
+        const res = await fetch(`/apps/browse-path?target=${encodeURIComponent(button.dataset.target || 'file')}`);
+        const data = await res.json();
+        if (data.path) {
+          input.value = data.path;
+        }
+      });
+    });
+  </script>
 {% endif %}

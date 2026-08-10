@@ -5,6 +5,9 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
+
+from flask import Flask
 
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
@@ -12,8 +15,9 @@ if root_folder not in sys.path:
     sys.path.append(root_folder)
 
 from apps.files.inventory_db import changed_files_for_scan, connect, create_or_update_source, last_successful_scan
-from apps.files.scanner import FileInventoryScanner
+from apps.files.scanner import FileInventoryScanner, scan_folder
 from modules.apps import schema as apps_model
+from modules.apps import routes as apps_routes
 
 
 class TestAppFileList(unittest.TestCase):
@@ -167,7 +171,68 @@ class TestAppFileList(unittest.TestCase):
         self.assertEqual(app["title"], "LifePIM File Inventory Scanner")
         action = app["actions"][0]
         self.assertEqual(action["action_name"], "Run File Scan")
-        self.assertIn("source_id", action["parameter_schema_json"])
+        self.assertIn("root_path", action["parameter_schema_json"])
+
+    def test_apps_run_route_scans_selected_folder_and_renders_summary(self):
+        app_conn = sqlite3.connect(":memory:")
+        app_conn.row_factory = sqlite3.Row
+        try:
+            apps_model.ensure_apps_schema(app_conn)
+            app_id = apps_model.ensure_file_inventory_app(app_conn, owner_user_id=1)
+            app = apps_model.app_get(app_id, conn=app_conn, owner_user_id=1)
+            action = app["actions"][0]
+        finally:
+            app_conn.close()
+
+        class FakeResult:
+            status = "SUCCESS"
+            error_messages = []
+
+            def as_dict(self):
+                return {
+                    "scan_id": 22,
+                    "status": "SUCCESS",
+                    "provider": "full_scan",
+                    "files_seen": 1,
+                    "new": 1,
+                    "changed": 0,
+                    "deleted": 0,
+                    "reactivated": 0,
+                    "unchanged": 0,
+                    "errors": 0,
+                    "error_messages": [],
+                }
+
+        app_ctx = Flask(__name__)
+        with app_ctx.test_request_context(
+            f"/apps/action/{action['app_action_id']}/run/{app_id}",
+            method="POST",
+            data={"param_root_path": self.root, "param_mode": "FULL"},
+        ):
+            with patch("modules.apps.routes.apps_model.app_get", return_value=app), patch(
+                "modules.apps.routes.apps_model.app_action_get", return_value=action
+            ), patch("apps.files.scanner.scan_folder", return_value=FakeResult()) as scan_folder_mock, patch(
+                "modules.apps.routes.render_template"
+            ) as render_template:
+                apps_routes.run_app_action_route(app_id, action["app_action_id"])
+
+        kwargs = render_template.call_args.kwargs
+        scan_folder_mock.assert_called_once_with(self.root, mode="FULL")
+        self.assertEqual(kwargs["scan_result"]["status"], "SUCCESS")
+        self.assertEqual(kwargs["scan_result"]["new"], 1)
+        self.assertEqual(kwargs["parameter_values"]["root_path"], self.root)
+
+    def test_scan_folder_convenience_does_not_require_source_id(self):
+        self._write("small/direct.txt", "direct")
+        self.conn.close()
+
+        result = scan_folder(self.root, mode="FULL", db_path=self.db_path)
+
+        self.assertEqual(result.status, "SUCCESS")
+        self.assertEqual(result.files_new, 1)
+        self.conn = connect(self.db_path)
+        row = self.conn.execute("SELECT name FROM lp_file WHERE name = 'direct.txt'").fetchone()
+        self.assertIsNotNone(row)
 
 
 if __name__ == "__main__":

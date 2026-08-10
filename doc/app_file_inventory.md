@@ -64,25 +64,29 @@ marked deleted.
 
 ## Running
 
-Create or update a source and scan it:
+Normal use is from the Apps tab:
 
-```powershell
-cd src
-python -m apps.files.scan --root-path "D:\Photos" --source-name "Local Photos Mirror" --mode FULL --json
+```text
+Apps -> LifePIM File Inventory Scanner -> Open -> choose Root folder -> Run
 ```
 
-Scan an existing source:
+The scanner creates or refreshes the source record internally. You do not need
+to name a source or remember a `source_id` for normal use.
 
-```powershell
+For direct testing, scan a folder:
+
+```text
 cd src
-python -m apps.files.scan --source-id 1 --scope "/" --mode AUTO --json
+python -m apps.files.scan "D:\Photos" --mode FULL --json
 ```
+
+Advanced source listing exists in the CLI, but it is not part of the normal
+workflow.
 
 The Apps tab is seeded with `LifePIM File Inventory Scanner`, a normal App
 action with parameters:
 
-- `source_id`
-- `scope`
+- `root_path`
 - `mode`
 
 The legacy `scripts/prod/filelister.py` now delegates to the new scanner.
