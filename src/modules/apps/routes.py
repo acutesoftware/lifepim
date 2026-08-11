@@ -1,6 +1,7 @@
 import json
+import os
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, send_file, url_for
 
 from common.utils import build_pagination, get_side_tabs, get_tabs, lg_usr, paginate_total, request_area_param
 from common import config as cfg
@@ -157,6 +158,8 @@ def _render_apps_index(area, item=None, launch_error="", message=""):
     if not item and items:
         item = items[0]
     related_tasks = tasks_model.related_tasks_for_app(item["app_id"]) if item else []
+    latest_run = apps_model.latest_app_run(item["app_id"]) if item else None
+    recent_runs = apps_model.list_app_runs(item["app_id"], limit=10) if item else []
     pagination = build_pagination(
         url_for,
         "apps.list_apps_table_route",
@@ -196,6 +199,8 @@ def _render_apps_index(area, item=None, launch_error="", message=""):
         launch_error=launch_error,
         message=message,
         related_tasks=related_tasks,
+        latest_run=latest_run,
+        recent_runs=recent_runs,
     )
 
 
@@ -348,7 +353,7 @@ def launch_app_route(item_id):
         action = (item or {}).get("default_action")
         if action and apps_model.action_has_parameters(action):
             return _render_run(item, action)
-        apps_model.launch_action(item_id)
+        apps_model.launch_action(item_id, trigger_source="manual")
     except Exception as exc:
         item = apps_model.app_get(item_id)
         return _render_apps_index(area, item=item, launch_error=str(exc))
@@ -362,7 +367,7 @@ def launch_app_action_route(item_id, action_id):
         action = apps_model.app_action_get(action_id)
         if action and apps_model.action_has_parameters(action):
             return _render_run(apps_model.app_get(item_id), action)
-        apps_model.launch_action(item_id, action_id=action_id)
+        apps_model.launch_action(item_id, action_id=action_id, trigger_source="manual")
     except Exception as exc:
         item = apps_model.app_get(item_id)
         return _render_apps_index(area, item=item, launch_error=str(exc))
@@ -427,37 +432,6 @@ def _render_run(item, action, error=""):
     )
 
 
-def _is_file_inventory_scan_action(item, action):
-    return (
-        (item or {}).get("import_source_path") == "apps.files.scan"
-        and (action or {}).get("action_name") == "Run File Scan"
-    )
-
-
-def _run_file_inventory_scan_from_form(item, action):
-    from apps.files.scanner import scan_folder
-
-    values = apps_model.parameter_values_from_form(request.form, action.get("parameter_schema_json"), prefix="param_")
-    cleaned = apps_model.validate_parameter_values(action.get("parameter_schema_json"), values)
-    result = scan_folder(cleaned.get("root_path") or "", mode=cleaned.get("mode") or "AUTO")
-    schema = apps_model.parameter_schema_from_json(action.get("parameter_schema_json"))
-    return render_template(
-        "apps_run.html",
-        active_tab="apps",
-        tabs=get_tabs(),
-        side_tabs=get_side_tabs(),
-        content_title=f"Run: {action.get('action_name') or item.get('title')}",
-        content_html="",
-        item=item,
-        action=action,
-        parameter_schema=schema,
-        parameter_values=apps_model.default_parameter_values(action.get("parameter_schema_json"), values),
-        error="" if result.status == "SUCCESS" else "; ".join(result.error_messages),
-        scan_result=result.as_dict(),
-        area=_area(),
-    )
-
-
 @apps_bp.route("/action/<int:action_id>/run/<int:item_id>", methods=["GET", "POST"])
 def run_app_action_route(item_id, action_id):
     item = apps_model.app_get(item_id)
@@ -466,10 +440,8 @@ def run_app_action_route(item_id, action_id):
         abort(404)
     if request.method == "POST":
         try:
-            if _is_file_inventory_scan_action(item, action):
-                return _run_file_inventory_scan_from_form(item, action)
             values = apps_model.parameter_values_from_form(request.form, action.get("parameter_schema_json"), prefix="param_")
-            apps_model.launch_action(item_id, action_id=action_id, parameter_values=values)
+            apps_model.launch_action(item_id, action_id=action_id, parameter_values=values, trigger_source="manual")
             return redirect(url_for("apps.view_app_route", item_id=item_id, **_args_with(message=f"{action.get('action_name') or 'App Action'} launched.")))
         except Exception as exc:
             schema = apps_model.parameter_schema_from_json(action.get("parameter_schema_json"))
@@ -493,6 +465,19 @@ def run_app_action_route(item_id, action_id):
                 area=_area(),
             )
     return _render_run(item, action)
+
+
+@apps_bp.route("/run/<int:run_id>/log/<stream>")
+def app_run_log_route(run_id, stream):
+    if stream not in {"stdout", "stderr"}:
+        abort(404)
+    run = apps_model.app_run_get(run_id)
+    if not run:
+        abort(404)
+    path = run.get(f"{stream}_log")
+    if not path or not os.path.exists(path):
+        abort(404)
+    return send_file(path, mimetype="text/plain")
 
 
 @apps_bp.route("/browse-path")

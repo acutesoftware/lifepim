@@ -49,7 +49,8 @@ PATH_ALIASES = [
 db_name = os.path.join(user_folder, 'lifepim.db')
 
 DB_FILE = db_name
-print('DB_FILE = ' + DB_FILE)
+if os.getenv("LIFEPIM_DEBUG_CONFIG"):
+    print('DB_FILE = ' + DB_FILE)
 
 # ----------------------------------------------------------------------------
 # Table Definitions

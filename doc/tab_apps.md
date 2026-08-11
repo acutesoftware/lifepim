@@ -37,8 +37,8 @@ Display modes:
   and favourite status.
 
 The right inspector shows the selected App, its icon, kind, Areas, path,
-repository URL, website URL, language, usage counts, tags, description, and
-configured actions.
+repository URL, website URL, language, usage counts, tags, description,
+configured actions, latest run status, and recent run history.
 
 ## Finding Apps
 
@@ -69,7 +69,7 @@ action metadata, including:
 ## Launching Apps
 
 Each App can have one or more launch actions. The default action is used by the
-main `Open` button.
+main `Run` button.
 
 Current action types:
 
@@ -88,6 +88,43 @@ Launching an App through LifePIM updates:
 - `lp_app.usage_count`
 
 Those fields drive the Recent saved view.
+
+Launching also creates an App Run record in `lp_app_run`. The run record stores
+what was requested, when it was requested, when it started, when it finished,
+the process ID when available, exit code, trigger source, and stdout/stderr log
+file paths.
+
+The Apps page does not keep the browser request open while a long-running App
+executes. LifePIM creates the run record, starts a short-lived background runner
+process, and returns to the browser. The runner starts the configured App,
+captures stdout and stderr to log files, waits for the App to exit, and marks
+the run `Completed` or `Failed`.
+
+For quick launch actions, this may appear as if nothing visible happened beyond
+the App opening or the page returning. That is expected. The action is still
+recorded as an App Run, but it may move from `Starting` to `Completed` very
+quickly.
+
+For long-running Apps, such as the LifePIM File Inventory Scanner / FileLister,
+the selected App inspector shows:
+
+- Status: `Starting`, `Running`, `Completed`, or `Failed`
+- Requested time
+- Started time
+- Elapsed time while running
+- Finished time after completion
+- Duration after completion
+- Exit code when available
+- links to stdout and stderr logs
+
+LifePIM does not auto-refresh the Apps page for this initial implementation. To
+check whether a long-running App has finished, use the inspector's `Refresh`
+link or refresh the browser page. While the App is still running, the elapsed
+duration is recalculated from the stored start time. After it exits, the run
+history shows the final status and total duration.
+
+Recent runs are shown in the selected App inspector. This gives a small history
+of the latest runs for that App without turning Apps into a general job manager.
 
 ### Parameterized Actions
 
@@ -188,6 +225,21 @@ preselected.
 Running a parameterized action directly from Apps shows a small parameter form.
 Running the same action from a Task uses the same validation and launch helper.
 Launching does not mark any Task complete.
+
+When a Task launches an App, LifePIM records the App Run with trigger source
+`task`. The App execution is still asynchronous. A quick Task launch may return
+with no obvious visible change except normal Task page behavior. A long-running
+Task-launched App can be checked from the related App's inspector in the Apps
+tab by refreshing the page and looking at Latest Run or Recent Runs.
+
+Tasks do not own App Run history. The relationship remains:
+
+```text
+Task -> App Action -> App Run
+```
+
+This keeps Tasks and Apps separate while still showing what happened when an App
+was executed.
 
 ## App Kinds
 
@@ -503,11 +555,13 @@ Core tables:
 | `lp_app` | Main App metadata. |
 | `lp_app_area` | Many-to-many App Area membership. |
 | `lp_app_action` | Launch actions for Apps. |
+| `lp_app_run` | Historical execution records for App launches. |
 | `lp_media` | Media rows used for materialised imported icons. |
 
 Important `lp_app` fields:
 
 - `title`
+- `app_key`
 - `kind`
 - `description`
 - `icon`
@@ -539,6 +593,74 @@ Important `lp_app_action` fields:
 - `requires_confirmation`
 - `sort_order`
 - `is_default`
+
+Important `lp_app_run` fields:
+
+- `app_id`
+- `app_action_id`
+- `status`
+- `requested_at`
+- `started_at`
+- `finished_at`
+- `process_id`
+- `command`
+- `arguments`
+- `working_directory`
+- `exit_code`
+- `stdout_log`
+- `stderr_log`
+- `error_message`
+- `trigger_source`
+
+Supported App Run statuses:
+
+```text
+Starting
+Running
+Completed
+Failed
+```
+
+`Completed` means the App exited with code `0`. `Failed` means the App could not
+be started or exited with a non-zero code.
+
+`app_key` is a readable identifier used by external launchers where available.
+The built-in File Inventory Scanner uses:
+
+```text
+filelister
+```
+
+This allows the same registered App to be launched from outside the web UI.
+
+## Command-Line Launching
+
+LifePIM includes a reusable launcher:
+
+```text
+lifepim-run <app>
+```
+
+Examples:
+
+```text
+lifepim-run filelister
+lifepim-run filelister --scan incremental
+```
+
+The launcher resolves the App from LifePIM's registered App records, creates an
+App Run, starts the detached runner, prints the run ID, and exits promptly. It
+does not wait for the App to finish.
+
+On Windows, use the BAT wrapper from the LifePIM install folder:
+
+```bat
+C:\apps\LifePIM_Prod\lifepim-run.bat filelister
+```
+
+Arguments after the App identifier are passed through to the configured App.
+LifePIM does not interpret App-specific arguments such as `--scan incremental`.
+They are stored in the App Run record and passed to the App process.
 
 ## Operational Notes
 

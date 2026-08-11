@@ -12,7 +12,7 @@ import etl_folder_mapping as folder_etl
 from . import config as cfg
 from . import if_sqlite as mod_sql
 
-DB_FILE = getattr(cfg, "DB_FILE", getattr(cfg, "db_name", "lifepim.db"))
+DB_FILE = os.getenv("LIFEPIM_DB_FILE") or getattr(cfg, "DB_FILE", getattr(cfg, "db_name", "lifepim.db"))
 if not os.path.isabs(DB_FILE):
     DB_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), DB_FILE))
 

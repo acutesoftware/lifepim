@@ -32,6 +32,8 @@ APP_KIND_OPTIONS = (
     "Other",
 )
 
+APP_RUN_STATUSES = ("Starting", "Running", "Completed", "Failed")
+
 ACTION_TYPE_OPTIONS = (
     "EXECUTABLE",
     "COMMAND",
@@ -64,6 +66,7 @@ DROP TABLE IF EXISTS lp_apps;
 CREATE TABLE IF NOT EXISTS lp_app (
     app_id          INTEGER PRIMARY KEY,
     owner_user_id   INTEGER,
+    app_key         TEXT,
     title           TEXT NOT NULL,
     kind            TEXT NOT NULL DEFAULT 'Other',
     description     TEXT,
@@ -88,15 +91,6 @@ CREATE TABLE IF NOT EXISTS lp_app (
     user_name       TEXT,
     rec_extract_date TEXT
 );
-
-CREATE INDEX IF NOT EXISTS ix_lp_app_owner_title
-ON lp_app (owner_user_id, enabled, lower(title));
-
-CREATE INDEX IF NOT EXISTS ix_lp_app_owner_kind
-ON lp_app (owner_user_id, kind);
-
-CREATE INDEX IF NOT EXISTS ix_lp_app_recent
-ON lp_app (owner_user_id, last_used_date);
 
 CREATE TABLE IF NOT EXISTS lp_app_area (
     app_area_id INTEGER PRIMARY KEY,
@@ -134,6 +128,34 @@ CREATE TABLE IF NOT EXISTS lp_app_action (
 
 CREATE INDEX IF NOT EXISTS ix_lp_app_action_app
 ON lp_app_action (owner_user_id, app_id, is_default DESC, sort_order);
+
+CREATE TABLE IF NOT EXISTS lp_app_run (
+    app_run_id       INTEGER PRIMARY KEY,
+    owner_user_id    INTEGER,
+    app_id           INTEGER NOT NULL,
+    app_action_id    INTEGER,
+    status           TEXT NOT NULL,
+    requested_at     TEXT NOT NULL,
+    started_at       TEXT,
+    finished_at      TEXT,
+    process_id       INTEGER,
+    command          TEXT,
+    arguments        TEXT,
+    working_directory TEXT,
+    exit_code        INTEGER,
+    stdout_log       TEXT,
+    stderr_log       TEXT,
+    error_message    TEXT,
+    trigger_source   TEXT,
+    created_utc      TEXT NOT NULL,
+    updated_utc      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_lp_app_run_app
+ON lp_app_run (owner_user_id, app_id, requested_at DESC);
+
+CREATE INDEX IF NOT EXISTS ix_lp_app_run_status
+ON lp_app_run (status, requested_at DESC);
 """
 
 _APPS_SCHEMA_READY_CONN_IDS = set()
@@ -173,6 +195,13 @@ def _clean_text(value):
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _clean_key(value):
+    text = _clean_text(value).lower()
+    text = re.sub(r"[^a-z0-9_-]+", "-", text)
+    text = re.sub(r"-+", "-", text).strip("-")
+    return text
 
 
 def _clean_int(value, default=None):
@@ -219,9 +248,10 @@ def ensure_apps_schema(conn=None):
 
 def _apps_schema_is_current(conn):
     return (
-        {"app_id", "title", "kind", "favorite", "last_used_date", "import_source", "import_source_path", "imported_date", "import_metadata"}.issubset(_table_columns(conn, "lp_app"))
+        {"app_id", "app_key", "title", "kind", "favorite", "last_used_date", "import_source", "import_source_path", "imported_date", "import_metadata"}.issubset(_table_columns(conn, "lp_app"))
         and {"app_id", "area_id"}.issubset(_table_columns(conn, "lp_app_area"))
         and {"app_id", "action_name", "action_type", "is_default", "parameter_schema_json", "agent_allowed", "requires_confirmation"}.issubset(_table_columns(conn, "lp_app_action"))
+        and {"app_run_id", "app_id", "status", "requested_at", "started_at", "finished_at", "stdout_log", "stderr_log"}.issubset(_table_columns(conn, "lp_app_run"))
         and not _table_exists(conn, "lp_apps")
     )
 
@@ -231,6 +261,7 @@ def _migrate_apps_schema(conn):
     app_cols = _table_columns(conn, "lp_app")
     additions = {
         "owner_user_id": "INTEGER",
+        "app_key": "TEXT",
         "description": "TEXT",
         "icon": "TEXT",
         "favorite": "INTEGER NOT NULL DEFAULT 0",
@@ -262,6 +293,10 @@ def _migrate_apps_schema(conn):
     conn.execute("UPDATE lp_app SET usage_count = 0 WHERE usage_count IS NULL")
     conn.execute("UPDATE lp_app SET created_date = ? WHERE COALESCE(created_date, '') = ''", (now,))
     conn.execute("UPDATE lp_app SET modified_date = ? WHERE COALESCE(modified_date, '') = ''", (now,))
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_app_owner_title ON lp_app (owner_user_id, enabled, lower(title))")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_app_owner_key ON lp_app (owner_user_id, lower(app_key))")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_app_owner_kind ON lp_app (owner_user_id, kind)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_app_recent ON lp_app (owner_user_id, last_used_date)")
     if _table_exists(conn, "lp_app_action"):
         action_cols = _table_columns(conn, "lp_app_action")
         action_additions = {
@@ -274,6 +309,29 @@ def _migrate_apps_schema(conn):
                 conn.execute(f"ALTER TABLE lp_app_action ADD COLUMN {col_name} {col_type}")
         conn.execute("UPDATE lp_app_action SET agent_allowed = 0 WHERE agent_allowed IS NULL")
         conn.execute("UPDATE lp_app_action SET requires_confirmation = 1 WHERE requires_confirmation IS NULL")
+    if _table_exists(conn, "lp_app_run"):
+        run_cols = _table_columns(conn, "lp_app_run")
+        run_additions = {
+            "owner_user_id": "INTEGER",
+            "app_action_id": "INTEGER",
+            "process_id": "INTEGER",
+            "command": "TEXT",
+            "arguments": "TEXT",
+            "working_directory": "TEXT",
+            "exit_code": "INTEGER",
+            "stdout_log": "TEXT",
+            "stderr_log": "TEXT",
+            "error_message": "TEXT",
+            "trigger_source": "TEXT",
+            "created_utc": "TEXT",
+            "updated_utc": "TEXT",
+        }
+        for col_name, col_type in run_additions.items():
+            if col_name not in run_cols:
+                conn.execute(f"ALTER TABLE lp_app_run ADD COLUMN {col_name} {col_type}")
+        conn.execute("UPDATE lp_app_run SET status = 'Starting' WHERE COALESCE(status, '') = ''")
+        conn.execute("UPDATE lp_app_run SET created_utc = COALESCE(NULLIF(created_utc, ''), requested_at, ?) WHERE COALESCE(created_utc, '') = ''", (now,))
+        conn.execute("UPDATE lp_app_run SET updated_utc = COALESCE(NULLIF(updated_utc, ''), requested_at, ?) WHERE COALESCE(updated_utc, '') = ''", (now,))
 
 
 def ensure_file_inventory_app(conn=None, owner_user_id=None):
@@ -303,6 +361,7 @@ def ensure_file_inventory_app(conn=None, owner_user_id=None):
     ).fetchone()
     values = (
         owner_user_id,
+        "filelister",
         "LifePIM File Inventory Scanner",
         "Script",
         "Scans configured filesystem sources into the LifePIM File Inventory database.",
@@ -328,20 +387,20 @@ def ensure_file_inventory_app(conn=None, owner_user_id=None):
     if row:
         app_id = int(row["app_id"])
         conn.execute(
-            "UPDATE lp_app SET owner_user_id = ?, title = ?, kind = ?, description = ?, icon = ?, "
+            "UPDATE lp_app SET owner_user_id = ?, app_key = ?, title = ?, kind = ?, description = ?, icon = ?, "
             "favorite = ?, enabled = ?, path = ?, repository_url = ?, website_url = ?, language = ?, "
             "version = ?, tags = ?, comments = ?, import_source = ?, import_source_path = ?, "
             "imported_date = ?, import_metadata = ?, modified_date = ?, rec_extract_date = ? "
             "WHERE app_id = ?",
-            values[:18] + (now, now, app_id),
+            values[:19] + (now, now, app_id),
         )
     else:
         cur = conn.execute(
             "INSERT INTO lp_app "
-            "(owner_user_id, title, kind, description, icon, favorite, enabled, path, repository_url, "
+            "(owner_user_id, app_key, title, kind, description, icon, favorite, enabled, path, repository_url, "
             "website_url, language, version, tags, comments, import_source, import_source_path, "
             "imported_date, import_metadata, created_date, modified_date, user_name, rec_extract_date) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             values,
         )
         app_id = int(cur.lastrowid)
@@ -648,12 +707,13 @@ def create_app(values, conn=None, owner_user_id=None):
     now = _utc_now()
     cur = conn.execute(
         "INSERT INTO lp_app "
-        "(owner_user_id, title, kind, description, icon, favorite, enabled, path, repository_url, website_url, "
+        "(owner_user_id, app_key, title, kind, description, icon, favorite, enabled, path, repository_url, website_url, "
         "language, version, tags, comments, import_source, import_source_path, imported_date, import_metadata, "
         "usage_count, created_date, modified_date, user_name, rec_extract_date) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
         (
             owner_user_id,
+            _clean_key(values.get("app_key")),
             title,
             normalize_kind(values.get("kind")),
             _clean_text(values.get("description")),
@@ -699,10 +759,11 @@ def update_app(app_id, values, conn=None, owner_user_id=None):
         raise ValueError("App name is required.")
     now = _utc_now()
     conn.execute(
-        "UPDATE lp_app SET title = ?, kind = ?, description = ?, icon = ?, favorite = ?, enabled = ?, "
+        "UPDATE lp_app SET app_key = ?, title = ?, kind = ?, description = ?, icon = ?, favorite = ?, enabled = ?, "
         "path = ?, repository_url = ?, website_url = ?, language = ?, version = ?, tags = ?, comments = ?, "
         "modified_date = ?, rec_extract_date = ? WHERE app_id = ? AND owner_user_id IS ?",
         (
+            _clean_key(values.get("app_key") or before.get("app_key")),
             title,
             normalize_kind(values.get("kind")),
             _clean_text(values.get("description")),
@@ -1048,31 +1109,163 @@ def area_counts(conn=None, owner_user_id=None):
     return {row["area_id"]: row["item_count"] for row in rows}
 
 
-def launch_action(app_id, action_id=None, parameter_values=None, conn=None, owner_user_id=None):
+def resolve_app_identifier(identifier, conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    text = _clean_text(identifier)
+    if not text:
+        return None
+    if text.isdigit():
+        return app_get(int(text), conn=conn, owner_user_id=owner_user_id)
+    key = _clean_key(text)
+    rows = conn.execute(
+        _app_select_sql() + " WHERE a.owner_user_id IS ? AND a.enabled = 1",
+        (owner_user_id,),
+    ).fetchall()
+    matches = []
+    for row in rows:
+        app = dict(row)
+        candidates = {
+            _clean_key(app.get("app_key")),
+            _clean_key(app.get("title")),
+            _clean_key(app.get("import_source_path")),
+            _clean_key((app.get("import_source_path") or "").split(".")[-1]),
+        }
+        if key in candidates or text.lower() in {(app.get("title") or "").lower(), (app.get("import_source_path") or "").lower()}:
+            matches.append(app)
+    if len(matches) == 1:
+        return _app_row(matches[0], conn=conn, owner_user_id=owner_user_id)
+    return None
+
+
+def get_default_action(app, action_id=None):
+    if not app:
+        return None
+    for candidate in app.get("actions", []):
+        if action_id and candidate["app_action_id"] == action_id:
+            return candidate
+        if not action_id and candidate.get("is_default"):
+            return candidate
+    if not action_id and app.get("actions"):
+        return app["actions"][0]
+    return None
+
+
+def prepare_action_for_run(action, parameter_values=None, extra_args=None):
+    if not action:
+        raise ValueError("No launch action is configured.")
+    action = dict(action)
+    if parameter_values is not None:
+        action["arguments"] = render_argument_template(
+            action.get("arguments"),
+            action.get("parameter_schema_json"),
+            parameter_values or {},
+        )
+    arguments = _clean_text(action.get("arguments"))
+    extra_args = [str(arg) for arg in (extra_args or [])]
+    if extra_args:
+        extra_text = subprocess.list2cmdline(extra_args)
+        arguments = f"{arguments} {extra_text}".strip()
+    action["arguments"] = arguments
+    return action
+
+
+def _run_base_dir():
+    from common import config as cfg
+
+    configured = os.getenv("LIFEPIM_APP_RUNS_DIR") or os.path.join(getattr(cfg, "data_folder", ""), "app_runs")
+    return os.path.abspath(configured)
+
+
+def _run_log_paths(run_id):
+    run_dir = os.path.join(_run_base_dir(), str(int(run_id)))
+    return run_dir, os.path.join(run_dir, "stdout.log"), os.path.join(run_dir, "stderr.log")
+
+
+def _create_run_log_files(run_id):
+    run_dir, stdout_log, stderr_log = _run_log_paths(run_id)
+    os.makedirs(run_dir, exist_ok=True)
+    for path in (stdout_log, stderr_log):
+        with open(path, "a", encoding="utf-8"):
+            pass
+    return stdout_log, stderr_log
+
+
+def create_app_run(app_id, action_id=None, parameter_values=None, extra_args=None, trigger_source="manual", conn=None, owner_user_id=None):
     conn = _get_conn(conn)
     ensure_apps_schema(conn)
     owner_user_id = _owner_user_id(owner_user_id)
     app = app_get(app_id, conn=conn, owner_user_id=owner_user_id)
     if not app:
         raise ValueError("App not found.")
-    action = None
-    for candidate in app.get("actions", []):
-        if action_id and candidate["app_action_id"] == action_id:
-            action = candidate
-            break
-        if not action_id and candidate.get("is_default"):
-            action = candidate
-    if not action and app.get("actions"):
-        action = app["actions"][0]
-    if not action:
-        raise ValueError("No launch action is configured.")
-    action = dict(action)
-    action["arguments"] = render_argument_template(
-        action.get("arguments"),
-        action.get("parameter_schema_json"),
-        parameter_values or {},
+    action = prepare_action_for_run(get_default_action(app, action_id=action_id), parameter_values=parameter_values, extra_args=extra_args)
+    now = _utc_now()
+    cur = conn.execute(
+        "INSERT INTO lp_app_run "
+        "(owner_user_id, app_id, app_action_id, status, requested_at, command, arguments, working_directory, "
+        "trigger_source, created_utc, updated_utc) "
+        "VALUES (?, ?, ?, 'Starting', ?, ?, ?, ?, ?, ?, ?)",
+        (
+            owner_user_id,
+            app_id,
+            action.get("app_action_id"),
+            now,
+            _clean_text(action.get("command")),
+            _clean_text(action.get("arguments")),
+            _clean_text(action.get("working_directory")),
+            _clean_text(trigger_source) or "manual",
+            now,
+            now,
+        ),
     )
-    _execute_action(action)
+    run_id = int(cur.lastrowid)
+    try:
+        stdout_log, stderr_log = _create_run_log_files(run_id)
+    except Exception as exc:
+        update_app_run(
+            run_id,
+            status="Failed",
+            finished_at=_utc_now(),
+            error_message=f"Could not create App Run log directory: {exc}",
+            conn=conn,
+        )
+        raise
+    conn.execute(
+        "UPDATE lp_app_run SET stdout_log = ?, stderr_log = ?, updated_utc = ? WHERE app_run_id = ?",
+        (stdout_log, stderr_log, _utc_now(), run_id),
+    )
+    conn.commit()
+    run = app_run_get(run_id, conn=conn)
+    run["app"] = app
+    run["action"] = action
+    return run
+
+
+def launch_action(app_id, action_id=None, parameter_values=None, extra_args=None, trigger_source="manual", conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    run = create_app_run(
+        app_id,
+        action_id=action_id,
+        parameter_values=parameter_values,
+        extra_args=extra_args,
+        trigger_source=trigger_source,
+        conn=conn,
+        owner_user_id=owner_user_id,
+    )
+    try:
+        _spawn_detached_worker(run["app_run_id"])
+    except Exception as exc:
+        update_app_run(
+            run["app_run_id"],
+            status="Failed",
+            finished_at=_utc_now(),
+            error_message=f"Could not launch LifePIM runner: {exc}",
+            conn=conn,
+        )
+        raise
     now = _utc_now()
     conn.execute(
         "UPDATE lp_app SET last_used_date = ?, usage_count = COALESCE(usage_count, 0) + 1, modified_date = ? "
@@ -1080,7 +1273,98 @@ def launch_action(app_id, action_id=None, parameter_values=None, conn=None, owne
         (now, now, owner_user_id, app_id),
     )
     conn.commit()
-    return action
+    result = dict(run.get("action") or {})
+    result["run_id"] = run["app_run_id"]
+    result["app_run_id"] = run["app_run_id"]
+    result["status"] = "Starting"
+    return result
+
+
+def app_run_get(run_id, conn=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    row = conn.execute(
+        "SELECT r.*, a.title AS app_title, a.app_key, ax.action_name, ax.action_type "
+        "FROM lp_app_run r "
+        "JOIN lp_app a ON a.app_id = r.app_id AND a.owner_user_id IS r.owner_user_id "
+        "LEFT JOIN lp_app_action ax ON ax.app_action_id = r.app_action_id AND ax.owner_user_id IS r.owner_user_id "
+        "WHERE r.app_run_id = ?",
+        (run_id,),
+    ).fetchone()
+    return _app_run_row(row) if row else None
+
+
+def list_app_runs(app_id, limit=10, conn=None, owner_user_id=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    owner_user_id = _owner_user_id(owner_user_id)
+    rows = conn.execute(
+        "SELECT r.*, a.title AS app_title, a.app_key, ax.action_name, ax.action_type "
+        "FROM lp_app_run r "
+        "JOIN lp_app a ON a.app_id = r.app_id AND a.owner_user_id IS r.owner_user_id "
+        "LEFT JOIN lp_app_action ax ON ax.app_action_id = r.app_action_id AND ax.owner_user_id IS r.owner_user_id "
+        "WHERE r.owner_user_id IS ? AND r.app_id = ? "
+        "ORDER BY r.requested_at DESC, r.app_run_id DESC LIMIT ?",
+        (owner_user_id, app_id, int(limit)),
+    ).fetchall()
+    return [_app_run_row(row) for row in rows]
+
+
+def latest_app_run(app_id, conn=None, owner_user_id=None):
+    rows = list_app_runs(app_id, limit=1, conn=conn, owner_user_id=owner_user_id)
+    return rows[0] if rows else None
+
+
+def update_app_run(run_id, status=None, started_at=None, finished_at=None, process_id=None, exit_code=None, stdout_log=None, stderr_log=None, error_message=None, conn=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    updates = []
+    params = []
+    values = {
+        "status": status,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "process_id": process_id,
+        "exit_code": exit_code,
+        "stdout_log": stdout_log,
+        "stderr_log": stderr_log,
+        "error_message": error_message,
+    }
+    for col_name, value in values.items():
+        if value is not None:
+            updates.append(f"{col_name} = ?")
+            params.append(value)
+    if not updates:
+        return app_run_get(run_id, conn=conn)
+    updates.append("updated_utc = ?")
+    params.append(_utc_now())
+    params.append(run_id)
+    conn.execute(f"UPDATE lp_app_run SET {', '.join(updates)} WHERE app_run_id = ?", params)
+    conn.commit()
+    return app_run_get(run_id, conn=conn)
+
+
+def _spawn_detached_worker(run_id):
+    src_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    env = os.environ.copy()
+    env["PYTHONPATH"] = src_root + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    env["LIFEPIM_DB_FILE"] = db.DB_FILE
+    cmd = [sys.executable, "-m", "modules.apps.runner", "_worker", str(int(run_id))]
+    kwargs = {
+        "cwd": src_root,
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "env": env,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0x00000008) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+        kwargs["close_fds"] = False
+    else:
+        kwargs["start_new_session"] = True
+        kwargs["close_fds"] = True
+    subprocess.Popen(cmd, **kwargs)
+    return True
 
 
 def validate_parameter_values(parameter_schema_json, values):
@@ -1177,6 +1461,94 @@ def split_arguments(arguments):
     return stripped
 
 
+def run_app_worker(run_id, conn=None):
+    conn = _get_conn(conn)
+    ensure_apps_schema(conn)
+    run = app_run_get(run_id, conn=conn)
+    if not run:
+        raise ValueError("App Run not found.")
+    stdout_log = run.get("stdout_log")
+    stderr_log = run.get("stderr_log")
+    try:
+        if not stdout_log or not stderr_log:
+            stdout_log, stderr_log = _create_run_log_files(run_id)
+            update_app_run(run_id, stdout_log=stdout_log, stderr_log=stderr_log, conn=conn)
+        with open(stdout_log, "ab") as stdout_file, open(stderr_log, "ab") as stderr_file:
+            process = _start_recorded_run_process(run, stdout_file, stderr_file)
+            started_at = _utc_now()
+            process_id = getattr(process, "pid", None) if process is not None else None
+            update_app_run(
+                run_id,
+                status="Running",
+                started_at=started_at,
+                process_id=process_id,
+                conn=conn,
+            )
+            exit_code = int(process.wait()) if process is not None else 0
+        update_app_run(
+            run_id,
+            status="Completed" if exit_code == 0 else "Failed",
+            finished_at=_utc_now(),
+            exit_code=exit_code,
+            conn=conn,
+        )
+        return app_run_get(run_id, conn=conn)
+    except Exception as exc:
+        update_app_run(
+            run_id,
+            status="Failed",
+            finished_at=_utc_now(),
+            error_message=str(exc),
+            conn=conn,
+        )
+        return app_run_get(run_id, conn=conn)
+
+
+def _start_recorded_run_process(run, stdout_file, stderr_file):
+    action_type = normalize_action_type(run.get("action_type") or "EXECUTABLE")
+    target = _clean_text(run.get("command"))
+    arguments = _clean_text(run.get("arguments"))
+    cwd = _clean_text(run.get("working_directory")) or None
+    if not target:
+        raise ValueError("Action target is empty.")
+    if action_type == "OPEN_URL":
+        webbrowser.open(target)
+        return None
+    if action_type == "OPEN_FOLDER":
+        if not os.path.isdir(target):
+            raise ValueError(f"Folder not found: {target}")
+        _open_with_system_default(target)
+        return None
+    if action_type == "OPEN_FILE":
+        if _is_web_url(target):
+            webbrowser.open(target)
+            return None
+        if not os.path.exists(target):
+            raise ValueError(f"File not found: {target}")
+        _open_with_system_default(target)
+        return None
+    if action_type == "EXECUTABLE":
+        return subprocess.Popen([target] + split_arguments(arguments), cwd=cwd or None, stdout=stdout_file, stderr=stderr_file)
+    if action_type == "COMMAND":
+        command = target if not arguments else f"{target} {arguments}"
+        return subprocess.Popen(command, cwd=cwd or None, shell=True, stdout=stdout_file, stderr=stderr_file)
+    if _is_web_url(target):
+        webbrowser.open(target)
+        return None
+    if not os.path.exists(target) and arguments:
+        return subprocess.Popen([target] + split_arguments(arguments), cwd=cwd or None, stdout=stdout_file, stderr=stderr_file)
+    _open_with_system_default(target)
+    return None
+
+
+def _open_with_system_default(target):
+    if hasattr(os, "startfile"):
+        os.startfile(target)
+        return
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    subprocess.Popen([opener, target])
+
+
 def _execute_action(action):
     action_type = normalize_action_type(action.get("action_type"))
     target = _clean_text(action.get("command"))
@@ -1219,6 +1591,63 @@ def _execute_action(action):
 
 def _is_web_url(value):
     return value.lower().startswith(("http://", "https://"))
+
+
+def _parse_utc(value):
+    text = _clean_text(value)
+    if not text:
+        return None
+    candidates = [text, text.replace("Z", "+00:00") if text.endswith("Z") else text]
+    for candidate in candidates:
+        try:
+            parsed = datetime.fromisoformat(candidate)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except ValueError:
+            pass
+    return None
+
+
+def _duration_label(seconds):
+    if seconds is None:
+        return ""
+    seconds = max(0, int(round(seconds)))
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+def _display_time(value):
+    try:
+        from common import localtime
+
+        return localtime.display_log_time(value)
+    except Exception:
+        return _clean_text(value)
+
+
+def _app_run_row(row):
+    if not row:
+        return None
+    run = dict(row)
+    run["id"] = run["app_run_id"]
+    started = _parse_utc(run.get("started_at"))
+    finished = _parse_utc(run.get("finished_at"))
+    duration_seconds = None
+    if started:
+        end = finished if finished else datetime.now(timezone.utc)
+        duration_seconds = (end - started).total_seconds()
+    run["duration_seconds"] = duration_seconds
+    run["duration_label"] = _duration_label(duration_seconds)
+    run["requested_display"] = _display_time(run.get("requested_at"))
+    run["started_display"] = _display_time(run.get("started_at"))
+    run["finished_display"] = _display_time(run.get("finished_at"))
+    run["is_running"] = run.get("status") == "Running"
+    run["stdout_log_name"] = os.path.basename(run.get("stdout_log") or "")
+    run["stderr_log_name"] = os.path.basename(run.get("stderr_log") or "")
+    return run
 
 
 def _app_row(row, conn=None, owner_user_id=None):

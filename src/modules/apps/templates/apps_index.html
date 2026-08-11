@@ -78,7 +78,7 @@
                     <td>{{ item.last_used_date or '' }}</td>
                     <td>{{ 'Yes' if item.favorite else '' }}</td>
                     <td class="apps-row-actions">
-                      <a class="apps-open-action" href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
+                      <a class="apps-open-action" href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Run</a>
                       <a class="apps-icon-action" href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}" title="Edit" aria-label="Edit {{ item.title }}">&#9998;</a>
                       <form method="post"
                             action="{{ url_for('apps.delete_app_route', item_id=item.app_id) }}"
@@ -118,7 +118,7 @@
                 </a>
                 <div class="apps-card-actions">
                   {% if item.default_action %}
-                    <a href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
+                    <a href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Run</a>
                   {% endif %}
                   <a href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}">Edit</a>
                   <form method="post"
@@ -160,7 +160,7 @@
           </div>
           <div class="apps-inspector-actions">
             {% if selected_app.default_action %}
-              <a class="apps-primary-action" href="{{ url_for('apps.launch_app_route', item_id=selected_app.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Open</a>
+              <a class="apps-primary-action" href="{{ url_for('apps.launch_app_route', item_id=selected_app.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Run</a>
             {% endif %}
             <a href="{{ url_for('apps.edit_app_route', item_id=selected_app.app_id, area=area) }}">Edit</a>
             <form method="post"
@@ -186,6 +186,65 @@
             <dt>Usage</dt><dd>{{ selected_app.usage_count or 0 }}</dd>
             <dt>Tags</dt><dd>{{ selected_app.tags or '' }}</dd>
           </dl>
+          <div class="apps-inspector-section">
+            <div class="apps-run-header">
+              <div class="apps-filter-title">Latest Run</div>
+              <a href="{{ url_for('apps.view_app_route', item_id=selected_app.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Refresh</a>
+            </div>
+            {% if latest_run %}
+              <dl class="apps-meta apps-run-meta">
+                <dt>Status</dt><dd><strong>{{ latest_run.status }}</strong></dd>
+                <dt>Requested</dt><dd>{{ latest_run.requested_display }}</dd>
+                <dt>Started</dt><dd>{{ latest_run.started_display or '' }}</dd>
+                {% if latest_run.finished_at %}
+                  <dt>Finished</dt><dd>{{ latest_run.finished_display }}</dd>
+                  <dt>Duration</dt><dd>{{ latest_run.duration_label }}</dd>
+                {% elif latest_run.started_at %}
+                  <dt>Elapsed</dt><dd>{{ latest_run.duration_label }}</dd>
+                {% endif %}
+                <dt>Exit code</dt><dd>{{ latest_run.exit_code if latest_run.exit_code is not none else '' }}</dd>
+                {% if latest_run.error_message %}
+                  <dt>Error</dt><dd>{{ latest_run.error_message }}</dd>
+                {% endif %}
+                <dt>Logs</dt>
+                <dd>
+                  {% if latest_run.stdout_log %}
+                    <a href="{{ url_for('apps.app_run_log_route', run_id=latest_run.app_run_id, stream='stdout') }}">stdout</a>
+                  {% endif %}
+                  {% if latest_run.stderr_log %}
+                    <a href="{{ url_for('apps.app_run_log_route', run_id=latest_run.app_run_id, stream='stderr') }}">stderr</a>
+                  {% endif %}
+                </dd>
+              </dl>
+            {% else %}
+              <div class="apps-muted">No runs yet.</div>
+            {% endif %}
+          </div>
+          <div class="apps-inspector-section">
+            <div class="apps-filter-title">Recent Runs</div>
+            {% if recent_runs %}
+              <table class="apps-run-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for run in recent_runs %}
+                    <tr>
+                      <td>{{ run.status }}</td>
+                      <td>{{ run.started_display or run.requested_display }}</td>
+                      <td>{{ run.duration_label }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <div class="apps-muted">No run history.</div>
+            {% endif %}
+          </div>
           <div class="apps-inspector-section">
             <div class="apps-filter-title">Actions</div>
             <ul class="apps-action-list">

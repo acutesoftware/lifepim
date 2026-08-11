@@ -47,6 +47,9 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 copy /Y "%ROOT_DIR%\src\STOP_DESKTOP.BAT" "%PROD_DIR%\STOP_DESKTOP.BAT" >nul
 if errorlevel 1 exit /b %ERRORLEVEL%
 
+copy /Y "%ROOT_DIR%\lifepim-run.bat" "%PROD_DIR%\lifepim-run.bat" >nul
+if errorlevel 1 exit /b %ERRORLEVEL%
+
 if not exist "%PYTHON_EXE%" (
   echo Creating production virtual environment.
   py -3 -m venv "%PROD_DIR%\.venv"

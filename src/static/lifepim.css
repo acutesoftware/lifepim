@@ -3846,6 +3846,33 @@ button.calendar-nav {
   padding-top: 6px;
 }
 
+.apps-run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.apps-run-header a,
+.apps-run-meta a {
+  color: #223;
+}
+
+.apps-run-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.apps-run-table th,
+.apps-run-table td {
+  border: 1px solid #e0e0e0;
+  padding: 3px 4px;
+  font-size: 11px;
+  text-align: left;
+  vertical-align: top;
+}
+
 .apps-action-list {
   list-style: none;
   padding: 0;

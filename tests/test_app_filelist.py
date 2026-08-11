@@ -173,7 +173,7 @@ class TestAppFileList(unittest.TestCase):
         self.assertEqual(action["action_name"], "Run File Scan")
         self.assertIn("root_path", action["parameter_schema_json"])
 
-    def test_apps_run_route_scans_selected_folder_and_renders_summary(self):
+    def test_apps_run_route_launches_file_inventory_scan_as_app_run(self):
         app_conn = sqlite3.connect(":memory:")
         app_conn.row_factory = sqlite3.Row
         try:
@@ -184,25 +184,6 @@ class TestAppFileList(unittest.TestCase):
         finally:
             app_conn.close()
 
-        class FakeResult:
-            status = "SUCCESS"
-            error_messages = []
-
-            def as_dict(self):
-                return {
-                    "scan_id": 22,
-                    "status": "SUCCESS",
-                    "provider": "full_scan",
-                    "files_seen": 1,
-                    "new": 1,
-                    "changed": 0,
-                    "deleted": 0,
-                    "reactivated": 0,
-                    "unchanged": 0,
-                    "errors": 0,
-                    "error_messages": [],
-                }
-
         app_ctx = Flask(__name__)
         with app_ctx.test_request_context(
             f"/apps/action/{action['app_action_id']}/run/{app_id}",
@@ -211,16 +192,19 @@ class TestAppFileList(unittest.TestCase):
         ):
             with patch("modules.apps.routes.apps_model.app_get", return_value=app), patch(
                 "modules.apps.routes.apps_model.app_action_get", return_value=action
-            ), patch("apps.files.scanner.scan_folder", return_value=FakeResult()) as scan_folder_mock, patch(
-                "modules.apps.routes.render_template"
-            ) as render_template:
-                apps_routes.run_app_action_route(app_id, action["app_action_id"])
+            ), patch("apps.files.scanner.scan_folder") as scan_folder_mock, patch(
+                "modules.apps.routes.apps_model.launch_action", return_value={"app_run_id": 5}
+            ) as launch_action_mock, patch("modules.apps.routes.url_for", return_value="/apps/view/1"):
+                response = apps_routes.run_app_action_route(app_id, action["app_action_id"])
 
-        kwargs = render_template.call_args.kwargs
-        scan_folder_mock.assert_called_once_with(self.root, mode="FULL")
-        self.assertEqual(kwargs["scan_result"]["status"], "SUCCESS")
-        self.assertEqual(kwargs["scan_result"]["new"], 1)
-        self.assertEqual(kwargs["parameter_values"]["root_path"], self.root)
+        scan_folder_mock.assert_not_called()
+        launch_action_mock.assert_called_once_with(
+            app_id,
+            action_id=action["app_action_id"],
+            parameter_values={"root_path": self.root, "mode": "FULL"},
+            trigger_source="manual",
+        )
+        self.assertEqual(response.status_code, 302)
 
     def test_scan_folder_convenience_does_not_require_source_id(self):
         self._write("small/direct.txt", "direct")

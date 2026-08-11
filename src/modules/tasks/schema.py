@@ -448,6 +448,7 @@ def run_task(task_id, conn=None, owner_user_id=None):
         task["app_id"],
         action_id=task["app_action_id"],
         parameter_values=task.get("parameter_values") or {},
+        trigger_source="task",
         conn=conn,
         owner_user_id=owner_user_id,
     )
