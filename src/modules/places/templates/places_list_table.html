@@ -1,55 +1,110 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div>
-    <a href="{{ url_for('places.list_places_table_route', area=area) }}">Table</a> |
-    <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a> |
-    <a href="{{ url_for('places.add_place_route', area=area) }}">Add Place</a>
-  </div>
-
-{% set link_list_type = "place" %}
-{% set link_list_context_id = "places_list" %}
-{% set link_table_id = "places-table" %}
-{% include "widgets/links_bulk_toolbar.html" %}
-
-<div class="tabular-scroll">
-<table border="1" cellpadding="5" id="places-table">
-  <tr>
-    <th><input type="checkbox" class="link-select-all"></th>
-    {% for col in col_list %}
-    {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
-    <th>
-      <a href="{{ url_for('places.list_places_table_route', area=area, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
-      {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
-    </th>
-    {% endfor %}
-    <th>Actions</th>
-  </tr>
-  {% for item in items %}
-  <tr onclick="window.location='{{ url_for('places.view_place_route', place_id=item.id, area=area) }}';" style="cursor:pointer;"
-      class="link-draggable" data-record-type="place" data-record-id="{{ item.id }}" data-record-title="{{ item.name }}">
-    <td onclick="event.stopPropagation();"><input type="checkbox" class="link-select" data-record-type="place" data-record-id="{{ item.id }}" data-record-title="{{ item.name }}"></td>
-    {% for col in col_list %}
-    <td>
-      {% if col == 'name' %}
-      <a href="{{ url_for('places.view_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation();">{{ item[col] }}</a>
-      {% else %}
-      {{ item[col] }}
-      {% endif %}
-    </td>
-    {% endfor %}
-    <td>
-      <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation();">Edit</a> |
-      <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation(); return confirm('Delete item?');">Del</a>
-      {% if item.map_actions %}
-        <span class="places-action-sep">|</span>
-        {% for action in item.map_actions %}
-          <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">{{ action.label }}</a>{% if not loop.last %} {% endif %}
+  <div class="places-page">
+    <div class="places-toolbar">
+      <div class="places-filters">
+        {% for filter in filters %}
+          <a class="{% if realm == filter.id %}active{% endif %}"
+             href="{{ url_for('places.list_places_table_route', area=area, realm=filter.id, mode='grid' if filter.id == 'internet' else 'table') }}">
+            {{ filter.label }} <span>{{ filter.count }}</span>
+          </a>
         {% endfor %}
-      {% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-</table>
-{% include "widgets/wid_pagination.html" %}
-</div>
+      </div>
+      <div class="places-actions">
+        <a class="{% if mode == 'table' %}active{% endif %}"
+           href="{{ url_for('places.list_places_table_route', area=area, realm=realm, mode='table', sort=sort_col, dir=sort_dir) }}">List</a>
+        <a class="{% if mode == 'grid' %}active{% endif %}"
+           href="{{ url_for('places.list_places_table_route', area=area, realm=realm, mode='grid', sort=sort_col, dir=sort_dir) }}">Grid</a>
+        <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a>
+        <a href="{{ url_for('places.add_place_route', area=area) }}">Add Place</a>
+      </div>
+    </div>
+
+    {% set link_list_type = "place" %}
+    {% set link_list_context_id = "places_list" %}
+    {% set link_table_id = "places-table" %}
+    {% include "widgets/links_bulk_toolbar.html" %}
+
+    {% if mode == 'grid' %}
+      <div class="places-grid" id="places-table">
+        {% for item in items %}
+          <div class="places-card link-draggable" data-record-type="place" data-record-id="{{ item.id }}" data-record-title="{{ item.name }}">
+            {% if item.open_url %}
+              <a class="places-card-main" href="{{ item.open_url }}" target="_blank" rel="noopener noreferrer">
+                <span class="places-card-title">{{ item.name or item.hostname or 'Internet Place' }}</span>
+                <span class="places-card-sub">{{ item.display_url or item.hostname }}</span>
+                {% if item.desc %}<span class="places-card-desc">{{ item.desc }}</span>{% endif %}
+              </a>
+            {% else %}
+              <a class="places-card-main" href="{{ url_for('places.view_place_route', place_id=item.id, area=area) }}">
+                <span class="places-card-title">{{ item.name or 'Place' }}</span>
+                <span class="places-card-sub">{{ item.place_type_label }}</span>
+                {% if item.location_summary %}<span class="places-card-desc">{{ item.location_summary }}</span>{% endif %}
+              </a>
+            {% endif %}
+            <div class="places-card-actions">
+              <a href="{{ url_for('places.view_place_route', place_id=item.id, area=area) }}">Details</a>
+              <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}">Edit</a>
+              <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
+            </div>
+          </div>
+        {% else %}
+          <div class="places-empty">No places found.</div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="tabular-scroll">
+        <table border="1" cellpadding="5" id="places-table">
+          <tr>
+            <th><input type="checkbox" class="link-select-all"></th>
+            {% for col in col_list %}
+              {% set next_dir = 'asc' if sort_col != col or sort_dir == 'desc' else 'desc' %}
+              <th>
+                <a href="{{ url_for('places.list_places_table_route', area=area, realm=realm, mode=mode, sort=col, dir=next_dir) }}">{{ col.replace('_', ' ') }}</a>
+                {% if sort_col == col %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
+              </th>
+            {% endfor %}
+            <th>Summary</th>
+            <th>Actions</th>
+          </tr>
+          {% for item in items %}
+            <tr onclick="window.location='{{ url_for('places.view_place_route', place_id=item.id, area=area) }}';" style="cursor:pointer;"
+                class="link-draggable" data-record-type="place" data-record-id="{{ item.id }}" data-record-title="{{ item.name }}">
+              <td onclick="event.stopPropagation();"><input type="checkbox" class="link-select" data-record-type="place" data-record-id="{{ item.id }}" data-record-title="{{ item.name }}"></td>
+              {% for col in col_list %}
+                <td>
+                  {% if col == 'name' %}
+                    <a href="{{ url_for('places.view_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation();">{{ item[col] }}</a>
+                  {% elif col == 'place_type' %}
+                    {{ item.place_type_label }}
+                  {% elif col == 'url' and item.open_url %}
+                    <a href="{{ item.open_url }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">{{ item.display_url }}</a>
+                  {% else %}
+                    {{ item[col] }}
+                  {% endif %}
+                </td>
+              {% endfor %}
+              <td>{{ item.location_summary }}</td>
+              <td>
+                <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation();">Edit</a> |
+                <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation(); return confirm('Delete item?');">Del</a>
+                {% if item.open_url %}
+                  | <a href="{{ item.open_url }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">Open</a>
+                {% endif %}
+                {% if item.map_actions %}
+                  <span class="places-action-sep">|</span>
+                  {% for action in item.map_actions %}
+                    <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">{{ action.label }}</a>{% if not loop.last %} {% endif %}
+                  {% endfor %}
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="{{ col_list|length + 3 }}">No places found.</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endif %}
+    {% include "widgets/wid_pagination.html" %}
+  </div>
 {% endblock %}

@@ -215,7 +215,29 @@ NOTE_SCHEMA_COLUMNS = {
     "source_note_id": "TEXT",
 }
 
+PLACE_SCHEMA_COLUMNS = {
+    "name": "TEXT",
+    "desc": "TEXT",
+    "address_street": "TEXT",
+    "suburb": "TEXT",
+    "postcode": "TEXT",
+    "state": "TEXT",
+    "country": "TEXT",
+    "gps_lat": "TEXT",
+    "gps_long": "TEXT",
+    "place_type": "TEXT",
+    "virtual_world": "TEXT",
+    "coord_x": "TEXT",
+    "coord_y": "TEXT",
+    "coord_z": "TEXT",
+    "coord_region": "TEXT",
+    "coord_notes": "TEXT",
+    "url": "TEXT",
+    "area": "TEXT",
+}
+
 _NOTES_SCHEMA_READY_CONN_IDS = set()
+_PLACES_SCHEMA_READY_CONN_IDS = set()
 
 
 def ensure_notes_schema(conn=None):
@@ -254,6 +276,78 @@ def ensure_notes_schema(conn=None):
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_rec_extract_date ON lp_notes(rec_extract_date)")
     conn.commit()
     _NOTES_SCHEMA_READY_CONN_IDS.add(conn_id)
+
+
+def ensure_places_schema(conn=None):
+    conn = _get_conn() if conn is None else conn
+    conn_id = id(conn)
+    if conn_id in _PLACES_SCHEMA_READY_CONN_IDS:
+        try:
+            rows = conn.execute("PRAGMA table_info(lp_places)").fetchall()
+            existing = {row[1].lower() for row in rows}
+            expected = {col.lower() for col in PLACE_SCHEMA_COLUMNS}
+            if expected.issubset(existing):
+                return
+        except Exception:
+            pass
+        _PLACES_SCHEMA_READY_CONN_IDS.discard(conn_id)
+    table_row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_places'"
+    ).fetchone()
+    if not table_row:
+        return
+    rows = conn.execute("PRAGMA table_info(lp_places)").fetchall()
+    existing = {row[1].lower() for row in rows}
+    for col_name, col_type in PLACE_SCHEMA_COLUMNS.items():
+        if col_name.lower() not in existing:
+            conn.execute(f"ALTER TABLE lp_places ADD COLUMN {col_name} {col_type}")
+
+    # A LifePIM Place is somewhere the user can navigate to. The active type
+    # determines whether the addressing system is Earth, virtual, or Internet.
+    conn.execute(
+        """
+        UPDATE lp_places
+           SET place_type = CASE
+               WHEN COALESCE(url, '') != '' THEN 'url'
+               WHEN COALESCE(virtual_world, '') != ''
+                 OR COALESCE(coord_x, '') != ''
+                 OR COALESCE(coord_y, '') != ''
+                 OR COALESCE(coord_z, '') != ''
+                 OR COALESCE(coord_region, '') != '' THEN 'virtual'
+               ELSE 'address'
+           END
+         WHERE COALESCE(place_type, '') = ''
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS ix_lp_places_type ON lp_places(place_type, virtual_world)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_places_area ON lp_places(area)")
+    conn.commit()
+    _PLACES_SCHEMA_READY_CONN_IDS.add(conn_id)
+
+
+def _infer_place_type(values_map):
+    if (values_map.get("url") or "").strip():
+        return "url"
+    if any((values_map.get(col) or "").strip() for col in ("virtual_world", "coord_x", "coord_y", "coord_z", "coord_region")):
+        return "virtual"
+    return "address"
+
+
+def _normalize_place_write_values(tbl_name, table_cols, cols, vals):
+    if tbl_name != "lp_places" or "place_type" not in table_cols:
+        return cols, vals
+    values_map = dict(zip(cols, vals))
+    place_type = (values_map.get("place_type") or "").strip().lower()
+    if place_type not in {"address", "url", "virtual"}:
+        place_type = _infer_place_type(values_map)
+    if "place_type" in cols:
+        vals = [place_type if col == "place_type" else val for col, val in zip(cols, vals)]
+    else:
+        cols.append("place_type")
+        vals.append(place_type)
+    return cols, vals
 
 
 def ensure_folder_schema(conn=None):
@@ -562,6 +656,7 @@ def add_record(conn, tbl_name, col_list, value_list):
         normalized, table_cols = _normalize_area_write_columns(conn, tbl_name, cols, vals)
         cols = [col for col, _ in normalized]
         vals = [val for _, val in normalized]
+        cols, vals = _normalize_place_write_values(tbl_name, table_cols, cols, vals)
         if "owner_user_id" in table_cols and "owner_user_id" not in cols:
             from flask_login import current_user
 
@@ -617,6 +712,7 @@ def update_record(conn, tbl_name, record_id, col_list, value_list):
         normalized, table_cols = _normalize_area_write_columns(conn, tbl_name, cols, vals)
         cols = [col for col, _ in normalized]
         vals = [val for _, val in normalized]
+        cols, vals = _normalize_place_write_values(tbl_name, table_cols, cols, vals)
         filtered = [(col, val) for col, val in zip(cols, vals) if col in table_cols]
         cols = [col for col, _ in filtered]
         vals = [val for _, val in filtered]

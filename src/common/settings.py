@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 import os
 import sqlite3
 
@@ -92,6 +93,16 @@ NOTE_DISPLAY_DEFAULTS = {
     "notes.display.notes_per_page": ("50", "Notes", "Notes per page"),
 }
 
+PLACES_DEFAULT_VIRTUAL_WORLDS = ["Alrona", "World of Warcraft", "Stardew Valley"]
+
+PLACES_DEFAULTS = {
+    "places.virtual_worlds": (
+        json.dumps(PLACES_DEFAULT_VIRTUAL_WORLDS, ensure_ascii=True),
+        "Places",
+        "Virtual world names",
+    ),
+}
+
 LOGGER_DEFAULTS = {
     "logger_sync_enabled": ("1", "Mobile Logger", "Enable Logger sync API"),
     "logger_raw_data_root": ("admin/logged_data/raw", "Mobile Logger", "Logger raw-data root"),
@@ -150,6 +161,7 @@ def ensure_settings_schema(conn=None):
         **AUDIO_DEFAULTS,
         **MEDIA_DEFAULTS,
         **NOTE_DISPLAY_DEFAULTS,
+        **PLACES_DEFAULTS,
         **LOGGER_DEFAULTS,
     }.items():
         conn.execute(
@@ -282,6 +294,53 @@ def get_note_display_settings(conn=None):
             get_setting("notes.display.notes_per_page", str(NOTE_NOTES_PER_PAGE_DEFAULT), conn)
         ),
     }
+
+
+def normalize_places_virtual_worlds(value, *, default_if_empty=False):
+    if isinstance(value, (list, tuple)):
+        raw_values = value
+    else:
+        text = str(value or "").strip()
+        raw_values = []
+        if text:
+            try:
+                parsed = json.loads(text)
+                raw_values = parsed if isinstance(parsed, list) else []
+            except json.JSONDecodeError:
+                raw_values = text.replace(",", "\n").splitlines()
+    worlds = []
+    seen = set()
+    for raw in raw_values:
+        world = str(raw or "").strip()
+        key = world.lower()
+        if world and key not in seen:
+            worlds.append(world)
+            seen.add(key)
+    if not worlds and default_if_empty:
+        return list(PLACES_DEFAULT_VIRTUAL_WORLDS)
+    return worlds
+
+
+def get_places_settings(conn=None):
+    raw = get_setting("places.virtual_worlds", json.dumps(PLACES_DEFAULT_VIRTUAL_WORLDS, ensure_ascii=True), conn)
+    worlds = normalize_places_virtual_worlds(raw, default_if_empty=True)
+    return {
+        "virtual_worlds": worlds,
+        "virtual_worlds_text": "\n".join(worlds),
+    }
+
+
+def save_places_settings(values, conn=None):
+    conn = db._get_conn() if conn is None else conn
+    ensure_settings_schema(conn)
+    worlds = normalize_places_virtual_worlds(values.get("virtual_worlds", ""))
+    set_setting(
+        "places.virtual_worlds",
+        json.dumps(worlds, ensure_ascii=True),
+        "Places",
+        "Virtual world names",
+        conn,
+    )
 
 
 def logger_default_raw_data_root(conn=None, user_id=None, username=None):

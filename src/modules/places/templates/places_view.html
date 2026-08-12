@@ -1,23 +1,70 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div>
-    <a href="{{ url_for('places.list_places_table_route', area=area) }}">Back to list</a> |
+  <div class="places-detail-actions">
+    <a href="{{ url_for('places.list_places_table_route', area=area, realm='internet' if item.place_type_current == 'url' else ('virtual:' ~ item.virtual_world if item.place_type_current == 'virtual' and item.virtual_world else 'earth')) }}">Back to list</a>
     <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a>
+    {% if item.open_url %}
+      <a href="{{ item.open_url }}" target="_blank" rel="noopener noreferrer">Open URL</a>
+    {% endif %}
   </div>
-  <table border="1" cellpadding="5">
-    {% for col in col_list %}
-    <tr>
-      <th>{{ col.replace('_', ' ') }}</th>
-      <td>{{ item[col] }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  <p>
-    <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}">Edit</a> |
+
+  <dl class="places-detail">
+    <dt>Type</dt>
+    <dd>{{ item.place_type_label }}</dd>
+    <dt>Title</dt>
+    <dd>{{ item.name }}</dd>
+    {% if item.desc %}
+      <dt>Description</dt>
+      <dd>{{ item.desc }}</dd>
+    {% endif %}
+
+    {% if item.place_type_current == 'url' %}
+      <dt>URL</dt>
+      <dd><a href="{{ item.open_url }}" target="_blank" rel="noopener noreferrer">{{ item.url }}</a></dd>
+      <dt>Host</dt>
+      <dd>{{ item.hostname }}</dd>
+    {% elif item.place_type_current == 'virtual' %}
+      <dt>World</dt>
+      <dd>{{ item.virtual_world or 'Virtual' }}</dd>
+      {% if item.coord_x or item.coord_y or item.coord_z %}
+        <dt>Coordinates</dt>
+        <dd>{{ item.coord_x }}{% if item.coord_y %}, {{ item.coord_y }}{% endif %}{% if item.coord_z %}, {{ item.coord_z }}{% endif %}</dd>
+      {% endif %}
+      {% if item.coord_region %}
+        <dt>Region / Zone</dt>
+        <dd>{{ item.coord_region }}</dd>
+      {% endif %}
+      {% if item.coord_notes %}
+        <dt>Coordinate notes</dt>
+        <dd>{{ item.coord_notes }}</dd>
+      {% endif %}
+    {% else %}
+      {% if item.address_street or item.suburb or item.state or item.postcode or item.country %}
+        <dt>Address</dt>
+        <dd>
+          {{ item.address_street }}
+          {% if item.suburb or item.state or item.postcode %}<br>{{ item.suburb }} {{ item.state }} {{ item.postcode }}{% endif %}
+          {% if item.country %}<br>{{ item.country }}{% endif %}
+        </dd>
+      {% endif %}
+      {% if item.gps_lat or item.gps_long %}
+        <dt>GPS</dt>
+        <dd>{{ item.gps_lat }}, {{ item.gps_long }}</dd>
+      {% endif %}
+    {% endif %}
+
+    {% if item.area %}
+      <dt>Area</dt>
+      <dd>{{ item.area }}</dd>
+    {% endif %}
+  </dl>
+
+  <p class="places-detail-actions">
+    <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}">Edit</a>
     <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
     {% if item.map_actions %}
       {% for action in item.map_actions %}
-        | <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer">{{ action.label }}</a>
+        <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer">{{ action.label }}</a>
       {% endfor %}
     {% endif %}
   </p>

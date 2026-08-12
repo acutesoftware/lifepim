@@ -6,6 +6,7 @@
     ('audio', 'Audio'),
     ('files', 'Files'),
     ('notes', 'Notes'),
+    ('places', 'Places'),
     ('logger', 'Mobile Logger'),
     ('areas', 'Edit Areas'),
     ('config', 'Config'),
@@ -177,6 +178,20 @@
       {% elif active_settings_tab == 'files' %}
         <h4>Files</h4>
         <p class="settings-empty">No Files settings yet.</p>
+      {% elif active_settings_tab == 'places' %}
+        <h4>Places</h4>
+        <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
+          <input type="hidden" name="tab" value="places">
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Virtual Worlds</div>
+            <label>
+              Names
+              <textarea name="virtual_worlds" rows="8">{{ places_settings.virtual_worlds_text }}</textarea>
+            </label>
+            <p class="settings-empty">Enter one virtual world name per line. These appear as Virtual Place types in the Places Add/Edit form.</p>
+          </div>
+          <button type="submit">Save Places settings</button>
+        </form>
       {% elif active_settings_tab == 'notes' %}
         <h4>Notes</h4>
         <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">

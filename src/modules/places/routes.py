@@ -1,13 +1,16 @@
-from urllib.parse import quote_plus
+from html.parser import HTMLParser
+import json
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote_plus, urlencode, urlsplit, urlunsplit
+from urllib.request import Request, urlopen
 
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for
 
 from common import data as db
 from common import config as cfg
 from common import projects as projects_mod
 from common import settings as settings_mod
 from common.utils import (
-    build_form_fields,
     get_side_tabs,
     get_table_def,
     get_tabs,
@@ -28,6 +31,7 @@ places_bp = Blueprint(
 
 
 def _get_tbl():
+    db.ensure_places_schema()
     return get_table_def("places")
 
 
@@ -35,13 +39,59 @@ def _normalize_area(area):
     return normalize_area_param(area) or None
 
 
-def _build_condition(area, tbl):
+def _clean_text(value):
+    return "" if value is None else str(value).strip()
+
+
+def _normalize_realm(value):
+    text = _clean_text(value) or "all"
+    lower = text.lower()
+    if lower in {"all", "any"}:
+        return "all"
+    if lower in {"earth", "address", "addresses"}:
+        return "earth"
+    if lower in {"internet", "url", "urls"}:
+        return "internet"
+    if lower == "virtual":
+        return "virtual"
+    if lower.startswith("virtual:"):
+        world = text.split(":", 1)[1].strip()
+        return f"virtual:{world}" if world else "virtual"
+    return "all"
+
+
+def _realm_label(realm):
+    if realm == "earth":
+        return "Earth"
+    if realm == "internet":
+        return "Internet"
+    if realm == "virtual":
+        return "Virtual"
+    if realm.startswith("virtual:"):
+        return realm.split(":", 1)[1] or "Virtual"
+    return "All"
+
+
+def _build_condition(area, tbl, realm=None):
+    clauses = []
+    params = []
     if area and "area" in (tbl["col_list"] if tbl else []):
-        return "lower(area) = lower(?)", [area]
-    return "1=1", []
+        clauses.append("lower(t.area) = lower(?)")
+        params.append(area)
+    realm = _normalize_realm(realm)
+    if realm == "earth":
+        clauses.append("COALESCE(NULLIF(t.place_type, ''), 'address') = 'address'")
+    elif realm == "internet":
+        clauses.append("t.place_type = 'url'")
+    elif realm == "virtual":
+        clauses.append("t.place_type = 'virtual'")
+    elif realm.startswith("virtual:"):
+        clauses.append("t.place_type = 'virtual' AND lower(COALESCE(t.virtual_world, '')) = lower(?)")
+        params.append(realm.split(":", 1)[1])
+    return " AND ".join(clauses) if clauses else "1=1", params
 
 
-def _fetch_places(area=None, sort_col=None, sort_dir=None, limit=None, offset=None):
+def _fetch_places(area=None, sort_col=None, sort_dir=None, limit=None, offset=None, realm=None):
     tbl = _get_tbl()
     if not tbl:
         return []
@@ -49,7 +99,7 @@ def _fetch_places(area=None, sort_col=None, sort_dir=None, limit=None, offset=No
     order_map = {col: f"t.{col}" for col in tbl["col_list"]}
     sort_key = order_map.get(sort_col or "name", "t.name")
     sort_dir = "desc" if (sort_dir or "").lower() == "desc" else "asc"
-    condition, params = _build_condition(area, tbl)
+    condition, params = _build_condition(area, tbl, realm)
     sql = (
         f"SELECT {', '.join([f't.{col}' for col in cols])} "
         f"FROM {tbl['name']} t "
@@ -63,14 +113,14 @@ def _fetch_places(area=None, sort_col=None, sort_dir=None, limit=None, offset=No
             sql += " OFFSET ?"
             params.append(int(offset))
     rows = db._get_conn().execute(sql, params).fetchall()
-    return [dict(row) for row in rows]
+    return _decorate_places([dict(row) for row in rows])
 
 
-def _count_places(area=None):
+def _count_places(area=None, realm=None):
     tbl = _get_tbl()
     if not tbl:
         return 0
-    condition, params = _build_condition(area, tbl)
+    condition, params = _build_condition(area, tbl, realm)
     row = db._get_conn().execute(
         f"SELECT COUNT(1) as cnt FROM {tbl['name']} t WHERE {condition}",
         params,
@@ -98,7 +148,7 @@ def _format_place_address(item):
 
 def _build_marker_details(item, lat, lon):
     details = []
-    description = (item.get("desc") or "").strip()
+    description = _clean_text(item.get("desc"))
     address = _format_place_address(item)
     if description:
         details.append(description)
@@ -109,7 +159,7 @@ def _build_marker_details(item, lat, lon):
 
 
 def _build_external_map_links(item, lat, lon):
-    name = (item.get("name") or "").strip()
+    name = _clean_text(item.get("name"))
     address = _format_place_address(item)
     context = {
         "lat": f"{lat:.6f}",
@@ -119,8 +169,8 @@ def _build_external_map_links(item, lat, lon):
     }
     links = []
     for spec in getattr(cfg, "PLACES_MAP_EXTERNAL_URLS", []):
-        label = (spec.get("label") or "").strip()
-        template = (spec.get("url") or "").strip()
+        label = _clean_text(spec.get("label"))
+        template = _clean_text(spec.get("url"))
         if not label or not template:
             continue
         try:
@@ -141,21 +191,351 @@ def _place_map_actions(item):
     return _build_external_map_links(item, lat, lon)
 
 
-def _attach_place_map_actions(items):
+def _place_type(item):
+    value = _clean_text(item.get("place_type")).lower()
+    if value in {"address", "url", "virtual"}:
+        return value
+    if _clean_text(item.get("url")):
+        return "url"
+    if any(_clean_text(item.get(col)) for col in ("virtual_world", "coord_x", "coord_y", "coord_z", "coord_region")):
+        return "virtual"
+    return "address"
+
+
+def _host_from_url(value):
+    try:
+        return urlsplit(value or "").hostname or ""
+    except ValueError:
+        return ""
+
+
+def _display_url(value):
+    try:
+        parts = urlsplit(value or "")
+    except ValueError:
+        return value or ""
+    host = parts.hostname or ""
+    if not host:
+        return value or ""
+    path = (parts.path or "").rstrip("/")
+    return host + (path if path and path != "/" else "")
+
+
+def _location_summary(item):
+    current_type = _place_type(item)
+    if current_type == "url":
+        return _display_url(item.get("url") or "")
+    if current_type == "virtual":
+        coords = _join_place_parts(item.get("coord_x"), item.get("coord_y"), item.get("coord_z"))
+        parts = [item.get("virtual_world"), item.get("coord_region"), coords]
+        return " - ".join([_clean_text(part) for part in parts if _clean_text(part)])
+    return _format_place_address(item) or _join_place_parts(item.get("gps_lat"), item.get("gps_long"))
+
+
+def _decorate_place(item):
+    current_type = _place_type(item)
+    item["place_type_current"] = current_type
+    item["place_type_label"] = {"address": "Earth", "url": "Internet", "virtual": "Virtual"}.get(current_type, current_type)
+    if current_type == "virtual" and _clean_text(item.get("virtual_world")):
+        item["place_type_label"] = _clean_text(item.get("virtual_world"))
+    item["hostname"] = _host_from_url(item.get("url") or "")
+    item["display_url"] = _display_url(item.get("url") or "")
+    item["location_summary"] = _location_summary(item)
+    item["open_url"] = item.get("url") if current_type == "url" and item.get("url") else ""
+    item["map_actions"] = _place_map_actions(item)
+    return item
+
+
+def _decorate_places(items):
     for item in items:
-        item["map_actions"] = _place_map_actions(item)
+        _decorate_place(item)
     return items
 
 
-def _build_fields(col_list):
-    fields = build_form_fields(col_list)
-    for field in fields:
-        if field["name"] == "desc":
-            field["is_textarea"] = True
-        if field["name"] in ("gps_lat", "gps_long"):
-            field["input_type"] = "number"
-            field["step"] = "any"
-    return fields
+class _TitleParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_title = False
+        self.title_parts = []
+        self.og_title = ""
+
+    def handle_starttag(self, tag, attrs):
+        tag = (tag or "").lower()
+        attrs = {str(key).lower(): value for key, value in attrs}
+        if tag == "title":
+            self.in_title = True
+        if tag == "meta":
+            prop = (attrs.get("property") or attrs.get("name") or "").lower()
+            if prop == "og:title" and not self.og_title:
+                self.og_title = _clean_text(attrs.get("content"))
+
+    def handle_endtag(self, tag):
+        if (tag or "").lower() == "title":
+            self.in_title = False
+
+    def handle_data(self, data):
+        if self.in_title and data:
+            self.title_parts.append(data)
+
+    @property
+    def title(self):
+        title = " ".join(" ".join(self.title_parts).split()).strip()
+        return title or " ".join((self.og_title or "").split()).strip()
+
+
+def normalize_place_url(value):
+    text = _clean_text(value)
+    if not text:
+        return ""
+    if any(ch.isspace() for ch in text):
+        raise ValueError("URL cannot contain spaces.")
+    if "://" not in text:
+        text = "https://" + text
+    parts = urlsplit(text)
+    scheme = (parts.scheme or "").lower()
+    if scheme not in {"http", "https"}:
+        raise ValueError("URL must start with http:// or https://.")
+    if not parts.netloc or not _clean_text(parts.hostname):
+        raise ValueError("URL must include a host.")
+    return urlunsplit((scheme, parts.netloc, parts.path or "", parts.query, ""))
+
+
+def _url_metadata(value, fetch=True):
+    try:
+        normalized = normalize_place_url(value)
+    except ValueError as exc:
+        return {"url": value or "", "title": _clean_text(value), "hostname": "", "error": str(exc)}
+    hostname = _host_from_url(normalized)
+    title = hostname
+    result_url = normalized
+    if fetch:
+        try:
+            req = Request(
+                normalized,
+                headers={
+                    "User-Agent": "LifePIM/1.0 (+local desktop URL title lookup)",
+                    "Accept": "text/html,application/xhtml+xml",
+                },
+            )
+            with urlopen(req, timeout=3) as response:
+                result_url = response.geturl() or normalized
+                hostname = _host_from_url(result_url) or hostname
+                charset = response.headers.get_content_charset() or "utf-8"
+                body = response.read(256 * 1024).decode(charset, errors="replace")
+            parser = _TitleParser()
+            parser.feed(body)
+            title = parser.title or hostname
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError):
+            title = hostname
+    return {"url": result_url, "title": title or hostname or normalized, "hostname": hostname}
+
+
+def _nominatim_json(path, params):
+    query = urlencode({key: value for key, value in params.items() if _clean_text(value)})
+    url = f"https://nominatim.openstreetmap.org/{path}?{query}"
+    req = Request(
+        url,
+        headers={
+            "User-Agent": "LifePIM Desktop/3.1 places-geocode",
+            "Accept": "application/json",
+        },
+    )
+    with urlopen(req, timeout=4) as response:
+        return json.loads(response.read(128 * 1024).decode("utf-8", errors="replace"))
+
+
+def _address_query(payload):
+    parts = [
+        payload.get("address_street"),
+        payload.get("suburb"),
+        payload.get("state"),
+        payload.get("postcode"),
+        payload.get("country"),
+    ]
+    query = ", ".join([_clean_text(part) for part in parts if _clean_text(part)])
+    return query or _clean_text(payload.get("name"))
+
+
+def _address_fields_from_nominatim(address):
+    address = address or {}
+    street = _join_place_parts(address.get("house_number"), address.get("road") or address.get("pedestrian"))
+    suburb = (
+        address.get("suburb")
+        or address.get("city")
+        or address.get("town")
+        or address.get("village")
+        or address.get("municipality")
+    )
+    state = address.get("state") or address.get("region")
+    return {
+        "address_street": street,
+        "suburb": _clean_text(suburb),
+        "state": _clean_text(state),
+        "postcode": _clean_text(address.get("postcode")),
+        "country": _clean_text(address.get("country")),
+    }
+
+
+def _geocode_address(payload):
+    query = _address_query(payload)
+    if not query:
+        return {"error": "Enter an address or title first."}
+    try:
+        results = _nominatim_json(
+            "search",
+            {
+                "format": "jsonv2",
+                "addressdetails": "1",
+                "limit": "1",
+                "q": query,
+            },
+        )
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
+        return {"error": f"Address lookup failed: {exc}"}
+    if not results:
+        return {"error": "No matching address found."}
+    first = results[0]
+    return {
+        "latitude": _clean_text(first.get("lat")),
+        "longitude": _clean_text(first.get("lon")),
+        "display_name": _clean_text(first.get("display_name")),
+        **_address_fields_from_nominatim(first.get("address")),
+    }
+
+
+def _reverse_geocode(payload):
+    lat = _parse_float(payload.get("gps_lat"))
+    lon = _parse_float(payload.get("gps_long"))
+    if lat is None or lon is None:
+        return {"error": "Enter latitude and longitude first."}
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return {"error": "Latitude or longitude is out of range."}
+    try:
+        result = _nominatim_json(
+            "reverse",
+            {
+                "format": "jsonv2",
+                "addressdetails": "1",
+                "lat": f"{lat:.7f}",
+                "lon": f"{lon:.7f}",
+            },
+        )
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
+        return {"error": f"Coordinate lookup failed: {exc}"}
+    if not result:
+        return {"error": "No matching address found."}
+    return {
+        "display_name": _clean_text(result.get("display_name")),
+        **_address_fields_from_nominatim(result.get("address")),
+    }
+
+
+def _configured_virtual_worlds():
+    worlds = []
+    try:
+        configured_worlds = settings_mod.get_places_settings(db._get_conn()).get("virtual_worlds") or []
+    except Exception:
+        configured_worlds = []
+    for world in configured_worlds:
+        text = _clean_text(world)
+        if text and text not in worlds:
+            worlds.append(text)
+    try:
+        rows = db._get_conn().execute(
+            "SELECT DISTINCT virtual_world FROM lp_places "
+            "WHERE COALESCE(virtual_world, '') != '' ORDER BY lower(virtual_world)"
+        ).fetchall()
+        for row in rows:
+            text = _clean_text(row["virtual_world"] if hasattr(row, "keys") else row[0])
+            if text and text not in worlds:
+                worlds.append(text)
+    except Exception:
+        pass
+    return worlds
+
+
+def _place_type_choices(item=None):
+    choices = [
+        {"value": "address", "label": "Address"},
+        {"value": "url", "label": "URL"},
+    ]
+    worlds = _configured_virtual_worlds()
+    current_world = _clean_text((item or {}).get("virtual_world"))
+    if current_world and current_world not in worlds:
+        worlds.insert(0, current_world)
+    if worlds:
+        choices.extend({"value": f"virtual|{world}", "label": world} for world in worlds)
+    else:
+        choices.append({"value": "virtual|", "label": "Virtual"})
+    return choices
+
+
+def _selected_type_choice(item):
+    current_type = _place_type(item or {})
+    if current_type == "virtual":
+        return f"virtual|{_clean_text((item or {}).get('virtual_world'))}"
+    return current_type
+
+
+def _form_values(form, area, tbl):
+    values = {col: _clean_text(form.get(col)) for col in (tbl["col_list"] if tbl else [])}
+    if "area" in values and not values["area"] and area:
+        values["area"] = area
+    choice = _clean_text(form.get("place_type_choice") or values.get("place_type") or "address")
+    virtual_world = values.get("virtual_world", "")
+    if choice.startswith("virtual|"):
+        place_type = "virtual"
+        selected_world = choice.split("|", 1)[1].strip()
+        if selected_world:
+            virtual_world = selected_world
+    elif choice == "url":
+        place_type = "url"
+    else:
+        place_type = "address"
+    values["place_type"] = place_type
+    values["virtual_world"] = virtual_world
+    if place_type == "url":
+        raw_url = values.get("url", "")
+        if not raw_url:
+            return values, "URL is required for Internet Places."
+        try:
+            values["url"] = normalize_place_url(raw_url)
+        except ValueError as exc:
+            return values, str(exc)
+        if not values.get("name"):
+            values["name"] = _host_from_url(values["url"]) or values["url"]
+    elif not values.get("name") and place_type == "virtual":
+        values["name"] = values.get("coord_region") or values.get("virtual_world") or "Virtual Place"
+    elif not values.get("name"):
+        values["name"] = _format_place_address(values) or _join_place_parts(values.get("gps_lat"), values.get("gps_long")) or "Place"
+    return values, ""
+
+
+def _filter_options(area, active_realm):
+    filters = [{"id": "all", "label": "All", "count": _count_places(area, "all")}]
+    earth_count = _count_places(area, "earth")
+    filters.append({"id": "earth", "label": "Earth", "count": earth_count})
+    internet_count = _count_places(area, "internet")
+    filters.append({"id": "internet", "label": "Internet", "count": internet_count})
+    try:
+        condition, params = _build_condition(area, _get_tbl(), "virtual")
+        rows = db._get_conn().execute(
+            "SELECT COALESCE(NULLIF(virtual_world, ''), 'Virtual') AS world, COUNT(1) AS cnt "
+            f"FROM lp_places t WHERE {condition} "
+            "GROUP BY COALESCE(NULLIF(virtual_world, ''), 'Virtual') "
+            "ORDER BY lower(world)",
+            params,
+        ).fetchall()
+    except Exception:
+        rows = []
+    for row in rows:
+        world = row["world"]
+        filter_id = f"virtual:{world if world != 'Virtual' else ''}".rstrip(":")
+        filters.append({"id": filter_id, "label": world, "count": row["cnt"]})
+    if active_realm.startswith("virtual:") and active_realm not in {item["id"] for item in filters}:
+        world = active_realm.split(":", 1)[1]
+        filters.append({"id": active_realm, "label": world, "count": 0})
+    return filters
 
 
 @places_bp.route("/")
@@ -166,36 +546,45 @@ def list_places_route():
 @places_bp.route("/table")
 def list_places_table_route():
     area = _normalize_area(request_area_param())
+    realm = _normalize_realm(request.args.get("realm"))
+    mode = request.args.get("mode") or ("grid" if realm == "internet" else "table")
+    if mode not in {"table", "grid"}:
+        mode = "table"
     sort_col = request.args.get("sort") or "name"
     sort_dir = request.args.get("dir") or "asc"
     page = request.args.get("page", type=int) or 1
     per_page = cfg.RECS_PER_PAGE
-    total = _count_places(area)
+    total = _count_places(area, realm)
     offset = (page - 1) * per_page
-    items = _fetch_places(area, sort_col, sort_dir, limit=per_page, offset=offset)
-    _attach_place_map_actions(items)
+    items = _fetch_places(area, sort_col, sort_dir, limit=per_page, offset=offset, realm=realm)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         "places.list_places_table_route",
-        {"area": area, "sort": sort_col, "dir": sort_dir},
+        {"area": area, "realm": realm, "mode": mode, "sort": sort_col, "dir": sort_dir},
         page,
         total_pages,
     )
     tbl = _get_tbl()
-    col_list = tbl["col_list"] if tbl else []
+    col_list = [
+        col for col in (tbl["col_list"] if tbl else [])
+        if col in {"name", "place_type", "virtual_world", "url", "suburb", "state", "country", "gps_lat", "gps_long", "area"}
+    ]
     return render_template(
         "places_list_table.html",
         active_tab="places",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
-        content_title=f"Places ({area or 'All'})",
+        content_title=f"Places - {_realm_label(realm)} ({area or 'All'})",
         content_html="",
         items=items,
         col_list=col_list,
         area=area,
+        realm=realm,
+        mode=mode,
+        filters=_filter_options(area, realm),
         sort_col=sort_col,
         sort_dir=sort_dir,
         page=page,
@@ -254,7 +643,7 @@ def view_place_route(place_id):
             item = dict(rows[0])
     if not item:
         return redirect(url_for("places.list_places_table_route", area=area))
-    item["map_actions"] = _place_map_actions(item)
+    _decorate_place(item)
     return render_template(
         "places_view.html",
         active_tab="places",
@@ -263,7 +652,7 @@ def view_place_route(place_id):
         content_title=item.get("name", "Place"),
         content_html="",
         item=item,
-        col_list=tbl["col_list"] if tbl else [],
+        selected_type_choice=_selected_type_choice(item),
         area=area,
         project_options=projects_mod.project_list(statuses=("planned", "active")),
         record_projects=projects_mod.record_projects("place", place_id),
@@ -272,39 +661,50 @@ def view_place_route(place_id):
 
 @places_bp.route("/add", methods=["GET", "POST"])
 def add_place_route():
-    area = request_area_param("General") or "General"
+    area = request_area_param("General", include_form=True) or "General"
     tbl = _get_tbl()
+    error = ""
+    item = {"place_type": "address", "area": area}
     if request.method == "POST" and tbl:
-        values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
-        db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
-        return redirect(url_for("places.list_places_table_route", area=area))
-    fields = _build_fields(tbl["col_list"]) if tbl else []
+        item, error = _form_values(request.form, area, tbl)
+        if not error:
+            values = [item.get(col, "") for col in tbl["col_list"]]
+            place_id = db.add_record(db.conn, tbl["name"], tbl["col_list"], values)
+            if place_id:
+                return redirect(url_for("places.view_place_route", place_id=place_id, area=area))
+            error = "Could not save Place."
     return render_template(
         "places_edit.html",
         active_tab="places",
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
         content_title="Add Place",
-        item=None,
-        fields=fields,
+        item=item,
+        error=error,
+        place_type_choices=_place_type_choices(item),
+        selected_type_choice=_selected_type_choice(item),
         area=area,
     )
 
 
 @places_bp.route("/edit/<int:place_id>", methods=["GET", "POST"])
 def edit_place_route(place_id):
-    area = _normalize_area(request_area_param())
+    area = _normalize_area(request_area_param(include_form=True))
     tbl = _get_tbl()
     item = None
     if tbl:
         rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [place_id])
         if rows:
             item = dict(rows[0])
+    if not item:
+        return redirect(url_for("places.list_places_table_route", area=area))
+    error = ""
     if request.method == "POST" and tbl:
-        values = [request.form.get(col, "").strip() for col in tbl["col_list"]]
-        db.update_record(db.conn, tbl["name"], place_id, tbl["col_list"], values)
-        return redirect(url_for("places.view_place_route", place_id=place_id, area=area))
-    fields = _build_fields(tbl["col_list"]) if tbl else []
+        item, error = _form_values(request.form, area, tbl)
+        if not error:
+            values = [item.get(col, "") for col in tbl["col_list"]]
+            db.update_record(db.conn, tbl["name"], place_id, tbl["col_list"], values)
+            return redirect(url_for("places.view_place_route", place_id=place_id, area=area))
     return render_template(
         "places_edit.html",
         active_tab="places",
@@ -312,7 +712,9 @@ def edit_place_route(place_id):
         side_tabs=get_side_tabs(),
         content_title="Edit Place",
         item=item,
-        fields=fields,
+        error=error,
+        place_type_choices=_place_type_choices(item),
+        selected_type_choice=_selected_type_choice(item),
         area=area,
     )
 
@@ -324,3 +726,21 @@ def delete_place_route(place_id):
     if tbl:
         db.delete_record(db.conn, tbl["name"], place_id)
     return redirect(url_for("places.list_places_table_route", area=area))
+
+
+@places_bp.route("/url-metadata", methods=["POST"])
+def url_metadata_route():
+    payload = request.get_json(silent=True) or {}
+    return jsonify(_url_metadata(payload.get("url") or ""))
+
+
+@places_bp.route("/geocode-address", methods=["POST"])
+def geocode_address_route():
+    payload = request.get_json(silent=True) or {}
+    return jsonify(_geocode_address(payload))
+
+
+@places_bp.route("/reverse-geocode", methods=["POST"])
+def reverse_geocode_route():
+    payload = request.get_json(silent=True) or {}
+    return jsonify(_reverse_geocode(payload))

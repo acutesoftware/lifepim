@@ -78,7 +78,7 @@ table_def = [
 	{'name':'lp_how', 'route':'how', 'display_name':'How', 'col_list':['parent_how_id', 'title','description', 'area']},
 	{'name':'lp_data', 'route':'data', 'display_name':'Data', 'col_list':['name','description', 'tbl_name', 'col_list', 'area']},
 	{'name':'lp_files', 'route':'files', 'display_name':'Files', 'col_list':['filelist_name','path', 'folder_id', 'file_type', 'area']},
-	{'name':'lp_places', 'route':'places', 'display_name':'Places', 'col_list':['name','desc', 'address_street', 'suburb', 'postcode', 'state', 'country', 'gps_lat', 'gps_long']},
+	{'name':'lp_places', 'route':'places', 'display_name':'Places', 'col_list':['name','desc', 'address_street', 'suburb', 'postcode', 'state', 'country', 'gps_lat', 'gps_long', 'place_type', 'virtual_world', 'coord_x', 'coord_y', 'coord_z', 'coord_region', 'coord_notes', 'url', 'area']},
 
 ]
 

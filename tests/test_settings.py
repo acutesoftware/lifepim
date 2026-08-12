@@ -196,6 +196,25 @@ class TestSettingsSchema(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_places_virtual_world_defaults_and_save(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            places_settings = settings.get_places_settings(conn)
+            self.assertEqual(
+                places_settings["virtual_worlds"],
+                ["Alrona", "World of Warcraft", "Stardew Valley"],
+            )
+
+            settings.save_places_settings(
+                {"virtual_worlds": "Alrona\nMinecraft\nMinecraft\nStardew Valley"},
+                conn,
+            )
+            saved = settings.get_places_settings(conn)
+            self.assertEqual(saved["virtual_worlds"], ["Alrona", "Minecraft", "Stardew Valley"])
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

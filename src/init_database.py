@@ -47,6 +47,7 @@ def reset_database(db_file):
     projects_mod.ensure_projects_schema(db_conn)
     collections_mod.ensure_collections_schema(db_conn)
     db.ensure_area_columns(db_conn)
+    db.ensure_places_schema(db_conn)
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_contacts.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_links.sql"))
     _run_sql_script(db_conn, os.path.join(os.path.dirname(__file__), "schema_money.sql"))

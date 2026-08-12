@@ -1,14 +1,267 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <form method="POST">
-    {% for field in fields %}
-    <label>{{ field.label }}:</label><br>
-    {% if field.is_textarea %}
-    <textarea name="{{ field.name }}" rows="6" cols="60">{{ item[field.name] if item else '' }}</textarea><br><br>
-    {% else %}
-    <input type="{{ field.input_type }}" name="{{ field.name }}" value="{{ item[field.name] if item else '' }}"{% if field.step %} step="{{ field.step }}"{% endif %}><br><br>
+  <form method="POST" class="places-edit-form"
+        data-url-metadata-url="{{ url_for('places.url_metadata_route') }}"
+        data-geocode-url="{{ url_for('places.geocode_address_route') }}"
+        data-reverse-geocode-url="{{ url_for('places.reverse_geocode_route') }}">
+    {% if error %}
+      <div class="places-form-error">{{ error }}</div>
     {% endif %}
-    {% endfor %}
-    <button type="submit">Save</button>
+
+    <label class="places-field">
+      <span>Type *</span>
+      <select name="place_type_choice" id="place-type">
+        {% for choice in place_type_choices %}
+          <option value="{{ choice.value }}" {% if selected_type_choice == choice.value %}selected{% endif %}>{{ choice.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <section class="places-field-group" data-place-group="url">
+      <label class="places-field">
+        <span>URL *</span>
+        <input type="url" name="url" id="place-url" value="{{ item.url or '' }}" autocomplete="url">
+      </label>
+      <div class="places-url-status" id="place-url-status"></div>
+    </section>
+
+    <label class="places-field">
+      <span>Title</span>
+      <input type="text" name="name" id="place-title" value="{{ item.name or '' }}" autocomplete="off">
+    </label>
+
+    <label class="places-field places-wide-field">
+      <span>Description</span>
+      <textarea name="desc" rows="5">{{ item.desc or '' }}</textarea>
+    </label>
+
+    <section class="places-field-group places-form-grid" data-place-group="address">
+      <label class="places-field places-wide-field">
+        <span>Address</span>
+        <input type="text" name="address_street" id="place-address-street" value="{{ item.address_street or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Suburb / City</span>
+        <input type="text" name="suburb" id="place-suburb" value="{{ item.suburb or '' }}">
+      </label>
+      <label class="places-field">
+        <span>State / Region</span>
+        <input type="text" name="state" id="place-state" value="{{ item.state or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Postcode</span>
+        <input type="text" name="postcode" id="place-postcode" value="{{ item.postcode or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Country</span>
+        <input type="text" name="country" id="place-country" value="{{ item.country or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Latitude</span>
+        <input type="number" step="any" name="gps_lat" id="place-gps-lat" value="{{ item.gps_lat or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Longitude</span>
+        <input type="number" step="any" name="gps_long" id="place-gps-long" value="{{ item.gps_long or '' }}">
+      </label>
+      <div class="places-address-tools">
+        <button type="button" id="place-geocode-button">Find GPS</button>
+        <button type="button" id="place-reverse-geocode-button">Find Address</button>
+        <span id="place-geocode-status"></span>
+      </div>
+    </section>
+
+    <section class="places-field-group places-form-grid" data-place-group="virtual">
+      <input type="hidden" name="virtual_world" id="virtual-world" value="{{ item.virtual_world or '' }}">
+      <label class="places-field">
+        <span>X</span>
+        <input type="text" name="coord_x" value="{{ item.coord_x or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Y</span>
+        <input type="text" name="coord_y" value="{{ item.coord_y or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Z</span>
+        <input type="text" name="coord_z" value="{{ item.coord_z or '' }}">
+      </label>
+      <label class="places-field">
+        <span>Region / Zone</span>
+        <input type="text" name="coord_region" value="{{ item.coord_region or '' }}">
+      </label>
+      <label class="places-field places-wide-field">
+        <span>Coordinate notes</span>
+        <textarea name="coord_notes" rows="4">{{ item.coord_notes or '' }}</textarea>
+      </label>
+    </section>
+
+    <input type="hidden" name="place_type" value="{{ item.place_type or 'address' }}">
+    <input type="hidden" name="area" value="{{ item.area or area or '' }}">
+
+    <div class="places-edit-actions">
+      <button type="submit">Save</button>
+      <a href="{{ url_for('places.list_places_table_route', area=area) }}">Cancel</a>
+    </div>
   </form>
+
+  <script>
+  (() => {
+    const form = document.querySelector(".places-edit-form");
+    if (!form) {
+      return;
+    }
+    const typeSelect = document.getElementById("place-type");
+    const urlInput = document.getElementById("place-url");
+    const titleInput = document.getElementById("place-title");
+    const statusEl = document.getElementById("place-url-status");
+    const virtualWorldInput = document.getElementById("virtual-world");
+    const metadataUrl = form.dataset.urlMetadataUrl;
+    const geocodeUrl = form.dataset.geocodeUrl;
+    const reverseGeocodeUrl = form.dataset.reverseGeocodeUrl;
+    const geocodeButton = document.getElementById("place-geocode-button");
+    const reverseGeocodeButton = document.getElementById("place-reverse-geocode-button");
+    const geocodeStatusEl = document.getElementById("place-geocode-status");
+    const addressFields = {
+      name: titleInput,
+      address_street: document.getElementById("place-address-street"),
+      suburb: document.getElementById("place-suburb"),
+      state: document.getElementById("place-state"),
+      postcode: document.getElementById("place-postcode"),
+      country: document.getElementById("place-country"),
+      gps_lat: document.getElementById("place-gps-lat"),
+      gps_long: document.getElementById("place-gps-long")
+    };
+    let titleTouched = Boolean((titleInput.value || "").trim());
+    let lookupTimer = null;
+    let requestToken = 0;
+
+    function activeKind() {
+      const value = typeSelect.value || "address";
+      if (value.startsWith("virtual|")) {
+        return "virtual";
+      }
+      return value === "url" ? "url" : "address";
+    }
+
+    function syncTypeFields() {
+      const kind = activeKind();
+      form.querySelectorAll("[data-place-group]").forEach((group) => {
+        group.hidden = group.dataset.placeGroup !== kind;
+      });
+      if (kind === "virtual") {
+        virtualWorldInput.value = (typeSelect.value || "").split("|").slice(1).join("|");
+      }
+      if (kind === "url" && urlInput.value.trim() && !titleTouched) {
+        scheduleLookup();
+      }
+    }
+
+    function setStatus(text) {
+      statusEl.textContent = text || "";
+    }
+
+    function setGeocodeStatus(text) {
+      geocodeStatusEl.textContent = text || "";
+    }
+
+    async function lookupUrl() {
+      const rawUrl = (urlInput.value || "").trim();
+      if (!rawUrl || titleTouched) {
+        setStatus("");
+        return;
+      }
+      const token = ++requestToken;
+      setStatus("Looking up title...");
+      try {
+        const response = await fetch(metadataUrl, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({url: rawUrl})
+        });
+        const data = await response.json();
+        if (token !== requestToken || titleTouched) {
+          return;
+        }
+        if (data.url) {
+          urlInput.value = data.url;
+        }
+        if (data.title) {
+          titleInput.value = data.title;
+        }
+        setStatus(data.error || "");
+      } catch (err) {
+        if (token === requestToken) {
+          setStatus("");
+        }
+      }
+    }
+
+    function scheduleLookup() {
+      window.clearTimeout(lookupTimer);
+      lookupTimer = window.setTimeout(lookupUrl, 500);
+    }
+
+    function addressPayload() {
+      const payload = {};
+      Object.entries(addressFields).forEach(([key, field]) => {
+        payload[key] = field ? field.value : "";
+      });
+      return payload;
+    }
+
+    function applyAddressResult(data, mode) {
+      if (!data || data.error) {
+        setGeocodeStatus((data && data.error) || "");
+        return;
+      }
+      if (mode === "geocode") {
+        if (data.latitude) {
+          addressFields.gps_lat.value = data.latitude;
+        }
+        if (data.longitude) {
+          addressFields.gps_long.value = data.longitude;
+        }
+      } else {
+        ["address_street", "suburb", "state", "postcode", "country"].forEach((key) => {
+          if (data[key] && addressFields[key] && !addressFields[key].value.trim()) {
+            addressFields[key].value = data[key];
+          }
+        });
+      }
+      setGeocodeStatus(data.display_name || "Found.");
+    }
+
+    async function runAddressLookup(url, mode) {
+      setGeocodeStatus(mode === "geocode" ? "Finding GPS..." : "Finding address...");
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(addressPayload())
+        });
+        applyAddressResult(await response.json(), mode);
+      } catch (err) {
+        setGeocodeStatus("");
+      }
+    }
+
+    typeSelect.addEventListener("change", syncTypeFields);
+    titleInput.addEventListener("input", () => {
+      titleTouched = true;
+    });
+    urlInput.addEventListener("input", () => {
+      if (!titleTouched) {
+        scheduleLookup();
+      }
+    });
+    urlInput.addEventListener("blur", () => {
+      if (!titleTouched) {
+        lookupUrl();
+      }
+    });
+    geocodeButton.addEventListener("click", () => runAddressLookup(geocodeUrl, "geocode"));
+    reverseGeocodeButton.addEventListener("click", () => runAddressLookup(reverseGeocodeUrl, "reverse"));
+    syncTypeFields();
+  })();
+  </script>
 {% endblock %}

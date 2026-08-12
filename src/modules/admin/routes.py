@@ -457,7 +457,7 @@ def settings_route():
     security.require_role("admin")
     message = request.args.get("message", "")
     active_settings_tab = (request.args.get("tab") or request.form.get("tab") or "calendar").strip().lower()
-    if active_settings_tab not in {"calendar", "media", "audio", "files", "notes", "logger", "general", "config"}:
+    if active_settings_tab not in {"calendar", "media", "audio", "files", "notes", "places", "logger", "general", "config"}:
         active_settings_tab = "calendar"
 
     conn = db.conn if db.conn is not None else None
@@ -576,6 +576,14 @@ def settings_route():
                     )
                 except Exception as exc:
                     message = f"Note search index rebuild failed: {exc}"
+        elif active_settings_tab == "places":
+            settings_mod.save_places_settings(
+                {
+                    "virtual_worlds": request.form.get("virtual_worlds", ""),
+                },
+                conn,
+            )
+            message = "Places settings saved."
         elif active_settings_tab == "config":
             names = request.form.getlist("config_name")
             existing_override_names = {
@@ -658,6 +666,7 @@ def settings_route():
     media_settings = settings_mod.get_media_settings(conn)
     audio_settings = settings_mod.get_audio_settings(conn)
     general_settings = settings_mod.get_general_settings(conn)
+    places_settings = settings_mod.get_places_settings(conn)
     note_settings = settings_mod.get_note_display_settings(conn)
     logger_settings = settings_mod.get_logger_settings(
         conn,
@@ -686,6 +695,7 @@ def settings_route():
         media_settings=media_settings,
         audio_settings=audio_settings,
         general_settings=general_settings,
+        places_settings=places_settings,
         note_settings=note_settings,
         logger_settings=logger_settings,
         config_settings=config_settings,
