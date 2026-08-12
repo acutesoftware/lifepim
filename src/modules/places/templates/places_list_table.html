@@ -16,6 +16,14 @@
         <a class="{% if mode == 'grid' %}active{% endif %}"
            href="{{ url_for('places.list_places_table_route', area=area, realm=realm, mode='grid', sort=sort_col, dir=sort_dir) }}">Grid</a>
         <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a>
+        <label class="places-import-select">
+          <span>Import</span>
+          <select onchange="if (this.value) window.location=this.value;">
+            <option value="">Choose...</option>
+            <option value="{{ url_for('places.import_places_route', area=area, kind='internet') }}">Internet - URL list</option>
+            <option value="{{ url_for('places.import_places_route', area=area, kind='address') }}">Address list</option>
+          </select>
+        </label>
         <a href="{{ url_for('places.add_place_route', area=area) }}">Add Place</a>
       </div>
     </div>

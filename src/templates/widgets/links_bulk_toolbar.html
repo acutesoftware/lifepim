@@ -12,6 +12,10 @@
       <option value="delete">Delete Selected notes</option>
       <option value="move">Move selected notes to Area</option>
       <option value="color">Set color of selected notes to ...</option>
+    {% elif link_list_type == "place" %}
+      <option value="link">Link selected records to ...</option>
+      <option value="delete">Delete selected Places</option>
+      <option value="rescan">Rescan selected Place details</option>
     {% else %}
       <option value="link">Link selected records to ...</option>
     {% endif %}

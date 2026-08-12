@@ -4277,6 +4277,27 @@ button.calendar-nav {
   padding: 3px 7px;
 }
 
+.places-import-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #c9d0d8;
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.places-import-select span {
+  color: #223;
+}
+
+.places-import-select select {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+
 .places-filters a.active,
 .places-actions a.active {
   background: #e7edf7;
@@ -4359,6 +4380,14 @@ button.calendar-nav {
   color: #7a1f1f;
   border-radius: 6px;
   padding: 6px 8px;
+}
+
+.places-fieldset {
+  border: 1px solid #ddd;
+  background: #fafafa;
+  border-radius: 6px;
+  padding: 8px;
+  max-width: 900px;
 }
 
 .places-field,

@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="places-page">
+    <div class="places-toolbar">
+      <div class="places-filters">
+        <a class="{% if import_kind == 'internet' %}active{% endif %}"
+           href="{{ url_for('places.import_places_route', area=area, kind='internet') }}">Internet</a>
+        <a class="{% if import_kind == 'address' %}active{% endif %}"
+           href="{{ url_for('places.import_places_route', area=area, kind='address') }}">Address</a>
+      </div>
+      <div class="places-actions">
+        <a href="{{ url_for('places.list_places_table_route', area=area, realm='internet' if import_kind == 'internet' else 'earth') }}">Back to Places</a>
+      </div>
+    </div>
+
+    <form method="post" class="places-edit-form">
+      <input type="hidden" name="area" value="{{ area or '' }}">
+      <input type="hidden" name="kind" value="{{ import_kind }}">
+      <div class="places-fieldset">
+        <div class="settings-fieldset-title">
+          {% if import_kind == 'internet' %}Internet URL List{% else %}Address List{% endif %}
+        </div>
+        <label class="places-field places-wide-field">
+          <span>{% if import_kind == 'internet' %}URLs{% else %}Addresses{% endif %}</span>
+          <textarea name="import_text" rows="14" placeholder="{% if import_kind == 'internet' %}https://example.com&#10;docs.python.org/3/{% else %}Adelaide Botanic Garden, North Terrace, Adelaide SA 5000, Australia&#10;1600 Pennsylvania Avenue NW, Washington DC, USA{% endif %}">{{ import_text or '' }}</textarea>
+        </label>
+      </div>
+      <div class="places-edit-actions">
+        <button type="submit">Import</button>
+      </div>
+    </form>
+
+    {% if results %}
+      <div class="tabular-scroll">
+        <table class="settings-table">
+          <thead>
+            <tr>
+              <th>Line</th>
+              <th>Status</th>
+              <th>Input</th>
+              <th>Title</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in results %}
+              <tr>
+                <td>{{ row.line }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.input }}</td>
+                <td>
+                  {% if row.place_id %}
+                    <a href="{{ url_for('places.view_place_route', place_id=row.place_id, area=area) }}">{{ row.title or row.url or row.place_id }}</a>
+                  {% else %}
+                    {{ row.title or row.url or '' }}
+                  {% endif %}
+                </td>
+                <td>{{ row.message or '' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

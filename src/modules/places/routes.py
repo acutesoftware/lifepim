@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 import json
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote_plus, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -28,6 +29,8 @@ places_bp = Blueprint(
     template_folder="templates",
     static_folder="static",
 )
+
+_NOMINATIM_LAST_REQUEST = 0.0
 
 
 def _get_tbl():
@@ -331,6 +334,11 @@ def _url_metadata(value, fetch=True):
 
 
 def _nominatim_json(path, params):
+    global _NOMINATIM_LAST_REQUEST
+    elapsed = time.monotonic() - _NOMINATIM_LAST_REQUEST
+    if elapsed < 1.0:
+        time.sleep(1.0 - elapsed)
+    _NOMINATIM_LAST_REQUEST = time.monotonic()
     query = urlencode({key: value for key, value in params.items() if _clean_text(value)})
     url = f"https://nominatim.openstreetmap.org/{path}?{query}"
     req = Request(
@@ -341,7 +349,8 @@ def _nominatim_json(path, params):
         },
     )
     with urlopen(req, timeout=4) as response:
-        return json.loads(response.read(128 * 1024).decode("utf-8", errors="replace"))
+        data = json.loads(response.read(128 * 1024).decode("utf-8", errors="replace"))
+    return data
 
 
 def _address_query(payload):
@@ -511,6 +520,180 @@ def _form_values(form, area, tbl):
     return values, ""
 
 
+def _place_row(place_id, tbl=None):
+    tbl = tbl or _get_tbl()
+    if not tbl:
+        return None
+    rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [place_id])
+    return dict(rows[0]) if rows else None
+
+
+def _insert_place(values, tbl=None):
+    tbl = tbl or _get_tbl()
+    if not tbl:
+        return None
+    return db.add_record(db.conn, tbl["name"], tbl["col_list"], [values.get(col, "") for col in tbl["col_list"]])
+
+
+def _update_place(place_id, values, tbl=None):
+    tbl = tbl or _get_tbl()
+    if not tbl:
+        return False
+    return db.update_record(db.conn, tbl["name"], place_id, tbl["col_list"], [values.get(col, "") for col in tbl["col_list"]])
+
+
+def _existing_url_place_id(url):
+    try:
+        row = db._get_conn().execute(
+            "SELECT id FROM lp_places WHERE place_type = 'url' AND lower(url) = lower(?) LIMIT 1",
+            (url,),
+        ).fetchone()
+    except Exception:
+        return None
+    return row["id"] if row else None
+
+
+def _fallback_address_parts(line):
+    parts = [_clean_text(part) for part in (line or "").split(",")]
+    parts = [part for part in parts if part]
+    values = {
+        "address_street": parts[0] if len(parts) > 0 else _clean_text(line),
+        "suburb": parts[1] if len(parts) > 1 else "",
+        "state": "",
+        "postcode": "",
+        "country": parts[-1] if len(parts) > 2 else "",
+    }
+    if len(parts) > 2:
+        state_parts = parts[2].split()
+        if state_parts and state_parts[-1].isdigit():
+            values["postcode"] = state_parts[-1]
+            values["state"] = " ".join(state_parts[:-1])
+        else:
+            values["state"] = parts[2]
+    return values
+
+
+def _import_url_lines(text, area):
+    tbl = _get_tbl()
+    rows = []
+    for line_no, line in enumerate((text or "").splitlines(), start=1):
+        raw = _clean_text(line)
+        if not raw:
+            continue
+        result = {"line": line_no, "input": raw, "status": "skipped", "message": ""}
+        metadata = _url_metadata(raw)
+        if metadata.get("error"):
+            result["message"] = metadata["error"]
+            rows.append(result)
+            continue
+        url = metadata.get("url") or ""
+        existing_id = _existing_url_place_id(url)
+        if existing_id:
+            result.update({"status": "exists", "place_id": existing_id, "title": metadata.get("title") or ""})
+            rows.append(result)
+            continue
+        values = {col: "" for col in tbl["col_list"]}
+        values.update(
+            {
+                "name": metadata.get("title") or metadata.get("hostname") or url,
+                "desc": "",
+                "place_type": "url",
+                "url": url,
+                "area": area or "",
+            }
+        )
+        place_id = _insert_place(values, tbl)
+        result.update({"status": "added" if place_id else "failed", "place_id": place_id, "title": values["name"], "url": url})
+        if not place_id:
+            result["message"] = "Could not save Place."
+        rows.append(result)
+    return rows
+
+
+def _import_address_lines(text, area):
+    tbl = _get_tbl()
+    rows = []
+    for line_no, line in enumerate((text or "").splitlines(), start=1):
+        raw = _clean_text(line)
+        if not raw:
+            continue
+        result = {"line": line_no, "input": raw, "status": "added", "message": ""}
+        values = {col: "" for col in tbl["col_list"]}
+        values.update(
+            {
+                "name": raw,
+                "desc": "",
+                "place_type": "address",
+                "area": area or "",
+                **_fallback_address_parts(raw),
+            }
+        )
+        geocoded = _geocode_address({"name": raw, "address_street": raw})
+        if geocoded.get("error"):
+            result["message"] = geocoded["error"]
+        else:
+            values.update(
+                {
+                    "gps_lat": geocoded.get("latitude") or "",
+                    "gps_long": geocoded.get("longitude") or "",
+                    "address_street": geocoded.get("address_street") or values["address_street"],
+                    "suburb": geocoded.get("suburb") or values["suburb"],
+                    "state": geocoded.get("state") or values["state"],
+                    "postcode": geocoded.get("postcode") or values["postcode"],
+                    "country": geocoded.get("country") or values["country"],
+                }
+            )
+            if geocoded.get("display_name"):
+                values["name"] = geocoded["display_name"].split(",", 1)[0] or raw
+        place_id = _insert_place(values, tbl)
+        result.update({"status": "added" if place_id else "failed", "place_id": place_id, "title": values["name"]})
+        if not place_id:
+            result["message"] = "Could not save Place."
+        rows.append(result)
+    return rows
+
+
+def _rescan_place(item):
+    tbl = _get_tbl()
+    values = {col: item.get(col, "") for col in tbl["col_list"]}
+    current_type = _place_type(item)
+    if current_type == "url":
+        metadata = _url_metadata(item.get("url") or "")
+        if metadata.get("error"):
+            return False, metadata["error"]
+        values["url"] = metadata.get("url") or values.get("url", "")
+        if metadata.get("title"):
+            values["name"] = metadata["title"]
+        return _update_place(item["id"], values, tbl), "URL title refreshed."
+    if current_type == "address":
+        if _format_place_address(item) or item.get("name"):
+            geocoded = _geocode_address(item)
+            if not geocoded.get("error"):
+                values["gps_lat"] = geocoded.get("latitude") or values.get("gps_lat", "")
+                values["gps_long"] = geocoded.get("longitude") or values.get("gps_long", "")
+                for col in ("address_street", "suburb", "state", "postcode", "country"):
+                    values[col] = geocoded.get(col) or values.get(col, "")
+                return _update_place(item["id"], values, tbl), "Address GPS refreshed."
+        reverse = _reverse_geocode(item)
+        if reverse.get("error"):
+            return False, reverse["error"]
+        for col in ("address_street", "suburb", "state", "postcode", "country"):
+            values[col] = reverse.get(col) or values.get(col, "")
+        return _update_place(item["id"], values, tbl), "Address fields refreshed."
+    return False, "Virtual Places do not have external details to rescan."
+
+
+def _selected_place_ids(payload):
+    raw_ids = payload.get("place_ids") or payload.get("ids") or []
+    ids = []
+    for value in raw_ids:
+        try:
+            ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
 def _filter_options(area, active_realm):
     filters = [{"id": "all", "label": "All", "count": _count_places(area, "all")}]
     earth_count = _count_places(area, "earth")
@@ -592,6 +775,33 @@ def list_places_table_route():
         pages=pagination["pages"],
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
+    )
+
+
+@places_bp.route("/import", methods=["GET", "POST"])
+def import_places_route():
+    area = request_area_param("General", include_form=True) or "General"
+    import_kind = (request.values.get("kind") or "internet").strip().lower()
+    if import_kind not in {"internet", "address"}:
+        import_kind = "internet"
+    text = request.form.get("import_text", "")
+    results = []
+    if request.method == "POST":
+        if import_kind == "internet":
+            results = _import_url_lines(text, area)
+        else:
+            results = _import_address_lines(text, area)
+    return render_template(
+        "places_import.html",
+        active_tab="places",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Import Places",
+        content_html="",
+        area=area,
+        import_kind=import_kind,
+        import_text=text,
+        results=results,
     )
 
 
@@ -693,9 +903,7 @@ def edit_place_route(place_id):
     tbl = _get_tbl()
     item = None
     if tbl:
-        rows = db.get_data(db.conn, tbl["name"], ["id"] + tbl["col_list"], "id = ?", [place_id])
-        if rows:
-            item = dict(rows[0])
+        item = _place_row(place_id, tbl)
     if not item:
         return redirect(url_for("places.list_places_table_route", area=area))
     error = ""
@@ -726,6 +934,44 @@ def delete_place_route(place_id):
     if tbl:
         db.delete_record(db.conn, tbl["name"], place_id)
     return redirect(url_for("places.list_places_table_route", area=area))
+
+
+@places_bp.route("/api/delete-selected", methods=["POST"])
+def delete_selected_places_route():
+    payload = request.get_json(silent=True) or {}
+    ids = _selected_place_ids(payload)
+    deleted = []
+    errors = []
+    tbl = _get_tbl()
+    for place_id in ids:
+        if not _place_row(place_id, tbl):
+            errors.append({"place_id": place_id, "error": "Place not found."})
+            continue
+        if db.delete_record(db.conn, tbl["name"], place_id):
+            deleted.append(place_id)
+        else:
+            errors.append({"place_id": place_id, "error": "Delete failed."})
+    return jsonify({"deleted": len(deleted), "deleted_ids": deleted, "errors": errors})
+
+
+@places_bp.route("/api/rescan-selected", methods=["POST"])
+def rescan_selected_places_route():
+    payload = request.get_json(silent=True) or {}
+    ids = _selected_place_ids(payload)
+    updated = []
+    errors = []
+    tbl = _get_tbl()
+    for place_id in ids:
+        item = _place_row(place_id, tbl)
+        if not item:
+            errors.append({"place_id": place_id, "error": "Place not found."})
+            continue
+        ok, message = _rescan_place(item)
+        if ok:
+            updated.append({"place_id": place_id, "message": message})
+        else:
+            errors.append({"place_id": place_id, "error": message})
+    return jsonify({"updated": len(updated), "updated_items": updated, "errors": errors})
 
 
 @places_bp.route("/url-metadata", methods=["POST"])

@@ -1216,6 +1216,8 @@
       };
       const noteIdsFromSelection = () =>
         selectedRecords().filter((record) => record.type === "note").map((record) => record.id);
+      const placeIdsFromSelection = () =>
+        selectedRecords().filter((record) => record.type === "place").map((record) => record.id);
       const moveSelectedNotes = () => {
         const noteIds = noteIdsFromSelection();
         if (!noteIds.length) {
@@ -1250,6 +1252,64 @@
           })
           .catch(() => showToast({ message: "Couldn't update selected note colors." }));
       };
+      const deleteSelectedPlaces = () => {
+        const placeIds = placeIdsFromSelection();
+        if (!placeIds.length) {
+          showToast({ message: "Select one or more Places first." });
+          return;
+        }
+        if (!window.confirm(`Delete ${placeIds.length} selected Place(s)?`)) {
+          return;
+        }
+        postJson("/places/api/delete-selected", { place_ids: placeIds })
+          .then((data) => {
+            const deletedIds = new Set((data.deleted_ids || []).map((id) => String(id)));
+            qsa("input.link-select:checked", root).forEach((checkbox) => {
+              if (deletedIds.has(String(checkbox.dataset.recordId))) {
+                const row = checkbox.closest(".link-draggable") || checkbox.closest("tr");
+                if (row) {
+                  row.remove();
+                }
+              } else {
+                checkbox.checked = false;
+              }
+            });
+            qsa("input.link-select", root).forEach((checkbox) => {
+              checkbox.checked = false;
+            });
+            const selectAll = qs("input.link-select-all", root);
+            if (selectAll) {
+              selectAll.checked = false;
+            }
+            updateCount();
+            if (data.errors && data.errors.length) {
+              showToast({ message: `Deleted ${data.deleted || 0}; ${data.errors.length} failed.` });
+            } else {
+              showToast({ message: `Deleted ${data.deleted || 0} selected Place(s).` });
+            }
+          })
+          .catch(() => showToast({ message: "Couldn't delete selected Places." }));
+      };
+      const rescanSelectedPlaces = () => {
+        const placeIds = placeIdsFromSelection();
+        if (!placeIds.length) {
+          showToast({ message: "Select one or more Places first." });
+          return;
+        }
+        postJson("/places/api/rescan-selected", { place_ids: placeIds })
+          .then((data) => {
+            const failed = (data.errors || []).length;
+            showToast({
+              message: failed
+                ? `Rescanned ${data.updated || 0}; ${failed} failed.`
+                : `Rescanned ${data.updated || 0} selected Place(s).`,
+            });
+            if (data.updated) {
+              window.location.reload();
+            }
+          })
+          .catch(() => showToast({ message: "Couldn't rescan selected Places." }));
+      };
       if (actionBtn) {
         actionBtn.addEventListener("click", openBulkLinkPicker);
       }
@@ -1260,11 +1320,17 @@
           if (action === "link") {
             openBulkLinkPicker();
           } else if (action === "delete") {
-            deleteSelectedNotes();
+            if (toolbar.dataset.listType === "place") {
+              deleteSelectedPlaces();
+            } else {
+              deleteSelectedNotes();
+            }
           } else if (action === "move") {
             moveSelectedNotes();
           } else if (action === "color") {
             colorSelectedNotes();
+          } else if (action === "rescan") {
+            rescanSelectedPlaces();
           }
         });
       }

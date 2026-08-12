@@ -124,6 +124,71 @@ class TestPlaces(unittest.TestCase):
         self.assertEqual(result["suburb"], "Adelaide")
         self.assertEqual(result["country"], "Australia")
 
+    def test_import_url_lines_adds_normalized_places_with_titles(self):
+        _create_places_table(self.conn)
+        metadata = {
+            "url": "https://example.com",
+            "title": "Example Domain",
+            "hostname": "example.com",
+        }
+
+        with patch.object(places_routes, "_url_metadata", return_value=metadata):
+            results = places_routes._import_url_lines("example.com\n", "Dev")
+
+        self.assertEqual(results[0]["status"], "added")
+        row = self.conn.execute("SELECT name, place_type, url, area FROM lp_places").fetchone()
+        self.assertEqual(dict(row), {"name": "Example Domain", "place_type": "url", "url": "https://example.com", "area": "Dev"})
+
+    def test_import_address_lines_adds_geocoded_places(self):
+        _create_places_table(self.conn)
+        geocode = {
+            "latitude": "-34.9172",
+            "longitude": "138.6116",
+            "display_name": "Adelaide Botanic Garden, Adelaide, Australia",
+            "address_street": "North Terrace",
+            "suburb": "Adelaide",
+            "state": "South Australia",
+            "postcode": "5000",
+            "country": "Australia",
+        }
+
+        with patch.object(places_routes, "_geocode_address", return_value=geocode):
+            results = places_routes._import_address_lines("Adelaide Botanic Garden, Adelaide\n", "Garden")
+
+        self.assertEqual(results[0]["status"], "added")
+        row = self.conn.execute("SELECT place_type, gps_lat, gps_long, suburb, country, area FROM lp_places").fetchone()
+        self.assertEqual(
+            dict(row),
+            {
+                "place_type": "address",
+                "gps_lat": "-34.9172",
+                "gps_long": "138.6116",
+                "suburb": "Adelaide",
+                "country": "Australia",
+                "area": "Garden",
+            },
+        )
+
+    def test_rescan_url_place_updates_title(self):
+        _create_places_table(self.conn)
+        tbl = next(tbl for tbl in cfg.table_def if tbl["route"] == "places")
+        values = {col: "" for col in tbl["col_list"]}
+        values.update({"name": "Old", "place_type": "url", "url": "https://example.com"})
+        place_id = data.add_record(self.conn, "lp_places", tbl["col_list"], [values[col] for col in tbl["col_list"]])
+        item = dict(self.conn.execute("SELECT * FROM lp_places WHERE id = ?", (place_id,)).fetchone())
+
+        with patch.object(
+            places_routes,
+            "_url_metadata",
+            return_value={"url": "https://example.com", "title": "New Title", "hostname": "example.com"},
+        ):
+            ok, message = places_routes._rescan_place(item)
+
+        self.assertTrue(ok)
+        self.assertIn("URL", message)
+        row = self.conn.execute("SELECT name FROM lp_places WHERE id = ?", (place_id,)).fetchone()
+        self.assertEqual(row["name"], "New Title")
+
 
 if __name__ == "__main__":
     unittest.main()
