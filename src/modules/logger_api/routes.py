@@ -128,6 +128,9 @@ def _validate_relative_path(relative_path):
         raise ValueError("Invalid log path")
     if text != "/".join(parts) or not all(LOGGER_SEGMENT_RE.match(part) for part in parts):
         raise ValueError("Invalid log path")
+    log_type = parts[0]
+    if log_type not in ALLOWED_LOG_TYPES:
+        raise ValueError("Invalid log type")
     filename = parts[-1]
     lower_filename = filename.lower()
     if not (lower_filename.endswith(".json") or lower_filename.endswith(".jsonl")):
@@ -137,7 +140,7 @@ def _validate_relative_path(relative_path):
         file_date = f"{date_match.group(1)}-{date_match.group(2)}-{date_match.group(3)}"
     else:
         file_date = datetime.now().strftime("%Y-%m-%d")
-    return text, parts[0], file_date
+    return text, log_type, file_date
 
 
 def _destination_for(relative_path, device_folder, settings=None):
@@ -434,12 +437,12 @@ def upload_route():
         return _json_error(error_message, 400, relative_path)
 
 
-def logger_summary(conn=None, settings=None):
+def logger_summary(conn=None, settings=None, files=None):
     conn = data._get_conn() if conn is None else conn
     ensure_logger_schema(conn)
     settings = settings or _settings(conn)
     root = logger_raw_root(settings)
-    files = list_raw_files(conn=conn, settings=settings)
+    files = files if files is not None else list_raw_files(conn=conn, settings=settings)
     today = datetime.now().strftime("%Y-%m-%d")
     last_success = conn.execute(
         "SELECT MAX(finished_at) AS value FROM lp_logger_sync_run WHERE status = 'success'"
@@ -524,7 +527,13 @@ def list_raw_files(filters=None, conn=None, settings=None):
         if not os.path.isdir(device_root):
             continue
         device = devices_by_folder.get(device_folder, {"device_name": device_folder, "logger_device_id": None})
-        for current_root, _dirs, filenames in os.walk(device_root):
+        for current_root, dirnames, filenames in os.walk(device_root):
+            relative_dir = os.path.relpath(current_root, device_root)
+            if relative_dir == ".":
+                dirnames[:] = [name for name in dirnames if name in ALLOWED_LOG_TYPES]
+            elif relative_dir.split(os.sep, 1)[0] not in ALLOWED_LOG_TYPES:
+                dirnames[:] = []
+                continue
             for filename in sorted(filenames, reverse=True):
                 full_path = os.path.join(current_root, filename)
                 relative_path = os.path.relpath(full_path, device_root).replace(os.sep, "/")

@@ -14,7 +14,7 @@ if root_folder not in sys.path:
 
 from common import data
 from common import settings
-from modules.logger_api.routes import logger_api_bp, logger_raw_root
+from modules.logger_api.routes import logger_api_bp, list_raw_files, logger_raw_root
 
 
 class TestLoggerApi(unittest.TestCase):
@@ -177,6 +177,25 @@ class TestLoggerApi(unittest.TestCase):
         ).fetchone()
         self.assertEqual(file_row["log_type"], "app_catalog")
         self.assertEqual(file_row["file_date"], "2026-08-05")
+
+    def test_upload_rejects_unknown_json_log_type(self):
+        resp = self.upload("mujoco/conversion_report_2026_08_05.json", content=b'{"title":"MuJoCo To USD Conversion Report"}\n')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.get_json()["error"], "Invalid log type")
+        stored_path = os.path.join(logger_raw_root(), "duncan-a22", "mujoco", "conversion_report_2026_08_05.json")
+        self.assertFalse(os.path.exists(stored_path))
+
+    def test_raw_file_listing_skips_unknown_top_level_folders(self):
+        self.upload("phone_usage/2026-08-05.jsonl", content=b'{"type":"phone_usage_event"}\n')
+        root = os.path.join(logger_raw_root(), "duncan-a22")
+        os.makedirs(os.path.join(root, "mujoco", "nested"), exist_ok=True)
+        with open(os.path.join(root, "mujoco", "nested", "conversion_report_2026_08_05.json"), "wb") as handle:
+            handle.write(b'{"title":"MuJoCo To USD Conversion Report"}\n')
+
+        files = list_raw_files(conn=self.conn)
+
+        self.assertEqual([row["relative_path"] for row in files], ["phone_usage/2026-08-05.jsonl"])
 
     def test_upload_rejects_traversal_and_bad_paths(self):
         traversal = self.upload("../2026-08-05.jsonl")

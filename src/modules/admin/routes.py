@@ -1108,7 +1108,7 @@ def logger_logs_route():
         content_title="Admin - Logs - Logger",
         content_html="",
         message=message,
-        summary=logger_api.logger_summary(conn, settings=logger_settings),
+        summary=logger_api.logger_summary(conn, settings=logger_settings, files=files),
         runs=logger_api.recent_sync_runs(100, conn),
         run_files=logger_api.run_files(selected_run_id, conn) if selected_run_id else [],
         selected_run_id=selected_run_id,
