@@ -58,6 +58,7 @@
           <button type="button" data-md-action="code-block" title="Code block">```</button>
           <button type="button" data-md-action="link" title="Link">Link</button>
           <button type="button" data-md-action="image" title="Markdown image">Image</button>
+          <button type="button" data-md-action="browse-image" title="Browse local image">Browse image</button>
           <button type="button" data-md-action="lifepim-image" title="LifePIM image tag">[img]</button>
           <button type="button" data-md-action="table" title="Table">Table</button>
           <button type="button" data-icon-picker-target="note-editor" data-icon-picker-mode="insert" title="Add icon">😀</button>
@@ -65,6 +66,7 @@
         <textarea id="note-editor"
                   data-note-id="{{ note.id }}"
                   data-save-url="{{ url_for('notes.save_note_route', note_id=note.id) }}"
+                  data-upload-image-url="{{ url_for('notes.upload_note_image_route', note_id=note.id) }}"
                   data-wiki-search-url="{{ url_for('notes.wiki_search_route') }}"
                   data-wiki-preview-url="{{ url_for('notes.wiki_preview_route', note_id=note.id) }}"
                   data-file-mtime-ns="{{ note_state.mtime_ns if note_state else '' }}"

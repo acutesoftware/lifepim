@@ -19,6 +19,7 @@
   const previewEl = qs("#note-editor-preview");
   const noteId = editor.dataset.noteId || "";
   const saveUrl = editor.dataset.saveUrl || "";
+  const uploadImageUrl = editor.dataset.uploadImageUrl || "";
   const wikiSearchUrl = editor.dataset.wikiSearchUrl || "";
   const wikiPreviewUrl = editor.dataset.wikiPreviewUrl || "";
   const saveDelayMs = 1500;
@@ -261,7 +262,7 @@
       return;
     }
     const item = wikiPopupState.results[index] || wikiPopupState.results[0];
-    const replacement = item.wiki_link || `[[${item.title || item.file_name || ""}]]`;
+    const replacement = item.markdown_link || item.wiki_link || `[[${item.title || item.file_name || ""}]]`;
     const cursor = wikiPopupState.start + replacement.length;
     replaceSelection(wikiPopupState.start, selection().start, replacement, cursor, cursor);
     hideWikiPopup();
@@ -421,6 +422,43 @@
     insertBlock(lifePimTag ? `[img]${source}[/img]` : `![image](${source})`);
   }
 
+  function browseForImage() {
+    if (!uploadImageUrl) {
+      insertImage(false);
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (file) {
+        void uploadImage(file);
+      }
+    });
+    input.click();
+  }
+
+  async function uploadImage(file) {
+    const form = new FormData();
+    form.append("image", file);
+    setStatus("Uploading image...");
+    try {
+      const resp = await fetch(uploadImageUrl, {
+        method: "POST",
+        body: form,
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.error || "Unable to upload image.");
+      }
+      insertBlock(data.markdown || `![image](${data.path})`);
+      setStatus("Image inserted.");
+    } catch (err) {
+      setStatus(err.message || "Image upload failed.", true);
+    }
+  }
+
   function insertTable() {
     const cols = Math.max(1, Math.min(8, parseInt(window.prompt("Columns", "2") || "2", 10) || 2));
     const rows = Math.max(1, Math.min(20, parseInt(window.prompt("Rows", "4") || "4", 10) || 4));
@@ -457,6 +495,8 @@
       insertLink();
     } else if (action === "image") {
       insertImage(false);
+    } else if (action === "browse-image") {
+      browseForImage();
     } else if (action === "lifepim-image") {
       insertImage(true);
     } else if (action === "table") {

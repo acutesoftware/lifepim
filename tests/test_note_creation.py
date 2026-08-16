@@ -3,6 +3,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from io import BytesIO
 from datetime import datetime
 from unittest.mock import patch
 
@@ -513,6 +514,22 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["results"][0]["id"], target_id)
         self.assertEqual(payload["results"][0]["wiki_link"], f"[[Alpha Project Plan|note:{target_id}]]")
+        self.assertEqual(payload["results"][0]["markdown_link"], "[Alpha Project Plan](<Alpha Project Plan.md>)")
+
+    def test_wiki_search_returns_relative_markdown_link_for_child_folder_note(self):
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "40-Dev", "42-HOWTO")
+        child_dir = os.path.join(note_dir, "42-4-misc")
+        source_id, _source = self._create_note_record("source", note_dir, area="")
+        target_id, _target = self._create_note_record("_HOWTO__SQL", child_dir, area="")
+
+        response = self._notes_test_app().test_client().get(
+            f"/notes/api/wiki-search?q=sql&exclude_id={source_id}"
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["results"][0]["id"], target_id)
+        self.assertEqual(payload["results"][0]["markdown_link"], "[_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)")
 
     def test_wiki_preview_renders_id_backed_links(self):
         note_dir = os.path.join(self.tmpdir.name, "wiki_preview")
@@ -528,6 +545,110 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(f'href="/notes/view/{target_id}"', payload["html"])
         self.assertIn(">Preview Target</a>", payload["html"])
+
+    def test_note_view_markdown_resolves_obsidian_path_link_without_md_extension(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        source_dir = os.path.join(notes_root, "70-Make", "72-PC")
+        target_dir = os.path.join(notes_root, "40-Dev", "42-HOWTO", "42-7-Apps", "Orgmode")
+        source_id, source = self._create_note_record("Linux_2024_manjaro", source_dir, area="")
+        target_id, _target = self._create_note_record("__INDEX__ORGMODE", target_dir, area="")
+        with open(source["full_path"], "w", encoding="utf-8") as handle:
+            handle.write(
+                "Back to [[40-Dev/42-HOWTO/42-7-Apps/Orgmode/__INDEX__ORGMODE|__INDEX__ORGMODE]]"
+            )
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{source_id}?format=markdown")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'href="/notes/view/{target_id}"', html)
+        self.assertIn(">__INDEX__ORGMODE</a>", html)
+        self.assertNotIn('class="wiki-link wiki-link-broken"', html)
+
+    def test_note_view_markdown_resolves_relative_markdown_note_link(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        source_dir = os.path.join(notes_root, "40-Dev", "42-HOWTO", "42-7-Apps", "Orgmode")
+        target_dir = os.path.join(source_dir, "42-4-misc")
+        source_id, source = self._create_note_record("OrgMode LifePIM", source_dir, area="")
+        target_id, _target = self._create_note_record("_HOWTO__SQL", target_dir, area="")
+        with open(source["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("*HOWTO* SQL = [_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{source_id}?format=markdown")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'href="/notes/view/{target_id}"', html)
+        self.assertIn(">_HOWTO__SQL</a>", html)
+        self.assertNotIn('href="42-4-misc/_HOWTO__SQL.md"', html)
+        self.assertNotIn('class="note-link note-link-broken"', html)
+
+    def test_note_asset_route_resolves_notes_root_relative_attachment(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        note_dir = os.path.join(notes_root, "Projects")
+        note_id, _created = self._create_note_record("asset note", note_dir, area="")
+        attachment_dir = os.path.join(notes_root, "00-META", "08-Attachments")
+        os.makedirs(attachment_dir, exist_ok=True)
+        attachment_path = os.path.join(attachment_dir, "photo.png")
+        with open(attachment_path, "wb") as handle:
+            handle.write(b"fake image bytes")
+
+        response = self._notes_test_app().test_client().get(
+            f"/notes/asset/{note_id}/00-META/08-Attachments/photo.png"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(), b"fake image bytes")
+
+    def test_note_asset_route_resolves_bare_filename_from_legacy_image_folder(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        note_dir = os.path.join(notes_root, "Projects")
+        note_id, _created = self._create_note_record("legacy asset note", note_dir, area="")
+        legacy_dir = os.path.join(notes_root, "_img", "orig_lifepim")
+        os.makedirs(legacy_dir, exist_ok=True)
+        with open(os.path.join(legacy_dir, "bp_animal_Wolf.PNG"), "wb") as handle:
+            handle.write(b"legacy image bytes")
+
+        response = self._notes_test_app().test_client().get(
+            f"/notes/asset/{note_id}/bp_animal_Wolf.PNG"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(), b"legacy image bytes")
+
+    def test_note_asset_route_prefers_current_folder_for_bare_filename(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        note_dir = os.path.join(notes_root, "Projects")
+        note_id, _created = self._create_note_record("local asset note", note_dir, area="")
+        attachment_dir = os.path.join(notes_root, "00-META", "08-Attachments")
+        os.makedirs(attachment_dir, exist_ok=True)
+        with open(os.path.join(note_dir, "photo.png"), "wb") as handle:
+            handle.write(b"current folder image")
+        with open(os.path.join(attachment_dir, "photo.png"), "wb") as handle:
+            handle.write(b"attachment image")
+
+        response = self._notes_test_app().test_client().get(f"/notes/asset/{note_id}/photo.png")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(), b"current folder image")
+
+    def test_upload_note_image_saves_to_notes_root_attachment_folder(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        note_dir = os.path.join(notes_root, "Projects")
+        note_id, _created = self._create_note_record("upload note", note_dir, area="")
+
+        response = self._notes_test_app().test_client().post(
+            f"/notes/api/upload-image/{note_id}",
+            data={"image": (BytesIO(b"fake png bytes"), "My Photo.png")},
+            content_type="multipart/form-data",
+        )
+        payload = response.get_json()
+        saved_path = os.path.join(notes_root, "00-META", "08-Attachments", "My Photo.png")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(os.path.isfile(saved_path))
+        self.assertEqual(payload["path"], "00-META/08-Attachments/My Photo.png")
+        self.assertEqual(payload["markdown"], "![image](00-META/08-Attachments/My Photo.png)")
 
     def test_autosave_maintains_note_links_table_with_target_ids(self):
         note_dir = os.path.join(self.tmpdir.name, "wiki_save")
@@ -555,6 +676,34 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(row["target_note_id"], target_id)
         self.assertEqual(row["link_text"], f"[[Saved Target|note:{target_id}]]")
         self.assertEqual(row["link_title"], "Saved Target")
+
+    def test_autosave_tracks_standard_markdown_note_links(self):
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "40-Dev", "42-HOWTO")
+        target_dir = os.path.join(note_dir, "42-4-misc")
+        source_id, source = self._create_note_record("source", note_dir, area="")
+        target_id, _target = self._create_note_record("_HOWTO__SQL", target_dir, area="")
+        state = notes_routes._note_file_state(source["full_path"])
+
+        app = Flask(__name__)
+        app.register_blueprint(notes_routes.notes_bp)
+        response = app.test_client().post(
+            f"/notes/api/save/{source_id}",
+            json={
+                "content": "[_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)",
+                "base_mtime_ns": state["mtime_ns"],
+                "base_hash": state["sha256"],
+            },
+        )
+        row = self.conn.execute(
+            "SELECT src_note_id, target_note_id, link_text, link_title FROM lp_note_links"
+        ).fetchone()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["link_count"], 1)
+        self.assertEqual(row["src_note_id"], source_id)
+        self.assertEqual(row["target_note_id"], target_id)
+        self.assertEqual(row["link_text"], "[_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)")
+        self.assertEqual(row["link_title"], "_HOWTO__SQL")
 
     def test_notes_table_view_uses_new_header_and_columns(self):
         note_dir = os.path.join(self.tmpdir.name, "notes_table_view")

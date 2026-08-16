@@ -7,7 +7,7 @@ import sys
 import tempfile
 from difflib import SequenceMatcher
 from datetime import datetime, timezone
-from urllib.parse import urlencode
+from urllib.parse import urlencode, unquote
 
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
 from flask_login import current_user
@@ -80,6 +80,7 @@ NOTE_COLOR_OPTIONS = [
 NOTE_VIEW_MODES = {"text", "markdown", "hex", "sample", "metadata"}
 NOTE_WIKI_LINK_RE = re.compile(r"(?<!!)\[\[([^\]\n]+)\]\]")
 NOTE_WIKI_TARGET_ID_RE = re.compile(r"(?i)^note:(\d+)$")
+NOTE_MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)")
 NOTE_LIST_SORT_OPTIONS = [
     ("title", "Title"),
     ("size", "Size"),
@@ -106,6 +107,21 @@ NOTE_TABLE_SORT_COLUMNS = [
     ("date_modified", "Date Modified", "date_modified"),
 ]
 _NOTE_AREA_MATERIALIZED_KEYS = set()
+NOTE_ATTACHMENT_FOLDER = os.path.join("00-META", "08-Attachments")
+NOTE_LEGACY_IMAGE_FOLDERS = [
+    NOTE_ATTACHMENT_FOLDER,
+    os.path.join("_img", "orig_lifepim"),
+]
+NOTE_IMAGE_EXTENSIONS = {
+    ".avif",
+    ".bmp",
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".png",
+    ".svg",
+    ".webp",
+}
 
 
 def _ensure_notes_schema(conn=None):
@@ -399,6 +415,116 @@ def _notes_root_from_path(path_value):
         if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
             return "\\".join(parts[: idx + 2])
     return ""
+
+
+def _note_allowed_asset_roots(note, note_path=None):
+    note_path = note_path or _build_note_path(note)
+    base_dir = os.path.dirname(note_path) if note_path else ""
+    roots = []
+    if base_dir:
+        roots.append(os.path.abspath(base_dir))
+    notes_root = _notes_root_from_path(note_path or note.get("path") or "")
+    if not notes_root:
+        notes_root = _notes_root_path(note.get("area") or note.get("derived_area"), create_dirs=False) or ""
+    if notes_root:
+        roots.append(os.path.abspath(notes_root))
+    seen = set()
+    unique_roots = []
+    for root in roots:
+        key = os.path.normcase(root)
+        if key and key not in seen:
+            seen.add(key)
+            unique_roots.append(root)
+    return unique_roots
+
+
+def _path_is_within(path_value, root):
+    try:
+        return os.path.commonpath([os.path.abspath(path_value), os.path.abspath(root)]) == os.path.abspath(root)
+    except ValueError:
+        return False
+
+
+def _resolve_note_asset_path(note, asset_path, note_path=None):
+    asset_path = (asset_path or "").replace("\\", os.sep).replace("/", os.sep).strip()
+    if not asset_path or os.path.isabs(asset_path) or "\x00" in asset_path:
+        return ""
+    normalized_asset = os.path.normpath(asset_path)
+    if normalized_asset == "." or normalized_asset.startswith(".." + os.sep) or normalized_asset == "..":
+        return ""
+
+    roots = _note_allowed_asset_roots(note, note_path=note_path)
+    notes_root = _notes_root_from_path(note_path or note.get("path") or "")
+    if not notes_root:
+        notes_root = _notes_root_path(note.get("area") or note.get("derived_area"), create_dirs=False) or ""
+    notes_root = os.path.abspath(notes_root) if notes_root else ""
+    candidates = []
+
+    def add_candidate(root, *parts):
+        if not root:
+            return
+        full_path = os.path.abspath(os.path.join(root, *parts))
+        if _path_is_within(full_path, root) and full_path not in candidates:
+            candidates.append(full_path)
+
+    if roots:
+        add_candidate(roots[0], normalized_asset)
+
+    media_basename = os.path.basename(normalized_asset)
+    has_folder = os.sep in normalized_asset
+    if media_basename and not has_folder and notes_root:
+        for folder in NOTE_LEGACY_IMAGE_FOLDERS:
+            add_candidate(notes_root, folder, media_basename)
+
+    for root in roots[1:]:
+        full_path = os.path.abspath(os.path.join(root, normalized_asset))
+        if _path_is_within(full_path, root):
+            candidates.append(full_path)
+
+    if normalized_asset.lower().startswith("media" + os.sep) and media_basename and roots:
+        add_candidate(roots[0], media_basename)
+
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return ""
+
+
+def _safe_note_attachment_filename(filename):
+    name = os.path.basename((filename or "").replace("\\", "/")).strip()
+    stem, ext = os.path.splitext(name)
+    ext = ext.lower()
+    stem = re.sub(r"[^A-Za-z0-9._ -]+", "_", stem).strip(" ._")
+    if not stem:
+        stem = "image"
+    stem = stem[:80]
+    if ext not in NOTE_IMAGE_EXTENSIONS:
+        raise ValueError("Unsupported image type.")
+    return stem + ext
+
+
+def _unique_attachment_path(folder_path, filename):
+    candidate = os.path.join(folder_path, filename)
+    if not os.path.exists(candidate):
+        return candidate
+    stem, ext = os.path.splitext(filename)
+    index = 2
+    while True:
+        candidate = os.path.join(folder_path, f"{stem}-{index}{ext}")
+        if not os.path.exists(candidate):
+            return candidate
+        index += 1
+
+
+def _note_attachment_target(note, note_path=None):
+    note_path = note_path or _build_note_path(note)
+    base_dir = os.path.dirname(note_path) if note_path else ""
+    notes_root = _notes_root_from_path(note_path or note.get("path") or "")
+    if notes_root:
+        return os.path.join(notes_root, NOTE_ATTACHMENT_FOLDER), NOTE_ATTACHMENT_FOLDER.replace("\\", "/")
+    if base_dir:
+        return os.path.join(base_dir, "attachments"), "attachments"
+    return "", ""
 
 
 def _alias_counterpart_roots(path_value):
@@ -1286,6 +1412,141 @@ def _note_link_syntax(title, target_note_id):
     return f"[[{escaped}|note:{int(target_note_id)}]]"
 
 
+def _markdown_link_destination(path_value):
+    path_value = (path_value or "").replace("\\", "/")
+    if not path_value:
+        return ""
+    if any(ch.isspace() for ch in path_value) or any(ch in path_value for ch in "()"):
+        return "<" + path_value.replace("<", "%3C").replace(">", "%3E") + ">"
+    return path_value
+
+
+def _relative_markdown_note_link(current_note, target_note):
+    label = _note_display_title(target_note)
+    target_path = _build_note_path(target_note)
+    current_path = _build_note_path(current_note) if current_note else ""
+    current_dir = os.path.dirname(current_path) if current_path else ""
+    if not label or not target_path or not current_dir:
+        return ""
+    try:
+        relative_path = os.path.relpath(target_path, start=current_dir)
+    except ValueError:
+        notes_root = _notes_root_from_path(target_path) or ""
+        relative_path = target_path[len(notes_root):].lstrip("\\/") if notes_root else target_path
+    return f"[{label}]({_markdown_link_destination(relative_path)})"
+
+
+def _normalize_wiki_note_path(value):
+    value = (value or "").strip().strip("/\\")
+    if not value:
+        return ""
+    value = value.replace("/", "\\")
+    value = re.sub(r"\\+", r"\\", value)
+    return value.lower()
+
+
+def _wiki_path_candidates(title):
+    normalized = _normalize_wiki_note_path(title)
+    if not normalized or "\\" not in normalized:
+        return []
+    candidates = [normalized]
+    if not normalized.endswith(".md"):
+        candidates.append(normalized + ".md")
+    return candidates
+
+
+def _wiki_db_path_candidates(title):
+    candidates = _wiki_path_candidates(title)
+    if not candidates:
+        return []
+    notes_root = _notes_root_path(create_dirs=False) or ""
+    notes_root = _normalize_wiki_note_path(notes_root)
+    if not notes_root:
+        return candidates
+    expanded = list(candidates)
+    for candidate in candidates:
+        if os.path.isabs(candidate):
+            continue
+        expanded.append(_normalize_wiki_note_path(os.path.join(notes_root, candidate)))
+    seen = set()
+    unique = []
+    for candidate in expanded:
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            unique.append(candidate)
+    return unique
+
+
+def _markdown_note_link_target_parts(target):
+    target = unquote((target or "").strip())
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    target = target.replace("/", "\\")
+    if not target or "\x00" in target:
+        return "", ""
+    path_part, hash_sep, fragment = target.partition("#")
+    path_part = path_part.split("?", 1)[0].strip().strip("/\\")
+    if not path_part:
+        return "", ""
+    _stem, ext = os.path.splitext(path_part)
+    if ext.lower() != ".md":
+        return "", ""
+    fragment = (hash_sep + fragment) if hash_sep and fragment else ""
+    return os.path.normpath(path_part), fragment
+
+
+def _markdown_note_link_candidates(current_note, target):
+    path_part, fragment = _markdown_note_link_target_parts(target)
+    if not path_part:
+        return [], ""
+    current_path = _build_note_path(current_note)
+    current_folder = os.path.dirname(current_path) if current_path else _normalize_note_path(current_note.get("path") or "")
+    notes_root = _notes_root_from_path(current_path or current_note.get("path") or "")
+    candidates = []
+    if current_folder:
+        candidates.append(_normalize_wiki_note_path(os.path.join(current_folder, path_part)))
+    if notes_root:
+        candidates.append(_normalize_wiki_note_path(os.path.join(notes_root, path_part)))
+    seen = set()
+    unique = []
+    for candidate in candidates:
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            unique.append(candidate)
+    return unique, fragment
+
+
+def _resolve_markdown_note_link(current_note, target):
+    path_candidates, fragment = _markdown_note_link_candidates(current_note, target)
+    if not path_candidates:
+        return None
+    tbl = get_table_def("notes")
+    if not tbl:
+        return {"status": "broken"}
+    condition, params = security.visible_record_condition("t", current_user)
+    placeholders = ", ".join(["?"] * len(path_candidates))
+    rows = data._get_conn().execute(
+        f"SELECT t.id, t.file_name, t.title, t.path "
+        f"FROM {tbl['name']} t "
+        f"WHERE {condition} "
+        f"AND lower(replace(rtrim(COALESCE(t.path, '') || '\\' || COALESCE(t.file_name, '')), '/', '\\')) "
+        f"IN ({placeholders}) "
+        f"ORDER BY LENGTH(COALESCE(t.path, '') || '\\' || COALESCE(t.file_name, '')), t.id ",
+        [*params, *path_candidates],
+    ).fetchall()
+    if not rows:
+        return {"status": "broken"}
+    if len(rows) > 1:
+        return {"status": "ambiguous", "count": len(rows)}
+    row = rows[0]
+    return {
+        "status": "resolved",
+        "url": url_for("notes.view_note_route", note_id=row["id"]) + fragment,
+        "title": _note_display_title(dict(row)) or target,
+        "target_note_id": row["id"],
+    }
+
+
 def _visible_note_by_id(note_id):
     try:
         note_id = int(note_id)
@@ -1315,6 +1576,29 @@ def _resolve_note_wiki_link(title, target_note_id=None):
     if not tbl:
         return {"status": "broken"}
     condition, params = security.visible_record_condition("t", current_user)
+    path_candidates = _wiki_db_path_candidates(title)
+    if path_candidates:
+        placeholders = ", ".join(["?"] * len(path_candidates))
+        rows = data._get_conn().execute(
+            f"SELECT t.id, t.file_name, t.title, t.path "
+            f"FROM {tbl['name']} t "
+            f"WHERE {condition} "
+            f"AND lower(replace(rtrim(COALESCE(t.path, '') || '\\' || COALESCE(t.file_name, '')), '/', '\\')) "
+            f"IN ({placeholders}) "
+            f"ORDER BY LENGTH(COALESCE(t.path, '') || '\\' || COALESCE(t.file_name, '')), t.id ",
+            [*params, *path_candidates],
+        ).fetchall()
+        if len(rows) == 1:
+            row = rows[0]
+            return {
+                "status": "resolved",
+                "url": url_for("notes.view_note_route", note_id=row["id"]),
+                "title": _note_display_title(dict(row)) or title,
+                "target_note_id": row["id"],
+            }
+        if len(rows) > 1:
+            return {"status": "ambiguous", "count": len(rows)}
+
     title_expr = _note_title_match_expr("t")
     rows = data._get_conn().execute(
         f"SELECT t.id, t.file_name, t.title, t.path "
@@ -1375,6 +1659,7 @@ def _fuzzy_note_score(query, row):
 
 
 def _search_wiki_notes(query, exclude_note_id=None, limit=20):
+    current_note = _visible_note_by_id(exclude_note_id) if exclude_note_id else None
     rows = _visible_note_rows()
     scored = []
     for row in rows:
@@ -1397,6 +1682,7 @@ def _search_wiki_notes(query, exclude_note_id=None, limit=20):
                 "area": row.get("area") or "",
                 "score": round(score, 3),
                 "wiki_link": _note_link_syntax(title, row["id"]),
+                "markdown_link": _relative_markdown_note_link(current_note, row),
                 "open_url": url_for("notes.view_note_route", note_id=row["id"]),
             }
         )
@@ -1408,6 +1694,19 @@ def _iter_note_wiki_links(content):
         title, target_note_id = _parse_note_wiki_link_value(match.group(1))
         if title:
             yield title, target_note_id, match.group(0)
+
+
+def _iter_note_markdown_links(content, current_note):
+    if not current_note:
+        return
+    for match in NOTE_MARKDOWN_LINK_RE.finditer(content or ""):
+        label = (match.group(1) or "").strip()
+        target = (match.group(2) or "").strip()
+        if not label or not target:
+            continue
+        resolved = _resolve_markdown_note_link(current_note, target)
+        if resolved and resolved.get("status") == "resolved" and resolved.get("target_note_id"):
+            yield label, int(resolved["target_note_id"]), match.group(0), resolved
 
 
 def _sync_note_links(note_id, content):
@@ -1426,6 +1725,18 @@ def _sync_note_links(note_id, content):
             target_id,
             link_text,
             title,
+            now,
+            now,
+        )
+    current_note, _tbl = _get_note_record(note_id)
+    for label, target_id, link_text, resolved in _iter_note_markdown_links(content, current_note):
+        if int(note_id) == target_id:
+            continue
+        rows[(int(note_id), target_id, link_text)] = (
+            int(note_id),
+            target_id,
+            link_text,
+            resolved.get("title") or label,
             now,
             now,
         )
@@ -2096,6 +2407,7 @@ def view_note_route(note_id):
             note_body_text,
             asset_resolver=_asset_url,
             wiki_link_resolver=_resolve_note_wiki_link,
+            link_resolver=lambda target, current_note=note: _resolve_markdown_note_link(current_note, target),
         )
     elif render_mode == "hex":
         hex_rows = hex_utils.hex_dump(note_text)
@@ -2166,23 +2478,9 @@ def note_asset_route(note_id, asset_path):
         abort(404)
     note = dict(rows[0])
     note_path = _build_note_path(note)
-    base_dir = os.path.dirname(note_path) if note_path else ""
-    if not base_dir or os.path.isabs(asset_path):
+    full_path = _resolve_note_asset_path(note, asset_path, note_path=note_path)
+    if not full_path:
         abort(404)
-    full_path = os.path.abspath(os.path.join(base_dir, asset_path))
-    base_dir = os.path.abspath(base_dir)
-    if not full_path.startswith(base_dir + os.sep):
-        abort(404)
-    if not os.path.isfile(full_path):
-        media_basename = os.path.basename((asset_path or "").replace("\\", "/"))
-        if asset_path.replace("\\", "/").lower().startswith("media/") and media_basename:
-            fallback_path = os.path.abspath(os.path.join(base_dir, media_basename))
-            if fallback_path.startswith(base_dir + os.sep) and os.path.isfile(fallback_path):
-                full_path = fallback_path
-            else:
-                abort(404)
-        else:
-            abort(404)
     return send_file(full_path)
 
 
@@ -2941,6 +3239,40 @@ def save_note_route(note_id):
     })
 
 
+@notes_bp.route('/api/upload-image/<int:note_id>', methods=["POST"])
+def upload_note_image_route(note_id):
+    if not security.can_edit_note(note_id, current_user):
+        abort(403)
+    note, _ = _get_note_record(note_id)
+    if not note:
+        return jsonify({"error": "Note not found."}), 404
+    upload = request.files.get("image")
+    if not upload or not upload.filename:
+        return jsonify({"error": "No image selected."}), 400
+    try:
+        filename = _safe_note_attachment_filename(upload.filename)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    note_path = _build_note_path(note)
+    folder_path, relative_folder = _note_attachment_target(note, note_path=note_path)
+    if not folder_path or not relative_folder:
+        return jsonify({"error": "Note attachment folder is unavailable."}), 400
+    try:
+        os.makedirs(folder_path, exist_ok=True)
+        target_path = _unique_attachment_path(folder_path, filename)
+        upload.save(target_path)
+    except OSError as exc:
+        return jsonify({"error": f"Unable to save image: {exc}"}), 500
+    link_path = relative_folder.rstrip("/") + "/" + os.path.basename(target_path)
+    link_path = link_path.replace("\\", "/")
+    return jsonify({
+        "ok": True,
+        "path": link_path,
+        "markdown": f"![image]({link_path})",
+        "obsidian": f"![[{link_path}]]",
+    })
+
+
 @notes_bp.route('/api/wiki-search')
 def wiki_search_route():
     query = request.args.get("q", "")
@@ -2955,6 +3287,9 @@ def wiki_preview_route(note_id):
         abort(403)
     payload = request.get_json(silent=True) or {}
     content = payload.get("content") or ""
+    note, _tbl = _get_note_record(note_id)
+    if not note:
+        return jsonify({"error": "Note not found."}), 404
 
     def _asset_url(asset_name):
         return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
@@ -2963,6 +3298,7 @@ def wiki_preview_route(note_id):
         content,
         asset_resolver=_asset_url,
         wiki_link_resolver=_resolve_note_wiki_link,
+        link_resolver=lambda target, current_note=note: _resolve_markdown_note_link(current_note, target),
     )
     return jsonify({"html": html_rendered})
 

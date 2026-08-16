@@ -138,6 +138,62 @@ class TestMarkdownUtils(unittest.TestCase):
         self.assertEqual(seen, {"title": "Display Title", "target_note_id": "42"})
         self.assertIn('href="/notes/view/42"', rendered)
 
+    def test_obsidian_wiki_link_uses_alias_as_label(self):
+        rendered = markdown_utils.render_markdown(
+            "[[folder/Target Note|Readable Label]]",
+            wiki_link_resolver=lambda title: {
+                "status": "resolved",
+                "url": "/notes/view/12",
+                "title": title,
+            },
+        )
+
+        self.assertIn('href="/notes/view/12"', rendered)
+        self.assertIn(">Readable Label</a>", rendered)
+        self.assertNotIn(">folder/Target Note</a>", rendered)
+
+    def test_obsidian_wiki_link_label_keeps_literal_asterisks(self):
+        rendered = markdown_utils.render_markdown(
+            "[[*HOWTO* UE4 Animation|note:1512]]",
+            wiki_link_resolver=lambda title, target_note_id=None: {
+                "status": "resolved",
+                "url": f"/notes/view/{target_note_id}",
+                "title": title,
+            },
+        )
+
+        self.assertIn('href="/notes/view/1512"', rendered)
+        self.assertIn("&#42;HOWTO&#42; UE4 Animation</a>", rendered)
+        self.assertNotIn("<em>HOWTO</em>", rendered)
+
+    def test_relative_markdown_note_link_uses_link_resolver(self):
+        rendered = markdown_utils.render_markdown(
+            "[_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)",
+            link_resolver=lambda target: {
+                "status": "resolved",
+                "url": "/notes/view/99",
+                "title": target,
+            },
+        )
+
+        self.assertIn('class="note-link note-link-resolved"', rendered)
+        self.assertIn('href="/notes/view/99"', rendered)
+        self.assertIn(">_HOWTO__SQL</a>", rendered)
+        self.assertNotIn('href="42-4-misc/_HOWTO__SQL.md"', rendered)
+
+    def test_external_and_non_markdown_links_are_not_resolved_as_notes(self):
+        seen = []
+
+        rendered = markdown_utils.render_markdown(
+            "[Web](https://example.com) [PDF](files/doc.pdf)",
+            link_resolver=lambda target: seen.append(target) or {"status": "broken"},
+        )
+
+        self.assertEqual(seen, [])
+        self.assertIn('href="https://example.com"', rendered)
+        self.assertIn('href="files/doc.pdf"', rendered)
+        self.assertNotIn("note-link-broken", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
