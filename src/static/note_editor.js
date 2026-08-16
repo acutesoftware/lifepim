@@ -262,7 +262,7 @@
       return;
     }
     const item = wikiPopupState.results[index] || wikiPopupState.results[0];
-    const replacement = item.markdown_link || item.wiki_link || `[[${item.title || item.file_name || ""}]]`;
+    const replacement = item.path_wiki_link || item.markdown_link || item.wiki_link || `[[${item.title || item.file_name || ""}]]`;
     const cursor = wikiPopupState.start + replacement.length;
     replaceSelection(wikiPopupState.start, selection().start, replacement, cursor, cursor);
     hideWikiPopup();

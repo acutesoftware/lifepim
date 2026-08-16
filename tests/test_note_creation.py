@@ -514,9 +514,10 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["results"][0]["id"], target_id)
         self.assertEqual(payload["results"][0]["wiki_link"], f"[[Alpha Project Plan|note:{target_id}]]")
+        self.assertEqual(payload["results"][0]["path_wiki_link"], "[[Alpha Project Plan.md]]")
         self.assertEqual(payload["results"][0]["markdown_link"], "[Alpha Project Plan](<Alpha Project Plan.md>)")
 
-    def test_wiki_search_returns_relative_markdown_link_for_child_folder_note(self):
+    def test_wiki_search_returns_relative_path_wiki_link_for_child_folder_note(self):
         note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "40-Dev", "42-HOWTO")
         child_dir = os.path.join(note_dir, "42-4-misc")
         source_id, _source = self._create_note_record("source", note_dir, area="")
@@ -529,6 +530,7 @@ class TestNoteCreation(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["results"][0]["id"], target_id)
+        self.assertEqual(payload["results"][0]["path_wiki_link"], "[[42-4-misc/_HOWTO__SQL.md]]")
         self.assertEqual(payload["results"][0]["markdown_link"], "[_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)")
 
     def test_wiki_preview_renders_id_backed_links(self):
@@ -582,6 +584,42 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn(">_HOWTO__SQL</a>", html)
         self.assertNotIn('href="42-4-misc/_HOWTO__SQL.md"', html)
         self.assertNotIn('class="note-link note-link-broken"', html)
+
+    def test_note_view_markdown_resolves_current_relative_path_wiki_link(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        source_dir = os.path.join(notes_root, "40-Dev", "42-HOWTO", "42-7-Apps", "Orgmode")
+        target_dir = os.path.join(source_dir, "42-4-misc")
+        source_id, source = self._create_note_record("OrgMode LifePIM", source_dir, area="")
+        target_id, _target = self._create_note_record("_HOWTO__SQL", target_dir, area="")
+        with open(source["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("*HOWTO* SQL = [[42-4-misc/_HOWTO__SQL.md]]")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{source_id}?format=markdown")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'href="/notes/view/{target_id}"', html)
+        self.assertIn(">42-4-misc/_HOWTO__SQL.md</a>", html)
+        self.assertNotIn('class="wiki-link wiki-link-broken"', html)
+
+    def test_note_view_markdown_resolves_parent_relative_path_wiki_link(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        source_dir = os.path.join(notes_root, "70-Make", "72-PC", "Linux")
+        target_dir = os.path.join(notes_root, "60-Design", "64-GameDesign")
+        source_id, source = self._create_note_record("linux note", source_dir, area="")
+        target_id, _target = self._create_note_record("_INDEX__Game_Sanctuary", target_dir, area="")
+        with open(source["full_path"], "w", encoding="utf-8") as handle:
+            handle.write(
+                "new link to index game sanctuary = [[../../../60-Design/64-GameDesign/_INDEX__Game_Sanctuary.md]]"
+            )
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{source_id}?format=markdown")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'href="/notes/view/{target_id}"', html)
+        self.assertIn(">../../../60-Design/64-GameDesign/_INDEX__Game_Sanctuary.md</a>", html)
+        self.assertNotIn('class="wiki-link wiki-link-broken"', html)
 
     def test_note_asset_route_resolves_notes_root_relative_attachment(self):
         notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
@@ -677,7 +715,7 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(row["link_text"], f"[[Saved Target|note:{target_id}]]")
         self.assertEqual(row["link_title"], "Saved Target")
 
-    def test_autosave_tracks_standard_markdown_note_links(self):
+    def test_autosave_tracks_current_relative_path_wiki_note_links(self):
         note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "40-Dev", "42-HOWTO")
         target_dir = os.path.join(note_dir, "42-4-misc")
         source_id, source = self._create_note_record("source", note_dir, area="")
@@ -689,7 +727,7 @@ class TestNoteCreation(unittest.TestCase):
         response = app.test_client().post(
             f"/notes/api/save/{source_id}",
             json={
-                "content": "[_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)",
+                "content": "[[42-4-misc/_HOWTO__SQL.md]]",
                 "base_mtime_ns": state["mtime_ns"],
                 "base_hash": state["sha256"],
             },
@@ -702,8 +740,8 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(response.get_json()["link_count"], 1)
         self.assertEqual(row["src_note_id"], source_id)
         self.assertEqual(row["target_note_id"], target_id)
-        self.assertEqual(row["link_text"], "[_HOWTO__SQL](42-4-misc/_HOWTO__SQL.md)")
-        self.assertEqual(row["link_title"], "_HOWTO__SQL")
+        self.assertEqual(row["link_text"], "[[42-4-misc/_HOWTO__SQL.md]]")
+        self.assertEqual(row["link_title"], "42-4-misc/_HOWTO__SQL.md")
 
     def test_notes_table_view_uses_new_header_and_columns(self):
         note_dir = os.path.join(self.tmpdir.name, "notes_table_view")

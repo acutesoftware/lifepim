@@ -1421,19 +1421,32 @@ def _markdown_link_destination(path_value):
     return path_value
 
 
-def _relative_markdown_note_link(current_note, target_note):
-    label = _note_display_title(target_note)
+def _relative_note_path(current_note, target_note):
     target_path = _build_note_path(target_note)
     current_path = _build_note_path(current_note) if current_note else ""
     current_dir = os.path.dirname(current_path) if current_path else ""
-    if not label or not target_path or not current_dir:
+    if not target_path or not current_dir:
         return ""
     try:
-        relative_path = os.path.relpath(target_path, start=current_dir)
+        return os.path.relpath(target_path, start=current_dir)
     except ValueError:
         notes_root = _notes_root_from_path(target_path) or ""
-        relative_path = target_path[len(notes_root):].lstrip("\\/") if notes_root else target_path
+        return target_path[len(notes_root):].lstrip("\\/") if notes_root else target_path
+
+
+def _relative_markdown_note_link(current_note, target_note):
+    label = _note_display_title(target_note)
+    relative_path = _relative_note_path(current_note, target_note)
+    if not label or not relative_path:
+        return ""
     return f"[{label}]({_markdown_link_destination(relative_path)})"
+
+
+def _relative_wiki_note_link(current_note, target_note):
+    relative_path = _relative_note_path(current_note, target_note)
+    if not relative_path:
+        return ""
+    return "[[" + relative_path.replace("\\", "/") + "]]"
 
 
 def _normalize_wiki_note_path(value):
@@ -1442,6 +1455,9 @@ def _normalize_wiki_note_path(value):
         return ""
     value = value.replace("/", "\\")
     value = re.sub(r"\\+", r"\\", value)
+    value = os.path.normpath(value)
+    if value == ".":
+        return ""
     return value.lower()
 
 
@@ -1455,19 +1471,22 @@ def _wiki_path_candidates(title):
     return candidates
 
 
-def _wiki_db_path_candidates(title):
+def _wiki_db_path_candidates(title, current_note=None):
     candidates = _wiki_path_candidates(title)
     if not candidates:
         return []
+    current_path = _build_note_path(current_note) if current_note else ""
+    current_folder = os.path.dirname(current_path) if current_path else ""
     notes_root = _notes_root_path(create_dirs=False) or ""
     notes_root = _normalize_wiki_note_path(notes_root)
-    if not notes_root:
-        return candidates
     expanded = list(candidates)
     for candidate in candidates:
         if os.path.isabs(candidate):
             continue
-        expanded.append(_normalize_wiki_note_path(os.path.join(notes_root, candidate)))
+        if current_folder:
+            expanded.append(_normalize_wiki_note_path(os.path.join(current_folder, candidate)))
+        if notes_root:
+            expanded.append(_normalize_wiki_note_path(os.path.join(notes_root, candidate)))
     seen = set()
     unique = []
     for candidate in expanded:
@@ -1558,7 +1577,7 @@ def _visible_note_by_id(note_id):
     return note
 
 
-def _resolve_note_wiki_link(title, target_note_id=None):
+def _resolve_note_wiki_link(title, target_note_id=None, current_note=None):
     title = (title or "").strip()
     if target_note_id:
         note = _visible_note_by_id(target_note_id)
@@ -1576,7 +1595,7 @@ def _resolve_note_wiki_link(title, target_note_id=None):
     if not tbl:
         return {"status": "broken"}
     condition, params = security.visible_record_condition("t", current_user)
-    path_candidates = _wiki_db_path_candidates(title)
+    path_candidates = _wiki_db_path_candidates(title, current_note=current_note)
     if path_candidates:
         placeholders = ", ".join(["?"] * len(path_candidates))
         rows = data._get_conn().execute(
@@ -1682,6 +1701,7 @@ def _search_wiki_notes(query, exclude_note_id=None, limit=20):
                 "area": row.get("area") or "",
                 "score": round(score, 3),
                 "wiki_link": _note_link_syntax(title, row["id"]),
+                "path_wiki_link": _relative_wiki_note_link(current_note, row),
                 "markdown_link": _relative_markdown_note_link(current_note, row),
                 "open_url": url_for("notes.view_note_route", note_id=row["id"]),
             }
@@ -1713,8 +1733,9 @@ def _sync_note_links(note_id, content):
     _ensure_note_links_schema()
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = {}
+    current_note, _tbl = _get_note_record(note_id)
     for title, target_note_id, link_text in _iter_note_wiki_links(content):
-        resolved = _resolve_note_wiki_link(title, target_note_id=target_note_id)
+        resolved = _resolve_note_wiki_link(title, target_note_id=target_note_id, current_note=current_note)
         if resolved.get("status") != "resolved" or not resolved.get("target_note_id"):
             continue
         target_id = int(resolved["target_note_id"])
@@ -1728,7 +1749,6 @@ def _sync_note_links(note_id, content):
             now,
             now,
         )
-    current_note, _tbl = _get_note_record(note_id)
     for label, target_id, link_text, resolved in _iter_note_markdown_links(content, current_note):
         if int(note_id) == target_id:
             continue
@@ -2406,7 +2426,11 @@ def view_note_route(note_id):
         content_html = markdown_utils.render_markdown(
             note_body_text,
             asset_resolver=_asset_url,
-            wiki_link_resolver=_resolve_note_wiki_link,
+            wiki_link_resolver=lambda title, target_note_id=None, current_note=note: _resolve_note_wiki_link(
+                title,
+                target_note_id=target_note_id,
+                current_note=current_note,
+            ),
             link_resolver=lambda target, current_note=note: _resolve_markdown_note_link(current_note, target),
         )
     elif render_mode == "hex":
@@ -3297,7 +3321,11 @@ def wiki_preview_route(note_id):
     html_rendered = markdown_utils.render_markdown(
         content,
         asset_resolver=_asset_url,
-        wiki_link_resolver=_resolve_note_wiki_link,
+        wiki_link_resolver=lambda title, target_note_id=None, current_note=note: _resolve_note_wiki_link(
+            title,
+            target_note_id=target_note_id,
+            current_note=current_note,
+        ),
         link_resolver=lambda target, current_note=note: _resolve_markdown_note_link(current_note, target),
     )
     return jsonify({"html": html_rendered})

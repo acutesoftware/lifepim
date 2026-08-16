@@ -106,6 +106,20 @@ Saving a note updates the markdown file on disk. The app also updates the note m
 
 This means edits made through LifePIM keep the database metadata current.
 
+### Linking to Other Notes
+
+When editing a note, type `[[` and start typing a note name to open the note-link popup. Select a note from the popup to insert a relative path wiki link.
+
+LifePIM writes the link into the `.md` file like this:
+
+```markdown
+[[42-4-misc/_HOWTO__SQL.md]]
+```
+
+This format is preferred for new note links because it works in both LifePIM and Obsidian, and the printed note still shows the target folder and filename. In LifePIM, the renderer resolves relative `.md` wiki links to the matching note record and opens the note view. In Obsidian, the same link opens the markdown file directly.
+
+Older LifePIM links such as `[[Some Note|note:1234]]` still render in LifePIM, but they are not preferred for new notes because the `note:1234` suffix is LifePIM-specific.
+
 ### Converting Notes to HOWTOs
 
 Open a note and click `Convert to HOWTO`.
