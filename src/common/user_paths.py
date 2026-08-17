@@ -12,18 +12,106 @@ USER_PATH_COLUMNS = {
 }
 
 _INVALID_SEGMENT_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+_PATH_SPLIT_RE = re.compile(r"[\\/]+")
 
 
 def normalize_path(path_value):
     path_value = (path_value or "").strip().strip('"').strip()
     if not path_value:
         return ""
-    path_value = path_value.replace("/", "\\")
     if len(path_value) >= 2 and path_value[1] == ":":
         path_value = path_value[0].upper() + path_value[1:]
-    if len(path_value) > 3 and path_value.endswith("\\"):
-        path_value = path_value.rstrip("\\")
+    path_value = _collapse_duplicate_separators(path_value)
+    while _can_strip_trailing_separator(path_value):
+        path_value = path_value[:-1]
     return path_value
+
+
+def _collapse_duplicate_separators(path_value):
+    sep = path_separator(path_value)
+    if len(path_value) >= 2 and path_value[1] == ":":
+        return path_value[:2] + re.sub(r"[\\/]+", lambda _match: sep, path_value[2:])
+    if path_value.startswith(("\\\\", "//")):
+        prefix = path_value[:2]
+        return prefix + re.sub(r"[\\/]+", lambda _match: sep, path_value[2:])
+    return path_value
+
+
+def _can_strip_trailing_separator(path_value):
+    if not path_value.endswith(("\\", "/")):
+        return False
+    if path_value in {"/", "\\"}:
+        return False
+    if len(path_value) == 3 and path_value[1] == ":" and path_value[2] in "\\/":
+        return False
+    return True
+
+
+def path_separator(path_value):
+    text = str(path_value or "")
+    if "\\" in text:
+        return "\\"
+    if "/" in text:
+        return "/"
+    if len(text) >= 2 and text[1] == ":":
+        return "\\"
+    return os.sep
+
+
+def join_path(root_path, *parts):
+    root = normalize_path(root_path)
+    if not root:
+        return normalize_path(os.path.join(*[str(part) for part in parts if str(part or "")]))
+    sep = path_separator(root)
+    joined = root.rstrip("\\/")
+    for part in parts:
+        cleaned = str(part or "").strip().strip("\\/")
+        if cleaned:
+            joined += sep + cleaned
+    return normalize_path(joined)
+
+
+def split_path(path_value):
+    path_norm = normalize_path(path_value)
+    return [part for part in _PATH_SPLIT_RE.split(path_norm) if part]
+
+
+def build_path_from_parts(reference_path, parts):
+    parts = [part for part in parts if part]
+    if not parts:
+        return ""
+    sep = path_separator(reference_path)
+    reference = normalize_path(reference_path)
+    prefix = ""
+    if reference.startswith(("\\\\", "//")):
+        prefix = sep * 2
+    elif reference.startswith(("/", "\\")) and not (len(reference) >= 2 and reference[1] == ":"):
+        prefix = sep
+    built = prefix + sep.join(parts)
+    if len(parts) == 1 and len(parts[0]) == 2 and parts[0][1] == ":":
+        built += sep
+    return normalize_path(built)
+
+
+def path_key(path_value):
+    return normalize_path(path_value).replace("\\", "/").rstrip("/").lower()
+
+
+def path_startswith(path_value, prefix):
+    path = path_key(path_value)
+    base = path_key(prefix)
+    return bool(base and (path == base or path.startswith(base + "/")))
+
+
+def is_absolute_path(path_value):
+    path_norm = normalize_path(path_value)
+    if not path_norm:
+        return False
+    if os.path.isabs(path_norm):
+        return True
+    if len(path_norm) >= 3 and path_norm[1] == ":" and path_norm[2] in "\\/":
+        return True
+    return path_norm.startswith(("\\\\", "//"))
 
 
 def table_columns(conn, table_name):
@@ -76,7 +164,7 @@ def default_lan_user_root_base():
 
 
 def default_paths_for_username(username):
-    root = os.path.join(default_lan_user_root_base(), safe_path_segment(username))
+    root = join_path(default_lan_user_root_base(), safe_path_segment(username))
     return paths_from_root(root)
 
 
@@ -84,18 +172,18 @@ def paths_from_root(root_path):
     root = normalize_path(root_path)
     return {
         "file_root_path": root,
-        "notes_root_path": normalize_path(os.path.join(root, "notes")),
-        "areas_root_path": normalize_path(os.path.join(root, "areas")),
-        "lists_root_path": normalize_path(os.path.join(root, "lists")),
+        "notes_root_path": join_path(root, "notes"),
+        "areas_root_path": join_path(root, "areas"),
+        "lists_root_path": join_path(root, "lists"),
     }
 
 
 def _notes_root_from_path(path_value):
     path_norm = normalize_path(path_value)
-    parts = [part for part in path_norm.split("\\") if part]
+    parts = split_path(path_norm)
     for idx in range(len(parts) - 1):
         if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
-            return "\\".join(parts[: idx + 2])
+            return build_path_from_parts(path_norm, parts[: idx + 2])
     return ""
 
 
@@ -103,10 +191,10 @@ def _path_parent(path_value):
     path_norm = normalize_path(path_value)
     if not path_norm:
         return ""
-    parts = path_norm.split("\\")
+    parts = split_path(path_norm)
     if len(parts) <= 1:
         return ""
-    return "\\".join(parts[:-1])
+    return build_path_from_parts(path_norm, parts[:-1])
 
 
 def derive_existing_notes_root(conn, user_id=None):
@@ -149,14 +237,14 @@ def legacy_paths_for_user(conn, user_id=None):
         return {
             "file_root_path": root,
             "notes_root_path": notes_root,
-            "areas_root_path": normalize_path(os.path.join(root, "areas")),
-            "lists_root_path": normalize_path(os.path.join(root, "lists")),
+            "areas_root_path": join_path(root, "areas"),
+            "lists_root_path": join_path(root, "lists"),
         }
     data_root = normalize_path(getattr(cfg, "data_folder", ""))
     if data_root:
         return paths_from_root(data_root)
     user_root = normalize_path(getattr(cfg, "user_folder", ""))
-    return paths_from_root(os.path.join(user_root, "DATA") if user_root else "")
+    return paths_from_root(join_path(user_root, "DATA") if user_root else "")
 
 
 def _row_paths(row):

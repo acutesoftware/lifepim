@@ -1,5 +1,7 @@
 import os
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
@@ -14,6 +16,15 @@ from modules.data import catalogue
 data_bp = Blueprint("data", __name__, url_prefix="/data", template_folder="templates", static_folder="static")
 catalogue.ensure_schema()
 ProcessService()
+
+
+def _open_with_system_default(path):
+    if sys.platform.startswith("win"):
+        os.startfile(str(path))
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
 
 
 def _ctx(title):
@@ -221,7 +232,7 @@ def process_open_route(process_id, target):
         try:
             if target == "database":
                 path.mkdir(parents=True, exist_ok=True)
-            os.startfile(str(path))
+            _open_with_system_default(path)
         except Exception:
             pass
     return redirect(url_for("data.processes_route", process_id=process_id))
@@ -500,7 +511,7 @@ def source_open_route(source_id):
         try:
             if path.is_file():
                 path = path.parent
-            os.startfile(str(path))
+            _open_with_system_default(path)
         except Exception:
             pass
     return redirect(url_for("data.database_source_detail_route", source_id=source_id, **_with_area()))

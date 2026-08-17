@@ -418,17 +418,11 @@ def _int_value(value, default=0):
 
 
 def normalize_path_prefix(path_value):
-    normalized = (path_value or "").strip().strip('"').strip()
+    normalized = user_paths.normalize_path(path_value)
     if not normalized:
         return ""
-    normalized = normalized.replace("/", "\\")
-    if len(normalized) >= 2 and normalized[1] == ":":
-        normalized = normalized[0].upper() + normalized[1:]
-    if not os.path.isabs(normalized):
+    if not user_paths.is_absolute_path(normalized):
         raise ValueError("Path prefix must be an absolute path.")
-    normalized = os.path.abspath(normalized)
-    if len(normalized) > 3 and normalized.endswith("\\"):
-        normalized = normalized.rstrip("\\")
     return normalized
 
 

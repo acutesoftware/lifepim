@@ -405,15 +405,9 @@ def _normalize_folder_path(path_value):
 
 
 def _normalize_note_folder_path(path_value):
-    path_value = (path_value or "").strip().strip('"').strip()
-    if not path_value:
-        return ""
-    path_value = path_value.replace("/", "\\")
-    if len(path_value) >= 2 and path_value[1] == ":":
-        path_value = path_value[0].upper() + path_value[1:]
-    if len(path_value) > 3 and path_value.endswith("\\"):
-        path_value = path_value.rstrip("\\")
-    return path_value
+    from common import user_paths
+
+    return user_paths.normalize_path(path_value)
 
 
 def _derive_folder_path(route_name, values_map):

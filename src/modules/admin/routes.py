@@ -718,15 +718,11 @@ def _notes_live_root(conn):
     root_counts = {}
     root_display = {}
     for row in rows:
-        path = (row["path"] or "").strip().replace("/", "\\")
-        parts = [part for part in path.split("\\") if part]
-        for idx in range(len(parts) - 1):
-            if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
-                root = "\\".join(parts[: idx + 2])
-                key = root.lower()
-                root_display.setdefault(key, root)
-                root_counts[key] = root_counts.get(key, 0) + int(row["cnt"] or 0)
-                break
+        root = user_paths._notes_root_from_path(row["path"] or "")
+        if root:
+            key = user_paths.path_key(root)
+            root_display.setdefault(key, root)
+            root_counts[key] = root_counts.get(key, 0) + int(row["cnt"] or 0)
     if not root_counts:
         return ""
     best_key = max(root_counts, key=root_counts.get)
@@ -1310,14 +1306,14 @@ def _resolve_username_segment(path_value, username):
     username = (username or "").strip()
     if not path_value or not username or username.lower() == "username":
         return path_value
-    parts = path_value.split("\\")
+    parts = user_paths.split_path(path_value)
     changed = False
     safe_username = user_paths.safe_path_segment(username)
     for idx, part in enumerate(parts):
         if part.lower() == "username":
             parts[idx] = safe_username
             changed = True
-    return "\\".join(parts) if changed else path_value
+    return user_paths.build_path_from_parts(path_value, parts) if changed else path_value
 
 
 def _default_or_submitted_user_paths(username):

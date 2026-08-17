@@ -26,6 +26,7 @@ from common import projects as projects_mod
 from common import collections as collections_mod
 from common import settings as settings_mod
 from common import content_catalog as content_catalog_mod
+from common import user_paths
 from common.network_log import log_network
 from core.security import configure_security
 from modules.how.schema import ensure_how_schema
@@ -99,18 +100,10 @@ def _notes_live_folder_path():
     root_counts = {}
     root_display = {}
     for row in rows:
-        path = (row["path"] or "").strip().replace("/", "\\")
-        if not path:
-            continue
-        parts = [part for part in path.split("\\") if part]
-        root = ""
-        for idx in range(len(parts) - 1):
-            if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
-                root = "\\".join(parts[: idx + 2])
-                break
+        root = user_paths._notes_root_from_path(row["path"] or "")
         if not root:
             continue
-        key = root.lower()
+        key = user_paths.path_key(root)
         root_display.setdefault(key, root)
         root_counts[key] = root_counts.get(key, 0) + int(row["cnt"] or 0)
 

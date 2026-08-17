@@ -382,21 +382,11 @@ def _normalize_area_param(area):
 
 def _normalize_note_path(path_value):
     """Normalize a notes path without applying global mirror/NAS aliases."""
-    path_value = (path_value or "").strip().strip('"').strip()
-    if not path_value:
-        return ""
-    path_value = path_value.replace("/", "\\")
-    if len(path_value) >= 2 and path_value[1] == ":":
-        path_value = path_value[0].upper() + path_value[1:]
-    if len(path_value) > 3 and path_value.endswith("\\"):
-        path_value = path_value.rstrip("\\")
-    return path_value
+    return user_paths.normalize_path(path_value)
 
 
 def _path_startswith(path_value, prefix):
-    path_value = _normalize_note_path(path_value)
-    prefix = _normalize_note_path(prefix)
-    return bool(prefix and (path_value.lower() == prefix.lower() or path_value.lower().startswith(prefix.lower() + "\\")))
+    return user_paths.path_startswith(path_value, prefix)
 
 
 def _replace_path_prefix(path_value, old_prefix, new_prefix):
@@ -405,16 +395,14 @@ def _replace_path_prefix(path_value, old_prefix, new_prefix):
     new_norm = _normalize_note_path(new_prefix)
     if not old_norm or not _path_startswith(path_norm, old_norm):
         return path_norm
-    return new_norm + path_norm[len(old_norm):]
+    path_parts = user_paths.split_path(path_norm)
+    old_parts = user_paths.split_path(old_norm)
+    new_parts = user_paths.split_path(new_norm)
+    return user_paths.build_path_from_parts(new_norm, new_parts + path_parts[len(old_parts):])
 
 
 def _notes_root_from_path(path_value):
-    path_norm = _normalize_note_path(path_value)
-    parts = [part for part in path_norm.split("\\") if part]
-    for idx in range(len(parts) - 1):
-        if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
-            return "\\".join(parts[: idx + 2])
-    return ""
+    return user_paths._notes_root_from_path(path_value)
 
 
 def _note_allowed_asset_roots(note, note_path=None):

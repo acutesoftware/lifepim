@@ -1562,7 +1562,7 @@ def _execute_action(action):
     if action_type == "OPEN_FOLDER":
         if not os.path.isdir(target):
             raise ValueError(f"Folder not found: {target}")
-        os.startfile(target)
+        _open_with_system_default(target)
         return
     if action_type == "OPEN_FILE":
         if _is_web_url(target):
@@ -1570,7 +1570,7 @@ def _execute_action(action):
             return
         if not os.path.exists(target):
             raise ValueError(f"File not found: {target}")
-        os.startfile(target)
+        _open_with_system_default(target)
         return
     if action_type == "EXECUTABLE":
         cmd = [target] + split_arguments(arguments)
@@ -1586,7 +1586,7 @@ def _execute_action(action):
     if not os.path.exists(target) and arguments:
         subprocess.Popen([target] + split_arguments(arguments), cwd=cwd or None)
         return
-    os.startfile(target)
+    _open_with_system_default(target)
 
 
 def _is_web_url(value):
