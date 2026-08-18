@@ -478,6 +478,24 @@ class TestNoteCreation(unittest.TestCase):
         self.assertNotIn("title: Markdown View", html)
         self.assertNotIn("color: Blue", html)
 
+    def test_note_view_inspect_mode_shows_raw_bytes_safely(self):
+        note_dir = os.path.join(self.tmpdir.name, "inspect_view")
+        note_id, created = self._create_note_record("inspect view", note_dir, area="")
+        raw_bytes = b'<script>alert("test")</script>\nHello\xffWorld'
+        with open(created["full_path"], "wb") as handle:
+            handle.write(raw_bytes)
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{note_id}?format=inspect")
+        html = response.get_data(as_text=True)
+
+        with open(created["full_path"], "rb") as handle:
+            self.assertEqual(handle.read(), raw_bytes)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<option value="inspect" selected>Inspect</option>', html)
+        self.assertIn("&lt;script&gt;alert(&#34;test&#34;)&lt;/script&gt;", html)
+        self.assertNotIn('<script>alert("test")</script>', html)
+        self.assertIn("[INVALID UTF-8: FF]", html)
+
     def test_note_view_markdown_mode_resolves_obsidian_wiki_links_by_title(self):
         note_dir = os.path.join(self.tmpdir.name, "wiki_links")
         source_id, source = self._create_note_record("source", note_dir, area="")

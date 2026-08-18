@@ -114,6 +114,14 @@
       {% elif file_exists %}
         {% if render_mode == 'markdown' %}
           <div class="note-rendered-content">{{ content_html_rendered|safe }}</div>
+        {% elif render_mode == 'inspect' %}
+          <div class="note-inspect-summary" aria-label="Inspect summary">
+            <span>ASCII: {{ inspect_result.summary.ascii or 0 }}</span>
+            <span>Non-ASCII: {{ inspect_result.summary.non_ascii or 0 }}</span>
+            <span>Suspicious: {{ inspect_result.summary.suspicious or 0 }}</span>
+            <span>Errors: {{ inspect_result.summary.errors or 0 }}</span>
+          </div>
+          <pre class="note-text-content note-inspect-content">{%- for token in inspect_result.tokens -%}{%- if token.kind == 'normal' -%}{{ token.text }}{%- else -%}<span class="note-inspect-token note-inspect-{{ token.kind }}" title="{{ token.title }}">{{ token.text }}</span>{%- endif -%}{%- endfor -%}</pre>
         {% elif render_mode == 'hex' %}
           <div class="note-hex-dump">
             <div>

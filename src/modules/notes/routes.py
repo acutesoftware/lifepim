@@ -18,6 +18,7 @@ from common import settings as settings_mod
 from utils import importer
 from utils import markdown_utils
 from utils import hex_utils
+from utils import note_inspect
 from common.utils import (
     get_tabs,
     get_side_tabs,
@@ -77,7 +78,7 @@ NOTE_COLOR_OPTIONS = [
     ("Grey", NOTE_COLOR_NAMES["grey"]),
     ("White", NOTE_COLOR_NAMES["white"]),
 ]
-NOTE_VIEW_MODES = {"text", "markdown", "hex", "sample", "metadata"}
+NOTE_VIEW_MODES = {"text", "markdown", "inspect", "hex", "sample", "metadata"}
 NOTE_WIKI_LINK_RE = re.compile(r"(?<!!)\[\[([^\]\n]+)\]\]")
 NOTE_WIKI_TARGET_ID_RE = re.compile(r"(?i)^note:(\d+)$")
 NOTE_MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)")
@@ -2406,6 +2407,7 @@ def view_note_route(note_id):
     front_matter = _parse_note_front_matter_text(note_text) if front_matter_raw else {}
     content_html = ""
     hex_rows = []
+    inspect_result = {"tokens": [], "summary": {}}
     sample_text = ""
     if render_mode == "markdown":
         def _asset_url(asset_name):
@@ -2423,6 +2425,8 @@ def view_note_route(note_id):
         )
     elif render_mode == "hex":
         hex_rows = hex_utils.hex_dump(note_text)
+    elif render_mode == "inspect" and file_exists:
+        inspect_result = note_inspect.inspect_note_bytes(_read_note_file_bytes(note_path))
     elif render_mode == "sample":
         sample_text = _sample_note_text(note_body_text, note_settings["sample_lines"])
     active_areas = areas_mod.areas_list_sidebar()
@@ -2446,6 +2450,7 @@ def view_note_route(note_id):
         render_mode=render_mode,
         content_html_rendered=content_html,
         hex_rows=hex_rows,
+        inspect_result=inspect_result,
         note_text=note_text,
         note_body_text=note_body_text,
         sample_text=sample_text,
@@ -2458,6 +2463,7 @@ def view_note_route(note_id):
         view_modes=[
             ("text", "Text"),
             ("markdown", "Markdown"),
+            ("inspect", "Inspect"),
             ("hex", "Hex"),
             ("sample", "Sample"),
             ("metadata", "Metadata"),
@@ -4105,6 +4111,14 @@ def _read_note_file(note_path):
             return handle.read()
     except OSError:
         return ""
+
+
+def _read_note_file_bytes(note_path):
+    try:
+        with open(note_path, "rb") as handle:
+            return handle.read()
+    except OSError:
+        return b""
 
 
 def _without_duplicate_title_heading(note_text, file_name, title=""):
