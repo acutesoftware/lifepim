@@ -5479,6 +5479,37 @@ body.links-resizing {
   width: 100%;
 }
 
+.collection-detail-summary {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e3e6ea;
+}
+
+.collection-summary-title,
+.collection-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.collection-summary-title h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.collection-summary-title span,
+.collection-summary-meta {
+  color: #555;
+  font-size: 12px;
+}
+
+.collection-summary-meta span {
+  overflow-wrap: anywhere;
+}
+
 .collection-list,
 .collection-source-list {
   display: grid;
@@ -5575,6 +5606,24 @@ body.links-resizing {
   align-items: center;
   border-bottom: 1px solid #e5e5e5;
   padding: 5px 0;
+}
+
+.collection-entry-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.collection-entry-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.collection-entry-open {
+  min-height: 24px;
 }
 
 .collection-entry-heading .collection-entry-title {

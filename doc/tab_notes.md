@@ -56,6 +56,50 @@ The Folders panel is included above the list. For a selected Area, it shows the 
 
 The main body is paginated.
 
+### Notebooks and Books
+
+Use `View as: Notebooks` to group existing notes into ordered collections without copying, moving, or rewriting the source markdown files.
+
+The default Notebooks screen shows:
+
+- the notebook/book list
+- status and type filters
+- a compact create-notebook form
+- overview cards when no notebook is selected
+
+Opening a notebook or book shows a compact read-only metadata header at the top. The header shows the collection name, type, description, linked areas, and linked projects. It is intentionally small so the working controls and chapter/note list remain immediately available.
+
+Use `Edit` to change notebook metadata. Edit mode exposes:
+
+- name
+- type: `Notebook` or `Book`
+- description
+- area checkboxes
+- project checkboxes
+
+Click `Save` to store those metadata changes and return to the compact read-only view. Click `Cancel` to leave metadata unchanged.
+
+Notebook contents are managed separately from metadata:
+
+- `Add Heading` adds an ordered heading/chapter marker.
+- `Add Divider` adds a visual divider.
+- The right-hand `Available Notes` panel adds existing notes into the notebook.
+- `Open` opens the source note for that row.
+- Up/down controls reorder rows.
+- `Remove` removes the row from the notebook only; it does not delete the source note.
+- `Read` shows readable note entries together in notebook order.
+
+`Notebook` and `Book` use the same underlying collection model and controls. The difference is intent and filtering:
+
+- A `Notebook` is a flexible working collection for research, planning, project notes, or topic grouping.
+- A `Book` is for a more deliberately ordered long-form structure, such as chapters, sections, drafts, or a manuscript-like collection.
+
+The type can be changed later from `Edit`, and the type filter can show only notebooks, only books, or both.
+
+`Archive` changes the collection status to archived. Archived notebooks/books are hidden from the default `Active` list, but the collection, ordering, headings, and linked note entries remain in the database. Source notes are not deleted. Use the status filter `All` to show archived collections, then use `Restore` to return an archived notebook/book to the active list.
+
+`Delete` removes the notebook/book collection and its collection rows. It does not delete the source notes on disk or the note records in `lp_notes`.
+
 ### View a Single Note
 
 Once the user clicks on a note the Note View screen is shown : 

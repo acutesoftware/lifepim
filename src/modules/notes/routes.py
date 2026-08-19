@@ -2318,6 +2318,7 @@ def notes_collections_route():
     collection_items = collections_mod.get_collection_items(selected["collection_id"]) if selected else []
     source_query = request.args.get("q", "")
     reading_mode = request.args.get("read") == "1"
+    notebook_edit_mode = request.args.get("edit") == "1"
     context = _notes_list_context(
         area=area,
         folder_filter="",
@@ -2345,6 +2346,7 @@ def notes_collections_route():
             "source_notes": _note_source_options(area, collection_items, source_query) if selected else [],
             "continuous_entries": _notebook_continuous_entries(collection_items) if selected and reading_mode else [],
             "reading_mode": reading_mode,
+            "notebook_edit_mode": notebook_edit_mode,
             "message": message,
             "error": error,
             "active_status": active_status,

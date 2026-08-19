@@ -194,6 +194,62 @@ class TestCollections(unittest.TestCase):
         self.assertEqual(default_response.status_code, 200)
         self.assertEqual(selected_response.status_code, 200)
         self.assertIn(b"Available Notes", selected_response.data)
+        selected_html = selected_response.get_data(as_text=True)
+        open_index = selected_html.find('class="note-button collection-entry-open"')
+        move_up_index = selected_html.find('name="action" value="move_up"', open_index)
+        self.assertGreaterEqual(open_index, 0)
+        self.assertGreater(move_up_index, open_index)
+
+    def test_selected_notebook_defaults_to_compact_read_metadata(self):
+        from app import app
+
+        data.conn = self.conn
+        self.conn.execute(
+            "INSERT INTO users(user_id, username, display_name, password_hash, role, is_active) "
+            "VALUES (1, 'alice', 'Alice', 'hash', 'user', 1)"
+        )
+        project_id = projects.create_project(
+            {"name": "Rome 2027", "status": "active", "area_ids": ["fun/travel"]},
+            owner_user_id=1,
+            conn=self.conn,
+        )
+        notebook_id = collections.create_collection(
+            {
+                "collection_name": "Route Notebook",
+                "collection_domain": "notes",
+                "collection_type": "notebook",
+                "description": "Trip notes",
+                "area_ids": ["fun/travel"],
+                "project_ids": [project_id],
+            },
+            owner_user_id=1,
+            conn=self.conn,
+        )
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        with app.test_client() as client:
+            with client.session_transaction() as session:
+                session["_user_id"] = "1"
+                session["_fresh"] = True
+            default_response = client.get(f"/notes/notebooks?collection_id={notebook_id}")
+            edit_response = client.get(f"/notes/notebooks?collection_id={notebook_id}&edit=1")
+
+        self.assertEqual(default_response.status_code, 200)
+        self.assertIn(b"collection-detail-summary", default_response.data)
+        self.assertIn(b"Trip notes", default_response.data)
+        self.assertIn(b"Areas:", default_response.data)
+        self.assertIn(b"Projects:", default_response.data)
+        self.assertIn(b"Add Heading", default_response.data)
+        self.assertIn(b"Available Notes", default_response.data)
+        self.assertNotIn(b'class="collection-detail-form"', default_response.data)
+        self.assertNotIn(b'name="description"', default_response.data)
+        self.assertNotIn(b'name="area_ids"', default_response.data)
+
+        self.assertEqual(edit_response.status_code, 200)
+        self.assertIn(b'class="collection-detail-form"', edit_response.data)
+        self.assertIn(b'name="description"', edit_response.data)
+        self.assertIn(b'name="area_ids"', edit_response.data)
+        self.assertIn(b"Save", edit_response.data)
 
     def test_phase4_domain_registry_drives_labels_and_compatibility(self):
         adapter = collections.get_domain_adapter("how")

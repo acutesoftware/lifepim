@@ -52,37 +52,69 @@
 
     <section class="collection-pane collection-content-pane">
       {% if selected_collection %}
-        <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}" class="collection-detail-form">
-          <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
-          <input type="hidden" name="action" value="save">
-          <div class="collection-title-row">
-            <input name="collection_name" value="{{ selected_collection.collection_name }}" aria-label="Notebook name" required>
-            <select name="collection_type" aria-label="Notebook type">
-              {% for option in type_options %}
-                <option value="{{ option.value }}" {% if selected_collection.collection_type == option.value %}selected{% endif %}>{{ option.label }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit">Save</button>
-            <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, read=1) }}">Read</a>
+        {% if notebook_edit_mode %}
+          <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}" class="collection-detail-form">
+            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+            <input type="hidden" name="action" value="save">
+            <div class="collection-title-row">
+              <input name="collection_name" value="{{ selected_collection.collection_name }}" aria-label="Notebook name" required>
+              <select name="collection_type" aria-label="Notebook type">
+                {% for option in type_options %}
+                  <option value="{{ option.value }}" {% if selected_collection.collection_type == option.value %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit">Save</button>
+              <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">Cancel</a>
+            </div>
+            <textarea name="description" rows="2" placeholder="Description">{{ selected_collection.description or '' }}</textarea>
+            <div class="collection-relations">
+              <fieldset>
+                <legend>Areas</legend>
+                {% for option in area_options %}
+                  <label><input type="checkbox" name="area_ids" value="{{ option.area_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.label }}</label>
+                {% endfor %}
+              </fieldset>
+              <fieldset>
+                <legend>Projects</legend>
+                {% for option in project_options %}
+                  <label><input type="checkbox" name="project_ids" value="{{ option.project_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.name }}</label>
+                {% else %}
+                  <small>No projects available.</small>
+                {% endfor %}
+              </fieldset>
+            </div>
+          </form>
+        {% else %}
+          <div class="collection-detail-summary">
+            <div class="collection-summary-title">
+              <h4>{{ selected_collection.collection_name }}</h4>
+              <span>{{ selected_collection.type_label }}</span>
+              <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), edit=1) }}">Edit</a>
+              <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, read=1) }}">Read</a>
+            </div>
+            <div class="collection-summary-meta">
+              {% if selected_collection.description %}
+                <span>{{ selected_collection.description }}</span>
+              {% endif %}
+              <span>
+                Areas:
+                {% for item in selected_collection.areas %}
+                  {{ item.icon }} {{ item.area_name or item.area_id }}{% if not loop.last %}, {% endif %}
+                {% else %}
+                  None
+                {% endfor %}
+              </span>
+              <span>
+                Projects:
+                {% for item in selected_collection.projects %}
+                  {{ item.icon }} {{ item.name or item.project_id }}{% if not loop.last %}, {% endif %}
+                {% else %}
+                  None
+                {% endfor %}
+              </span>
+            </div>
           </div>
-          <textarea name="description" rows="2" placeholder="Description">{{ selected_collection.description or '' }}</textarea>
-          <div class="collection-relations">
-            <fieldset>
-              <legend>Areas</legend>
-              {% for option in area_options %}
-                <label><input type="checkbox" name="area_ids" value="{{ option.area_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.label }}</label>
-              {% endfor %}
-            </fieldset>
-            <fieldset>
-              <legend>Projects</legend>
-              {% for option in project_options %}
-                <label><input type="checkbox" name="project_ids" value="{{ option.project_id }}" {% if option.selected %}checked{% endif %}> {{ option.icon }} {{ option.name }}</label>
-              {% else %}
-                <small>No projects available.</small>
-              {% endfor %}
-            </fieldset>
-          </div>
-        </form>
+        {% endif %}
 
         <div class="collection-actions">
           <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}">
@@ -115,11 +147,11 @@
                 <hr>
               {% else %}
                 <span class="collection-entry-title">{{ item.display_title or item.entry_kind|title }}</span>
-                {% if item.summary and item.summary.open_url %}
-                  <a href="{{ item.summary.open_url }}">Open</a>
-                {% endif %}
               {% endif %}
               <span class="collection-entry-actions">
+                {% if item.summary and item.summary.open_url %}
+                  <a class="note-button collection-entry-open" href="{{ item.summary.open_url }}">Open</a>
+                {% endif %}
                 <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}">
                   <input type="hidden" name="collection_item_id" value="{{ item.collection_item_id }}">
                   <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
