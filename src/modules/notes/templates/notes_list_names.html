@@ -9,6 +9,9 @@
     <li class="note-list-row link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
       <input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}">
       <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a>
+      <a class="note-button"
+         href="{{ url_for('notes.note_popout_route', note_id=n.id) }}"
+         onclick="window.open(this.href, 'lifepim-note-{{ n.id }}', 'width=600,height=700,resizable=yes'); return false;">Pop Out</a>
     </li>
     {% endfor %}
   </ul>

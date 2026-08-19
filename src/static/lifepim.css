@@ -5422,6 +5422,98 @@ body.links-resizing {
   cursor: pointer;
 }
 
+.note-popout-body {
+  margin: 0;
+  background: #f8f8f8;
+  color: #222;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+}
+
+.note-popout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 100vh;
+  background: var(--note-color, #ffff93);
+}
+
+.note-popout-header {
+  border-bottom: 1px solid #d0d0d0;
+  background: #f3f4f6;
+  padding: 8px 10px;
+}
+
+.note-popout-header h1 {
+  margin: 0 0 7px;
+  font-size: 17px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.note-popout-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.note-popout-toolbar button {
+  box-sizing: border-box;
+  min-width: 58px;
+  height: 28px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background: #f7f7f7;
+  color: #222;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.note-popout-toolbar button.active {
+  border-color: #555;
+  background: #dde8f7;
+  font-weight: 700;
+}
+
+.note-popout-content {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  background: var(--note-color, #ffff93);
+}
+
+.note-popout-viewer {
+  max-width: 860px;
+}
+
+.note-popout-editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(100vh - 130px);
+  resize: vertical;
+  border: 1px solid #bbb;
+  background: var(--note-color, #ffff93);
+  color: #111;
+  padding: 8px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.note-popout-status {
+  min-height: 20px;
+  border-top: 1px solid #d0d0d0;
+  padding: 5px 10px;
+  background: #f8f8f8;
+  color: #555;
+  font-size: 12px;
+}
+
+.note-popout-status.is-error {
+  color: #b00020;
+}
+
 .collection-workspace {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(320px, 1fr) minmax(220px, 300px);
@@ -5570,6 +5662,268 @@ body.links-resizing {
 .collection-overview-card small {
   color: #666;
   overflow-wrap: anywhere;
+}
+
+.notebook-workspace {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+}
+
+.notebook-workspace.collection-workspace-list-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.notebook-workspace .collection-toolbar-pane {
+  grid-column: 1 / -1;
+}
+
+.notebook-workspace .collection-content-pane {
+  grid-column: 1;
+}
+
+.notebook-workspace.collection-workspace-list-only .collection-content-pane {
+  grid-column: 1 / -1;
+}
+
+.notebook-workspace .collection-source-pane {
+  grid-column: 2;
+}
+
+.collection-toolbar-pane .collection-pane-header {
+  justify-content: flex-start;
+}
+
+.collection-toolbar-pane h4 {
+  margin-right: 8px;
+}
+
+.collection-toolbar-pane .collection-create-form {
+  margin: 0 0 0 auto;
+}
+
+.collection-toolbar-pane .collection-create-form input {
+  width: min(240px, 34vw);
+}
+
+.notebook-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.notebook-book-card {
+  display: grid;
+  grid-template-rows: auto minmax(58px, auto);
+  gap: 7px;
+  color: #222;
+  text-decoration: none;
+  border: 1px solid #d8dde5;
+  border-radius: 6px;
+  padding: 9px;
+  background: #fff;
+}
+
+.notebook-book-card:hover,
+.notebook-book-card:focus {
+  border-color: #3866a3;
+  background: #f6f9ff;
+  outline: none;
+}
+
+.notebook-book-cover,
+.notebook-summary-cover {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--book-cover-bg, #2f5d50);
+  box-shadow: inset 10px 0 10px rgba(0, 0, 0, 0.22), 0 4px 10px rgba(0, 0, 0, 0.16);
+}
+
+.notebook-book-cover {
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 7px 7px 3px;
+}
+
+.notebook-book-cover::before,
+.notebook-summary-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 12%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.24);
+  z-index: 2;
+}
+
+.notebook-book-cover img,
+.notebook-summary-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.notebook-book-title,
+.notebook-summary-cover span {
+  position: absolute;
+  left: 14%;
+  right: 8%;
+  bottom: 8%;
+  z-index: 3;
+  box-sizing: border-box;
+  max-height: 44%;
+  overflow: hidden;
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #1f2526;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.notebook-book-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notebook-book-info strong,
+.notebook-book-info span,
+.notebook-book-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notebook-book-info strong {
+  white-space: nowrap;
+}
+
+.notebook-book-info span,
+.notebook-book-info small {
+  color: #666;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.notebook-cover-style-paper .notebook-book-cover,
+.notebook-cover-style-paper.notebook-summary-cover {
+  box-shadow: inset 8px 0 8px rgba(0, 0, 0, 0.12), 0 3px 7px rgba(0, 0, 0, 0.12);
+}
+
+.notebook-cover-style-classic .notebook-book-title,
+.notebook-cover-style-classic.notebook-summary-cover span {
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.notebook-cover-style-minimal .notebook-book-title,
+.notebook-cover-style-minimal.notebook-summary-cover span {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.notebook-cover-font-serif .notebook-book-title,
+.notebook-cover-font-serif.notebook-summary-cover span {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.notebook-cover-font-sans .notebook-book-title,
+.notebook-cover-font-sans.notebook-summary-cover span {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.notebook-cover-font-mono .notebook-book-title,
+.notebook-cover-font-mono.notebook-summary-cover span {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+}
+
+.notebook-cover-font-display .notebook-book-title,
+.notebook-cover-font-display.notebook-summary-cover span {
+  font-family: "Trebuchet MS", Arial, sans-serif;
+  text-transform: uppercase;
+}
+
+.notebook-workspace .collection-detail-summary {
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: start;
+}
+
+.notebook-summary-cover {
+  width: 72px;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 6px 6px 3px;
+}
+
+.notebook-summary-cover span {
+  font-size: 9px;
+  padding: 3px 4px;
+}
+
+.notebook-workspace .collection-summary-details {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.notebook-cover-edit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.notebook-cover-edit > label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #444;
+  font-size: 11px;
+}
+
+.notebook-cover-edit input[type="color"] {
+  width: 100%;
+  padding: 1px;
+}
+
+.notebook-cover-presets {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin: 0;
+  padding: 7px;
+}
+
+.notebook-cover-preset,
+.notebook-cover-upload {
+  display: grid;
+  gap: 4px;
+  align-items: start;
+  color: #333;
+  font-size: 11px;
+}
+
+.notebook-cover-preset {
+  grid-template-columns: auto 44px minmax(0, 1fr);
+}
+
+.notebook-cover-preset img {
+  width: 44px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid #d8dde5;
+}
+
+.notebook-cover-upload {
+  align-self: center;
+}
+
+.notebook-cover-upload input {
+  width: 100%;
 }
 
 .collection-relations {
@@ -6051,6 +6405,12 @@ body.freeze-headers .note-card-page .note-card-grid {
 
 .note-card-head .note-card-title {
   flex: 1 1 auto;
+}
+
+.note-card-popout {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .note-card-head .link-select {

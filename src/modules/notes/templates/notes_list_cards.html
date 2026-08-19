@@ -15,6 +15,9 @@
           <div class="note-card-head">
             <input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}">
             <a class="note-card-title" href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.title or n.file_name }}</a>
+            <a class="note-card-popout"
+               href="{{ url_for('notes.note_popout_route', note_id=n.id) }}"
+               onclick="window.open(this.href, 'lifepim-note-{{ n.id }}', 'width=600,height=700,resizable=yes'); return false;">Pop Out</a>
           </div>
           {% if card_mode == 'preview' %}
             <div class="note-card-markdown note-rendered-content">{{ n.preview_html|safe }}</div>

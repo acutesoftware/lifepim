@@ -62,10 +62,9 @@ Use `View as: Notebooks` to group existing notes into ordered collections withou
 
 The default Notebooks screen shows:
 
-- the notebook/book list
-- status and type filters
-- a compact create-notebook form
-- overview cards when no notebook is selected
+- a full-width Notebooks toolbar with status and type filters
+- a compact create-notebook form in that toolbar
+- a full-width Notebook List library of book-style notebook covers when no notebook is selected
 
 Opening a notebook or book shows a compact read-only metadata header at the top. The header shows the collection name, type, description, linked areas, and linked projects. It is intentionally small so the working controls and chapter/note list remain immediately available.
 
@@ -74,6 +73,10 @@ Use `Edit` to change notebook metadata. Edit mode exposes:
 - name
 - type: `Notebook` or `Book`
 - description
+- book cover background colour
+- book cover image, from generated presets or a browsed local image
+- book cover style
+- book cover font
 - area checkboxes
 - project checkboxes
 

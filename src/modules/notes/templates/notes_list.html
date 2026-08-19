@@ -40,6 +40,8 @@
       <td>{{ n.date_modified or n.updated.strftime('%Y-%m-%d %H:%M') }}</td>
       <td>
         <a href="{{ url_for('notes.edit_note_route', note_id=n.id) }}">Edit</a> |
+        <a href="{{ url_for('notes.note_popout_route', note_id=n.id) }}"
+           onclick="window.open(this.href, 'lifepim-note-{{ n.id }}', 'width=600,height=700,resizable=yes'); return false;">Pop Out</a> |
         <a href="{{ url_for('notes.delete_note_route', note_id=n.id) }}" onclick="return confirm('Delete note?');">Del</a>
       </td>
     </tr>

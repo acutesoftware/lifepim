@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LifePIM Note : {{ note_title }}</title>
+  {% if csrf_token is defined %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  {% endif %}
+  {% include "_app_icons.html" %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='lifepim.css', v=static_asset_version|default(0)) }}">
+</head>
+<body class="note-popout-body" data-active-tab="notes">
+  <main class="note-popout"
+        data-note-id="{{ note.id }}"
+        style="--note-color: {{ note.list_color_style or note.color_style or '#ffff93' }};">
+    <header class="note-popout-header">
+      <h1>LifePIM Note : {{ note_title }}</h1>
+      <div class="note-popout-toolbar" aria-label="Note pop-out actions">
+        <button type="button" id="note-popout-view">View</button>
+        <button type="button" id="note-popout-edit">Edit</button>
+        <button type="button" id="note-popout-save">Save</button>
+        <button type="button" id="note-popout-close">Close</button>
+      </div>
+    </header>
+
+    <section class="note-popout-content">
+      {% if not file_exists %}
+        <p class="note-file-warning">File not found: {{ note_path }}</p>
+      {% else %}
+        <div id="note-popout-viewer" class="note-rendered-content note-popout-viewer">{{ content_html_rendered|safe }}</div>
+        <textarea id="note-popout-editor"
+                  class="note-popout-editor"
+                  data-note-id="{{ note.id }}"
+                  data-save-url="{{ url_for('notes.save_note_route', note_id=note.id) }}"
+                  data-preview-url="{{ url_for('notes.wiki_preview_route', note_id=note.id) }}"
+                  data-file-mtime-ns="{{ note_state.mtime_ns if note_state else '' }}"
+                  data-file-hash="{{ note_state.sha256 if note_state else '' }}"
+                  hidden>{{ note_text }}</textarea>
+      {% endif %}
+    </section>
+
+    <footer class="note-popout-status" id="note-popout-status" aria-live="polite">
+      {% if file_exists %}Saved{% else %}Unable to load note{% endif %}
+    </footer>
+  </main>
+  <script src="{{ url_for('static', filename='note_popout.js', v=static_asset_version|default(0)) }}"></script>
+</body>
+</html>

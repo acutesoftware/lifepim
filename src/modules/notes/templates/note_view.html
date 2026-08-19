@@ -22,6 +22,9 @@
         </form>
 
         <a class="note-button" href="{{ url_for('notes.edit_note_route', note_id=note.id) }}">Edit</a>
+        <a class="note-button"
+           href="{{ url_for('notes.note_popout_route', note_id=note.id) }}"
+           onclick="window.open(this.href, 'lifepim-note-{{ note.id }}', 'width=600,height=700,resizable=yes'); return false;">Pop Out</a>
 
         <form method="post" action="{{ url_for('notes.open_note_folder_route', note_id=note.id) }}" class="note-inline-form">
           <input type="hidden" name="return_format" value="{{ render_mode }}">

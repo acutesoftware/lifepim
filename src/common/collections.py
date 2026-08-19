@@ -249,6 +249,29 @@ DOMAIN_ITEM_TYPES = {
 
 ENTRY_KINDS = ("item", "heading", "divider", "collection")
 DEFAULT_VISIBILITY = "private"
+DEFAULT_BOOK_COVER_BG_COLOUR = "#2f5d50"
+DEFAULT_BOOK_COVER_STYLE = "cloth"
+DEFAULT_BOOK_COVER_FONT = "serif"
+NOTEBOOK_COVER_PRESETS = [
+    {"value": "notebook_covers/notebook-cover-green.png", "label": "Green geometry", "bg_colour": "#173d31"},
+    {"value": "notebook_covers/notebook-cover-rust.png", "label": "Rust horizon", "bg_colour": "#b94a2b"},
+    {"value": "notebook_covers/notebook-cover-blue.png", "label": "Blue constellation", "bg_colour": "#263f52"},
+    {"value": "notebook_covers/notebook-cover-border.png", "label": "Thin border", "bg_colour": "#0d4a47"},
+    {"value": "notebook_covers/notebook-cover-technical.png", "label": "Faded technical", "bg_colour": "#24282d"},
+    {"value": "notebook_covers/notebook-cover-old-book.png", "label": "Old worn book", "bg_colour": "#4a2d19"},
+]
+BOOK_COVER_STYLE_OPTIONS = [
+    {"value": "cloth", "label": "Cloth"},
+    {"value": "paper", "label": "Paper"},
+    {"value": "classic", "label": "Classic"},
+    {"value": "minimal", "label": "Minimal"},
+]
+BOOK_COVER_FONT_OPTIONS = [
+    {"value": "serif", "label": "Serif"},
+    {"value": "sans", "label": "Sans"},
+    {"value": "mono", "label": "Mono"},
+    {"value": "display", "label": "Display"},
+]
 
 COLLECTIONS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS lp_collection (
@@ -259,6 +282,10 @@ CREATE TABLE IF NOT EXISTS lp_collection (
     collection_domain   TEXT NOT NULL,
     description         TEXT,
     icon                TEXT,
+    book_cover_bg_colour TEXT NOT NULL DEFAULT '#2f5d50',
+    book_cover_image    TEXT NOT NULL DEFAULT '',
+    book_cover_style    TEXT NOT NULL DEFAULT 'cloth',
+    book_cover_font     TEXT NOT NULL DEFAULT 'serif',
     status              TEXT NOT NULL DEFAULT 'active',
     visibility          TEXT NOT NULL DEFAULT 'private',
     created_at          TEXT NOT NULL,
@@ -374,6 +401,75 @@ def _clean_int(value, default=None):
         return default
 
 
+def _normalize_book_cover_bg_colour(value, fallback=DEFAULT_BOOK_COVER_BG_COLOUR):
+    colour = _clean_text(value) or fallback
+    if (
+        colour.startswith("#")
+        and len(colour) in {4, 7}
+        and all(char in "0123456789abcdefABCDEF" for char in colour[1:])
+    ):
+        return colour.lower()
+    return fallback
+
+
+def _normalize_book_cover_style(value):
+    style = _clean_text(value).lower()
+    allowed = {option["value"] for option in BOOK_COVER_STYLE_OPTIONS}
+    return style if style in allowed else DEFAULT_BOOK_COVER_STYLE
+
+
+def _normalize_book_cover_font(value):
+    font = _clean_text(value).lower()
+    allowed = {option["value"] for option in BOOK_COVER_FONT_OPTIONS}
+    return font if font in allowed else DEFAULT_BOOK_COVER_FONT
+
+
+def _default_notebook_cover_image(collection_id=None):
+    if not NOTEBOOK_COVER_PRESETS:
+        return ""
+    idx = 0
+    try:
+        if collection_id is not None:
+            idx = (int(collection_id) - 1) % len(NOTEBOOK_COVER_PRESETS)
+    except (TypeError, ValueError):
+        idx = 0
+    return NOTEBOOK_COVER_PRESETS[idx]["value"]
+
+
+def notebook_cover_presets():
+    return list(NOTEBOOK_COVER_PRESETS)
+
+
+def book_cover_style_options():
+    return list(BOOK_COVER_STYLE_OPTIONS)
+
+
+def book_cover_font_options():
+    return list(BOOK_COVER_FONT_OPTIONS)
+
+
+def _collection_cover_values(values, domain, before=None):
+    before = before or {}
+    is_notes = normalize_domain(domain) == "notes"
+    bg_value = values.get("book_cover_bg_colour") if "book_cover_bg_colour" in values else before.get("book_cover_bg_colour")
+    image_value = values.get("book_cover_image") if "book_cover_image" in values else before.get("book_cover_image")
+    style_value = values.get("book_cover_style") if "book_cover_style" in values else before.get("book_cover_style")
+    font_value = values.get("book_cover_font") if "book_cover_font" in values else before.get("book_cover_font")
+    if not is_notes:
+        return (
+            _clean_text(bg_value),
+            _clean_text(image_value),
+            _clean_text(style_value),
+            _clean_text(font_value),
+        )
+    return (
+        _normalize_book_cover_bg_colour(bg_value),
+        _clean_text(image_value),
+        _normalize_book_cover_style(style_value),
+        _normalize_book_cover_font(font_value),
+    )
+
+
 def _table_columns(conn, table_name):
     try:
         return {row["name"] if hasattr(row, "keys") else row[1] for row in conn.execute(f"PRAGMA table_info({table_name})")}
@@ -401,7 +497,7 @@ def ensure_collections_schema(conn=None):
 
 def _collections_schema_is_current(conn):
     return (
-        {"collection_id", "collection_name", "collection_type", "collection_domain", "status", "visibility"}.issubset(_table_columns(conn, "lp_collection"))
+        {"collection_id", "collection_name", "collection_type", "collection_domain", "status", "visibility", "book_cover_bg_colour", "book_cover_image", "book_cover_style", "book_cover_font"}.issubset(_table_columns(conn, "lp_collection"))
         and {"collection_item_id", "collection_id", "entry_kind", "sort_order", "parent_collection_item_id"}.issubset(_table_columns(conn, "lp_collection_item"))
         and {"collection_id", "area_id", "is_primary"}.issubset(_table_columns(conn, "lp_collection_area"))
         and {"collection_id", "project_id", "comments"}.issubset(_table_columns(conn, "lp_collection_project"))
@@ -418,6 +514,10 @@ def _migrate_collections_schema(conn):
             "collection_domain": "TEXT",
             "description": "TEXT",
             "icon": "TEXT",
+            "book_cover_bg_colour": "TEXT NOT NULL DEFAULT '#2f5d50'",
+            "book_cover_image": "TEXT NOT NULL DEFAULT ''",
+            "book_cover_style": "TEXT NOT NULL DEFAULT 'cloth'",
+            "book_cover_font": "TEXT NOT NULL DEFAULT 'serif'",
             "status": "TEXT NOT NULL DEFAULT 'active'",
             "visibility": "TEXT NOT NULL DEFAULT 'private'",
             "created_at": "TEXT",
@@ -695,11 +795,14 @@ def create_collection(values, conn=None, owner_user_id=None):
         raise ValueError("Collection name is required.")
     domain = normalize_domain(values.get("collection_domain") or values.get("domain"))
     collection_type = normalize_collection_type(values.get("collection_type") or values.get("type"), domain)
+    cover_bg_colour, cover_image, cover_style, cover_font = _collection_cover_values(values, domain)
     now = _utc_now()
     cur = conn.execute(
         "INSERT INTO lp_collection "
-        "(owner_user_id, collection_name, collection_type, collection_domain, description, icon, status, visibility, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(owner_user_id, collection_name, collection_type, collection_domain, description, icon, "
+        "book_cover_bg_colour, book_cover_image, book_cover_style, book_cover_font, "
+        "status, visibility, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             owner_user_id,
             name,
@@ -707,6 +810,10 @@ def create_collection(values, conn=None, owner_user_id=None):
             domain,
             _clean_text(values.get("description")),
             _clean_text(values.get("icon")),
+            cover_bg_colour,
+            cover_image,
+            cover_style,
+            cover_font,
             normalize_status(values.get("status")),
             _clean_text(values.get("visibility")) or DEFAULT_VISIBILITY,
             now,
@@ -733,9 +840,11 @@ def update_collection(collection_id, values, conn=None, owner_user_id=None):
         raise ValueError("Collection name is required.")
     domain = normalize_domain(values.get("collection_domain") or values.get("domain") or before["collection_domain"])
     collection_type = normalize_collection_type(values.get("collection_type") or values.get("type") or before["collection_type"], domain)
+    cover_bg_colour, cover_image, cover_style, cover_font = _collection_cover_values(values, domain, before=before)
     conn.execute(
         "UPDATE lp_collection SET collection_name = ?, collection_type = ?, collection_domain = ?, "
-        "description = ?, icon = ?, status = ?, visibility = ?, updated_at = ? "
+        "description = ?, icon = ?, book_cover_bg_colour = ?, book_cover_image = ?, "
+        "book_cover_style = ?, book_cover_font = ?, status = ?, visibility = ?, updated_at = ? "
         "WHERE collection_id = ? AND owner_user_id IS ?",
         (
             name,
@@ -743,6 +852,10 @@ def update_collection(collection_id, values, conn=None, owner_user_id=None):
             domain,
             _clean_text(values.get("description")),
             _clean_text(values.get("icon")),
+            cover_bg_colour,
+            cover_image,
+            cover_style,
+            cover_font,
             normalize_status(values.get("status") or before.get("status")),
             _clean_text(values.get("visibility")) or before.get("visibility") or DEFAULT_VISIBILITY,
             _utc_now(),
@@ -1259,6 +1372,11 @@ def _collection_row(row, conn=None, owner_user_id=None):
         collection["type_label"] = collection_type_label(collection.get("collection_domain"), collection.get("collection_type"))
     except Exception:
         collection["type_label"] = (collection.get("collection_type") or "").replace("_", " ").title()
+    if collection.get("collection_domain") == "notes":
+        collection["book_cover_bg_colour"] = _normalize_book_cover_bg_colour(collection.get("book_cover_bg_colour"))
+        collection["book_cover_image"] = _clean_text(collection.get("book_cover_image")) or _default_notebook_cover_image(collection.get("collection_id"))
+        collection["book_cover_style"] = _normalize_book_cover_style(collection.get("book_cover_style"))
+        collection["book_cover_font"] = _normalize_book_cover_font(collection.get("book_cover_font"))
     collection["areas"] = list_collection_areas(collection["collection_id"], conn=conn, owner_user_id=owner_user_id)
     collection["area_ids"] = [area["area_id"] for area in collection["areas"]]
     collection["projects"] = list_collection_projects(collection["collection_id"], conn=conn, owner_user_id=owner_user_id)

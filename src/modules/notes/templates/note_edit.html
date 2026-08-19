@@ -15,6 +15,9 @@
         {% set btn_style = "display:inline-block;padding:2px 8px;border:1px solid #999;border-radius:4px;text-decoration:none;margin-right:4px;" %}
         <a href="{{ url_for('notes.view_note_route', note_id=note.id) }}" style="{{ btn_style }}">View</a>
         <a href="{{ url_for('notes.edit_note_route', note_id=note.id) }}" style="{{ btn_style }}background:#ddd;font-weight:bold;">Edit</a>
+        <a href="{{ url_for('notes.note_popout_route', note_id=note.id) }}"
+           style="{{ btn_style }}"
+           onclick="window.open(this.href, 'lifepim-note-{{ note.id }}', 'width=600,height=700,resizable=yes'); return false;">Pop Out</a>
       </div>
 
       <div class="tabular-scroll">

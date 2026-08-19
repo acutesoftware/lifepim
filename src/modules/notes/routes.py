@@ -9,8 +9,9 @@ from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from urllib.parse import urlencode, unquote
 
-from flask import Blueprint, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
 from flask_login import current_user
+from werkzeug.utils import secure_filename
 
 from common import data
 from common import note_search_index
@@ -78,6 +79,7 @@ NOTE_COLOR_OPTIONS = [
     ("Grey", NOTE_COLOR_NAMES["grey"]),
     ("White", NOTE_COLOR_NAMES["white"]),
 ]
+NOTEBOOK_COVER_UPLOAD_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 NOTE_VIEW_MODES = {"text", "markdown", "inspect", "hex", "sample", "metadata"}
 NOTE_WIKI_LINK_RE = re.compile(r"(?<!!)\[\[([^\]\n]+)\]\]")
 NOTE_WIKI_TARGET_ID_RE = re.compile(r"(?i)^note:(\d+)$")
@@ -1376,6 +1378,10 @@ def _note_display_title(row):
     return (row.get("title") or os.path.splitext(row.get("file_name") or "")[0] or row.get("file_name") or "").strip()
 
 
+def _note_window_title(note):
+    return _note_display_title(note) or "Untitled"
+
+
 def _parse_note_wiki_link_value(value):
     parts = [part.strip() for part in (value or "").split("|")]
     title = parts[0] if parts else ""
@@ -2158,17 +2164,38 @@ def _notebook_form_values(form, area=""):
     selected_area_ids = form.getlist("area_ids")
     if not selected_area_ids and area:
         selected_area_ids = [area]
+    book_cover_image = form.get("book_cover_image", "").strip() or form.get("existing_book_cover_image", "").strip()
     return {
         "collection_name": form.get("collection_name", "").strip(),
         "collection_domain": "notes",
         "collection_type": form.get("collection_type", "notebook").strip() or "notebook",
         "description": form.get("description", "").strip(),
         "icon": form.get("icon", "").strip(),
+        "book_cover_bg_colour": form.get("book_cover_bg_colour", "").strip(),
+        "book_cover_image": book_cover_image,
+        "book_cover_style": form.get("book_cover_style", "").strip(),
+        "book_cover_font": form.get("book_cover_font", "").strip(),
         "status": form.get("status", "active").strip() or "active",
         "visibility": form.get("visibility", "private").strip() or "private",
         "area_ids": selected_area_ids,
         "project_ids": form.getlist("project_ids"),
     }
+
+
+def _save_notebook_cover_upload(collection_id):
+    upload = request.files.get("book_cover_upload")
+    if not upload or not upload.filename:
+        return ""
+    original_name = secure_filename(upload.filename)
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext not in NOTEBOOK_COVER_UPLOAD_EXTENSIONS:
+        raise ValueError("Cover image must be PNG, JPG, GIF, or WebP.")
+    folder_path = os.path.join(current_app.static_folder, "notebook_covers", "uploads")
+    os.makedirs(folder_path, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    destination_name = f"notebook-{collection_id}-{stamp}{ext}"
+    upload.save(os.path.join(folder_path, destination_name))
+    return f"notebook_covers/uploads/{destination_name}"
 
 
 def _collection_note_ids(collection_items):
@@ -2263,7 +2290,11 @@ def notes_collections_route():
                 collection_id = collections_mod.create_collection(_notebook_form_values(request.form, area))
                 message = "Notebook created."
             elif action == "save" and collection_id:
-                collections_mod.update_collection(collection_id, _notebook_form_values(request.form, area))
+                values = _notebook_form_values(request.form, area)
+                uploaded_cover = _save_notebook_cover_upload(collection_id)
+                if uploaded_cover:
+                    values["book_cover_image"] = uploaded_cover
+                collections_mod.update_collection(collection_id, values)
                 message = "Notebook saved."
             elif action == "archive" and collection_id:
                 collections_mod.archive_collection(collection_id)
@@ -2351,6 +2382,9 @@ def notes_collections_route():
             "error": error,
             "active_status": active_status,
             "type_options": collections_mod.collection_type_options("notes"),
+            "book_cover_presets": collections_mod.notebook_cover_presets(),
+            "book_cover_style_options": collections_mod.book_cover_style_options(),
+            "book_cover_font_options": collections_mod.book_cover_font_options(),
             "area_options": collections_mod.area_options(selected.get("area_ids") if selected else ([area] if area else [])),
             "project_options": collections_mod.project_options(selected.get("project_ids") if selected else []),
             "source_query": source_query,
@@ -2477,6 +2511,61 @@ def view_note_route(note_id):
         message=request.args.get("message", ""),
         project_options=projects_mod.project_list(statuses=("planned", "active")),
         record_projects=projects_mod.record_projects("note", note_id),
+    )
+
+
+@notes_bp.route('/<int:note_id>/popout')
+def note_popout_route(note_id):
+    if not security.can_view_note(note_id, current_user):
+        abort(404)
+    _ensure_notes_schema()
+    note, _tbl = _get_note_record(note_id)
+    if not note:
+        abort(404)
+
+    note_path = _build_note_path(note)
+    file_exists = bool(note_path and os.path.isfile(note_path))
+    note_text = ""
+    note_state = None
+    note_body_text = ""
+    content_html = ""
+    if file_exists:
+        note_text = _read_note_file(note_path)
+        note_state = _note_file_state(note_path)
+        if note_state:
+            note["size"] = note_state["size"]
+            note["date_modified"] = note_state["date_modified"]
+        note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
+        for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
+            if note_metadata.get(key):
+                note[key] = note_metadata.get(key)
+        _apply_note_display_fields(note)
+        note_body_text = _note_body_text(note_text, note.get("file_name"), note.get("title"))
+
+        def _asset_url(asset_name):
+            return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
+
+        content_html = markdown_utils.render_markdown(
+            note_body_text,
+            asset_resolver=_asset_url,
+            wiki_link_resolver=lambda title, target_note_id=None, current_note=note: _resolve_note_wiki_link(
+                title,
+                target_note_id=target_note_id,
+                current_note=current_note,
+            ),
+            link_resolver=lambda target, current_note=note: _resolve_markdown_note_link(current_note, target),
+        )
+
+    return render_template(
+        "note_popout.html",
+        note=note,
+        note_title=_note_window_title(note),
+        note_text=note_text,
+        note_body_text=note_body_text,
+        content_html_rendered=content_html,
+        file_exists=file_exists,
+        note_path=note_path,
+        note_state=note_state,
     )
 
 
@@ -3314,8 +3403,12 @@ def wiki_preview_route(note_id):
     def _asset_url(asset_name):
         return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
 
+    render_content = content
+    if payload.get("body_only"):
+        render_content = _note_body_text(content, note.get("file_name"), note.get("title"))
+
     html_rendered = markdown_utils.render_markdown(
-        content,
+        render_content,
         asset_resolver=_asset_url,
         wiki_link_resolver=lambda title, target_note_id=None, current_note=note: _resolve_note_wiki_link(
             title,

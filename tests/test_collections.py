@@ -49,6 +49,10 @@ class TestCollections(unittest.TestCase):
 
         self.assertIn("collection_domain", collection_cols)
         self.assertIn("visibility", collection_cols)
+        self.assertIn("book_cover_bg_colour", collection_cols)
+        self.assertIn("book_cover_image", collection_cols)
+        self.assertIn("book_cover_style", collection_cols)
+        self.assertIn("book_cover_font", collection_cols)
         self.assertIn("parent_collection_item_id", item_cols)
         self.assertIn("child_collection_id", item_cols)
 
@@ -75,6 +79,39 @@ class TestCollections(unittest.TestCase):
         self.assertIsNone(collections.get_collection(collection_id, owner_user_id=1, conn=self.conn))
         self.assertIsNotNone(self.conn.execute("SELECT 1 FROM lp_notes WHERE id = 1").fetchone())
         self.assertEqual(self.conn.execute("SELECT COUNT(1) FROM lp_collection_item").fetchone()[0], 0)
+
+    def test_notebook_cover_defaults_and_update(self):
+        collection_id = collections.create_collection(
+            {"collection_name": "Cover Notebook", "collection_domain": "notes", "collection_type": "notebook"},
+            owner_user_id=1,
+            conn=self.conn,
+        )
+
+        notebook = collections.get_collection(collection_id, owner_user_id=1, conn=self.conn)
+        self.assertEqual(notebook["book_cover_bg_colour"], "#2f5d50")
+        self.assertEqual(notebook["book_cover_style"], "cloth")
+        self.assertEqual(notebook["book_cover_font"], "serif")
+        self.assertIn("notebook-cover-", notebook["book_cover_image"])
+
+        collections.update_collection(
+            collection_id,
+            {
+                "collection_name": "Cover Notebook",
+                "collection_domain": "notes",
+                "collection_type": "book",
+                "book_cover_bg_colour": "#123456",
+                "book_cover_image": "notebook_covers/notebook-cover-blue.png",
+                "book_cover_style": "classic",
+                "book_cover_font": "display",
+            },
+            owner_user_id=1,
+            conn=self.conn,
+        )
+        updated = collections.get_collection(collection_id, owner_user_id=1, conn=self.conn)
+        self.assertEqual(updated["book_cover_bg_colour"], "#123456")
+        self.assertEqual(updated["book_cover_image"], "notebook_covers/notebook-cover-blue.png")
+        self.assertEqual(updated["book_cover_style"], "classic")
+        self.assertEqual(updated["book_cover_font"], "display")
 
     def test_item_membership_ordering_headings_and_duplicates(self):
         collection_id = collections.create_collection(
@@ -166,6 +203,8 @@ class TestCollections(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Route Notebook", response.data)
         self.assertIn(b"Notebook List", response.data)
+        self.assertIn(b"notebook-library-grid", response.data)
+        self.assertNotIn(b"collection-list-item", response.data)
         self.assertNotIn(b"Available Notes", response.data)
 
     def test_notes_route_loads_notebook_contents_only_when_selected(self):
@@ -248,6 +287,11 @@ class TestCollections(unittest.TestCase):
         self.assertEqual(edit_response.status_code, 200)
         self.assertIn(b'class="collection-detail-form"', edit_response.data)
         self.assertIn(b'name="description"', edit_response.data)
+        self.assertIn(b'name="book_cover_bg_colour"', edit_response.data)
+        self.assertIn(b'name="book_cover_image"', edit_response.data)
+        self.assertIn(b'name="book_cover_style"', edit_response.data)
+        self.assertIn(b'name="book_cover_font"', edit_response.data)
+        self.assertIn(b"notebook-cover-green.png", edit_response.data)
         self.assertIn(b'name="area_ids"', edit_response.data)
         self.assertIn(b"Save", edit_response.data)
 

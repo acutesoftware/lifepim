@@ -9,8 +9,8 @@
     <div class="settings-error">{{ error }}</div>
   {% endif %}
 
-  <div class="collection-workspace">
-    <aside class="collection-pane collection-list-pane">
+  <div class="collection-workspace notebook-workspace{% if not selected_collection %} collection-workspace-list-only{% endif %}">
+    <section class="collection-pane collection-toolbar-pane">
       <div class="collection-pane-header">
         <h4>Notebooks</h4>
         <form method="get" action="{{ url_for('notes.notes_collections_route') }}" class="collection-filter-form">
@@ -26,36 +26,21 @@
             {% endfor %}
           </select>
         </form>
+        <form method="post" action="{{ url_for('notes.notes_collections_route', area=area) }}" class="collection-create-form">
+          <input type="hidden" name="action" value="create">
+          <input name="collection_name" placeholder="New notebook" required>
+          <button type="submit">Create</button>
+        </form>
       </div>
-
-      <form method="post" action="{{ url_for('notes.notes_collections_route', area=area) }}" class="collection-create-form">
-        <input type="hidden" name="action" value="create">
-        <input name="collection_name" placeholder="New notebook" required>
-        <button type="submit">Create</button>
-      </form>
-
-      <div class="collection-list">
-        {% for collection in collections %}
-          <a class="collection-list-item{% if selected_collection and selected_collection.collection_id == collection.collection_id %} active{% endif %}"
-             href="{{ url_for('notes.notes_collections_route', area=area, collection_id=collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">
-            <span class="collection-list-icon">{{ collection.icon or '#' }}</span>
-            <span>
-              <strong>{{ collection.collection_name }}</strong>
-              <small>{{ collection.type_label }} · {{ collection.item_count }} entries</small>
-            </span>
-          </a>
-        {% else %}
-          <p class="project-empty-state">No notebooks found.</p>
-        {% endfor %}
-      </div>
-    </aside>
+    </section>
 
     <section class="collection-pane collection-content-pane">
       {% if selected_collection %}
         {% if notebook_edit_mode %}
-          <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}" class="collection-detail-form">
+          <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}" class="collection-detail-form" enctype="multipart/form-data">
             <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
             <input type="hidden" name="action" value="save">
+            <input type="hidden" name="existing_book_cover_image" value="{{ selected_collection.book_cover_image or '' }}">
             <div class="collection-title-row">
               <input name="collection_name" value="{{ selected_collection.collection_name }}" aria-label="Notebook name" required>
               <select name="collection_type" aria-label="Notebook type">
@@ -67,6 +52,41 @@
               <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">Cancel</a>
             </div>
             <textarea name="description" rows="2" placeholder="Description">{{ selected_collection.description or '' }}</textarea>
+
+            <div class="notebook-cover-edit">
+              <label>Cover color
+                <input type="color" name="book_cover_bg_colour" value="{{ selected_collection.book_cover_bg_colour or '#2f5d50' }}">
+              </label>
+              <label>Cover style
+                <select name="book_cover_style">
+                  {% for option in book_cover_style_options %}
+                    <option value="{{ option.value }}" {% if selected_collection.book_cover_style == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>Cover font
+                <select name="book_cover_font">
+                  {% for option in book_cover_font_options %}
+                    <option value="{{ option.value }}" {% if selected_collection.book_cover_font == option.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <fieldset class="notebook-cover-presets">
+                <legend>Cover image</legend>
+                {% for preset in book_cover_presets %}
+                  <label class="notebook-cover-preset">
+                    <input type="radio" name="book_cover_image" value="{{ preset.value }}" {% if selected_collection.book_cover_image == preset.value %}checked{% endif %}>
+                    <img src="{{ url_for('static', filename=preset.value) }}" alt="{{ preset.label }}" loading="lazy">
+                    <span>{{ preset.label }}</span>
+                  </label>
+                {% endfor %}
+                <label class="notebook-cover-upload">
+                  <span>Browse image</span>
+                  <input type="file" name="book_cover_upload" accept="image/*">
+                </label>
+              </fieldset>
+            </div>
+
             <div class="collection-relations">
               <fieldset>
                 <legend>Areas</legend>
@@ -86,32 +106,40 @@
           </form>
         {% else %}
           <div class="collection-detail-summary">
-            <div class="collection-summary-title">
-              <h4>{{ selected_collection.collection_name }}</h4>
-              <span>{{ selected_collection.type_label }}</span>
-              <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), edit=1) }}">Edit</a>
-              <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, read=1) }}">Read</a>
-            </div>
-            <div class="collection-summary-meta">
-              {% if selected_collection.description %}
-                <span>{{ selected_collection.description }}</span>
+            <div class="notebook-summary-cover notebook-cover-style-{{ selected_collection.book_cover_style }} notebook-cover-font-{{ selected_collection.book_cover_font }}" style="--book-cover-bg: {{ selected_collection.book_cover_bg_colour }};">
+              {% if selected_collection.book_cover_image %}
+                <img src="{{ url_for('static', filename=selected_collection.book_cover_image) }}" alt="" loading="lazy">
               {% endif %}
-              <span>
-                Areas:
-                {% for item in selected_collection.areas %}
-                  {{ item.icon }} {{ item.area_name or item.area_id }}{% if not loop.last %}, {% endif %}
-                {% else %}
-                  None
-                {% endfor %}
-              </span>
-              <span>
-                Projects:
-                {% for item in selected_collection.projects %}
-                  {{ item.icon }} {{ item.name or item.project_id }}{% if not loop.last %}, {% endif %}
-                {% else %}
-                  None
-                {% endfor %}
-              </span>
+              <span>{{ selected_collection.collection_name }}</span>
+            </div>
+            <div class="collection-summary-details">
+              <div class="collection-summary-title">
+                <h4>{{ selected_collection.collection_name }}</h4>
+                <span>{{ selected_collection.type_label }}</span>
+                <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), edit=1) }}">Edit</a>
+                <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, read=1) }}">Read</a>
+              </div>
+              <div class="collection-summary-meta">
+                {% if selected_collection.description %}
+                  <span>{{ selected_collection.description }}</span>
+                {% endif %}
+                <span>
+                  Areas:
+                  {% for item in selected_collection.areas %}
+                    {{ item.icon }} {{ item.area_name or item.area_id }}{% if not loop.last %}, {% endif %}
+                  {% else %}
+                    None
+                  {% endfor %}
+                </span>
+                <span>
+                  Projects:
+                  {% for item in selected_collection.projects %}
+                    {{ item.icon }} {{ item.name or item.project_id }}{% if not loop.last %}, {% endif %}
+                  {% else %}
+                    None
+                  {% endfor %}
+                </span>
+              </div>
             </div>
           </div>
         {% endif %}
@@ -183,12 +211,22 @@
       {% else %}
         <div class="collection-overview">
           <h4>Notebook List</h4>
-          <div class="collection-overview-grid">
+          <div class="notebook-library-grid">
             {% for collection in collections %}
-              <a class="collection-overview-card" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">
-                <strong>{{ collection.collection_name }}</strong>
-                <span>{{ collection.type_label }} · {{ collection.item_count }} entries</span>
-                {% if collection.description %}<small>{{ collection.description }}</small>{% endif %}
+              <a class="notebook-book-card notebook-cover-style-{{ collection.book_cover_style }} notebook-cover-font-{{ collection.book_cover_font }}"
+                 style="--book-cover-bg: {{ collection.book_cover_bg_colour }};"
+                 href="{{ url_for('notes.notes_collections_route', area=area, collection_id=collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">
+                <span class="notebook-book-cover">
+                  {% if collection.book_cover_image %}
+                    <img src="{{ url_for('static', filename=collection.book_cover_image) }}" alt="" loading="lazy">
+                  {% endif %}
+                  <span class="notebook-book-title">{{ collection.collection_name }}</span>
+                </span>
+                <span class="notebook-book-info">
+                  <strong>{{ collection.collection_name }}</strong>
+                  <span>{{ collection.type_label }} &middot; {{ collection.item_count }} entries</span>
+                  {% if collection.description %}<small>{{ collection.description }}</small>{% endif %}
+                </span>
               </a>
             {% else %}
               <p class="project-empty-state">Create a notebook to start grouping notes.</p>
@@ -199,31 +237,31 @@
     </section>
 
     {% if selected_collection %}
-    <aside class="collection-pane collection-source-pane">
-      <h4>Available Notes</h4>
-      <form method="get" action="{{ url_for('notes.notes_collections_route') }}" class="collection-filter-form">
-        {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
-        {% if selected_collection %}<input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">{% endif %}
-        <input name="q" value="{{ source_query }}" placeholder="Search notes">
-        <button type="submit">Search</button>
-      </form>
-      <div class="collection-source-list">
-        {% for note in source_notes %}
-          <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id if selected_collection else None) }}" class="collection-source-item">
-            <input type="hidden" name="action" value="add_note">
-            <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id if selected_collection else '' }}">
-            <input type="hidden" name="note_id" value="{{ note.id }}">
-            <span>
-              <strong>{{ note.title }}</strong>
-              <small>{{ note.subtitle }}</small>
-            </span>
-            <button type="submit" {% if not selected_collection or note.already_present %}disabled{% endif %}>{{ 'Added' if note.already_present else 'Add' }}</button>
-          </form>
-        {% else %}
-          <p class="project-empty-state">No matching notes.</p>
-        {% endfor %}
-      </div>
-    </aside>
+      <aside class="collection-pane collection-source-pane">
+        <h4>Available Notes</h4>
+        <form method="get" action="{{ url_for('notes.notes_collections_route') }}" class="collection-filter-form">
+          {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
+          <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+          <input name="q" value="{{ source_query }}" placeholder="Search notes">
+          <button type="submit">Search</button>
+        </form>
+        <div class="collection-source-list">
+          {% for note in source_notes %}
+            <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}" class="collection-source-item">
+              <input type="hidden" name="action" value="add_note">
+              <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
+              <input type="hidden" name="note_id" value="{{ note.id }}">
+              <span>
+                <strong>{{ note.title }}</strong>
+                <small>{{ note.subtitle }}</small>
+              </span>
+              <button type="submit" {% if note.already_present %}disabled{% endif %}>{{ 'Added' if note.already_present else 'Add' }}</button>
+            </form>
+          {% else %}
+            <p class="project-empty-state">No matching notes.</p>
+          {% endfor %}
+        </div>
+      </aside>
     {% endif %}
   </div>
 {% endblock %}

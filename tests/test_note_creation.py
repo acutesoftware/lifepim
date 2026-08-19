@@ -478,6 +478,62 @@ class TestNoteCreation(unittest.TestCase):
         self.assertNotIn("title: Markdown View", html)
         self.assertNotIn("color: Blue", html)
 
+    def test_note_view_has_popout_action(self):
+        note_dir = os.path.join(self.tmpdir.name, "popout_action")
+        note_id, _created = self._create_note_record("popout action", note_dir, area="")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{note_id}")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f"/notes/{note_id}/popout", html)
+        self.assertIn(f"lifepim-note-{note_id}", html)
+        self.assertIn("Pop Out", html)
+
+    def test_note_popout_route_renders_minimal_note_window(self):
+        note_dir = os.path.join(self.tmpdir.name, "popout_view")
+        note_id, created = self._create_note_record("Book Ideas", note_dir, area="")
+        with open(created["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("---\ntitle: Book Ideas\ncolor: Blue\n---\n\n# Book Ideas\n\nSome **notes** here.")
+
+        response = self._notes_test_app().test_client().get(f"/notes/{note_id}/popout")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("<title>LifePIM Note : Book Ideas</title>", html)
+        self.assertIn("<h1>LifePIM Note : Book Ideas</h1>", html)
+        self.assertIn("style=\"--note-color: #81ecec;\"", html)
+        self.assertIn('id="note-popout-view"', html)
+        self.assertIn('id="note-popout-edit"', html)
+        self.assertIn('id="note-popout-save"', html)
+        self.assertIn('id="note-popout-close"', html)
+        self.assertIn("<strong>notes</strong>", html)
+        self.assertIn(f'data-save-url="/notes/api/save/{note_id}"', html)
+        self.assertNotIn('class="topbar"', html)
+        self.assertNotIn('class="side-tabs"', html)
+        self.assertNotIn("Open Folder", html)
+        self.assertNotIn("Delete this file", html)
+
+    def test_note_popout_save_url_uses_existing_save_endpoint(self):
+        note_dir = os.path.join(self.tmpdir.name, "popout_save")
+        note_id, created = self._create_note_record("popout save", note_dir, area="")
+        loaded_state = notes_routes._note_file_state(created["full_path"])
+
+        app = self._notes_test_app()
+        resp = app.test_client().post(
+            f"/notes/api/save/{note_id}",
+            json={
+                "content": "saved from popout",
+                "base_mtime_ns": loaded_state["mtime_ns"],
+                "base_hash": loaded_state["sha256"],
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json().get("ok"))
+        with open(created["full_path"], "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "saved from popout")
+
     def test_note_view_inspect_mode_shows_raw_bytes_safely(self):
         note_dir = os.path.join(self.tmpdir.name, "inspect_view")
         note_id, created = self._create_note_record("inspect view", note_dir, area="")
