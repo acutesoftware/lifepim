@@ -16,6 +16,11 @@
     selectedIndex: 0,
     pendingTitle: "",
     pendingSidebar: "",
+    pendingContent: null,
+    pendingIsTemplate: false,
+    pendingIsImportant: false,
+    pendingTemplateId: null,
+    modalMode: "folder",
     open: false,
     creating: false,
   };
@@ -104,6 +109,33 @@
     return data;
   }
 
+  async function createFromTemplate(payload) {
+    const resp = await fetch("/notes/api/create-from-template", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {}),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error || "Unable to create note from template.");
+    }
+    return data;
+  }
+
+  async function fetchTemplates(areaId) {
+    const params = new URLSearchParams();
+    const pid = (areaId || "").trim();
+    if (pid) {
+      params.set("area_id", pid);
+    }
+    const resp = await fetch(`/notes/api/templates?${params.toString()}`);
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error || "Unable to fetch note templates.");
+    }
+    return data.templates || [];
+  }
+
   async function setDefaultFolder(areaFolderId) {
     const resp = await fetch(`/areas/api/folders/${areaFolderId}/set-default`, {
       method: "POST",
@@ -158,7 +190,7 @@
       return;
     }
     STATE.optionsEl.innerHTML = "";
-    const options = STATE.options.slice(0, MAX_OPTIONS);
+    const options = STATE.options.slice(0, STATE.modalMode === "template" ? 200 : MAX_OPTIONS);
     options.forEach((opt, idx) => {
       const row = document.createElement("div");
       row.className = "note-option";
@@ -166,11 +198,11 @@
 
       const title = document.createElement("div");
       title.className = "note-option-title";
-      title.textContent = formatFolderName(opt.path_prefix);
+      title.textContent = STATE.modalMode === "template" ? (opt.title || opt.file_name || "Untitled") : formatFolderName(opt.path_prefix);
 
       const path = document.createElement("div");
       path.className = "note-option-path";
-      path.textContent = opt.path_prefix || "";
+      path.textContent = STATE.modalMode === "template" ? (opt.path || opt.area || "") : (opt.path_prefix || "");
 
       row.appendChild(title);
       row.appendChild(path);
@@ -197,14 +229,15 @@
       return;
     }
     STATE.options = options.slice(0, MAX_OPTIONS);
+    STATE.modalMode = resolvedLabel === "template" ? "template" : "folder";
     STATE.pendingTitle = title;
     STATE.pendingSidebar = areaId;
-    STATE.titleEl.textContent = `Title: ${title}`;
+    STATE.titleEl.textContent = STATE.modalMode === "template" ? "Choose a template" : `Title: ${title}`;
     if (STATE.areaEl) {
       STATE.areaEl.textContent = `Area: ${areaId}`;
     }
     if (STATE.writeRootEl) {
-      STATE.writeRootEl.textContent = resolvedLabel ? `Choose default folder` : "";
+      STATE.writeRootEl.textContent = resolvedLabel === "template" ? "Add from Template" : (resolvedLabel ? `Choose default folder` : "");
       STATE.writeRootEl.style.display = resolvedLabel ? "" : "none";
     }
     renderOptions();
@@ -232,15 +265,28 @@
     if (!option) {
       return;
     }
+    if (STATE.modalMode === "template") {
+      closeModal();
+      const title = promptForTitle("");
+      if (!title) {
+        return;
+      }
+      await create_new_note(STATE.pendingSidebar, title, { templateId: option.id, skipPrompt: true });
+      return;
+    }
     STATE.creating = true;
     try {
       if (option.area_folder_id) {
         await setDefaultFolder(option.area_folder_id);
       }
-      const result = await createNote({
+      const result = await submitCreate({
         title: STATE.pendingTitle,
         area_id: STATE.pendingSidebar,
         path_prefix: option.path_prefix,
+        content: STATE.pendingContent,
+        is_template: STATE.pendingIsTemplate,
+        is_important: STATE.pendingIsImportant,
+        template_id: STATE.pendingTemplateId,
       });
       closeModal();
       if (result.open_url) {
@@ -257,15 +303,27 @@
     }
   }
 
-  async function create_new_note(sidebarLabel, defaultTitle) {
+  async function submitCreate(payload) {
+    if (payload.template_id) {
+      return createFromTemplate(payload);
+    }
+    return createNote(payload);
+  }
+
+  async function create_new_note(sidebarLabel, defaultTitle, options) {
     if (!activeTabIsNotes()) {
       return;
     }
+    options = options || {};
     const areaId = getAreaId(sidebarLabel);
-    const title = promptForTitle(defaultTitle);
+    const title = defaultTitle && options.skipPrompt ? defaultTitle : promptForTitle(defaultTitle);
     if (!title) {
       return;
     }
+    STATE.pendingContent = typeof options.content === "string" ? options.content : null;
+    STATE.pendingIsTemplate = Boolean(options.isTemplate);
+    STATE.pendingIsImportant = Boolean(options.isImportant);
+    STATE.pendingTemplateId = options.templateId || null;
     let data;
     try {
       data = await fetchAreaInfo(areaId);
@@ -277,10 +335,14 @@
     const defaultFolder = data.default_folder ? data.default_folder.path_prefix : "";
     if (defaultFolder) {
       try {
-        const result = await createNote({
+        const result = await submitCreate({
           title: title,
           area_id: areaId,
           path_prefix: defaultFolder,
+          content: STATE.pendingContent,
+          is_template: STATE.pendingIsTemplate,
+          is_important: STATE.pendingIsImportant,
+          template_id: STATE.pendingTemplateId,
         });
         if (result.open_url) {
           window.location.href = result.open_url;
@@ -308,9 +370,13 @@
     }
     try {
       await addDefaultFolder(areaId, newPath);
-      const result = await createNote({
+      const result = await submitCreate({
         title: title,
         area_id: areaId,
+        content: STATE.pendingContent,
+        is_template: STATE.pendingIsTemplate,
+        is_important: STATE.pendingIsImportant,
+        template_id: STATE.pendingTemplateId,
       });
       if (result.open_url) {
         window.location.href = result.open_url;
@@ -322,6 +388,41 @@
     } catch (err) {
       alert(err.message || "Unable to create note.");
     }
+  }
+
+  async function createFromClipboard(sidebarLabel) {
+    if (!navigator.clipboard || typeof navigator.clipboard.readText !== "function") {
+      alert("Clipboard text is unavailable in this browser.");
+      return;
+    }
+    let text = "";
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (err) {
+      alert("Clipboard access was denied or unavailable.");
+      return;
+    }
+    await create_new_note(sidebarLabel, "", { content: text || "" });
+  }
+
+  async function chooseTemplate(sidebarLabel) {
+    const areaId = getAreaId(sidebarLabel);
+    let templates = [];
+    try {
+      templates = await fetchTemplates(areaId);
+    } catch (err) {
+      alert(err.message || "Unable to fetch note templates.");
+      return;
+    }
+    if (!templates.length) {
+      const create = window.confirm("No note templates have been created yet. Create one now?");
+      if (create) {
+        await create_new_note(sidebarLabel, "New Template", { isTemplate: true });
+      }
+      return;
+    }
+    STATE.pendingSidebar = areaId;
+    openModal(templates, "", areaId, "template");
   }
 
   function initModal() {
@@ -351,7 +452,23 @@
         evt.preventDefault();
         const label = btn.dataset.sidebarLabel || "";
         const defaultTitle = btn.dataset.defaultTitle || "";
-        create_new_note(label, defaultTitle);
+        const isTemplate = btn.dataset.templateDefault === "true";
+        create_new_note(label, defaultTitle || (isTemplate ? "New Template" : ""), { isTemplate });
+      });
+    });
+    qsa(".note-add-menu").forEach((menu) => {
+      menu.addEventListener("change", () => {
+        const action = menu.value;
+        const label = menu.dataset.sidebarLabel || "";
+        const createTemplateDefault = menu.dataset.templateDefault === "true";
+        menu.selectedIndex = 0;
+        if (action === "blank") {
+          create_new_note(label, createTemplateDefault ? "New Template" : "", { isTemplate: createTemplateDefault });
+        } else if (action === "template") {
+          chooseTemplate(label);
+        } else if (action === "clipboard") {
+          createFromClipboard(label);
+        }
       });
     });
   }

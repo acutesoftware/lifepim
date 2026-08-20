@@ -99,7 +99,7 @@
           {% set is_all = tab_area in ['any', 'All', 'all', 'ALL'] %}
           {% set is_header = (s.is_header is defined and s.is_header) or tab_area in ['spacer', ''] %}
           {% set is_active = (current_area and tab_area and tab_area|lower == current_area|lower) or (not current_area and is_all) %}
-          {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names'] %}
+          {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names', '/notes/templates'] %}
           {% set side_base_path = '/' if active_tab == 'home' else (request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab) %}
           {% if not is_header %}
             <option value="{{ side_base_path }}{% if not is_all %}?area={{tab_area|urlencode}}{% endif %}" {% if is_active %}selected{% endif %}>
@@ -139,7 +139,7 @@
           {% set tab_area = (s.area if s.area is defined and s.area else s.id) %}
           {% set is_all = tab_area in ['any', 'All', 'all', 'ALL'] %}
           {% set is_active = (current_area and tab_area and tab_area|lower == current_area|lower) or (not current_area and is_all) %}
-          {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names'] %}
+          {% set notes_list_paths = ['/notes', '/notes/', '/notes/table', '/notes/list', '/notes/cards', '/notes/names', '/notes/templates'] %}
           {% set side_base_path = '/' if active_tab == 'home' else (request.path if active_tab == 'data' or (active_tab == 'notes' and request.path in notes_list_paths) else '/' ~ active_tab) %}
           <a class="side {% if is_active %}active{% endif %}" href="{{ side_base_path }}{% if tab_area not in ['any', 'All', 'all', 'ALL', 'spacer'] %}?area={{tab_area|urlencode}}{% endif %}">
             <span class="ic">{{s.icon}}</span>

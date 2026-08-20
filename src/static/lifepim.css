@@ -5316,6 +5316,11 @@ body.links-resizing {
   line-height: 1.2;
 }
 
+.note-list-controls .note-button.active {
+  background: #e8ecff;
+  font-weight: bold;
+}
+
 .note-list-controls select {
   max-width: 220px;
   padding: 2px 4px;
@@ -5332,6 +5337,10 @@ body.links-resizing {
 
 .note-more-menu {
   width: 42px;
+}
+
+.note-add-menu {
+  min-width: 132px;
 }
 
 .note-status {
@@ -6269,6 +6278,21 @@ body.links-resizing {
 
 .note-list-row input.link-select {
   flex: 0 0 auto;
+}
+
+.note-important-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #d21f1f;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
 }
 
 .note-list-folder {

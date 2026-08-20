@@ -3,6 +3,7 @@
   {% include "_notes_list_header.html" %}
   {% include "widgets/area_folders.html" %}
   {% include "_notes_folder_panel.html" %}
+  {% include "_notes_empty_state.html" %}
 
   <div class="note-card-page">
     <div id="notes-selection-root"
@@ -14,6 +15,9 @@
         <article class="note-card link-draggable" style="--note-color: {{ n.list_color_style }};" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
           <div class="note-card-head">
             <input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}">
+            {% if n.is_important == 'true' or n.important == 'true' %}
+              <span class="note-important-mark" title="Important" aria-label="Important">!</span>
+            {% endif %}
             <a class="note-card-title" href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.title or n.file_name }}</a>
             <a class="note-card-popout"
                href="{{ url_for('notes.note_popout_route', note_id=n.id) }}"

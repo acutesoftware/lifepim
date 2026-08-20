@@ -1338,6 +1338,179 @@ class TestNoteCreation(unittest.TestCase):
         with open(full_path, "r", encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "browser edit after timestamp drift")
 
+    def test_note_template_and_important_defaults_and_save_reload(self):
+        note_dir = os.path.join(self.tmpdir.name, "metadata_flags")
+        note_id, created = self._create_note_record("metadata flags", note_dir, area="")
+
+        note, _tbl = notes_routes._get_note_record(note_id)
+        self.assertEqual(note["is_template"], "false")
+        self.assertEqual(note["is_important"], "false")
+        metadata = notes_routes._note_metadata_from_file(created["full_path"])
+        self.assertEqual(metadata["is_template"], "false")
+        self.assertEqual(metadata["is_important"], "false")
+
+        app = Flask(__name__)
+        app.register_blueprint(notes_routes.notes_bp)
+        resp = app.test_client().post(
+            f"/notes/api/save/{note_id}",
+            json={
+                "content": "# metadata flags\n",
+                "metadata": {"is_template": True, "is_important": True},
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        reloaded, tbl = notes_routes._get_note_record(note_id)
+        self.assertEqual(reloaded["is_template"], "true")
+        self.assertEqual(reloaded["is_important"], "true")
+        row = self.conn.execute(
+            f"SELECT is_template, is_important FROM {tbl['name']} WHERE id = ?",
+            (note_id,),
+        ).fetchone()
+        self.assertEqual(row["is_template"], "true")
+        self.assertEqual(row["is_important"], "true")
+        with open(created["full_path"], "r", encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("is_template: true", text)
+        self.assertIn("is_important: true", text)
+
+    def test_template_filter_returns_only_template_notes(self):
+        note_dir = os.path.join(self.tmpdir.name, "template_filter")
+        note_a_id, _ = self._create_note_record("Note A", note_dir, area="")
+        note_b_id, _ = self._create_note_record("Note B", note_dir, area="")
+        note_c_id, _ = self._create_note_record("Note C", note_dir, area="")
+        tbl = common_utils.get_table_def("notes")
+        self.conn.execute(f"UPDATE {tbl['name']} SET title = file_name")
+        self.conn.execute(f"UPDATE {tbl['name']} SET is_template = 'true' WHERE id IN (?, ?)", (note_b_id, note_c_id))
+        self.conn.commit()
+
+        templates = notes_routes._fetch_notes("unmapped", "title", "asc", template_filter="templates")
+        normal = notes_routes._fetch_notes("unmapped", "title", "asc")
+
+        self.assertEqual({row["id"] for row in templates}, {note_b_id, note_c_id})
+        self.assertEqual({row["id"] for row in normal}, {note_a_id})
+
+    def test_all_areas_request_is_unfiltered_for_notes(self):
+        note_dir = os.path.join(self.tmpdir.name, "all_areas_filter")
+        note_id, _ = self._create_note_record("All Areas Visible", note_dir, area="family")
+
+        normalized = notes_routes._normalize_area(common_utils.normalize_area_param("All Areas"))
+        notes = notes_routes._fetch_notes(normalized, "date_modified", "desc")
+
+        self.assertIsNone(normalized)
+        self.assertIn(note_id, {row["id"] for row in notes})
+
+    def test_render_note_template_replaces_known_variables_only(self):
+        fixed = datetime(2026, 8, 20, 15, 54)
+
+        rendered = notes_routes.render_note_template("{{date}} {{time}} {{something_else}}", now=fixed)
+
+        self.assertEqual(rendered, "2026-08-20 15:54 {{something_else}}")
+
+    def test_create_from_template_copies_body_and_resets_flags(self):
+        note_dir = os.path.join(self.tmpdir.name, "template_copy")
+        area_id = "area.templates"
+        areas_mod.area_upsert(
+            {
+                "area_id": area_id,
+                "tab": "TEST",
+                "group_name": "Test",
+                "area_name": "Templates",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add(area_id, note_dir, folder_role="default", is_write_enabled=1, conn=self.conn)
+        template = notes_routes._create_note_record(
+            "Journal Entry",
+            area_id=area_id,
+            path_prefix=note_dir,
+            body_content="Date: {{date}}\nTime: {{time}}\n{{unknown}}\n",
+            is_template=True,
+            is_important=True,
+        )
+        with open(template["full_path"], "r", encoding="utf-8") as handle:
+            source_before = handle.read()
+        original_render = notes_routes.render_note_template
+
+        app = Flask(__name__)
+        app.register_blueprint(notes_routes.notes_bp)
+        with patch(
+            "modules.notes.routes.render_note_template",
+            side_effect=lambda content: original_render(content, now=datetime(2026, 8, 20, 15, 54)),
+        ):
+            resp = app.test_client().post(
+                "/notes/api/create-from-template",
+                json={
+                    "template_id": template["note_id"],
+                    "title": "Today",
+                    "area_id": area_id,
+                    "path_prefix": note_dir,
+                },
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        result = resp.get_json()
+        self.assertNotEqual(result["note_id"], template["note_id"])
+        with open(template["full_path"], "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), source_before)
+        with open(result["full_path"], "r", encoding="utf-8") as handle:
+            copied = handle.read()
+        self.assertIn("Date: 2026-08-20", copied)
+        self.assertIn("Time: 15:54", copied)
+        self.assertIn("{{unknown}}", copied)
+        self.assertIn("is_template: false", copied)
+        self.assertIn("is_important: false", copied)
+        new_note, _tbl = notes_routes._get_note_record(result["note_id"])
+        self.assertEqual(new_note["is_template"], "false")
+        self.assertEqual(new_note["is_important"], "false")
+
+    def test_important_notes_sort_before_normal_notes(self):
+        rows = [
+            {"title": "Bravo", "is_important": "false"},
+            {"title": "Zulu", "is_important": "true"},
+            {"title": "Alpha", "is_important": "false"},
+            {"title": "Charlie", "is_important": "true"},
+        ]
+
+        sorted_rows = notes_routes._sort_notes(rows, "title", "asc")
+
+        self.assertEqual([row["title"] for row in sorted_rows], ["Charlie", "Zulu", "Alpha", "Bravo"])
+
+    def test_create_note_api_accepts_clipboard_plain_text_content(self):
+        note_dir = os.path.join(self.tmpdir.name, "clipboard_note")
+        area_id = "area.clipboard"
+        areas_mod.area_upsert(
+            {
+                "area_id": area_id,
+                "tab": "TEST",
+                "group_name": "Test",
+                "area_name": "Clipboard",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add(area_id, note_dir, folder_role="default", is_write_enabled=1, conn=self.conn)
+        app = Flask(__name__)
+        app.register_blueprint(notes_routes.notes_bp)
+
+        resp = app.test_client().post(
+            "/notes/api/create-note",
+            json={
+                "title": "Clipboard Note",
+                "area_id": area_id,
+                "path_prefix": note_dir,
+                "content": "plain clipboard text",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        result = resp.get_json()
+        with open(result["full_path"], "r", encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("plain clipboard text", text)
+        created, _tbl = notes_routes._get_note_record(result["note_id"])
+        self.assertEqual(created["is_template"], "false")
+        self.assertEqual(created["is_important"], "false")
+
 
 if __name__ == "__main__":
     unittest.main()

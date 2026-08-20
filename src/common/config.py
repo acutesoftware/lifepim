@@ -66,7 +66,7 @@ if os.getenv("LIFEPIM_DEBUG_CONFIG"):
 #  column name contains 'amount', 'total', 'num_' = NUMBER
 #  
 table_def = [
-	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'folder_id', 'size', 'title', 'color', 'date_created', 'date_modified', 'area', 'important', 'source_note_id']},
+	{'name':'lp_notes', 'route':'notes', 'display_name':'Notes', 'col_list':['file_name','path', 'folder_id', 'size', 'title', 'color', 'date_created', 'date_modified', 'area', 'important', 'is_template', 'is_important', 'source_note_id']},
 	{'name':'lp_tasks', 'route':'tasks', 'display_name':'Tasks', 'col_list':['title','content', 'area', 'start_date', 'due_date', 'status', 'task_kind', 'app_action_id', 'parameters_json', 'completed_date']},
 	{'name':'lp_calendar_events', 'route':'calendar', 'display_name':'Events', 'col_list':['title','content', 'event_date', 'remind_date', 'area']},
 	{'name':'lp_media', 'route':'media', 'display_name':'Media', 'col_list':['path', 'filename', 'ext', 'media_type', 'size_bytes', 'mtime_utc', 'ctime_utc', 'hash']},

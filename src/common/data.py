@@ -212,6 +212,8 @@ NOTE_SCHEMA_COLUMNS = {
     "date_modified": "TEXT",
     "area": "TEXT",
     "important": "TEXT",
+    "is_template": "TEXT",
+    "is_important": "TEXT",
     "source_note_id": "TEXT",
 }
 

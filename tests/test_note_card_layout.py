@@ -62,6 +62,14 @@ class TestNoteCardLayout(unittest.TestCase):
         self.assertIn("max-width: 100%;", _css_rule(".note-card-raw"))
         self.assertIn("max-width: 100%;", _css_rule(".note-card-markdown"))
 
+    def test_note_important_marker_is_visible_and_stable(self):
+        rule = _css_rule(".note-important-mark")
+
+        self.assertIn("display: inline-flex;", rule)
+        self.assertIn("background: #d21f1f;", rule)
+        self.assertIn("color: #fff;", rule)
+        self.assertIn("flex: 0 0 auto;", rule)
+
 
 if __name__ == "__main__":
     unittest.main()

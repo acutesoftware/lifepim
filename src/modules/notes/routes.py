@@ -254,6 +254,56 @@ def _set_note_front_matter_field(note_path, key, value, aliases=None):
     return _write_note_file_content(note_path, updated)
 
 
+def _set_note_front_matter_fields_text(text, fields):
+    cleaned_fields = [
+        (key, _front_matter_scalar_text(value), {key.lower(), *{alias.lower() for alias in aliases}})
+        for key, value, aliases in fields
+    ]
+    if not cleaned_fields:
+        return text or ""
+    lines = (text or "").splitlines(keepends=True)
+    if lines and lines[0].strip() == "---":
+        end_idx = None
+        for idx, line in enumerate(lines[1:], 1):
+            if line.strip() in ("---", "..."):
+                end_idx = idx
+                break
+        if end_idx is not None:
+            written = set()
+            for idx in range(1, end_idx):
+                if ":" not in lines[idx]:
+                    continue
+                field_name = lines[idx].split(":", 1)[0].strip().lower().replace(" ", "_")
+                for key, value, aliases in cleaned_fields:
+                    if field_name not in aliases:
+                        continue
+                    newline = "\r\n" if lines[idx].endswith("\r\n") else "\n"
+                    lines[idx] = f"{key}: {value}{newline}"
+                    written.add(key)
+                    break
+            insert_at = end_idx
+            for key, value, _aliases in cleaned_fields:
+                if key not in written:
+                    lines.insert(insert_at, f"{key}: {value}\n")
+                    insert_at += 1
+            return "".join(lines)
+    front_matter = ["---\n"]
+    for key, value, _aliases in cleaned_fields:
+        front_matter.append(f"{key}: {value}\n")
+    front_matter.append("---\n\n")
+    return "".join(front_matter) + (text or "")
+
+
+def _note_metadata_fields_for_content(metadata):
+    metadata = metadata or {}
+    fields = []
+    if "is_template" in metadata:
+        fields.append(("is_template", _note_bool_text(metadata.get("is_template")), ("template",)))
+    if "is_important" in metadata:
+        fields.append(("is_important", _note_bool_text(metadata.get("is_important")), ("important",)))
+    return fields
+
+
 def _front_matter_value(front_matter, keys):
     for key in keys:
         value = front_matter.get(key)
@@ -271,6 +321,38 @@ def _front_matter_bool_text(value):
     return ""
 
 
+def _note_bool_text(value):
+    return "true" if _front_matter_bool_text(value) == "true" else "false"
+
+
+def _note_bool(value):
+    return _front_matter_bool_text(value) == "true"
+
+
+def _note_bool_sql_expr(value_expr):
+    return f"lower(trim(COALESCE({value_expr}, ''))) IN ('1', 'true', 'yes', 'y', 'on')"
+
+
+def _note_template_sql_expr(alias="t"):
+    return f"CASE WHEN {_note_bool_sql_expr(f'{alias}.is_template')} THEN 1 ELSE 0 END"
+
+
+def _note_important_sql_expr(alias="t"):
+    return (
+        f"CASE WHEN {_note_bool_sql_expr(f'{alias}.is_important')} "
+        f"OR {_note_bool_sql_expr(f'{alias}.important')} THEN 1 ELSE 0 END"
+    )
+
+
+def _note_is_template(note):
+    return _note_bool((note or {}).get("is_template"))
+
+
+def _note_is_important(note):
+    note = note or {}
+    return _note_bool(note.get("is_important")) or _note_bool(note.get("important"))
+
+
 def _note_color_style(value):
     color = (value or "").strip()
     if NOTE_COLOR_HEX_RE.match(color):
@@ -280,6 +362,9 @@ def _note_color_style(value):
 
 def _apply_note_display_fields(note):
     if note is not None:
+        note["is_template"] = _note_bool_text(note.get("is_template"))
+        note["is_important"] = _note_bool_text(_note_is_important(note))
+        note["important"] = _note_bool_text(_note_is_important(note))
         note["color_style"] = _note_color_style(note.get("color"))
         note["list_color_style"] = note["color_style"] or NOTE_COLOR_NAMES["yellow"]
     return note
@@ -335,7 +420,8 @@ def _note_metadata_rows(note, note_path, file_exists):
         ("Date modified", note.get("date_modified") or ""),
         ("Area", note.get("area") or ""),
         ("Derived area", note.get("derived_area") or ""),
-        ("Important", note.get("important") or ""),
+        ("Template", "Yes" if _note_is_template(note) else "No"),
+        ("Important", "Yes" if _note_is_important(note) else "No"),
         ("Source note ID", note.get("source_note_id") or ""),
         ("Updated", updated or ""),
     ]
@@ -375,6 +461,8 @@ def _note_metadata_from_file(note_path, stat=None, fallback_area=""):
         "date_modified": date_modified,
         "area": area,
         "important": _front_matter_bool_text(_front_matter_value(front_matter, ("important", "is_important"))),
+        "is_template": _note_bool_text(_front_matter_value(front_matter, ("is_template", "template"))),
+        "is_important": _note_bool_text(_front_matter_value(front_matter, ("is_important", "important"))),
         "source_note_id": _front_matter_value(front_matter, ("source_note_id", "lifepim_com_note_id", "note_id")),
     }
 
@@ -568,7 +656,7 @@ def _table_columns(conn, table_name):
     return {row[1] for row in rows}
 
 
-def _note_template(title, created_utc, sidebar_label):
+def _note_template(title, created_utc, sidebar_label, body_content=None, is_template=False, is_important=False):
     title_value = (title or "").replace("\n", " ").replace("\r", " ").strip()
     escaped_title = title_value.replace('"', '\\"')
     area_value = (sidebar_label or "").replace("\n", " ").replace("\r", " ").strip()
@@ -579,12 +667,17 @@ def _note_template(title, created_utc, sidebar_label):
         f"area: {area_value}",
         f"date_created: {created_utc}",
         f"date_modified: {created_utc}",
+        f"is_template: {_note_bool_text(is_template)}",
+        f"is_important: {_note_bool_text(is_important)}",
     ]
     lines.append("---")
     lines.append("")
-    lines.append(f"# {title}")
-    lines.append("")
-    lines.append("")
+    if body_content is None:
+        lines.append(f"# {title}")
+        lines.append("")
+        lines.append("")
+    else:
+        lines.append(body_content)
     return "\n".join(lines)
 
 
@@ -595,7 +688,7 @@ def _write_note_file(folder_path, base_name, content):
     return base_name, full_path
 
 
-def _create_note_file(folder_path, title, sidebar_label):
+def _create_note_file(folder_path, title, sidebar_label, body_content=None, is_template=False, is_important=False):
     folder_norm = _normalize_note_path(folder_path)
     folder_path = folder_norm or folder_path
     if not folder_path:
@@ -607,7 +700,14 @@ def _create_note_file(folder_path, title, sidebar_label):
     title_base = root_name if ext.lower() == ".md" else raw_title
     title_clean = _sanitize_title(title_base)
     created_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    content = _note_template(title_clean, created_utc, sidebar_label)
+    content = _note_template(
+        title_clean,
+        created_utc,
+        sidebar_label,
+        body_content=body_content,
+        is_template=is_template,
+        is_important=is_important,
+    )
     file_name, full_path = _write_note_file(folder_path, file_name, content)
     return {
         "file_name": file_name,
@@ -616,6 +716,11 @@ def _create_note_file(folder_path, title, sidebar_label):
         "created_utc": created_utc,
         "title": title_clean,
     }
+
+
+def render_note_template(content, now=None):
+    now = now or datetime.now()
+    return (content or "").replace("{{date}}", now.strftime("%Y-%m-%d")).replace("{{time}}", now.strftime("%H:%M"))
 
 
 def _normalize_area(area):
@@ -805,7 +910,7 @@ def _unmapped_area_condition():
     )
 
 
-def _notes_base_condition(area, folder_path=None):
+def _notes_base_condition(area, folder_path=None, template_filter="notes"):
     params = []
     if area and area.lower() == "unmapped":
         condition = _unmapped_area_condition()
@@ -819,19 +924,24 @@ def _notes_base_condition(area, folder_path=None):
     if folder_path:
         condition = f"({condition}) AND lower(rtrim(replace(t.path, '/', '\\'))) = lower(?)"
         params.append(folder_path)
+    template_filter = (template_filter or "notes").strip().lower()
+    if template_filter == "templates":
+        condition = f"({condition}) AND {_note_template_sql_expr('t')} = 1"
+    elif template_filter != "all":
+        condition = f"({condition}) AND {_note_template_sql_expr('t')} = 0"
     visibility_condition, visibility_params = security.visible_record_condition("t", current_user)
     condition = f"({condition}) AND {visibility_condition}"
     params.extend(visibility_params)
     return condition, params
 
 
-def _count_notes(area, folder_path=None):
+def _count_notes(area, folder_path=None, template_filter="notes"):
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         return 0
     areas_mod.ensure_areas_schema(data._get_conn())
-    condition, params = _notes_base_condition(area, folder_path)
+    condition, params = _notes_base_condition(area, folder_path, template_filter=template_filter)
     row = data._get_conn().execute(
         f"SELECT COUNT(1) AS cnt FROM {tbl['name']} t WHERE {condition}",
         params,
@@ -839,12 +949,14 @@ def _count_notes(area, folder_path=None):
     return row["cnt"] if row else 0
 
 
-def _notes_url_args(area=None, folder_path=None, **extra):
+def _notes_url_args(area=None, folder_path=None, template_filter="notes", **extra):
     args = {}
     if area:
         args["area"] = area
     if folder_path:
         args["folder"] = folder_path
+    if template_filter == "templates":
+        args["templates"] = "1"
     for key, value in extra.items():
         if value not in (None, "", False):
             args[key] = value
@@ -882,6 +994,11 @@ def _normalize_note_sort_dir(value):
     return "asc" if (value or "").strip().lower() == "asc" else "desc"
 
 
+def _request_note_template_filter():
+    value = (request.args.get("templates") or request.args.get("template_filter") or "").strip().lower()
+    return "templates" if value in {"1", "true", "yes", "templates"} else "notes"
+
+
 def _notes_route_for_view(view_mode):
     view_mode = _normalize_note_list_view(view_mode)
     if view_mode == "list":
@@ -895,19 +1012,19 @@ def _notes_route_for_view(view_mode):
     return "notes.list_notes_table_route"
 
 
-def _notes_view_url(view_mode, area, folder_filter, sort_col, sort_dir):
+def _notes_view_url(view_mode, area, folder_filter, sort_col, sort_dir, template_filter="notes"):
     view_mode = _normalize_note_list_view(view_mode)
-    args = _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir)
+    args = _notes_url_args(area, folder_filter, template_filter=template_filter, sort=sort_col, dir=sort_dir)
     if view_mode in {"grid", "preview"}:
         args["mode"] = "preview" if view_mode == "preview" else "grid"
     return url_for(_notes_route_for_view(view_mode), **args)
 
 
-def _notes_view_options(area, folder_filter, sort_col, sort_dir, active_view):
+def _notes_view_options(area, folder_filter, sort_col, sort_dir, active_view, template_filter="notes"):
     active_view = _normalize_note_list_view(active_view)
     return [
         {
-            "value": _notes_view_url(view, area, folder_filter, sort_col, sort_dir),
+            "value": _notes_view_url(view, area, folder_filter, sort_col, sort_dir, template_filter=template_filter),
             "label": label,
             "active": view == active_view,
         }
@@ -915,13 +1032,13 @@ def _notes_view_options(area, folder_filter, sort_col, sort_dir, active_view):
     ]
 
 
-def _notes_table_sort_headers(area, folder_filter, route_name, sort_col, sort_dir, card_mode=None):
+def _notes_table_sort_headers(area, folder_filter, route_name, sort_col, sort_dir, card_mode=None, template_filter="notes"):
     sort_col = _normalize_note_sort_col(sort_col)
     sort_dir = _normalize_note_sort_dir(sort_dir)
     headers = {}
     for key, label, column in NOTE_TABLE_SORT_COLUMNS:
         next_dir = "desc" if sort_col == column and sort_dir == "asc" else "asc"
-        args = _notes_url_args(area, folder_filter, sort=column, dir=next_dir)
+        args = _notes_url_args(area, folder_filter, template_filter=template_filter, sort=column, dir=next_dir)
         if card_mode:
             args["mode"] = card_mode
         headers[key] = {
@@ -935,8 +1052,9 @@ def _notes_table_sort_headers(area, folder_filter, route_name, sort_col, sort_di
     return headers
 
 
-def _notes_page_title(area_label):
-    return f"Notes ({area_label})" if area_label else "Notes"
+def _notes_page_title(area_label, template_filter="notes"):
+    label = "Note Templates" if template_filter == "templates" else "Notes"
+    return f"{label} ({area_label})" if area_label else label
 
 
 def _note_bulk_area_options(active_areas=None):
@@ -1047,6 +1165,7 @@ def _current_user_notes_root(create_dirs=False):
 
 
 def _notes_root_path(area=None, *, create_dirs=False):
+    _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
         return None
@@ -1230,6 +1349,7 @@ def _notes_list_context(
     last_url,
     card_mode=None,
     note_settings=None,
+    template_filter="notes",
 ):
     active_areas = areas_mod.areas_list_sidebar()
     view_mode = _normalize_note_list_view(view_mode)
@@ -1239,7 +1359,7 @@ def _notes_list_context(
         "active_tab": "notes",
         "tabs": get_tabs(),
         "side_tabs": get_side_tabs(),
-        "content_title": _notes_page_title(area_label),
+        "content_title": _notes_page_title(area_label, template_filter=template_filter),
         "content_html": "",
         "area_info": area_info,
         "area_folders": area_folders,
@@ -1265,9 +1385,13 @@ def _notes_list_context(
             sort_col,
             sort_dir,
             card_mode,
+            template_filter=template_filter,
         ),
-        "view_options": _notes_view_options(area, folder_filter, sort_col, sort_dir, view_mode),
+        "view_options": _notes_view_options(area, folder_filter, sort_col, sort_dir, view_mode, template_filter=template_filter),
         "notes_view_mode": view_mode,
+        "template_filter": template_filter,
+        "templates_url": _notes_view_url(view_mode, area, folder_filter, sort_col, sort_dir, template_filter="templates"),
+        "normal_notes_url": _notes_view_url(view_mode, area, folder_filter, sort_col, sort_dir, template_filter="notes"),
         "route_name": route_name,
         "card_mode": card_mode,
         "note_card_max_chars": (note_settings or {}).get("card_width_chars", NOTE_CARD_MAX_CHARS),
@@ -1283,7 +1407,7 @@ def _notes_list_context(
     }
 
 
-def _fetch_notes(area, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=False):
+def _fetch_notes(area, sort_col=None, sort_dir=None, limit=None, offset=None, folder_path=None, include_derived=False, template_filter="notes"):
     _ensure_notes_schema()
     tbl = get_table_def("notes")
     if not tbl:
@@ -1310,16 +1434,17 @@ def _fetch_notes(area, sort_col=None, sort_dir=None, limit=None, offset=None, fo
     sort_key = order_map.get(sort_col, "t.rec_extract_date")
     sort_dir = sort_dir or "desc"
     if sort_col == "size":
-        order_by = f"CASE WHEN ({sort_key}) IS NULL THEN 1 ELSE 0 END ASC, ({sort_key}) {sort_dir}"
+        secondary_order = f"CASE WHEN ({sort_key}) IS NULL THEN 1 ELSE 0 END ASC, ({sort_key}) {sort_dir}"
     else:
-        order_by = f"{sort_key} {sort_dir}"
+        secondary_order = f"{sort_key} {sort_dir}"
+    order_by = f"{_note_important_sql_expr('t')} DESC, {secondary_order}"
     select_cols = [f"t.{col}" for col in cols]
     select_cols.append("t.rec_extract_date as updated")
     if include_derived:
         select_cols.append(f"{_derived_area_expr()} as derived_area")
     else:
         select_cols.append("COALESCE(NULLIF(t.area, ''), '') as derived_area")
-    condition, params = _notes_base_condition(area, folder_path)
+    condition, params = _notes_base_condition(area, folder_path, template_filter=template_filter)
     join_sql = "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id " if include_derived else ""
     sql = (
         f"SELECT {', '.join(select_cols)} "
@@ -1770,6 +1895,7 @@ def _sync_note_links(note_id, content):
 def list_notes_route():
     area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    template_filter = _request_note_template_filter()
     note_settings = _note_display_settings()
     area_info, area_folders = _area_context(area)
     area_label = area_info["area_name"] if area_info else area
@@ -1793,26 +1919,27 @@ def list_notes_route():
             first_url=url_for(route_name),
             last_url=url_for(route_name),
             note_settings=note_settings,
+            template_filter=template_filter,
         )
         context["notes"] = []
         return render_template("notes_list.html", **context)
     view_pref = request.cookies.get("notes_view")
     if view_pref in ("list", "cards", "grid", "preview", "collections", "names"):
-        return redirect(_notes_view_url(view_pref, area, folder_filter, request.cookies.get("notes_sort_col") or "date_modified", request.cookies.get("notes_sort_dir") or "desc"))
+        return redirect(_notes_view_url(view_pref, area, folder_filter, request.cookies.get("notes_sort_col") or "date_modified", request.cookies.get("notes_sort_dir") or "desc", template_filter=template_filter))
     sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "date_modified")
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(area, folder_filter)
+    total = _count_notes(area, folder_filter, template_filter=template_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, template_filter=template_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, template_filter=template_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -1833,6 +1960,7 @@ def list_notes_route():
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
         note_settings=note_settings,
+        template_filter=template_filter,
     )
     context["notes"] = notes
     resp = make_response(
@@ -1844,10 +1972,25 @@ def list_notes_route():
     return resp
 
 
+@notes_bp.route('/templates')
+def list_note_templates_route():
+    area = _normalize_area(request_area_param())
+    folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    sort_col = _normalize_note_sort_col(request.args.get("sort") or request.cookies.get("notes_sort_col") or "title")
+    sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "asc")
+    return redirect(
+        url_for(
+            "notes.list_notes_table_route",
+            **_notes_url_args(area, folder_filter, template_filter="templates", sort=sort_col, dir=sort_dir),
+        )
+    )
+
+
 @notes_bp.route('/table')
 def list_notes_table_route():
     area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    template_filter = _request_note_template_filter()
     note_settings = _note_display_settings()
     area_info, area_folders = _area_context(area)
     area_label = area_info["area_name"] if area_info else area
@@ -1871,6 +2014,7 @@ def list_notes_table_route():
             first_url=url_for(route_name),
             last_url=url_for(route_name),
             note_settings=note_settings,
+            template_filter=template_filter,
         )
         context["notes"] = []
         return render_template("notes_list.html", **context)
@@ -1878,16 +2022,16 @@ def list_notes_table_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(area, folder_filter)
+    total = _count_notes(area, folder_filter, template_filter=template_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, template_filter=template_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, template_filter=template_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -1908,6 +2052,7 @@ def list_notes_table_route():
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
         note_settings=note_settings,
+        template_filter=template_filter,
     )
     context["notes"] = notes
     resp = make_response(
@@ -1923,6 +2068,7 @@ def list_notes_table_route():
 def list_notes_list_route():
     area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    template_filter = _request_note_template_filter()
     note_settings = _note_display_settings()
     area_info, area_folders = _area_context(area)
     area_label = area_info["area_name"] if area_info else area
@@ -1946,6 +2092,7 @@ def list_notes_list_route():
             first_url=url_for(route_name),
             last_url=url_for(route_name),
             note_settings=note_settings,
+            template_filter=template_filter,
         )
         context["notes"] = []
         return render_template("notes_list_list.html", **context)
@@ -1953,16 +2100,16 @@ def list_notes_list_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(area, folder_filter)
+    total = _count_notes(area, folder_filter, template_filter=template_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False, template_filter=template_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, template_filter=template_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -1983,6 +2130,7 @@ def list_notes_list_route():
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
         note_settings=note_settings,
+        template_filter=template_filter,
     )
     context["notes"] = notes
     resp = make_response(
@@ -1998,6 +2146,7 @@ def list_notes_list_route():
 def list_notes_names_route():
     area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    template_filter = _request_note_template_filter()
     note_settings = _note_display_settings()
     area_info, area_folders = _area_context(area)
     area_label = area_info["area_name"] if area_info else area
@@ -2021,6 +2170,7 @@ def list_notes_names_route():
             first_url=url_for(route_name),
             last_url=url_for(route_name),
             note_settings=note_settings,
+            template_filter=template_filter,
         )
         context["notes"] = []
         return render_template("notes_list_names.html", **context)
@@ -2028,16 +2178,16 @@ def list_notes_names_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(area, folder_filter)
+    total = _count_notes(area, folder_filter, template_filter=template_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False, template_filter=template_filter)
     page_data = paginate_total(total, page, per_page)
     page = page_data["page"]
     total_pages = page_data["total_pages"]
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(area, folder_filter, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, template_filter=template_filter, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -2058,6 +2208,7 @@ def list_notes_names_route():
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
         note_settings=note_settings,
+        template_filter=template_filter,
     )
     context["notes"] = notes
     resp = make_response(render_template("notes_list_names.html", **context))
@@ -2071,6 +2222,7 @@ def list_notes_names_route():
 def list_notes_cards_route():
     area = _normalize_area(request_area_param())
     folder_filter = _normalize_folder_filter(request.args.get("folder"))
+    template_filter = _request_note_template_filter()
     note_settings = _note_display_settings()
     area_info, area_folders = _area_context(area)
     area_label = area_info["area_name"] if area_info else area
@@ -2094,9 +2246,10 @@ def list_notes_cards_route():
             page=1,
             total_pages=1,
             pages=[],
-            first_url=url_for(route_name, **_notes_url_args(area, folder_filter, mode=card_mode)),
-            last_url=url_for(route_name, **_notes_url_args(area, folder_filter, mode=card_mode)),
+            first_url=url_for(route_name, **_notes_url_args(area, folder_filter, template_filter=template_filter, mode=card_mode)),
+            last_url=url_for(route_name, **_notes_url_args(area, folder_filter, template_filter=template_filter, mode=card_mode)),
             note_settings=note_settings,
+            template_filter=template_filter,
         )
         context["notes"] = []
         context["card_values"] = []
@@ -2106,9 +2259,9 @@ def list_notes_cards_route():
     sort_dir = _normalize_note_sort_dir(request.args.get("dir") or request.cookies.get("notes_sort_dir") or "desc")
     page = request.args.get("page", type=int) or 1
     per_page = note_settings["notes_per_page"]
-    total = _count_notes(area, folder_filter)
+    total = _count_notes(area, folder_filter, template_filter=template_filter)
     offset = (page - 1) * per_page
-    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False)
+    notes = _fetch_notes(area, sort_col, sort_dir, limit=per_page, offset=offset, folder_path=folder_filter, include_derived=False, template_filter=template_filter)
     _prepare_note_card_previews(
         notes,
         max_chars=note_settings["preview_chars"],
@@ -2120,7 +2273,7 @@ def list_notes_cards_route():
     pagination = build_pagination(
         url_for,
         route_name,
-        _notes_url_args(area, folder_filter, mode=card_mode, sort=sort_col, dir=sort_dir),
+        _notes_url_args(area, folder_filter, template_filter=template_filter, mode=card_mode, sort=sort_col, dir=sort_dir),
         page,
         total_pages,
     )
@@ -2146,6 +2299,7 @@ def list_notes_cards_route():
         first_url=pagination["first_url"],
         last_url=pagination["last_url"],
         note_settings=note_settings,
+        template_filter=template_filter,
     )
     context["notes"] = notes
     context["card_values"] = card_values
@@ -2433,7 +2587,7 @@ def view_note_route(note_id):
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
         note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
-        for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
+        for key in ("title", "color", "date_created", "area", "important", "is_template", "is_important", "source_note_id"):
             if note_metadata.get(key):
                 note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
@@ -2536,7 +2690,7 @@ def note_popout_route(note_id):
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
         note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
-        for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
+        for key in ("title", "color", "date_created", "area", "important", "is_template", "is_important", "source_note_id"):
             if note_metadata.get(key):
                 note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
@@ -2684,6 +2838,8 @@ def _update_note_file_metadata(note_id, note, file_name, folder_path, area=None,
             "date_modified": date_modified,
             "area": metadata.get("area") or values_map.get("area", ""),
             "important": metadata.get("important") or values_map.get("important", ""),
+            "is_template": metadata.get("is_template") or values_map.get("is_template", "false"),
+            "is_important": metadata.get("is_important") or values_map.get("is_important", "false"),
             "source_note_id": metadata.get("source_note_id") or values_map.get("source_note_id", ""),
         }
     )
@@ -3092,6 +3248,26 @@ def new_note_options_route():
     })
 
 
+@notes_bp.route('/api/templates')
+def note_templates_route():
+    area = _normalize_area(request_area_param())
+    rows = _fetch_notes(area, "title", "asc", limit=200, offset=0, template_filter="templates")
+    return jsonify(
+        {
+            "templates": [
+                {
+                    "id": row.get("id"),
+                    "title": _note_display_title(row) or row.get("file_name") or "Untitled",
+                    "file_name": row.get("file_name") or "",
+                    "path": row.get("path") or "",
+                    "area": row.get("area") or "",
+                }
+                for row in rows
+            ]
+        }
+    )
+
+
 def _note_create_target_folder(area_id, path_prefix=""):
     area_id = (area_id or "").strip()
     path_prefix = _normalize_note_path(path_prefix)
@@ -3114,30 +3290,18 @@ def _note_create_target_folder(area_id, path_prefix=""):
     return _current_user_notes_root(create_dirs=True), area_id
 
 
-@notes_bp.route('/api/create-note', methods=["POST"])
-def create_note_route():
-    payload = request.get_json(silent=True) or {}
-    area_id = utils_normalize_area_param(
-        payload.get("area_id") or payload.get("project_id") or payload.get("area") or payload.get("project") or ""
-    )
-    title = (payload.get("title") or "").strip()
-    path_prefix = (payload.get("path_prefix") or "").strip()
-    if not title:
-        return jsonify({"error": "Title is required."}), 400
-    try:
-        path_prefix, area_id = _note_create_target_folder(area_id, path_prefix)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+def _create_note_record(title, area_id="", path_prefix="", body_content=None, is_template=False, is_important=False):
+    path_prefix, area_id = _note_create_target_folder(area_id, path_prefix)
     if not path_prefix:
-        return jsonify({"error": "Folder path is required."}), 400
-    try:
-        created = _create_note_file(path_prefix, title, area_id)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except OSError as exc:
-        return jsonify({"error": f"Unable to create note file: {exc}"}), 500
-    except Exception as exc:
-        return jsonify({"error": f"Unable to create note file: {exc}"}), 500
+        raise ValueError("Folder path is required.")
+    created = _create_note_file(
+        path_prefix,
+        title,
+        area_id,
+        body_content=body_content,
+        is_template=is_template,
+        is_important=is_important,
+    )
 
     tbl = get_table_def("notes")
     if not tbl:
@@ -3145,14 +3309,12 @@ def create_note_route():
             os.remove(created["full_path"])
         except Exception:
             pass
-        return jsonify({"error": "Notes table not found."}), 500
+        raise ValueError("Notes table not found.")
 
     try:
         size = str(os.path.getsize(created["full_path"]))
         stat = os.stat(created["full_path"])
-        date_modified = datetime.fromtimestamp(
-            stat.st_mtime
-        ).strftime("%Y-%m-%d %H:%M:%S")
+        date_modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         size = ""
         stat = None
@@ -3169,7 +3331,9 @@ def create_note_route():
         "date_created": metadata.get("date_created") or created["created_utc"],
         "date_modified": date_modified,
         "area": metadata.get("area") or area_id,
-        "important": metadata.get("important") or "",
+        "important": metadata.get("important") or _note_bool_text(is_important),
+        "is_template": metadata.get("is_template") or _note_bool_text(is_template),
+        "is_important": metadata.get("is_important") or _note_bool_text(is_important),
         "source_note_id": metadata.get("source_note_id") or "",
     }
     values = [values_map.get(col, "") for col in tbl["col_list"]]
@@ -3179,14 +3343,109 @@ def create_note_route():
             os.remove(created["full_path"])
         except Exception:
             pass
-        return jsonify({"error": "Unable to insert note record."}), 500
+        raise ValueError("Unable to insert note record.")
     _set_note_folder_id(data._get_conn(), tbl["name"], note_id, created["folder_path"])
-    return jsonify({
+    try:
+        note_search_index.upsert_note(
+            note_id,
+            created["full_path"],
+            title=values_map.get("title") or created["file_name"],
+            content=_read_note_file(created["full_path"]),
+            conn=data._get_conn(),
+        )
+    except Exception:
+        pass
+    return {
         "note_id": note_id,
         "file_name": created["file_name"],
         "path": created["folder_path"],
         "full_path": created["full_path"],
-        "open_url": url_for("notes.edit_note_route", note_id=note_id),
+    }
+
+
+@notes_bp.route('/api/create-from-template', methods=["POST"])
+def create_from_template_route():
+    payload = request.get_json(silent=True) or {}
+    template_id = payload.get("template_id")
+    try:
+        template_id = int(template_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Template is required."}), 400
+    if not security.can_view_note(template_id, current_user):
+        abort(403)
+    template_note, _tbl = _get_note_record(template_id)
+    if not template_note:
+        return jsonify({"error": "Template not found."}), 404
+    if not _note_is_template(template_note):
+        return jsonify({"error": "Selected note is not marked as a template."}), 400
+    template_path = _build_note_path(template_note)
+    if not template_path or not os.path.isfile(template_path):
+        return jsonify({"error": "Template file not found."}), 404
+    title = (payload.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "Title is required."}), 400
+    area_id = utils_normalize_area_param(
+        payload.get("area_id") or payload.get("project_id") or payload.get("area") or payload.get("project") or ""
+    )
+    path_prefix = (payload.get("path_prefix") or "").strip()
+    template_text = _read_note_file(template_path)
+    template_body = _note_body_text(template_text, template_note.get("file_name"), template_note.get("title"))
+    body_content = render_note_template(template_body)
+    try:
+        created = _create_note_record(
+            title,
+            area_id=area_id,
+            path_prefix=path_prefix,
+            body_content=body_content,
+            is_template=False,
+            is_important=False,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": f"Unable to create note from template: {exc}"}), 500
+    return jsonify(
+        {
+            "note_id": created["note_id"],
+            "file_name": created["file_name"],
+            "path": created["path"],
+            "full_path": created["full_path"],
+            "open_url": url_for("notes.edit_note_route", note_id=created["note_id"]),
+        }
+    )
+
+
+@notes_bp.route('/api/create-note', methods=["POST"])
+def create_note_route():
+    payload = request.get_json(silent=True) or {}
+    area_id = utils_normalize_area_param(
+        payload.get("area_id") or payload.get("project_id") or payload.get("area") or payload.get("project") or ""
+    )
+    title = (payload.get("title") or "").strip()
+    path_prefix = (payload.get("path_prefix") or "").strip()
+    if not title:
+        return jsonify({"error": "Title is required."}), 400
+    try:
+        created = _create_note_record(
+            title,
+            area_id=area_id,
+            path_prefix=path_prefix,
+            body_content=payload.get("content") if isinstance(payload.get("content"), str) else None,
+            is_template=payload.get("is_template"),
+            is_important=payload.get("is_important"),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except OSError as exc:
+        return jsonify({"error": f"Unable to create note file: {exc}"}), 500
+    except Exception as exc:
+        return jsonify({"error": f"Unable to create note file: {exc}"}), 500
+    return jsonify({
+        "note_id": created["note_id"],
+        "file_name": created["file_name"],
+        "path": created["path"],
+        "full_path": created["full_path"],
+        "open_url": url_for("notes.edit_note_route", note_id=created["note_id"]),
     })
 
 @notes_bp.route('/add', methods=["GET", "POST"])
@@ -3205,7 +3464,7 @@ def add_note_route():
             except OSError:
                 stat = None
             metadata = _note_metadata_from_file(note_path, stat=stat, fallback_area=form_values.get("area") or area)
-            for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
+            for key in ("title", "color", "date_created", "area", "important", "is_template", "is_important", "source_note_id"):
                 if not form_values.get(key):
                     form_values[key] = metadata.get(key) or ""
             if not form_values.get("size"):
@@ -3261,7 +3520,7 @@ def edit_note_route(note_id):
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
         note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
-        for key in ("title", "color", "date_created", "area", "important", "source_note_id"):
+        for key in ("title", "color", "date_created", "area", "important", "is_template", "is_important", "source_note_id"):
             if note_metadata.get(key):
                 note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
@@ -3291,6 +3550,9 @@ def save_note_route(note_id):
     content = payload.get("content")
     if content is None:
         return jsonify({"error": "Missing content."}), 400
+    metadata_fields = _note_metadata_fields_for_content(payload.get("metadata") or {})
+    if metadata_fields:
+        content = _set_note_front_matter_fields_text(content, metadata_fields)
     note, tbl = _get_note_record(note_id)
     if not note:
         return jsonify({"error": "Note not found."}), 404
@@ -3533,6 +3795,8 @@ def _collect_note_import_rows(folder_path, area):
                     "date_modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
                     "area": metadata.get("area") or area,
                     "important": metadata.get("important") or "",
+                    "is_template": metadata.get("is_template") or "false",
+                    "is_important": metadata.get("is_important") or "false",
                     "source_note_id": metadata.get("source_note_id") or "",
                 }
             )
@@ -3819,6 +4083,8 @@ def _sync_note_rows(folder_path, fallback_area=""):
                         "date_modified": date_modified,
                         "area": metadata.get("area") or current.get("area", ""),
                         "important": metadata.get("important") or current.get("important", ""),
+                        "is_template": metadata.get("is_template") or current.get("is_template", "false"),
+                        "is_important": metadata.get("is_important") or current.get("is_important", "false"),
                         "source_note_id": metadata.get("source_note_id") or current.get("source_note_id", ""),
                     }
                 )
@@ -3832,6 +4098,8 @@ def _sync_note_rows(folder_path, fallback_area=""):
                     or str(current.get("date_modified") or "") != date_modified
                     or str(current.get("area") or "") != str(values_map.get("area") or "")
                     or str(current.get("important") or "") != str(values_map.get("important") or "")
+                    or str(current.get("is_template") or "false") != str(values_map.get("is_template") or "false")
+                    or str(current.get("is_important") or "false") != str(values_map.get("is_important") or "false")
                     or str(current.get("source_note_id") or "") != str(values_map.get("source_note_id") or "")
                     or not _note_folder_id_matches(conn, current.get("folder_id"), root_norm)
                 )
@@ -3876,6 +4144,8 @@ def _sync_note_rows(folder_path, fallback_area=""):
                     "date_modified": date_modified,
                     "area": metadata.get("area") or "",
                     "important": metadata.get("important") or "",
+                    "is_template": metadata.get("is_template") or "false",
+                    "is_important": metadata.get("is_important") or "false",
                     "source_note_id": metadata.get("source_note_id") or "",
                 }
                 values = [values_map.get(col, "") for col in tbl["col_list"]]
@@ -4167,12 +4437,19 @@ def _area_context(area_id):
 
 
 def _sort_notes(notes, sort_col, sort_dir):
+    notes = list(notes or [])
     if sort_col == "size":
         reverse = sort_dir == "desc"
         keyed = [(note, _parse_size(note.get("size"))) for note in notes]
         valid = [(note, size) for note, size in keyed if size is not None]
         invalid = [note for note, size in keyed if size is None]
-        return [note for note, _size in sorted(valid, key=lambda item: item[1], reverse=reverse)] + invalid
+        sorted_valid = [note for note, _size in sorted(valid, key=lambda item: item[1], reverse=reverse)]
+        return (
+            [note for note in sorted_valid if _note_is_important(note)]
+            + [note for note in invalid if _note_is_important(note)]
+            + [note for note in sorted_valid if not _note_is_important(note)]
+            + [note for note in invalid if not _note_is_important(note)]
+        )
     key_map = {
         "file_name": lambda n: (n.get("file_name") or "").lower(),
         "path": lambda n: (n.get("path") or "").lower(),
@@ -4187,7 +4464,10 @@ def _sort_notes(notes, sort_col, sort_dir):
     }
     key_fn = key_map.get(sort_col, key_map["updated"])
     reverse = sort_dir == "desc"
-    return sorted(notes, key=key_fn, reverse=reverse)
+    sorted_notes = sorted(notes, key=key_fn, reverse=reverse)
+    return [note for note in sorted_notes if _note_is_important(note)] + [
+        note for note in sorted_notes if not _note_is_important(note)
+    ]
 
 
 def _build_note_path(note):

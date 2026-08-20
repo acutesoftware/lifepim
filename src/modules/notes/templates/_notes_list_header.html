@@ -6,10 +6,13 @@
         <option value="{{ option.value }}" {% if option.active %}selected{% endif %}>{{ option.label }}</option>
       {% endfor %}
     </select>
+    <a class="note-button {% if template_filter != 'templates' %}active{% endif %}" href="{{ normal_notes_url }}">Notes</a>
+    <a class="note-button {% if template_filter == 'templates' %}active{% endif %}" href="{{ templates_url }}">Templates</a>
 
     <form method="get" action="{{ url_for(route_name) }}" class="note-sort-form">
       {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
       {% if folder_filter %}<input type="hidden" name="folder" value="{{ folder_filter }}">{% endif %}
+      {% if template_filter == 'templates' %}<input type="hidden" name="templates" value="1">{% endif %}
       {% if card_mode %}<input type="hidden" name="mode" value="{{ card_mode }}">{% endif %}
       <label for="notes-sort-col">Sort by:</label>
       <select id="notes-sort-col" name="sort" onchange="this.form.submit()">
@@ -23,9 +26,14 @@
       </select>
     </form>
 
-    <a href="#" class="note-button new-note-btn" data-sidebar-label="{{ area or '' }}">New Note</a>
+    <select class="note-add-menu" data-sidebar-label="{{ area or '' }}" data-template-default="{{ 'true' if template_filter == 'templates' else 'false' }}" aria-label="Add note">
+      <option value="">Add Note</option>
+      <option value="blank">Add Blank Note</option>
+      <option value="template">Add from Template...</option>
+      <option value="clipboard">Add from Clipboard</option>
+    </select>
 
-    <span class="note-status"><span class="note-total-count">{{ total_notes|default(notes|length) }} Notes</span></span>
+    <span class="note-status"><span class="note-total-count">{{ total_notes|default(notes|length) }} {{ 'Templates' if template_filter == 'templates' else 'Notes' }}</span></span>
     {% set link_list_type = "note" %}
     {% set link_list_context_id = "notes_list" %}
     {% set link_table_id = "notes-selection-root" %}

@@ -1,0 +1,6 @@
+{% if template_filter == 'templates' and not notes %}
+  <div class="note-empty-state">
+    <p>No note templates yet.</p>
+    <button type="button" class="note-button new-note-btn" data-sidebar-label="{{ area or '' }}" data-template-default="true">Create Template</button>
+  </div>
+{% endif %}

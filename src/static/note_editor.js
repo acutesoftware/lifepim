@@ -17,6 +17,7 @@
   const toolbar = qs(".note-markdown-toolbar");
   const wikiPopup = qs("#note-wiki-popup");
   const previewEl = qs("#note-editor-preview");
+  const metadataInputs = Array.from(document.querySelectorAll("[data-note-metadata-field]"));
   const noteId = editor.dataset.noteId || "";
   const saveUrl = editor.dataset.saveUrl || "";
   const uploadImageUrl = editor.dataset.uploadImageUrl || "";
@@ -33,6 +34,7 @@
   let wikiSearchToken = 0;
   let wikiPopupState = null;
   let lastSaved = editor.value;
+  let lastSavedMetadata = metadataPayload();
   let fileMtimeNs = editor.dataset.fileMtimeNs || "";
   let fileHash = editor.dataset.fileHash || "";
 
@@ -44,6 +46,21 @@
       savedContent: lastSaved,
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  function metadataPayload() {
+    const payload = {};
+    metadataInputs.forEach((input) => {
+      const field = input.dataset.noteMetadataField || "";
+      if (field) {
+        payload[field] = input.checked;
+      }
+    });
+    return payload;
+  }
+
+  function metadataChanged() {
+    return JSON.stringify(metadataPayload()) !== JSON.stringify(lastSavedMetadata || {});
   }
 
   function writeDraft() {
@@ -513,7 +530,7 @@
       clearTimeout(saveTimer);
     }
     saveTimer = setTimeout(() => {
-      if (editor.value === lastSaved) {
+      if (editor.value === lastSaved && !metadataChanged()) {
         return;
       }
       void doSave();
@@ -562,7 +579,8 @@
       return;
     }
     const content = editor.value;
-    if (content === lastSaved) {
+    const metadata = metadataPayload();
+    if (content === lastSaved && !metadataChanged()) {
       return;
     }
     inflight = true;
@@ -572,13 +590,14 @@
       const resp = await fetch(saveUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, base_mtime_ns: fileMtimeNs, base_hash: fileHash }),
+        body: JSON.stringify({ content, metadata, base_mtime_ns: fileMtimeNs, base_hash: fileHash }),
       });
       const data = await resp.json();
       if (!resp.ok) {
         throw new Error(data.error || "Unable to save note.");
       }
       lastSaved = content;
+      lastSavedMetadata = metadata;
       if (data.mtime_ns !== undefined) {
         fileMtimeNs = String(data.mtime_ns || "");
         editor.dataset.fileMtimeNs = fileMtimeNs;
@@ -671,6 +690,11 @@
       void doSave();
     });
   }
+  metadataInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      scheduleSave();
+    });
+  });
   if (previewEl) {
     previewEl.addEventListener("click", (evt) => {
       const link = evt.target.closest("a.wiki-link");

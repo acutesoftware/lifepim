@@ -38,7 +38,24 @@
         <tr><th>Date Created</th><td>{{ note.date_created or '' }}</td></tr>
         <tr><th>Date Modified</th><td id="note-meta-modified">{{ note.date_modified }}</td></tr>
         <tr><th>Area</th><td>{{ note.area }}</td></tr>
-        <tr><th>Important</th><td>{{ note.important or '' }}</td></tr>
+        <tr>
+          <th>Template</th>
+          <td>
+            <label>
+              <input type="checkbox" data-note-metadata-field="is_template" {% if note.is_template == 'true' %}checked{% endif %}>
+              Template
+            </label>
+          </td>
+        </tr>
+        <tr>
+          <th>Important</th>
+          <td>
+            <label>
+              <input type="checkbox" data-note-metadata-field="is_important" {% if note.is_important == 'true' or note.important == 'true' %}checked{% endif %}>
+              Important
+            </label>
+          </td>
+        </tr>
         <tr><th>Source Note ID</th><td>{{ note.source_note_id or '' }}</td></tr>
         <tr><th>Updated</th><td>{{ note.updated.strftime('%Y-%m-%d %H:%M') }}</td></tr>
       </table>

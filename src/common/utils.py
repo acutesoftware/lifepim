@@ -103,7 +103,7 @@ def normalize_area_param(value, default=""):
         text = "area." + text[8:]
     elif text == "All Projects":
         text = "All Areas"
-    return "" if text in ("any", "All", "all", "ALL", "spacer") else text
+    return "" if text in ("any", "All", "all", "ALL", "All Areas", "all areas", "ALL AREAS", "spacer") else text
 
 
 def request_area_param(default="", *, include_form=False, include_id=False):

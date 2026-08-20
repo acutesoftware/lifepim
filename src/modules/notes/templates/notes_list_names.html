@@ -3,11 +3,15 @@
   {% include "_notes_list_header.html" %}
   {% include "widgets/area_folders.html" %}
   {% include "_notes_folder_panel.html" %}
+  {% include "_notes_empty_state.html" %}
 
   <ul class="note-list-items note-names-list" id="notes-selection-root" data-notes-context="true" data-bulk-selection-root="true">
     {% for n in notes %}
     <li class="note-list-row link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
       <input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}">
+      {% if n.is_important == 'true' or n.important == 'true' %}
+        <span class="note-important-mark" title="Important" aria-label="Important">!</span>
+      {% endif %}
       <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a>
       <a class="note-button"
          href="{{ url_for('notes.note_popout_route', note_id=n.id) }}"
