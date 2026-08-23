@@ -31,7 +31,12 @@
     {% for n in notes %}
     <tr class="link-draggable" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}">
       <td><input type="checkbox" class="link-select" data-record-type="note" data-record-id="{{ n.id }}" data-record-title="{{ n.file_name }}" aria-label="Select {{ n.file_name }}"></td>
-      <td><a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a></td>
+      <td>
+        {% if n.is_important == 'true' or n.important == 'true' %}
+          <span class="note-important-mark" title="Important" aria-label="Important">!</span>
+        {% endif %}
+        <a href="{{ url_for('notes.view_note_route', note_id=n.id) }}">{{ n.file_name }}</a>
+      </td>
       <td>
         <span class="note-list-dot" style="background:{{ n.list_color_style }};"></span>
       </td>
