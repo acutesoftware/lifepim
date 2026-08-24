@@ -224,6 +224,10 @@ Notebook contents are managed separately from metadata:
 - `Remove` removes the row from the notebook only; it does not delete the source note.
 - `Read` shows readable note entries together in notebook order.
 
+`Available Notes` only offers notes whose markdown source file exists on disk. This prevents stale `lp_notes` rows from being added after a file has been renamed, moved, or deleted outside LifePIM. If a browser already has an old Available Notes form open and that file no longer exists, LifePIM rejects the add action and asks you to sync the folder.
+
+When a note file is renamed outside LifePIM and the containing folder is synced, LifePIM tries to preserve the existing note ID for a conservative same-folder rename. The rename check only applies when a folder has exactly one missing markdown file and one new markdown file with the same recorded size. Broader changes are treated as a new file plus a missing old file, so stale missing rows remain non-destructive but are not offered in Available Notes.
+
 `Notebook` and `Book` use the same underlying collection model and controls. The difference is intent and filtering:
 
 - A `Notebook` is a flexible working collection for research, planning, project notes, or topic grouping.

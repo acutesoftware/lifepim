@@ -2499,12 +2499,19 @@ def _collection_note_ids(collection_items):
     return ids
 
 
+def _note_file_exists_on_disk(note):
+    note_path = _build_note_path(note or {})
+    return bool(note_path and os.path.isfile(note_path))
+
+
 def _note_source_options(area, collection_items, query=""):
     existing = set(_collection_note_ids(collection_items))
     notes = _fetch_notes(area, "date_modified", "desc", limit=50, offset=0)
     query = (query or "").strip().lower()
     options = []
     for note in notes:
+        if not _note_file_exists_on_disk(note):
+            continue
         title = note.get("file_name") or note.get("title") or f"Note {note.get('id')}"
         haystack = f"{title} {note.get('path') or ''}".lower()
         if query and query not in haystack:
@@ -2597,6 +2604,9 @@ def notes_collections_route():
                 collections_mod.delete_collection(collection_id)
                 return redirect(url_for("notes.notes_collections_route", area=area, message="Notebook deleted."))
             elif action == "add_note" and collection_id:
+                note = _load_note_by_id(request.form.get("note_id"))
+                if not note or not _note_file_exists_on_disk(note):
+                    raise ValueError("Note file is missing. Sync the folder and try again.")
                 collections_mod.add_item_to_collection(collection_id, "note", request.form.get("note_id"))
                 message = "Note added."
             elif action == "add_heading" and collection_id:
@@ -4189,6 +4199,7 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
     area_fallbacks = [] if fallback_area else _sync_area_fallbacks(conn, _current_owner_user_id())
     root_lower = folder_path.rstrip("\\").lower()
     existing = {}
+    existing_by_folder = {}
     duplicates = 0
     rows = conn.execute(
         f"SELECT id, {', '.join(tbl['col_list'])} FROM {tbl['name']} "
@@ -4212,10 +4223,11 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
             duplicates += 1
             continue
         existing[key] = row_dict
+        existing_by_folder.setdefault(row_path_lower, {})[key] = row_dict
 
     scan_roots = []
     if recursive:
-        scan_roots = os.walk(folder_path)
+        scan_roots = list(os.walk(folder_path))
     else:
         names = []
         try:
@@ -4233,17 +4245,32 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
     scanned = inserted = updated = unchanged = renamed = 0
     seen = set()
     rename_targets = {}
-    if not recursive:
-        current_keys = {
-            _note_full_path_key(folder_path, name)
-            for _root, _dirs, files in scan_roots
+    current_keys_by_folder = {}
+    current_paths_by_key = {}
+    for root, _dirs, files in scan_roots:
+        root_norm = _normalize_note_path(root)
+        folder_key = root_norm.rstrip("\\").lower()
+        current_keys_by_folder[folder_key] = {
+            _note_full_path_key(root_norm, name)
             for name in files
             if name.lower().endswith(".md")
         }
-        missing_keys = [key for key in existing.keys() if key not in current_keys]
+        for name in files:
+            if name.lower().endswith(".md"):
+                current_paths_by_key[_note_full_path_key(root_norm, name)] = os.path.join(root_norm, name)
+    for folder_key, current_keys in current_keys_by_folder.items():
+        folder_existing = existing_by_folder.get(folder_key, {})
+        missing_keys = [key for key in folder_existing.keys() if key not in current_keys]
         new_keys = [key for key in current_keys if key not in existing]
         if len(missing_keys) == 1 and len(new_keys) == 1:
-            rename_targets[new_keys[0]] = existing[missing_keys[0]]
+            old_row = folder_existing[missing_keys[0]]
+            new_path = current_paths_by_key.get(new_keys[0])
+            try:
+                size_matches = str(old_row.get("size") or "") == str(os.path.getsize(new_path))
+            except OSError:
+                size_matches = False
+            if size_matches:
+                rename_targets[new_keys[0]] = old_row
 
     for root, _, files in scan_roots:
         root_norm = _normalize_note_path(root)

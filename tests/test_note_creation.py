@@ -20,6 +20,8 @@ from common import settings
 from common import search
 from common import utils as common_utils
 from common import areas as areas_mod
+from common import collections as collections_mod
+from common import projects as projects_mod
 from modules.notes import routes as notes_routes
 from modules.admin import routes as admin_routes
 
@@ -1218,6 +1220,26 @@ class TestNoteCreation(unittest.TestCase):
         count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
         self.assertEqual(count, 1)
 
+    def test_recursive_note_sync_preserves_note_id_on_same_folder_rename(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_recursive_rename")
+        folder_a = os.path.join(notes_root, "A")
+        os.makedirs(folder_a, exist_ok=True)
+        old_path = os.path.join(folder_a, "old.md")
+        with open(old_path, "w", encoding="utf-8") as handle:
+            handle.write("same content")
+        notes_routes.full_sync_note_folders([notes_root])
+        tbl = common_utils.get_table_def("notes")
+        note_id = self.conn.execute(f"SELECT id FROM {tbl['name']} WHERE file_name = ?", ("old.md",)).fetchone()["id"]
+
+        os.rename(old_path, os.path.join(folder_a, "new.md"))
+        result = notes_routes.full_sync_note_folders([notes_root])
+
+        self.assertEqual(result["notes"], 1)
+        rows = self.conn.execute(f"SELECT id, file_name FROM {tbl['name']}").fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["id"], note_id)
+        self.assertEqual(rows[0]["file_name"], "new.md")
+
     def test_note_folder_quick_sync_discovers_new_subtree_once(self):
         notes_root = os.path.join(self.tmpdir.name, "folder_new_subtree")
         folder_a = os.path.join(notes_root, "A")
@@ -1475,6 +1497,41 @@ class TestNoteCreation(unittest.TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(calls, [True])
+
+    def test_notebook_available_notes_hide_missing_files_after_external_rename(self):
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "Notebook")
+        old_id, old_created = self._create_note_record("old name", note_dir, area="")
+        new_id, _new_created = self._create_note_record("new name", note_dir, area="")
+        os.remove(old_created["full_path"])
+
+        app = self._notes_test_app()
+        with app.test_request_context("/notes/notebooks"):
+            options = notes_routes._note_source_options(None, [], query="")
+
+        option_ids = {option["id"] for option in options}
+        self.assertNotIn(old_id, option_ids)
+        self.assertIn(new_id, option_ids)
+
+    def test_notebook_add_note_rejects_missing_file(self):
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "Notebook")
+        note_id, created = self._create_note_record("missing notebook source", note_dir, area="")
+        os.remove(created["full_path"])
+        projects_mod.ensure_projects_schema(self.conn)
+        collections_mod.ensure_collections_schema(self.conn)
+        collection_id = collections_mod.create_collection(
+            {"collection_name": "Missing Source Notebook", "collection_domain": "notes", "collection_type": "notebook"},
+            conn=self.conn,
+        )
+
+        response = self._notes_test_app().test_client().post(
+            "/notes/notebooks",
+            data={"action": "add_note", "collection_id": str(collection_id), "note_id": str(note_id)},
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        count = self.conn.execute("SELECT COUNT(1) AS cnt FROM lp_collection_item").fetchone()["cnt"]
+        self.assertEqual(count, 0)
 
     def test_sync_note_rows_uses_area_folder_fallback_area(self):
         notes_dir = os.path.join(self.tmpdir.name, "sync_area")
