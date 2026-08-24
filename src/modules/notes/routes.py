@@ -1057,6 +1057,12 @@ def _notes_page_title(area_label, template_filter="notes"):
     return f"{label} ({area_label})" if area_label else label
 
 
+def _notes_breadcrumb_browser_title(breadcrumb):
+    labels = [(crumb.get("label") or "").strip() for crumb in (breadcrumb or [])]
+    labels = [label for label in labels if label]
+    return " > ".join(labels) or "notes"
+
+
 def _note_bulk_area_options(active_areas=None):
     areas = active_areas if active_areas is not None else areas_mod.areas_list_sidebar()
     return [
@@ -1355,17 +1361,19 @@ def _notes_list_context(
     view_mode = _normalize_note_list_view(view_mode)
     sort_col = _normalize_note_sort_col(sort_col)
     sort_dir = _normalize_note_sort_dir(sort_dir)
+    note_breadcrumb = _note_folder_breadcrumb(folder_filter, area)
     return {
         "active_tab": "notes",
         "tabs": get_tabs(),
         "side_tabs": get_side_tabs(),
+        "browser_title": _notes_breadcrumb_browser_title(note_breadcrumb),
         "content_title": _notes_page_title(area_label, template_filter=template_filter),
         "content_html": "",
         "area_info": area_info,
         "area_folders": area_folders,
         "area": area,
         "folder_filter": folder_filter,
-        "note_breadcrumb": _note_folder_breadcrumb(folder_filter, area),
+        "note_breadcrumb": note_breadcrumb,
         "note_folder_panel_items": _note_folder_panel_items(
             area,
             folder_filter,
@@ -2635,6 +2643,7 @@ def view_note_route(note_id):
         tabs=get_tabs(),
         side_tabs=get_side_tabs(),
         note=note,
+        browser_title=note.get("file_name") or _note_window_title(note),
         content_title="Notes",
         content_html="",
         render_mode=render_mode,
@@ -2714,6 +2723,7 @@ def note_popout_route(note_id):
         "note_popout.html",
         note=note,
         note_title=_note_window_title(note),
+        note_file_name=note.get("file_name") or _note_window_title(note),
         note_text=note_text,
         note_body_text=note_body_text,
         content_html_rendered=content_html,
@@ -2811,7 +2821,7 @@ def _update_note_title_content(note_path, old_title, new_title):
         _write_note_file_content(note_path, updated)
 
 
-def _update_note_file_metadata(note_id, note, file_name, folder_path, area=None, content=None):
+def _update_note_file_metadata(note_id, note, file_name, folder_path, area=None, content=None, log_user_change=True):
     tbl = get_table_def("notes")
     if not tbl:
         return False
@@ -2846,7 +2856,14 @@ def _update_note_file_metadata(note_id, note, file_name, folder_path, area=None,
     if area is not None:
         values_map["area"] = area
     values = [values_map.get(col, "") for col in tbl["col_list"]]
-    ok = data.update_record(data._get_conn(), tbl["name"], note_id, tbl["col_list"], values)
+    ok = data.update_record(
+        data._get_conn(),
+        tbl["name"],
+        note_id,
+        tbl["col_list"],
+        values,
+        log_user_change=log_user_change,
+    )
     if ok:
         _set_note_folder_id(data._get_conn(), tbl["name"], note_id, folder_path)
         try:
@@ -3524,6 +3541,20 @@ def edit_note_route(note_id):
             if note_metadata.get(key):
                 note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
+    if note and tbl:
+        try:
+            lg_usr(
+                action="edit_start",
+                entity_type=tbl["name"],
+                entity_id=note_id,
+                extra={
+                    "file_name": note.get("file_name") or os.path.basename(note_path),
+                    "path": note_path,
+                },
+                conn=data._get_conn(),
+            )
+        except Exception:
+            pass
     note_folder = _normalize_folder_filter(note.get("path")) if note else ""
     breadcrumb_area = note.get("derived_area") or note.get("area") if note else None
     return render_template(
@@ -3537,6 +3568,7 @@ def edit_note_route(note_id):
         note_path=note_path,
         note_state=note_state,
         note_breadcrumb=_note_folder_breadcrumb(note_folder, breadcrumb_area),
+        browser_title=(note.get("file_name") or _note_window_title(note)) if note else "Edit Note",
         content_title=f"Edit: {note.get('file_name')}" if note else "Edit Note",
         project_options=projects_mod.project_list(statuses=("planned", "active")) if note else [],
         record_projects=projects_mod.record_projects("note", note_id) if note else [],
@@ -3597,6 +3629,7 @@ def save_note_route(note_id):
             note.get("file_name") or os.path.basename(note_path),
             _normalize_note_path(note.get("path")) or os.path.dirname(note_path),
             content=content,
+            log_user_change=False,
         )
     link_count = _sync_note_links(note_id, content)
 

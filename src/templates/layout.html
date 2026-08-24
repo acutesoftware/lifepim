@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>LifePIM - {{ active_tab }}</title>
+  <title>LifePIM - {{ browser_title or active_tab }}</title>
   {% if csrf_token is defined %}
   <meta name="csrf-token" content="{{ csrf_token() }}">
   {% endif %}

@@ -689,7 +689,7 @@ def add_record(conn, tbl_name, col_list, value_list):
         return None
 
 
-def update_record(conn, tbl_name, record_id, col_list, value_list):
+def update_record(conn, tbl_name, record_id, col_list, value_list, log_user_change=True):
     """
     Update a row in a table.
 
@@ -726,7 +726,8 @@ def update_record(conn, tbl_name, record_id, col_list, value_list):
         conn.commit()
         _update_folder_id_from_values(conn, tbl_name, col_list, value_list, record_id)
         after = _fetch_row_by_id(conn, tbl_name, record_id)
-        _log_user_change(conn, "update", tbl_name, record_id, before=before, after=after)
+        if log_user_change:
+            _log_user_change(conn, "update", tbl_name, record_id, before=before, after=after)
         return True
     except Exception as exc:
         _log_error(conn, f"update_record failed: {exc}")
