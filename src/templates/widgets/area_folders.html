@@ -1,4 +1,5 @@
 {% if area_info %}
+  {% set folder_items = area_folder_display_items if area_folder_display_items is defined else area_folders %}
   <div class="area-folders" data-collapsible="area-folders">
     <div class="area-folders-header">
       <h4>Folders</h4>
@@ -20,7 +21,7 @@
       </select>
       <button type="submit">Add</button>
     </form>
-    {% if area_folders %}
+    {% if folder_items %}
       <table border="1" cellpadding="4" class="area-folders-table">
         <tr>
           <th>Role</th>
@@ -28,11 +29,13 @@
           <th>Status</th>
           <th>Actions</th>
         </tr>
-        {% for folder in area_folders %}
+        {% for folder in folder_items %}
+          {% set is_detected = folder.source == 'detected' %}
           <tr>
             <td>
-              {% if folder.folder_role == 'default' %}🏠{% elif folder.folder_role == 'include' %}🔗{% elif folder.folder_role == 'archive' %}🗄️{% else %}⚙️{% endif %}
-              {% if folder.folder_role == 'default' %}
+              {% if is_detected %}
+                Detected from notes
+              {% elif folder.folder_role == 'default' %}
                 Default (writes here)
               {% elif folder.folder_role == 'include' %}
                 Included (read-only)
@@ -42,31 +45,47 @@
                 Output
               {% endif %}
             </td>
-            <td>{{ folder.path_prefix }}</td>
-            <td>{% if folder.is_enabled %}Enabled{% else %}Disabled{% endif %}</td>
             <td>
-              <form method="post" action="{{ url_for('notes.sync_area_folder_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <button type="submit">Sync</button>
-              </form>
-              <form method="post" action="{{ url_for('areas.area_folder_open_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <button type="submit">Open</button>
-              </form>
-              {% if folder.folder_role != 'default' %}
-                <form method="post" action="{{ url_for('areas.area_folder_set_default_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
+              {% if is_detected %}
+                <a href="{{ folder.view_url }}">{{ folder.path_prefix }}</a>
+              {% else %}
+                {{ folder.path_prefix }}
+              {% endif %}
+            </td>
+            <td>{% if is_detected %}Detected{% elif folder.is_enabled %}Enabled{% else %}Disabled{% endif %}</td>
+            <td>
+              {% if is_detected %}
+                <form method="post" action="{{ url_for('notes.sync_notes_route') }}" style="display:inline;">
                   <input type="hidden" name="next" value="{{ request.full_path }}">
-                  <button type="submit">Set Default</button>
+                  <input type="hidden" name="area" value="{{ area_info.area_id }}">
+                  <input type="hidden" name="folder" value="{{ folder.path_prefix }}">
+                  <button type="submit">Sync</button>
+                </form>
+                <a href="{{ folder.view_url }}">View</a>
+              {% else %}
+                <form method="post" action="{{ url_for('notes.sync_area_folder_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <button type="submit">Sync</button>
+                </form>
+                <form method="post" action="{{ url_for('areas.area_folder_open_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <button type="submit">Open</button>
+                </form>
+                {% if folder.folder_role != 'default' %}
+                  <form method="post" action="{{ url_for('areas.area_folder_set_default_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
+                    <button type="submit">Set Default</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('areas.area_folder_toggle_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <button type="submit">{% if folder.is_enabled %}Disable{% else %}Enable{% endif %}</button>
+                </form>
+                <form method="post" action="{{ url_for('areas.area_folder_remove_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <button type="submit" onclick="return confirm('Remove folder?');">Remove</button>
                 </form>
               {% endif %}
-              <form method="post" action="{{ url_for('areas.area_folder_toggle_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <button type="submit">{% if folder.is_enabled %}Disable{% else %}Enable{% endif %}</button>
-              </form>
-              <form method="post" action="{{ url_for('areas.area_folder_remove_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <button type="submit" onclick="return confirm('Remove folder?');">Remove</button>
-              </form>
             </td>
           </tr>
         {% endfor %}

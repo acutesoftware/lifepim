@@ -52,9 +52,141 @@ Current list views:
 | Preview | Card layout using rendered markdown preview. |
 | Names only | Compact filename list. |
 
-The Folders panel is included above the list. For a selected Area, it shows the area folder rules and mapped folders that drive creation/sync behavior. The separate Notes folder panel is a navigation aid for drilling through actual note folders.
+The Folders panel is included above the list when a specific area is selected. It combines explicit area folder rules with detected note folders from the matching notes. The separate Subfolders panel is a navigation aid for drilling through child folders under the current folder filter.
 
 The main body is paginated.
+
+### Folders Panel
+
+The `Folders` panel appears on selected area views such as:
+
+```text
+/notes/table?area=food
+```
+
+It has two kinds of rows.
+
+| Row type | Source | Meaning |
+| --- | --- | --- |
+| Explicit folder rule | `lp_area_folders` | A saved area-to-folder rule used by new-note defaults, sync, import/materialization, and area mapping maintenance. |
+| Detected from notes | `lp_notes.path` | A real folder already represented by notes in the selected area. This row is derived from note metadata and is not a saved folder rule. |
+
+This distinction matters because an area can have accurate note results even when it has no explicit folder rules. For example, if three notes have `lp_notes.area = food` and all three live in:
+
+```text
+N:\duncan\LifePIM_Data\DATA\notes\50-Fun\Food
+```
+
+then the Food area list is accurate from saved note metadata. The `Folders` panel should still show that folder as `Detected from notes` so it can be viewed or synced.
+
+Folder panel actions:
+
+| Action | Explicit folder rule | Detected from notes |
+| --- | --- | --- |
+| `Add` | Adds a new saved folder rule for the selected area. | Not applicable. |
+| `Sync` | Syncs that saved area folder rule. | Syncs that detected folder through the scoped Notes sync route. |
+| `Open` | Opens the saved folder in the operating system. | Not shown. |
+| `View` | The path itself is shown as text. | Opens the Notes list filtered to that folder. |
+| `Set Default` | Makes a non-default saved folder the write/default folder. | Not shown because detected rows are not saved rules. |
+| `Disable` / `Enable` | Toggles the saved folder rule. | Not shown. |
+| `Remove` | Removes the saved folder rule. | Not shown. |
+
+When no explicit folder rules and no detected note folders exist for the selected area, the panel shows:
+
+```text
+No folders linked to this area.
+```
+
+### Folder Sync
+
+LifePIM Notes are markdown files on disk, so files may also be changed outside LifePIM in tools such as VS Code, Emacs, Obsidian, Explorer, or command-line scripts.
+
+LifePIM keeps a small folder index in SQLite in `lp_note_folders`. The index stores known Notes folders, their parent/child relationships, and each folder's last observed filesystem modification timestamp.
+
+When a Notes list, grid, table, or preview is opened with a selected area or folder, LifePIM runs a lightweight folder check for the visible Notes folder paths only:
+
+```text
+resolve the selected area/folder to a Notes root
+load known folders for that visible path from SQLite
+stat() that folder path
+if the folder timestamp is unchanged, do nothing
+if the folder timestamp changed, scan that one folder
+```
+
+This means the normal unchanged case should be cheap. LifePIM does not recursively scan every note file each time the Notes tab opens, and it does not treat unrelated area folders such as media or development folders as Notes sync roots.
+
+The first run after the folder index is created is different. If `lp_note_folders` has no row for the visible Notes folder yet, LifePIM performs an initial recursive scan for that selected folder so it can learn the folder tree. After that, routine checks only scan folders whose directory timestamp changed.
+
+Recognized Notes roots include both the shared Notes tree and per-user LAN Notes trees:
+
+```text
+...\DATA\notes
+...\DATA\lan_users\<user>\notes
+```
+
+When a changed folder is scanned, LifePIM reconciles the immediate contents of that folder:
+
+- new `.md` files are added to `lp_notes`
+- renamed files in the same folder are detected conservatively and the existing note row is preserved where possible
+- deleted files are counted as missing, following the existing non-destructive Notes sync behavior
+- new subfolders are discovered and indexed recursively once
+- deleted subfolders are marked missing in `lp_note_folders`
+
+Example:
+
+```text
+N:\duncan\LifePIM_Data\DATA\notes\50-Fun
+```
+
+If you create this file outside LifePIM:
+
+```text
+N:\duncan\LifePIM_Data\DATA\notes\50-Fun\board-game-ideas.md
+```
+
+then the `50-Fun` folder timestamp should change. The next time Notes checks folders, LifePIM scans `50-Fun`, adds `board-game-ideas.md` to `lp_notes`, and the note appears in the Notes list for that folder/area.
+
+If you create a whole new subtree outside LifePIM:
+
+```text
+N:\duncan\LifePIM_Data\DATA\notes\40-Dev\42-HOWTO
+    blender.md
+    python\
+        sqlite.md
+```
+
+then the parent folder is detected as changed. LifePIM discovers the new subtree once, indexes the new folders, and imports the markdown files in those folders.
+
+External edits to the contents of an existing `.md` file do not always change the containing folder timestamp. That is acceptable: opening the note still reads the current file from disk. Folder sync is mainly for structural changes such as new, renamed, moved, or deleted files and folders.
+
+### Full Notes Sync
+
+Use the Notes list sync button to reconcile the current Notes scope from the filesystem. The button label depends on the current filter:
+
+```text
+Notes tab with no area/folder filter -> Full Sync
+Notes tab with an area, folder, or template filter -> Sync
+```
+
+In a filtered view, `Sync` only scans folders for the selected scope. For example, if the `Food` area currently has notes in one Food folder, `Sync` scans that Food folder rather than every configured Notes root.
+
+Use Full Sync when you want LifePIM to rebuild/reconcile all configured Notes roots from the filesystem. It is also available from settings:
+
+```text
+Admin -> Settings -> Notes -> Sync notes
+```
+
+Full Sync is deliberately more expensive than the automatic folder check. It recursively walks the configured Notes roots, refreshes `lp_note_folders`, and reconciles markdown files with `lp_notes`.
+
+Use Full Sync when:
+
+- the folder index may be stale
+- a large external move/rename happened
+- timestamps were preserved by a copy/restore tool
+- a network drive was unavailable during a previous check
+- you want an authoritative repair pass
+
+Full Sync is idempotent and safe to run repeatedly. It adds and updates note rows, but it follows the existing Notes convention for missing files: missing-on-disk notes are counted, not automatically deleted from `lp_notes`.
 
 ### Notebooks and Books
 
@@ -216,9 +348,45 @@ Use this when adding another notes folder without deleting existing notes.
 Do not import the same folder twice unless duplicate rows are acceptable.
 
 
-### Modify Notes outside of LifEPIM
+### Useful Related Buttons
 
-If you add or remove notes in other apps (logging programs, or other text editors), you can refresh the LifePIM metadata via
+```text
+Notes -> Full Sync
+```
+
+From the unfiltered Notes root, run an authoritative recursive folder sync and return to the current Notes list.
+
+```text
+Notes -> filtered Area/Folder/Templates -> Sync
+```
+
+Sync only the folders represented by the current filter and return to the current Notes list.
+
+```text
+Admin -> Settings -> Notes -> Sync notes
+```
+
+Run the same full Notes sync from settings.
+
+```text
+Notes -> select Area -> Folders panel -> Sync
+```
+
+Sync just that mapped area folder.
+
+```text
+Admin -> Settings -> Notes -> Rebuild note search index
+```
+
+Refresh cached note content search. Folder sync indexes scanned files, but rebuild is useful after broader external content changes.
+
+Use `Import Folder` only when append-only import behavior is acceptable. Use folder sync or Full Sync for normal ongoing refresh.
+
+<!-- Older notes below describe the pre-folder-index sync path and are retained only as implementation background. -->
+
+### Historical Sync Notes
+
+Before the folder index, external note changes were normally refreshed via:
 
 ```
     Admin -> Settings -> Notes -> Sync notes
@@ -247,9 +415,9 @@ Sync just that mapped area folder.
 Refresh cached note content search. Sync already indexes scanned files, but rebuild is useful after broader external changes.
 
 
-## Sync Notes
+## Historical Sync Notes
 
-Use sync when markdown files were added or edited outside LifePIM and the database metadata needs to catch up.
+Before the folder index, sync was the main way to catch up after markdown files were added or edited outside LifePIM.
 
 Full notes sync:
 
@@ -274,7 +442,7 @@ Sync is idempotent:
 - counts missing-on-disk rows but does not delete them
 - ignores duplicate database rows after the first matching full path
 
-Use `Import Folder` only when append-only import behavior is acceptable. Use `Sync notes` for normal ongoing refresh.
+Use the current Folder Sync and Full Sync controls above for normal ongoing refresh. Use `Import Folder` only when append-only import behavior is acceptable.
 
 ## Migrate
 
@@ -358,7 +526,7 @@ should map more specifically than:
 N:\duncan\LifePIM_Data\DATA\notes\10-Pers
 ```
 
-The Folders section in Notes is a navigation aid. It shows subfolders for the current notes/area filter so you can drill into the markdown tree.
+The Folders panel behavior is documented in the `Folders Panel` section above. In short, it shows saved `lp_area_folders` rules plus detected folders derived from `lp_notes.path`. Detected rows let you view or sync folders already represented by the selected area, but they are not saved area-folder rules until you add an explicit rule.
 
 If folder/area mapping looks wrong after changing source, run `Migrate notes source` rather than plain `Import Folder`, because migration rewrites the mapping prefixes from the old root to the new root.
 

@@ -43,6 +43,7 @@ def _create_table(conn, tbl):
 class TestNoteCreation(unittest.TestCase):
     def setUp(self):
         notes_routes._NOTE_AREA_MATERIALIZED_KEYS.clear()
+        notes_routes._NOTE_FOLDER_INVALID_PRUNE_DONE = False
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
         self._old_conn = data.conn
@@ -61,6 +62,7 @@ class TestNoteCreation(unittest.TestCase):
             self.tmpdir.cleanup()
         finally:
             notes_routes._NOTE_AREA_MATERIALIZED_KEYS.clear()
+            notes_routes._NOTE_FOLDER_INVALID_PRUNE_DONE = False
             data.conn = self._old_conn
             self.conn.close()
 
@@ -110,8 +112,42 @@ class TestNoteCreation(unittest.TestCase):
             endpoint="projects.add_project_route",
             view_func=lambda: "",
         )
+        app.add_url_rule(
+            "/areas/folders/add",
+            endpoint="areas.area_folder_add_route",
+            view_func=lambda: "",
+            methods=["POST"],
+        )
+        app.add_url_rule(
+            "/areas/folders/<int:area_folder_id>/default",
+            endpoint="areas.area_folder_set_default_route",
+            view_func=lambda area_folder_id: "",
+            methods=["POST"],
+        )
+        app.add_url_rule(
+            "/areas/folders/<int:area_folder_id>/open",
+            endpoint="areas.area_folder_open_route",
+            view_func=lambda area_folder_id: "",
+            methods=["POST"],
+        )
+        app.add_url_rule(
+            "/areas/folders/<int:area_folder_id>/toggle",
+            endpoint="areas.area_folder_toggle_route",
+            view_func=lambda area_folder_id: "",
+            methods=["POST"],
+        )
+        app.add_url_rule(
+            "/areas/folders/<int:area_folder_id>/remove",
+            endpoint="areas.area_folder_remove_route",
+            view_func=lambda area_folder_id: "",
+            methods=["POST"],
+        )
 
         return app
+
+    def _bump_dir_mtime(self, folder_path):
+        current = os.stat(folder_path).st_mtime_ns
+        os.utime(folder_path, ns=(current + 1_000_000_000, current + 1_000_000_000))
 
     def test_unmapped_and_filtered_notes_and_search(self):
         unmapped_dir = os.path.join(self.tmpdir.name, "unmapped")
@@ -500,7 +536,7 @@ class TestNoteCreation(unittest.TestCase):
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("<title>LifePIM Note : Book Ideas</title>", html)
+        self.assertIn("<title>LifePIM - Book Ideas.md</title>", html)
         self.assertIn("<h1>LifePIM Note : Book Ideas</h1>", html)
         self.assertIn("style=\"--note-color: #81ecec;\"", html)
         self.assertIn('id="note-popout-view"', html)
@@ -1067,6 +1103,378 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(result["missing"], 1)
         count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
         self.assertEqual(count, 2)
+
+    def test_note_folder_full_sync_indexes_hierarchy(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_index")
+        os.makedirs(os.path.join(notes_root, "A"), exist_ok=True)
+        os.makedirs(os.path.join(notes_root, "B", "C"), exist_ok=True)
+
+        result = notes_routes.full_sync_note_folders([notes_root])
+
+        self.assertEqual(result["folders"], 4)
+        rows = {
+            row["relative_path"]: row
+            for row in self.conn.execute(
+                "SELECT id, parent_id, relative_path, is_missing FROM lp_note_folders WHERE root_path = ?",
+                (notes_routes._normalize_note_path(notes_root),),
+            ).fetchall()
+        }
+        self.assertEqual(set(rows.keys()), {"", "A", "B", "B/C"})
+        self.assertIsNone(rows[""]["parent_id"])
+        self.assertEqual(rows["B/C"]["parent_id"], rows["B"]["id"])
+        self.assertEqual(rows["B/C"]["is_missing"], 0)
+
+    def test_note_folder_tree_reconciles_notes_once_for_subtree(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_single_reconcile")
+        os.makedirs(os.path.join(notes_root, "A", "B"), exist_ok=True)
+        calls = []
+        original_sync = notes_routes._sync_note_rows
+
+        def tracking_sync(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_sync(*args, **kwargs)
+
+        with patch.object(notes_routes, "_sync_note_rows", side_effect=tracking_sync):
+            notes_routes.add_note_folder_tree(notes_root, notes_root)
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(notes_routes._normalize_note_path(calls[0][0][0]), notes_routes._normalize_note_path(notes_root))
+        self.assertTrue(calls[0][1].get("recursive"))
+
+    def test_note_folder_relative_path_handles_unrelated_windows_drives(self):
+        rel_path = notes_routes._note_folder_rel_path(r"N:\Notes", r"D:\Other")
+
+        self.assertEqual(rel_path, "")
+
+    def test_notes_root_from_path_supports_lan_user_notes_root(self):
+        root = notes_routes._notes_root_from_path(
+            r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes\40-Dev\42-HOWTO"
+        )
+
+        self.assertEqual(root, r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes")
+
+    def test_notes_root_path_derives_lan_user_notes_root(self):
+        tbl = common_utils.get_table_def("notes")
+        note_path = r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes\40-Dev"
+        values_map = {
+            "file_name": "lan.md",
+            "path": note_path,
+            "folder_id": "",
+            "size": "1",
+            "date_modified": "2026-01-01 00:00:00",
+            "area": "",
+        }
+        values = [values_map.get(col, "") for col in tbl["col_list"]]
+        data.add_record(self.conn, tbl["name"], tbl["col_list"], values)
+
+        self.assertEqual(notes_routes._notes_root_path(), r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes")
+
+    def test_note_folder_quick_sync_unchanged_does_not_enumerate(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_no_changes")
+        os.makedirs(os.path.join(notes_root, "A"), exist_ok=True)
+        notes_routes.full_sync_note_folders([notes_root])
+
+        with patch.object(notes_routes.os, "scandir", side_effect=AssertionError("unexpected scandir")):
+            result = notes_routes.check_note_folders([notes_root])
+
+        self.assertEqual(result["dirty"], 0)
+        self.assertEqual(result["refreshed"], 0)
+
+    def test_note_folder_quick_sync_adds_new_file_from_dirty_folder(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_new_file")
+        folder_a = os.path.join(notes_root, "A")
+        os.makedirs(folder_a, exist_ok=True)
+        notes_routes.full_sync_note_folders([notes_root])
+
+        with open(os.path.join(folder_a, "new.md"), "w", encoding="utf-8") as handle:
+            handle.write("new note")
+        self._bump_dir_mtime(folder_a)
+        result = notes_routes.check_note_folders([notes_root])
+
+        self.assertEqual(result["dirty"], 1)
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(f"SELECT file_name, path FROM {tbl['name']} WHERE file_name = ?", ("new.md",)).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["path"], notes_routes._normalize_note_path(folder_a))
+
+    def test_note_folder_quick_sync_preserves_note_id_on_same_folder_rename(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_rename")
+        folder_a = os.path.join(notes_root, "A")
+        os.makedirs(folder_a, exist_ok=True)
+        old_path = os.path.join(folder_a, "old.md")
+        with open(old_path, "w", encoding="utf-8") as handle:
+            handle.write("same content")
+        notes_routes.full_sync_note_folders([notes_root])
+        tbl = common_utils.get_table_def("notes")
+        note_id = self.conn.execute(f"SELECT id FROM {tbl['name']} WHERE file_name = ?", ("old.md",)).fetchone()["id"]
+
+        os.rename(old_path, os.path.join(folder_a, "new.md"))
+        self._bump_dir_mtime(folder_a)
+        result = notes_routes.check_note_folders([notes_root])
+
+        self.assertEqual(result["dirty"], 1)
+        row = self.conn.execute(f"SELECT id, file_name FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
+        self.assertEqual(row["file_name"], "new.md")
+        count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
+        self.assertEqual(count, 1)
+
+    def test_note_folder_quick_sync_discovers_new_subtree_once(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_new_subtree")
+        folder_a = os.path.join(notes_root, "A")
+        os.makedirs(folder_a, exist_ok=True)
+        notes_routes.full_sync_note_folders([notes_root])
+
+        new_folder = os.path.join(folder_a, "NewFolder")
+        nested = os.path.join(new_folder, "Nested")
+        os.makedirs(nested, exist_ok=True)
+        with open(os.path.join(new_folder, "one.md"), "w", encoding="utf-8") as handle:
+            handle.write("one")
+        with open(os.path.join(nested, "two.md"), "w", encoding="utf-8") as handle:
+            handle.write("two")
+        self._bump_dir_mtime(folder_a)
+        result = notes_routes.check_note_folders([notes_root])
+
+        self.assertEqual(result["dirty"], 1)
+        rels = {
+            row["relative_path"]
+            for row in self.conn.execute(
+                "SELECT relative_path FROM lp_note_folders WHERE root_path = ? AND is_missing = 0",
+                (notes_routes._normalize_note_path(notes_root),),
+            ).fetchall()
+        }
+        self.assertIn("A/NewFolder", rels)
+        self.assertIn("A/NewFolder/Nested", rels)
+        tbl = common_utils.get_table_def("notes")
+        count = self.conn.execute(
+            f"SELECT COUNT(1) AS cnt FROM {tbl['name']} WHERE file_name IN ('one.md', 'two.md')"
+        ).fetchone()["cnt"]
+        self.assertEqual(count, 2)
+
+    def test_note_folder_quick_sync_marks_deleted_subtree_missing(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_deleted_subtree")
+        folder_a = os.path.join(notes_root, "A")
+        old_folder = os.path.join(folder_a, "Old")
+        os.makedirs(old_folder, exist_ok=True)
+        notes_routes.full_sync_note_folders([notes_root])
+
+        os.rmdir(old_folder)
+        self._bump_dir_mtime(folder_a)
+        result = notes_routes.check_note_folders([notes_root])
+
+        self.assertEqual(result["dirty"], 1)
+        row = self.conn.execute(
+            "SELECT is_missing FROM lp_note_folders WHERE root_path = ? AND relative_path = ?",
+            (notes_routes._normalize_note_path(notes_root), "A/Old"),
+        ).fetchone()
+        self.assertEqual(row["is_missing"], 1)
+
+    def test_note_folder_quick_sync_unavailable_root_is_non_destructive(self):
+        notes_root = os.path.join(self.tmpdir.name, "folder_unavailable")
+        os.makedirs(os.path.join(notes_root, "A"), exist_ok=True)
+        notes_routes.full_sync_note_folders([notes_root])
+
+        os.rename(notes_root, notes_root + "_offline")
+        try:
+            result = notes_routes.check_note_folders([notes_root])
+        finally:
+            os.rename(notes_root + "_offline", notes_root)
+
+        self.assertEqual(result["checked"], 0)
+        missing = self.conn.execute(
+            "SELECT COUNT(1) AS cnt FROM lp_note_folders WHERE root_path = ? AND is_missing = 1",
+            (notes_routes._normalize_note_path(notes_root),),
+        ).fetchone()["cnt"]
+        self.assertEqual(missing, 0)
+
+    def test_notes_count_without_area_does_not_run_global_folder_check(self):
+        app = self._notes_test_app()
+        with app.test_request_context("/notes"):
+            with patch.object(notes_routes, "check_note_folders", side_effect=AssertionError("global check")):
+                with patch.object(notes_routes, "_check_note_folder_paths", side_effect=AssertionError("visible check")):
+                    notes_routes._count_notes(None, None)
+
+    def test_notes_count_with_area_checks_only_area_folder(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        area_dir = os.path.join(notes_root, "Games")
+        other_dir = os.path.join(notes_root, "Other")
+        os.makedirs(area_dir, exist_ok=True)
+        os.makedirs(other_dir, exist_ok=True)
+        areas_mod.area_upsert(
+            {
+                "area_id": "fun/games",
+                "tab": "FUN",
+                "group_name": "FUN",
+                "area_name": "Games",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add("fun/games", area_dir, folder_role="default", is_write_enabled=1, conn=self.conn)
+        app = self._notes_test_app()
+
+        captured = []
+        with app.test_request_context("/notes?area=fun/games"):
+            with patch.object(notes_routes, "_check_note_folder_paths", side_effect=lambda paths: captured.extend(paths) or {"checked": 0, "dirty": 0, "missing": 0, "refreshed": 0, "new_subtrees": 0, "notes": 0}):
+                notes_routes._count_notes("fun/games", None)
+
+        self.assertEqual(captured, [notes_routes._normalize_note_path(area_dir)])
+
+    def test_notes_count_with_non_note_area_folder_skips_folder_check(self):
+        area_dir = os.path.join(self.tmpdir.name, "Movies")
+        os.makedirs(area_dir, exist_ok=True)
+        areas_mod.area_upsert(
+            {
+                "area_id": "media/movies",
+                "tab": "MEDIA",
+                "group_name": "MEDIA",
+                "area_name": "Movies",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add("media/movies", area_dir, folder_role="default", is_write_enabled=1, conn=self.conn)
+        app = self._notes_test_app()
+
+        with app.test_request_context("/notes?area=media/movies"):
+            with patch.object(notes_routes, "_check_note_folder_paths", side_effect=AssertionError("visible check")):
+                notes_routes._count_notes("media/movies", None)
+
+    def test_configured_note_roots_ignore_non_note_area_folders(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        area_dir = os.path.join(notes_root, "40-Dev")
+        non_note_dir = os.path.join(self.tmpdir.name, "Movies")
+        os.makedirs(area_dir, exist_ok=True)
+        os.makedirs(non_note_dir, exist_ok=True)
+        areas_mod.area_upsert(
+            {
+                "area_id": "dev/howto",
+                "tab": "DEV",
+                "group_name": "DEV",
+                "area_name": "Howto",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add("dev/howto", area_dir, folder_role="default", is_write_enabled=1, conn=self.conn)
+        areas_mod.area_folder_add("dev/howto", non_note_dir, folder_role="include", is_write_enabled=0, conn=self.conn)
+
+        roots = notes_routes._configured_note_roots(create_dirs=False)
+
+        self.assertIn(notes_routes._normalize_note_path(notes_root), roots)
+        self.assertNotIn(notes_routes._normalize_note_path(non_note_dir), roots)
+
+    def test_auto_check_prunes_invalid_folder_index_roots_without_scan(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        invalid_root = os.path.join(self.tmpdir.name, "Movies")
+        os.makedirs(notes_root, exist_ok=True)
+        os.makedirs(invalid_root, exist_ok=True)
+        notes_routes._ensure_note_folders_schema(self.conn)
+        notes_routes._upsert_note_folder_index(self.conn, notes_root, notes_root)
+        notes_routes._upsert_note_folder_index(self.conn, invalid_root, invalid_root)
+        self.conn.commit()
+
+        with patch.object(notes_routes, "_check_note_folder_paths", side_effect=AssertionError("visible check")):
+            result = notes_routes._auto_check_visible_note_folders(None, None)
+
+        self.assertEqual(result["checked"], 0)
+        roots = {
+            row["root_path"]
+            for row in self.conn.execute("SELECT DISTINCT root_path FROM lp_note_folders").fetchall()
+        }
+        self.assertIn(notes_routes._normalize_note_path(notes_root), roots)
+        self.assertNotIn(notes_routes._normalize_note_path(invalid_root), roots)
+
+    def test_filtered_area_header_uses_scoped_sync_label_and_fields(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        food_dir = os.path.join(notes_root, "Food")
+        areas_mod.area_upsert(
+            {
+                "area_id": "food",
+                "tab": "HOME",
+                "group_name": "HOME",
+                "area_name": "Food",
+            },
+            conn=self.conn,
+        )
+        self._create_note_record("recipe", food_dir, area="food")
+
+        response = self._notes_test_app().test_client().get("/notes/table?area=food")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<input type="hidden" name="area" value="food">', html)
+        self.assertIn('<button type="submit">Sync</button>', html)
+        self.assertNotIn('<button type="submit">Full Sync</button>', html)
+
+    def test_area_folder_inset_shows_detected_note_folders_without_links(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        food_dir = os.path.join(notes_root, "Food")
+        areas_mod.area_upsert(
+            {
+                "area_id": "food",
+                "tab": "HOME",
+                "group_name": "HOME",
+                "area_name": "Food",
+            },
+            conn=self.conn,
+        )
+        for idx in range(3):
+            self._create_note_record(f"recipe {idx}", food_dir, area="food")
+
+        response = self._notes_test_app().test_client().get("/notes/table?area=food")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Detected from notes", html)
+        self.assertIn(notes_routes._normalize_note_path(food_dir), html)
+        self.assertNotIn("No folders linked to this area.", html)
+
+    def test_unfiltered_header_keeps_full_sync_label(self):
+        response = self._notes_test_app().test_client().get("/notes/table")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<button type="submit">Full Sync</button>', html)
+
+    def test_sync_route_filtered_area_syncs_only_matching_note_folders(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        food_dir = os.path.join(notes_root, "Food")
+        other_dir = os.path.join(notes_root, "Other")
+        for idx in range(3):
+            self._create_note_record(f"recipe {idx}", food_dir, area="food")
+        self._create_note_record("other", other_dir, area="other")
+
+        captured = []
+        fallback_areas = []
+
+        def fake_sync(paths, fallback_area=""):
+            captured.extend(paths)
+            fallback_areas.append(fallback_area)
+            return {"paths": len(paths), "folders": len(paths), "notes": 3, "missing": 0}
+
+        app = self._notes_test_app()
+        with patch.object(notes_routes, "full_sync_note_folders", side_effect=AssertionError("full sync")):
+            with patch.object(notes_routes, "sync_note_folders", side_effect=fake_sync):
+                response = app.test_client().post(
+                    "/notes/sync",
+                    data={"area": "food", "next": "/notes/table?area=food"},
+                )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(captured, [notes_routes._normalize_note_path(food_dir)])
+        self.assertEqual(fallback_areas, ["food"])
+
+    def test_sync_route_unfiltered_uses_full_sync(self):
+        calls = []
+
+        def fake_full_sync():
+            calls.append(True)
+            return {"roots": 1, "folders": 2, "notes": 3}
+
+        app = self._notes_test_app()
+        with patch.object(notes_routes, "sync_note_folders", side_effect=AssertionError("scoped sync")):
+            with patch.object(notes_routes, "full_sync_note_folders", side_effect=fake_full_sync):
+                response = app.test_client().post("/notes/sync", data={"next": "/notes/table"})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(calls, [True])
 
     def test_sync_note_rows_uses_area_folder_fallback_area(self):
         notes_dir = os.path.join(self.tmpdir.name, "sync_area")

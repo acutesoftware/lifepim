@@ -184,6 +184,13 @@ def _notes_root_from_path(path_value):
     for idx in range(len(parts) - 1):
         if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
             return build_path_from_parts(path_norm, parts[: idx + 2])
+    for idx in range(len(parts) - 3):
+        if (
+            parts[idx].lower() == "data"
+            and parts[idx + 1].lower() == "lan_users"
+            and parts[idx + 3].lower() == "notes"
+        ):
+            return build_path_from_parts(path_norm, parts[: idx + 4])
     return ""
 
 

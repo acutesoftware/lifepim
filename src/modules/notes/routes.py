@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from urllib.parse import urlencode, unquote
 
-from flask import Blueprint, current_app, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, make_response, send_file, abort, jsonify, g, has_request_context
 from flask_login import current_user
 from werkzeug.utils import secure_filename
 
@@ -79,6 +79,8 @@ NOTE_COLOR_OPTIONS = [
     ("Grey", NOTE_COLOR_NAMES["grey"]),
     ("White", NOTE_COLOR_NAMES["white"]),
 ]
+NOTE_FOLDER_SYNC_ROLES = {"default", "include", "archive", "output"}
+_NOTE_FOLDER_INVALID_PRUNE_DONE = False
 NOTEBOOK_COVER_UPLOAD_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 NOTE_VIEW_MODES = {"text", "markdown", "inspect", "hex", "sample", "metadata"}
 NOTE_WIKI_LINK_RE = re.compile(r"(?<!!)\[\[([^\]\n]+)\]\]")
@@ -494,6 +496,85 @@ def _replace_path_prefix(path_value, old_prefix, new_prefix):
 
 def _notes_root_from_path(path_value):
     return user_paths._notes_root_from_path(path_value)
+
+
+def _add_note_root_candidate(roots, path_value, *, create_dirs=False):
+    path_value = _normalize_note_path(path_value)
+    if not path_value:
+        return
+    if create_dirs:
+        try:
+            os.makedirs(path_value, exist_ok=True)
+        except OSError:
+            pass
+    key = user_paths.path_key(path_value)
+    if key and key not in {user_paths.path_key(root) for root in roots}:
+        roots.append(path_value)
+
+
+def _known_note_root_candidates(create_dirs=False):
+    roots = []
+    data_root = _normalize_note_path(getattr(cfg, "data_folder", "") or "")
+    if data_root:
+        _add_note_root_candidate(roots, os.path.join(data_root, "notes"), create_dirs=create_dirs)
+    _add_note_root_candidate(roots, _current_user_notes_root(create_dirs=create_dirs) or "", create_dirs=create_dirs)
+    try:
+        if _table_exists(data._get_conn(), "users"):
+            columns = user_paths.table_columns(data._get_conn(), "users")
+            if "notes_root_path" in columns:
+                rows = data._get_conn().execute(
+                    "SELECT DISTINCT notes_root_path FROM users WHERE COALESCE(TRIM(notes_root_path), '') != ''"
+                ).fetchall()
+                for row in rows:
+                    _add_note_root_candidate(roots, row["notes_root_path"], create_dirs=create_dirs)
+    except Exception:
+        pass
+    return roots
+
+
+def _note_root_for_sync_path(path_value, *, create_dirs=False):
+    path_value = _normalize_note_path(path_value)
+    if not path_value:
+        return ""
+    root_path = _notes_root_from_path(path_value)
+    if root_path:
+        return _normalize_note_path(root_path)
+    for root_path in _known_note_root_candidates(create_dirs=create_dirs):
+        if _path_startswith(path_value, root_path):
+            return _normalize_note_path(root_path)
+    return ""
+
+
+def _maybe_prune_invalid_note_folder_roots(conn=None, valid_roots=None):
+    global _NOTE_FOLDER_INVALID_PRUNE_DONE
+    if _NOTE_FOLDER_INVALID_PRUNE_DONE:
+        return 0
+    conn = data._get_conn() if conn is None else conn
+    try:
+        if not _table_exists(conn, "lp_note_folders"):
+            _NOTE_FOLDER_INVALID_PRUNE_DONE = True
+            return 0
+        valid_keys = {user_paths.path_key(root) for root in valid_roots or [] if root}
+        invalid_roots = []
+        rows = conn.execute("SELECT DISTINCT root_path FROM lp_note_folders").fetchall()
+        for row in rows:
+            root_path = _normalize_note_path(row["root_path"] or "")
+            if not root_path:
+                continue
+            root_key = user_paths.path_key(root_path)
+            canonical_root = _notes_root_from_path(root_path)
+            canonical_key = user_paths.path_key(canonical_root) if canonical_root else ""
+            if root_key in valid_keys or (canonical_key and root_key == canonical_key):
+                continue
+            invalid_roots.append(root_path)
+        for root_path in invalid_roots:
+            conn.execute("DELETE FROM lp_note_folders WHERE root_path = ?", (root_path,))
+        if invalid_roots:
+            conn.commit()
+        _NOTE_FOLDER_INVALID_PRUNE_DONE = True
+        return len(invalid_roots)
+    except Exception:
+        return 0
 
 
 def _note_allowed_asset_roots(note, note_path=None):
@@ -937,6 +1018,9 @@ def _notes_base_condition(area, folder_path=None, template_filter="notes"):
 
 def _count_notes(area, folder_path=None, template_filter="notes"):
     _ensure_notes_schema()
+    if has_request_context() and not getattr(g, "notes_folder_check_done", False):
+        g.notes_folder_check_done = True
+        _auto_check_visible_note_folders(area, folder_path)
     tbl = get_table_def("notes")
     if not tbl:
         return 0
@@ -1182,17 +1266,20 @@ def _notes_root_path(area=None, *, create_dirs=False):
         f"FROM {tbl['name']} t "
         "LEFT JOIN dim_folder df ON df.folder_id = t.folder_id "
         f"WHERE {condition} "
-        "AND lower(replace(t.path, '/', '\\')) LIKE '%\\data\\notes%' "
+        "AND COALESCE(TRIM(t.path), '') != '' "
         "ORDER BY LENGTH(t.path) ASC "
-        "LIMIT 1"
+        "LIMIT 200"
     )
-    row = data._get_conn().execute(sql, params).fetchone()
-    if not row:
-        return _current_user_notes_root(create_dirs=create_dirs) or None
-    parts = [part for part in _normalize_folder_filter(row["path"]).split("\\") if part]
-    for idx in range(len(parts) - 1):
-        if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
-            return "\\".join(parts[: idx + 2])
+    rows = data._get_conn().execute(sql, params).fetchall()
+    for row in rows:
+        root_path = _notes_root_from_path(row["path"])
+        if root_path:
+            if create_dirs:
+                try:
+                    os.makedirs(root_path, exist_ok=True)
+                except OSError:
+                    pass
+            return root_path
     return _current_user_notes_root(create_dirs=create_dirs) or None
 
 
@@ -1328,6 +1415,38 @@ def _note_folder_panel_items(area, folder_filter, area_folders, view_mode, sort_
     return []
 
 
+def _area_folder_display_items(area, area_folders, view_mode, sort_col, sort_dir, template_filter="notes"):
+    items = []
+    seen = set()
+
+    def add_item(path_value, *, source, folder=None):
+        path_value = _normalize_note_path(path_value)
+        if not path_value:
+            return
+        key = user_paths.path_key(path_value)
+        if not key or key in seen:
+            return
+        seen.add(key)
+        item = dict(folder or {})
+        item.update(
+            {
+                "path_prefix": path_value,
+                "source": source,
+                "view_url": _notes_view_url(view_mode, area, path_value, sort_col, sort_dir, template_filter=template_filter),
+            }
+        )
+        items.append(item)
+
+    for folder in area_folders or []:
+        add_item(folder.get("path_prefix") or "", source="linked", folder=folder)
+
+    for path_value in _distinct_note_folder_paths(area, None, template_filter=template_filter):
+        if _note_root_for_sync_path(path_value):
+            add_item(path_value, source="detected")
+
+    return items
+
+
 def _sqlite_int_text_expr(value_expr):
     trimmed = f"trim(COALESCE({value_expr}, ''))"
     return (
@@ -1362,6 +1481,7 @@ def _notes_list_context(
     sort_col = _normalize_note_sort_col(sort_col)
     sort_dir = _normalize_note_sort_dir(sort_dir)
     note_breadcrumb = _note_folder_breadcrumb(folder_filter, area)
+    sync_is_full = not area and not folder_filter and (template_filter or "notes") == "notes"
     return {
         "active_tab": "notes",
         "tabs": get_tabs(),
@@ -1371,6 +1491,14 @@ def _notes_list_context(
         "content_html": "",
         "area_info": area_info,
         "area_folders": area_folders,
+        "area_folder_display_items": _area_folder_display_items(
+            area,
+            area_folders,
+            view_mode,
+            sort_col,
+            sort_dir,
+            template_filter=template_filter,
+        ),
         "area": area,
         "folder_filter": folder_filter,
         "note_breadcrumb": note_breadcrumb,
@@ -1400,6 +1528,7 @@ def _notes_list_context(
         "template_filter": template_filter,
         "templates_url": _notes_view_url(view_mode, area, folder_filter, sort_col, sort_dir, template_filter="templates"),
         "normal_notes_url": _notes_view_url(view_mode, area, folder_filter, sort_col, sort_dir, template_filter="notes"),
+        "sync_button_label": "Full Sync" if sync_is_full else "Sync",
         "route_name": route_name,
         "card_mode": card_mode,
         "note_card_max_chars": (note_settings or {}).get("card_width_chars", NOTE_CARD_MAX_CHARS),
@@ -4045,7 +4174,7 @@ def _ensure_note_areas_materialized(conn):
     return result
 
 
-def _sync_note_rows(folder_path, fallback_area=""):
+def _sync_note_rows(folder_path, fallback_area="", recursive=True):
     _ensure_notes_schema()
     folder_path = _normalize_note_path(folder_path)
     tbl = get_table_def("notes")
@@ -4071,7 +4200,10 @@ def _sync_note_rows(folder_path, fallback_area=""):
         if not row_path:
             continue
         row_path_lower = row_path.lower()
-        if row_path_lower != root_lower and not row_path_lower.startswith(root_lower + "\\"):
+        if recursive:
+            if row_path_lower != root_lower and not row_path_lower.startswith(root_lower + "\\"):
+                continue
+        elif row_path_lower != root_lower:
             continue
         key = _note_full_path_key(row_path, row_dict.get("file_name"))
         if not key:
@@ -4081,9 +4213,39 @@ def _sync_note_rows(folder_path, fallback_area=""):
             continue
         existing[key] = row_dict
 
-    scanned = inserted = updated = unchanged = 0
+    scan_roots = []
+    if recursive:
+        scan_roots = os.walk(folder_path)
+    else:
+        names = []
+        try:
+            with os.scandir(folder_path) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_file() and entry.name.lower().endswith(".md"):
+                            names.append(entry.name)
+                    except OSError:
+                        continue
+        except OSError:
+            names = []
+        scan_roots = [(folder_path, [], names)]
+
+    scanned = inserted = updated = unchanged = renamed = 0
     seen = set()
-    for root, _, files in os.walk(folder_path):
+    rename_targets = {}
+    if not recursive:
+        current_keys = {
+            _note_full_path_key(folder_path, name)
+            for _root, _dirs, files in scan_roots
+            for name in files
+            if name.lower().endswith(".md")
+        }
+        missing_keys = [key for key in existing.keys() if key not in current_keys]
+        new_keys = [key for key in current_keys if key not in existing]
+        if len(missing_keys) == 1 and len(new_keys) == 1:
+            rename_targets[new_keys[0]] = existing[missing_keys[0]]
+
+    for root, _, files in scan_roots:
         root_norm = _normalize_note_path(root)
         for name in files:
             if not name.lower().endswith(".md"):
@@ -4103,6 +4265,11 @@ def _sync_note_rows(folder_path, fallback_area=""):
             key = _note_full_path_key(root_norm, name)
             seen.add(key)
             current = existing.get(key)
+            was_renamed = False
+            if not current and key in rename_targets:
+                current = rename_targets[key]
+                was_renamed = True
+                seen.add(_note_full_path_key(current.get("path"), current.get("file_name")))
             if current:
                 values_map = {col: current.get(col, "") for col in tbl["col_list"]}
                 values_map.update(
@@ -4135,6 +4302,7 @@ def _sync_note_rows(folder_path, fallback_area=""):
                     or str(current.get("is_important") or "false") != str(values_map.get("is_important") or "false")
                     or str(current.get("source_note_id") or "") != str(values_map.get("source_note_id") or "")
                     or not _note_folder_id_matches(conn, current.get("folder_id"), root_norm)
+                    or was_renamed
                 )
                 if needs_update:
                     values = [values_map.get(col, "") for col in tbl["col_list"]]
@@ -4150,7 +4318,10 @@ def _sync_note_rows(folder_path, fallback_area=""):
                             )
                         except Exception:
                             pass
-                        updated += 1
+                        if was_renamed:
+                            renamed += 1
+                        else:
+                            updated += 1
                     else:
                         unchanged += 1
                 else:
@@ -4206,6 +4377,7 @@ def _sync_note_rows(folder_path, fallback_area=""):
         "unchanged": unchanged,
         "missing": missing,
         "duplicates": duplicates,
+        "renamed": renamed,
     }
 
 
@@ -4213,21 +4385,585 @@ def _sync_notes_message(result):
     return (
         f"Synced notes folder {result['folder_path']}: scanned {result['scanned']}, "
         f"inserted {result['inserted']}, updated {result['updated']}, "
-        f"unchanged {result['unchanged']}, missing on disk {result['missing']}, "
+        f"renamed {result.get('renamed', 0)}, unchanged {result['unchanged']}, missing on disk {result['missing']}, "
         f"duplicate DB rows ignored {result['duplicates']}."
     )
 
 
+def _note_folder_index_now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _note_folder_rel_path(root_path, folder_path):
+    root_path = _normalize_note_path(root_path)
+    folder_path = _normalize_note_path(folder_path)
+    if not root_path or not folder_path:
+        return ""
+    try:
+        rel = os.path.relpath(folder_path, root_path)
+    except ValueError:
+        return ""
+    if rel in (".", ""):
+        return ""
+    return rel.replace("\\", "/")
+
+
+def _note_folder_abs_path(root_path, relative_path):
+    relative_path = (relative_path or "").strip().replace("/", os.sep)
+    return _normalize_note_path(os.path.join(root_path, relative_path)) if relative_path else _normalize_note_path(root_path)
+
+
+def _note_folder_name(root_path, relative_path):
+    if not relative_path:
+        return os.path.basename(_normalize_note_path(root_path).rstrip("\\/")) or "notes"
+    return relative_path.rstrip("/").split("/")[-1]
+
+
+def _ensure_note_folders_schema(conn=None):
+    conn = data._get_conn() if conn is None else conn
+    _ensure_notes_schema(conn)
+    if not _table_exists(conn, "lp_note_folders"):
+        data.ensure_notes_schema(conn)
+
+
+def _upsert_note_folder_index(conn, root_path, folder_path, parent_id=None, folder_mtime_ns=None, is_missing=0):
+    root_path = _normalize_note_path(root_path)
+    folder_path = _normalize_note_path(folder_path)
+    relative_path = _note_folder_rel_path(root_path, folder_path)
+    name = _note_folder_name(root_path, relative_path)
+    if folder_mtime_ns is None:
+        try:
+            folder_mtime_ns = os.stat(folder_path).st_mtime_ns
+        except OSError:
+            folder_mtime_ns = None
+    conn.execute(
+        """
+        INSERT INTO lp_note_folders
+            (root_path, parent_id, name, relative_path, folder_mtime_ns, last_scanned_at, is_missing)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(root_path, relative_path) DO UPDATE SET
+            parent_id = excluded.parent_id,
+            name = excluded.name,
+            folder_mtime_ns = excluded.folder_mtime_ns,
+            last_scanned_at = excluded.last_scanned_at,
+            is_missing = excluded.is_missing
+        """,
+        (root_path, parent_id, name, relative_path, folder_mtime_ns, _note_folder_index_now(), int(is_missing or 0)),
+    )
+    row = conn.execute(
+        "SELECT id FROM lp_note_folders WHERE root_path = ? AND relative_path = ?",
+        (root_path, relative_path),
+    ).fetchone()
+    return row["id"] if row else None
+
+
+def _configured_note_roots(create_dirs=False):
+    roots = []
+
+    def add_root(path_value):
+        _add_note_root_candidate(roots, path_value, create_dirs=create_dirs)
+
+    add_root(_notes_root_path(create_dirs=create_dirs) or "")
+    try:
+        areas_mod.ensure_areas_schema(data._get_conn())
+        rows = data._get_conn().execute(
+            "SELECT path_prefix FROM lp_area_folders "
+            "WHERE is_enabled = 1 AND folder_role IN ('default','include','archive','output')"
+        ).fetchall()
+        for row in rows:
+            add_root(_note_root_for_sync_path(row["path_prefix"], create_dirs=create_dirs))
+    except Exception:
+        pass
+
+    normalized = []
+    for root in sorted(roots, key=lambda value: (len(value), value.lower())):
+        if not any(_path_startswith(root, existing) for existing in normalized):
+            normalized.append(root)
+    _maybe_prune_invalid_note_folder_roots(data._get_conn(), normalized)
+    return normalized
+
+
+def _mark_note_folder_missing(conn, folder_id):
+    row = conn.execute("SELECT root_path, relative_path FROM lp_note_folders WHERE id = ?", (folder_id,)).fetchone()
+    if not row:
+        return 0
+    root_path = row["root_path"]
+    relative_path = row["relative_path"] or ""
+    if relative_path:
+        pattern = relative_path.rstrip("/") + "/%"
+        cur = conn.execute(
+            "UPDATE lp_note_folders SET is_missing = 1, last_scanned_at = ? "
+            "WHERE root_path = ? AND (relative_path = ? OR relative_path LIKE ?)",
+            (_note_folder_index_now(), root_path, relative_path, pattern),
+        )
+    else:
+        cur = conn.execute(
+            "UPDATE lp_note_folders SET is_missing = 1, last_scanned_at = ? WHERE root_path = ?",
+            (_note_folder_index_now(), root_path),
+        )
+    conn.commit()
+    return cur.rowcount if cur else 0
+
+
+def _mark_note_folder_path_missing(conn, root_path, folder_path):
+    root_path = _normalize_note_path(root_path)
+    folder_path = _normalize_note_path(folder_path)
+    relative_path = _note_folder_rel_path(root_path, folder_path)
+    row = conn.execute(
+        "SELECT id FROM lp_note_folders WHERE root_path = ? AND relative_path = ?",
+        (root_path, relative_path),
+    ).fetchone()
+    return _mark_note_folder_missing(conn, row["id"]) if row else 0
+
+
+def _note_folder_parent_id(conn, root_path, folder_path):
+    parent_path = _normalize_note_path(os.path.dirname(_normalize_note_path(folder_path)))
+    root_path = _normalize_note_path(root_path)
+    if not parent_path or parent_path.lower() == _normalize_note_path(folder_path).lower():
+        return None
+    if _path_startswith(root_path, parent_path):
+        return None
+    parent_rel = _note_folder_rel_path(root_path, parent_path)
+    row = conn.execute(
+        "SELECT id FROM lp_note_folders WHERE root_path = ? AND relative_path = ? AND is_missing = 0",
+        (root_path, parent_rel),
+    ).fetchone()
+    return row["id"] if row else None
+
+
+def _ensure_note_folder_ancestors(conn, root_path, folder_path):
+    root_path = _normalize_note_path(root_path)
+    folder_path = _normalize_note_path(folder_path)
+    if not root_path or not folder_path or not os.path.isdir(root_path):
+        return None
+    root_id = _upsert_note_folder_index(conn, root_path, root_path, parent_id=None)
+    if user_paths.path_key(folder_path) == user_paths.path_key(root_path):
+        return None
+    try:
+        rel = os.path.relpath(folder_path, root_path)
+    except ValueError:
+        return None
+    if rel in ("", "."):
+        return None
+    parent_id = root_id
+    current_path = root_path
+    parts = [part for part in rel.replace("\\", os.sep).replace("/", os.sep).split(os.sep) if part]
+    for part in parts[:-1]:
+        current_path = _normalize_note_path(os.path.join(current_path, part))
+        if not os.path.isdir(current_path):
+            return parent_id
+        parent_id = _upsert_note_folder_index(conn, root_path, current_path, parent_id=parent_id)
+    return parent_id
+
+
+def add_note_folder_tree(root_path, folder_path, parent_id=None, fallback_area="", reconcile_notes=True):
+    conn = data._get_conn()
+    _ensure_note_folders_schema(conn)
+    root_path = _normalize_note_path(root_path)
+    folder_path = _normalize_note_path(folder_path)
+    if not root_path or not folder_path or not os.path.isdir(folder_path):
+        return {"folders": 0, "notes": 0}
+    folders = 0
+    parent_by_path = {_note_folder_rel_path(root_path, folder_path): parent_id}
+    for current_root, dirs, _files in os.walk(folder_path):
+        current_root = _normalize_note_path(current_root)
+        relative_path = _note_folder_rel_path(root_path, current_root)
+        current_parent_id = parent_by_path.get(relative_path)
+        try:
+            current_mtime = os.stat(current_root).st_mtime_ns
+        except OSError:
+            current_mtime = None
+        folder_id = _upsert_note_folder_index(
+            conn,
+            root_path,
+            current_root,
+            parent_id=current_parent_id,
+            folder_mtime_ns=current_mtime,
+            is_missing=0,
+        )
+        folders += 1
+        for child in dirs:
+            child_abs = _normalize_note_path(os.path.join(current_root, child))
+            parent_by_path[_note_folder_rel_path(root_path, child_abs)] = folder_id
+    notes = 0
+    if reconcile_notes:
+        sync_result = _sync_note_rows(folder_path, fallback_area=fallback_area, recursive=True)
+        notes = sync_result.get("scanned", 0)
+    conn.commit()
+    return {"folders": folders, "notes": notes}
+
+
+def _distinct_note_folder_paths(area=None, folder_filter=None, template_filter="notes"):
+    _ensure_notes_schema()
+    tbl = get_table_def("notes")
+    if not tbl:
+        return []
+    areas_mod.ensure_areas_schema(data._get_conn())
+    condition, params = _notes_base_condition(area, folder_filter, template_filter=template_filter)
+    rows = data._get_conn().execute(
+        f"SELECT DISTINCT rtrim(replace(t.path, '/', '\\')) AS path "
+        f"FROM {tbl['name']} t "
+        f"WHERE {condition} AND COALESCE(TRIM(t.path), '') != ''",
+        params,
+    ).fetchall()
+    return [row["path"] for row in rows if row["path"]]
+
+
+def _note_sync_scope_paths(area=None, folder_filter=None, template_filter="notes"):
+    paths = []
+
+    def add_path(path_value):
+        path_value = _normalize_note_path(path_value)
+        if path_value and _note_root_for_sync_path(path_value):
+            paths.append(path_value)
+
+    if folder_filter:
+        add_path(folder_filter)
+    elif area:
+        if area.lower() != "unmapped":
+            _area_info, area_folders = _area_context(area)
+            for folder in area_folders or []:
+                if int(folder.get("is_enabled") or 0) != 1:
+                    continue
+                if (folder.get("folder_role") or "") not in NOTE_FOLDER_SYNC_ROLES:
+                    continue
+                add_path(folder.get("path_prefix") or "")
+        for path_value in _distinct_note_folder_paths(area, None, template_filter=template_filter):
+            add_path(path_value)
+    elif (template_filter or "notes") == "templates":
+        for path_value in _distinct_note_folder_paths(None, None, template_filter=template_filter):
+            add_path(path_value)
+
+    scoped = []
+    for path_value in sorted(paths, key=lambda value: (len(value), value.lower())):
+        if not any(_path_startswith(path_value, existing) for existing in scoped):
+            scoped.append(path_value)
+    return scoped
+
+
+def sync_note_folders(folder_paths, fallback_area=""):
+    conn = data._get_conn()
+    _ensure_note_folders_schema(conn)
+    total_folders = total_notes = missing = 0
+    active_paths = []
+    seen = set()
+    for folder_path in folder_paths or []:
+        folder_path = _normalize_note_path(folder_path)
+        if not folder_path:
+            continue
+        key = user_paths.path_key(folder_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        if not os.path.isdir(folder_path):
+            continue
+        root_path = _note_root_for_sync_path(folder_path)
+        if not root_path:
+            continue
+        parent_id = _ensure_note_folder_ancestors(conn, root_path, folder_path)
+        missing += _mark_note_folder_path_missing(conn, root_path, folder_path)
+        result = add_note_folder_tree(
+            root_path,
+            folder_path,
+            parent_id=parent_id,
+            fallback_area=fallback_area,
+        )
+        total_folders += result.get("folders", 0)
+        total_notes += result.get("notes", 0)
+        active_paths.append(folder_path)
+    conn.commit()
+    lg_usr(
+        action="notes_sync",
+        entity_type="lp_note_folders",
+        extra={"paths": active_paths, "folders": total_folders, "notes": total_notes, "missing": missing},
+        conn=conn,
+    )
+    return {"paths": len(active_paths), "folders": total_folders, "notes": total_notes, "missing": missing}
+
+
+def _check_note_folder_paths(folder_paths):
+    conn = data._get_conn()
+    _ensure_note_folders_schema(conn)
+    checked = dirty = missing = refreshed = new_subtrees = notes = 0
+    seen = set()
+    for folder_path in folder_paths or []:
+        folder_path = _normalize_note_path(folder_path)
+        if not folder_path:
+            continue
+        key = folder_path.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if not os.path.isdir(folder_path):
+            continue
+        root_path = _note_root_for_sync_path(folder_path)
+        if not root_path:
+            continue
+        root_path = _normalize_note_path(root_path)
+        relative_path = _note_folder_rel_path(root_path, folder_path)
+        row = conn.execute(
+            "SELECT * FROM lp_note_folders WHERE root_path = ? AND relative_path = ?",
+            (root_path, relative_path),
+        ).fetchone()
+        if not row:
+            parent_id = _note_folder_parent_id(conn, root_path, folder_path)
+            result = add_note_folder_tree(root_path, folder_path, parent_id=parent_id)
+            refreshed += result.get("folders", 0)
+            notes += result.get("notes", 0)
+            continue
+        checked += 1
+        try:
+            current_mtime = os.stat(folder_path).st_mtime_ns
+        except FileNotFoundError:
+            missing += _mark_note_folder_missing(conn, row["id"])
+            continue
+        except OSError:
+            continue
+        if str(current_mtime) == str(row["folder_mtime_ns"]):
+            continue
+        dirty += 1
+        result = refresh_note_folder(row)
+        refreshed += result.get("refreshed", 0)
+        new_subtrees += result.get("new_subtrees", 0)
+        notes += result.get("notes", 0)
+    summary = {
+        "checked": checked,
+        "dirty": dirty,
+        "missing": missing,
+        "refreshed": refreshed,
+        "new_subtrees": new_subtrees,
+        "notes": notes,
+    }
+    if dirty or missing or refreshed or new_subtrees:
+        lg_usr(action="notes_folder_check", entity_type="lp_note_folders", extra=summary, conn=conn)
+    return summary
+
+
+def refresh_note_folder(folder_row, fallback_area=""):
+    conn = data._get_conn()
+    _ensure_note_folders_schema(conn)
+    root_path = folder_row["root_path"]
+    relative_path = folder_row["relative_path"] or ""
+    folder_path = _note_folder_abs_path(root_path, relative_path)
+    if not os.path.isdir(folder_path):
+        missing = _mark_note_folder_missing(conn, folder_row["id"])
+        return {"refreshed": 0, "missing_folders": missing, "new_subtrees": 0, "notes": 0}
+
+    existing_children = {
+        row["relative_path"]: row
+        for row in conn.execute(
+            "SELECT * FROM lp_note_folders WHERE root_path = ? AND parent_id = ?",
+            (root_path, folder_row["id"]),
+        ).fetchall()
+    }
+    seen_child_rel = set()
+    new_subtrees = 0
+    missing_folders = 0
+    try:
+        with os.scandir(folder_path) as entries:
+            for entry in entries:
+                try:
+                    if not entry.is_dir():
+                        continue
+                except OSError:
+                    continue
+                child_path = _normalize_note_path(entry.path)
+                child_rel = _note_folder_rel_path(root_path, child_path)
+                seen_child_rel.add(child_rel)
+                child_row = existing_children.get(child_rel)
+                if not child_row or int(child_row["is_missing"] or 0):
+                    result = add_note_folder_tree(root_path, child_path, parent_id=folder_row["id"], fallback_area=fallback_area)
+                    new_subtrees += result.get("folders", 0)
+                else:
+                    conn.execute(
+                        "UPDATE lp_note_folders SET parent_id = ?, name = ?, is_missing = 0 WHERE id = ?",
+                        (folder_row["id"], _note_folder_name(root_path, child_rel), child_row["id"]),
+                    )
+    except OSError:
+        return {"refreshed": 0, "missing_folders": 0, "new_subtrees": 0, "notes": 0}
+
+    for child_rel, child_row in existing_children.items():
+        if child_rel not in seen_child_rel:
+            missing_folders += _mark_note_folder_missing(conn, child_row["id"])
+
+    sync_result = _sync_note_rows(folder_path, fallback_area=fallback_area, recursive=False)
+    try:
+        folder_mtime_ns = os.stat(folder_path).st_mtime_ns
+    except OSError:
+        folder_mtime_ns = None
+    _upsert_note_folder_index(
+        conn,
+        root_path,
+        folder_path,
+        parent_id=folder_row["parent_id"],
+        folder_mtime_ns=folder_mtime_ns,
+        is_missing=0,
+    )
+    conn.commit()
+    return {
+        "refreshed": 1,
+        "missing_folders": missing_folders,
+        "new_subtrees": new_subtrees,
+        "notes": sync_result.get("scanned", 0),
+        "inserted": sync_result.get("inserted", 0),
+        "updated": sync_result.get("updated", 0),
+        "renamed": sync_result.get("renamed", 0),
+        "missing_notes": sync_result.get("missing", 0),
+    }
+
+
+def full_sync_note_folders(roots=None):
+    conn = data._get_conn()
+    _ensure_note_folders_schema(conn)
+    roots = roots or _configured_note_roots(create_dirs=True)
+    total_folders = total_notes = 0
+    active_roots = []
+    for root_path in roots:
+        root_path = _normalize_note_path(root_path)
+        if not root_path or not os.path.isdir(root_path):
+            continue
+        active_roots.append(root_path)
+        conn.execute("UPDATE lp_note_folders SET is_missing = 1 WHERE root_path = ?", (root_path,))
+        result = add_note_folder_tree(root_path, root_path)
+        total_folders += result.get("folders", 0)
+        total_notes += result.get("notes", 0)
+    conn.commit()
+    lg_usr(
+        action="notes_full_sync",
+        entity_type="lp_note_folders",
+        extra={"roots": active_roots, "folders": total_folders, "notes": total_notes},
+        conn=conn,
+    )
+    return {"roots": len(active_roots), "folders": total_folders, "notes": total_notes}
+
+
+def check_note_folders(roots=None):
+    conn = data._get_conn()
+    _ensure_note_folders_schema(conn)
+    roots = roots or _configured_note_roots(create_dirs=False)
+    checked = dirty = missing = refreshed = new_subtrees = notes = 0
+    for root_path in roots:
+        root_path = _normalize_note_path(root_path)
+        if not root_path:
+            continue
+        if not os.path.isdir(root_path):
+            continue
+        row_count = conn.execute(
+            "SELECT COUNT(1) AS cnt FROM lp_note_folders WHERE root_path = ?",
+            (root_path,),
+        ).fetchone()["cnt"]
+        if not row_count:
+            result = add_note_folder_tree(root_path, root_path)
+            refreshed += result.get("folders", 0)
+            notes += result.get("notes", 0)
+            continue
+        rows = conn.execute(
+            "SELECT * FROM lp_note_folders WHERE root_path = ? AND is_missing = 0 ORDER BY LENGTH(relative_path), relative_path",
+            (root_path,),
+        ).fetchall()
+        for row in rows:
+            current_row = conn.execute("SELECT is_missing FROM lp_note_folders WHERE id = ?", (row["id"],)).fetchone()
+            if current_row and int(current_row["is_missing"] or 0):
+                continue
+            checked += 1
+            folder_path = _note_folder_abs_path(row["root_path"], row["relative_path"] or "")
+            try:
+                current_mtime = os.stat(folder_path).st_mtime_ns
+            except FileNotFoundError:
+                missing += _mark_note_folder_missing(conn, row["id"])
+                continue
+            except OSError:
+                continue
+            if str(current_mtime) == str(row["folder_mtime_ns"]):
+                continue
+            dirty += 1
+            result = refresh_note_folder(row)
+            refreshed += result.get("refreshed", 0)
+            new_subtrees += result.get("new_subtrees", 0)
+            notes += result.get("notes", 0)
+    summary = {
+        "checked": checked,
+        "dirty": dirty,
+        "missing": missing,
+        "refreshed": refreshed,
+        "new_subtrees": new_subtrees,
+        "notes": notes,
+    }
+    if dirty or missing or refreshed or new_subtrees:
+        lg_usr(action="notes_folder_check", entity_type="lp_note_folders", extra=summary, conn=conn)
+    return summary
+
+
+def _auto_check_note_folders():
+    try:
+        return check_note_folders()
+    except Exception as exc:
+        try:
+            lg_usr(
+                action="notes_folder_check_failed",
+                entity_type="lp_note_folders",
+                extra={"error": str(exc)},
+                conn=data._get_conn(),
+            )
+        except Exception:
+            pass
+    return {"checked": 0, "dirty": 0, "missing": 0, "refreshed": 0, "new_subtrees": 0, "notes": 0}
+
+
+def _auto_check_visible_note_folders(area=None, folder_filter=None):
+    paths = []
+    if folder_filter:
+        paths.append(folder_filter)
+    elif area and area.lower() != "unmapped":
+        _area_info, area_folders = _area_context(area)
+        for folder in area_folders or []:
+            if int(folder.get("is_enabled") or 0) != 1:
+                continue
+            if (folder.get("folder_role") or "") not in NOTE_FOLDER_SYNC_ROLES:
+                continue
+            folder_path = folder.get("path_prefix") or ""
+            if _note_root_for_sync_path(folder_path):
+                paths.append(folder_path)
+    valid_roots = _known_note_root_candidates()
+    valid_roots.extend(_note_root_for_sync_path(path) for path in paths)
+    _maybe_prune_invalid_note_folder_roots(data._get_conn(), valid_roots)
+    if not paths:
+        return {"checked": 0, "dirty": 0, "missing": 0, "refreshed": 0, "new_subtrees": 0, "notes": 0}
+    try:
+        return _check_note_folder_paths(paths)
+    except Exception as exc:
+        try:
+            lg_usr(
+                action="notes_folder_check_failed",
+                entity_type="lp_note_folders",
+                extra={"error": str(exc), "scope": "visible", "paths": paths[:20]},
+                conn=data._get_conn(),
+            )
+        except Exception:
+            pass
+    return {"checked": 0, "dirty": 0, "missing": 0, "refreshed": 0, "new_subtrees": 0, "notes": 0}
+
+
 @notes_bp.route('/sync', methods=["POST"])
 def sync_notes_route():
-    folder_path = request.form.get("notes_folder", "").strip()
-    if not folder_path:
-        folder_path = _notes_root_path(create_dirs=True) or ""
+    folder_path = request.form.get("folder") or request.form.get("notes_folder", "")
+    folder_path = _normalize_folder_filter(folder_path)
+    area = _normalize_area(request.form.get("area"))
+    template_filter = "templates" if request.form.get("templates") else "notes"
+    next_url = request.form.get("next") or ""
     try:
-        result = _sync_note_rows(folder_path)
-        msg = _sync_notes_message(result)
+        if folder_path or area or template_filter == "templates":
+            paths = _note_sync_scope_paths(area, folder_path, template_filter=template_filter)
+            result = sync_note_folders(paths, fallback_area=area or "")
+            msg = f"Notes sync complete: {result['folders']} folders, {result['notes']} notes."
+        else:
+            result = full_sync_note_folders()
+            msg = f"Notes full sync complete: {result['folders']} folders, {result['notes']} notes."
     except Exception as exc:
         msg = f"Notes sync failed: {exc}"
+    if next_url:
+        sep = "&" if "?" in next_url else "?"
+        return redirect(f"{next_url}{sep}{urlencode({'message': msg})}")
     return redirect(url_for("admin.settings_route", tab="notes", message=msg))
 
 

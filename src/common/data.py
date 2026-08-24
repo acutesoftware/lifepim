@@ -254,7 +254,10 @@ def ensure_notes_schema(conn=None):
                 rows = conn.execute("PRAGMA table_info(lp_notes)").fetchall()
                 existing = {row[1].lower() for row in rows}
                 expected = {col.lower() for col in NOTE_SCHEMA_COLUMNS}
-                if expected.issubset(existing):
+                folder_row = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='lp_note_folders'"
+                ).fetchone()
+                if expected.issubset(existing) and folder_row:
                     return
         except Exception:
             pass
@@ -276,6 +279,24 @@ def ensure_notes_schema(conn=None):
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_path ON lp_notes(path)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_date_modified ON lp_notes(date_modified)")
     conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_notes_rec_extract_date ON lp_notes(rec_extract_date)")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS lp_note_folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_path TEXT NOT NULL,
+            parent_id INTEGER,
+            name TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            folder_mtime_ns INTEGER,
+            last_scanned_at TEXT,
+            is_missing INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(root_path, relative_path)
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_note_folders_root ON lp_note_folders(root_path)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_note_folders_parent ON lp_note_folders(parent_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_lp_note_folders_missing ON lp_note_folders(is_missing)")
     conn.commit()
     _NOTES_SCHEMA_READY_CONN_IDS.add(conn_id)
 
