@@ -251,7 +251,7 @@ The note view header shows the filename, breadcrumb navigation, and controls:
 - Color dot and color selector.
 - `Rename`.
 - Area selector.
-- `Assign Area`, which changes metadata/front matter without moving the file.
+- `Assign Area`, which changes the saved note metadata without moving the file.
 - `Move File`, which moves the markdown file to the selected Area's default folder.
 - `Convert to HOWTO`.
 - `Delete this file`, which moves the file to the notes `deleted` folder and removes the DB row.
@@ -266,7 +266,7 @@ View modes:
 | Markdown | Renders markdown, including LifePIM `[img]...[/img]` tags. |
 | Hex | Shows a hex/ascii dump. |
 | Sample | Shows the first and last configured number of lines. |
-| Metadata | Shows database metadata, parsed front matter, and raw front matter. |
+| Metadata | Shows database metadata from `lp_notes`. |
 
 ### Add Notes
 
@@ -274,7 +274,7 @@ New notes can be created from the Notes UI. The app writes a new `.md` file into
 
 The selected area normally needs a default folder configured in `lp_area_folders`. The new note picker uses `/notes/api/new-note-options` to find the default folder and any additional enabled folders for the selected area. If area folder mapping is not in use, the user notes root can be used as a fallback.
 
-New note creation writes front matter, populates `lp_notes.path`, `lp_notes.folder_id`, `lp_notes.area`, `lp_notes.color`, and file size/date metadata, then opens the new note.
+New note creation writes the markdown body only, populates `lp_notes.path`, `lp_notes.folder_id`, `lp_notes.area`, `lp_notes.color`, and file size/date metadata, then opens the new note.
 
 ### Edit Notes
 
@@ -285,7 +285,7 @@ Saving a note updates the markdown file on disk. The app also updates the note m
 - `size`
 - `date_modified`
 - `rec_extract_date`
-- front-matter-backed fields such as title, color, area, important, and source note id when present
+- database-backed fields such as title, color, area, important, and source note id
 
 This means edits made through LifePIM keep the database metadata current.
 

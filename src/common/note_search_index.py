@@ -50,6 +50,16 @@ def read_note_text(path: str) -> str:
         return ""
 
 
+def strip_front_matter(text: str) -> str:
+    lines = (text or "").splitlines(keepends=True)
+    if not lines or lines[0].strip() != "---":
+        return text or ""
+    for idx, line in enumerate(lines[1:], 1):
+        if line.strip() in ("---", "..."):
+            return "".join(lines[idx + 1 :])
+    return text or ""
+
+
 def upsert_note(
     note_id: int,
     note_path: str,
@@ -67,6 +77,7 @@ def upsert_note(
         return False
     if content is None:
         content = read_note_text(note_path)
+    content = strip_front_matter(content)
     indexed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     conn.execute(
         """
@@ -93,7 +104,7 @@ def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
     conn = ensure_schema(conn)
     rows = conn.execute(
         """
-        SELECT id, file_name, path, size, date_modified, area
+        SELECT id, file_name, path, size, date_modified, area, title
         FROM lp_notes
         WHERE COALESCE(file_name, '') != ''
         """
@@ -115,7 +126,7 @@ def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
         except OSError:
             missing += 1
             continue
-        content = read_note_text(note_path)
+        content = strip_front_matter(read_note_text(note_path))
         conn.execute(
             """
             INSERT OR REPLACE INTO lp_note_search_index
@@ -127,7 +138,7 @@ def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
                 note_path,
                 stat.st_mtime,
                 stat.st_size,
-                note.get("file_name") or "",
+                note.get("title") or note.get("file_name") or "",
                 content,
                 indexed_at,
             ),

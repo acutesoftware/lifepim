@@ -343,6 +343,25 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn("&lt;div", note["preview_html"])
         self.assertIn("<strong>bold</strong>", note["preview_html"])
 
+    def test_note_search_index_strips_front_matter_and_uses_database_title(self):
+        note_dir = os.path.join(self.tmpdir.name, "search_index_metadata")
+        note_id, created = self._create_note_record("indexed note", note_dir, area="")
+        with open(created["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("---\ntitle: File Title\nis_template: true\n---\n\nBody text")
+        tbl = common_utils.get_table_def("notes")
+        self.conn.execute(f"UPDATE {tbl['name']} SET title = ? WHERE id = ?", ("Database Title", note_id))
+        self.conn.commit()
+
+        note_search_index.rebuild_index(self.conn)
+
+        row = self.conn.execute(
+            "SELECT title, content_text FROM lp_note_search_index WHERE note_id = ?",
+            (note_id,),
+        ).fetchone()
+        self.assertEqual(row["title"], "Database Title")
+        self.assertEqual(row["content_text"], "\nBody text")
+        self.assertNotIn("is_template", row["content_text"])
+
     def test_fetch_notes_does_not_read_front_matter(self):
         note_dir = os.path.join(self.tmpdir.name, "metadata_only")
         note_id, _ = self._create_note_record("metadata_only", note_dir, area="")
@@ -474,7 +493,7 @@ class TestNoteCreation(unittest.TestCase):
             "---\ntitle: Meta\ncolor: Blue\n---",
         )
 
-    def test_set_note_color_updates_front_matter_and_database(self):
+    def test_set_note_color_updates_database_only(self):
         note_dir = os.path.join(self.tmpdir.name, "color_update")
         note_id, created = self._create_note_record("color update", note_dir, area="")
 
@@ -482,12 +501,35 @@ class TestNoteCreation(unittest.TestCase):
 
         with open(created["full_path"], "r", encoding="utf-8") as handle:
             text = handle.read()
-        self.assertIn("color: Blue", text)
+        self.assertNotIn("color: Blue", text)
         tbl = common_utils.get_table_def("notes")
         row = self.conn.execute(f"SELECT color FROM {tbl['name']} WHERE id = ?", (note_id,)).fetchone()
         self.assertEqual(row["color"], "Blue")
 
-    def test_note_view_metadata_mode_hides_body_and_shows_front_matter(self):
+    def test_note_view_uses_database_metadata_not_front_matter(self):
+        note_dir = os.path.join(self.tmpdir.name, "view_db_metadata")
+        note_id, created = self._create_note_record("view db metadata", note_dir, area="")
+        tbl = common_utils.get_table_def("notes")
+        self.conn.execute(
+            f"UPDATE {tbl['name']} SET title = ?, color = ?, area = ?, is_template = ?, is_important = ? WHERE id = ?",
+            ("Database Title", "Green", "db/area", "true", "true", note_id),
+        )
+        self.conn.commit()
+        with open(created["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("---\ntitle: File Title\ncolor: Blue\narea: file/area\nis_template: false\nis_important: false\n---\n\nBody text")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{note_id}?format=metadata")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Database Title", html)
+        self.assertIn("db/area", html)
+        self.assertIn("Template</th><td>Yes", html)
+        self.assertIn("Important</th><td>Yes", html)
+        self.assertNotIn("Front Matter", html)
+        self.assertNotIn("File Title", html)
+
+    def test_note_view_metadata_mode_hides_body_and_front_matter(self):
         note_dir = os.path.join(self.tmpdir.name, "metadata_view")
         note_id, created = self._create_note_record("metadata view", note_dir, area="")
         with open(created["full_path"], "w", encoding="utf-8") as handle:
@@ -497,9 +539,10 @@ class TestNoteCreation(unittest.TestCase):
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Front Matter", html)
-        self.assertIn("Meta View", html)
-        self.assertIn("color", html)
+        self.assertIn("metadata view.md", html)
+        self.assertNotIn("Front Matter", html)
+        self.assertNotIn("Meta View", html)
+        self.assertNotIn("color: Blue", html)
         self.assertNotIn("Body text", html)
 
     def test_note_view_markdown_mode_shows_body_without_front_matter(self):
@@ -531,6 +574,9 @@ class TestNoteCreation(unittest.TestCase):
     def test_note_popout_route_renders_minimal_note_window(self):
         note_dir = os.path.join(self.tmpdir.name, "popout_view")
         note_id, created = self._create_note_record("Book Ideas", note_dir, area="")
+        tbl = common_utils.get_table_def("notes")
+        self.conn.execute(f"UPDATE {tbl['name']} SET color = ? WHERE id = ?", ("Blue", note_id))
+        self.conn.commit()
         with open(created["full_path"], "w", encoding="utf-8") as handle:
             handle.write("---\ntitle: Book Ideas\ncolor: Blue\n---\n\n# Book Ideas\n\nSome **notes** here.")
 
@@ -547,6 +593,8 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn('id="note-popout-close"', html)
         self.assertIn("<strong>notes</strong>", html)
         self.assertIn(f'data-save-url="/notes/api/save/{note_id}"', html)
+        self.assertNotIn("title: Book Ideas", html)
+        self.assertNotIn("color: Blue", html)
         self.assertNotIn('class="topbar"', html)
         self.assertNotIn('class="side-tabs"', html)
         self.assertNotIn("Open Folder", html)
@@ -1637,7 +1685,7 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(row["path"], notes_routes._normalize_note_path(note_dir))
         with open(new_path, "r", encoding="utf-8") as handle:
             text = handle.read()
-        self.assertIn('title: "new title"', text)
+        self.assertNotIn("title:", text)
         self.assertIn("# new title", text)
 
     def test_move_note_updates_area_folder_and_metadata(self):
@@ -1698,7 +1746,7 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(row["area"], area_id)
         with open(created["full_path"], "r", encoding="utf-8") as handle:
             text = handle.read()
-        self.assertIn("area: make/new", text)
+        self.assertNotIn("area: make/new", text)
         filtered_ids = {note.get("id") for note in notes_routes._fetch_notes(area_id)}
         self.assertIn(note_id, filtered_ids)
 
@@ -1810,9 +1858,8 @@ class TestNoteCreation(unittest.TestCase):
         note, _tbl = notes_routes._get_note_record(note_id)
         self.assertEqual(note["is_template"], "false")
         self.assertEqual(note["is_important"], "false")
-        metadata = notes_routes._note_metadata_from_file(created["full_path"])
-        self.assertEqual(metadata["is_template"], "false")
-        self.assertEqual(metadata["is_important"], "false")
+        with open(created["full_path"], "r", encoding="utf-8") as handle:
+            self.assertNotEqual(handle.read().splitlines()[0], "---")
 
         app = Flask(__name__)
         app.register_blueprint(notes_routes.notes_bp)
@@ -1836,8 +1883,8 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(row["is_important"], "true")
         with open(created["full_path"], "r", encoding="utf-8") as handle:
             text = handle.read()
-        self.assertIn("is_template: true", text)
-        self.assertIn("is_important: true", text)
+        self.assertNotIn("is_template:", text)
+        self.assertNotIn("is_important:", text)
 
     def test_template_filter_returns_only_template_notes(self):
         note_dir = os.path.join(self.tmpdir.name, "template_filter")
@@ -1923,8 +1970,8 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn("Date: 2026-08-20", copied)
         self.assertIn("Time: 15:54", copied)
         self.assertIn("{{unknown}}", copied)
-        self.assertIn("is_template: false", copied)
-        self.assertIn("is_important: false", copied)
+        self.assertNotIn("is_template:", copied)
+        self.assertNotIn("is_important:", copied)
         new_note, _tbl = notes_routes._get_note_record(result["note_id"])
         self.assertEqual(new_note["is_template"], "false")
         self.assertEqual(new_note["is_important"], "false")

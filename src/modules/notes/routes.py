@@ -221,91 +221,6 @@ def _front_matter_block_text(text):
     return ""
 
 
-def _front_matter_scalar_text(value):
-    value = str(value or "").strip()
-    if not value:
-        return '""'
-    if value.startswith("#") or any(ch in value for ch in ('"', "'", ":", "\r", "\n")):
-        return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-    return value
-
-
-def _set_note_front_matter_field(note_path, key, value, aliases=None):
-    aliases = {key.lower(), *{alias.lower() for alias in (aliases or [])}}
-    text = _read_note_file(note_path)
-    value_line = f"{key}: {_front_matter_scalar_text(value)}\n"
-    lines = text.splitlines(keepends=True)
-    if lines and lines[0].strip() == "---":
-        end_idx = None
-        for idx, line in enumerate(lines[1:], 1):
-            if line.strip() in ("---", "..."):
-                end_idx = idx
-                break
-        if end_idx is not None:
-            for idx in range(1, end_idx):
-                if ":" not in lines[idx]:
-                    continue
-                field_name = lines[idx].split(":", 1)[0].strip().lower().replace(" ", "_")
-                if field_name in aliases:
-                    newline = "\r\n" if lines[idx].endswith("\r\n") else "\n"
-                    lines[idx] = value_line.rstrip("\n") + newline
-                    return _write_note_file_content(note_path, "".join(lines))
-            lines.insert(end_idx, value_line)
-            return _write_note_file_content(note_path, "".join(lines))
-    updated = "---\n" + value_line + "---\n\n" + text
-    return _write_note_file_content(note_path, updated)
-
-
-def _set_note_front_matter_fields_text(text, fields):
-    cleaned_fields = [
-        (key, _front_matter_scalar_text(value), {key.lower(), *{alias.lower() for alias in aliases}})
-        for key, value, aliases in fields
-    ]
-    if not cleaned_fields:
-        return text or ""
-    lines = (text or "").splitlines(keepends=True)
-    if lines and lines[0].strip() == "---":
-        end_idx = None
-        for idx, line in enumerate(lines[1:], 1):
-            if line.strip() in ("---", "..."):
-                end_idx = idx
-                break
-        if end_idx is not None:
-            written = set()
-            for idx in range(1, end_idx):
-                if ":" not in lines[idx]:
-                    continue
-                field_name = lines[idx].split(":", 1)[0].strip().lower().replace(" ", "_")
-                for key, value, aliases in cleaned_fields:
-                    if field_name not in aliases:
-                        continue
-                    newline = "\r\n" if lines[idx].endswith("\r\n") else "\n"
-                    lines[idx] = f"{key}: {value}{newline}"
-                    written.add(key)
-                    break
-            insert_at = end_idx
-            for key, value, _aliases in cleaned_fields:
-                if key not in written:
-                    lines.insert(insert_at, f"{key}: {value}\n")
-                    insert_at += 1
-            return "".join(lines)
-    front_matter = ["---\n"]
-    for key, value, _aliases in cleaned_fields:
-        front_matter.append(f"{key}: {value}\n")
-    front_matter.append("---\n\n")
-    return "".join(front_matter) + (text or "")
-
-
-def _note_metadata_fields_for_content(metadata):
-    metadata = metadata or {}
-    fields = []
-    if "is_template" in metadata:
-        fields.append(("is_template", _note_bool_text(metadata.get("is_template")), ("template",)))
-    if "is_important" in metadata:
-        fields.append(("is_important", _note_bool_text(metadata.get("is_important")), ("important",)))
-    return fields
-
-
 def _front_matter_value(front_matter, keys):
     for key in keys:
         value = front_matter.get(key)
@@ -738,28 +653,9 @@ def _table_columns(conn, table_name):
 
 
 def _note_template(title, created_utc, sidebar_label, body_content=None, is_template=False, is_important=False):
-    title_value = (title or "").replace("\n", " ").replace("\r", " ").strip()
-    escaped_title = title_value.replace('"', '\\"')
-    area_value = (sidebar_label or "").replace("\n", " ").replace("\r", " ").strip()
-    lines = [
-        "---",
-        f'title: "{escaped_title}"',
-        f"color: {DEFAULT_NOTE_COLOR}",
-        f"area: {area_value}",
-        f"date_created: {created_utc}",
-        f"date_modified: {created_utc}",
-        f"is_template: {_note_bool_text(is_template)}",
-        f"is_important: {_note_bool_text(is_important)}",
-    ]
-    lines.append("---")
-    lines.append("")
     if body_content is None:
-        lines.append(f"# {title}")
-        lines.append("")
-        lines.append("")
-    else:
-        lines.append(body_content)
-    return "\n".join(lines)
+        return f"# {title}\n\n"
+    return body_content
 
 
 def _write_note_file(folder_path, base_name, content):
@@ -1183,14 +1079,18 @@ def _note_display_settings():
         }
 
 
-def _note_body_text(markdown_text, file_name="", title=""):
+def _strip_note_front_matter_text(markdown_text):
     text = markdown_text or ""
     lines = text.splitlines(keepends=True)
     if lines and lines[0].strip() == "---":
         for idx, line in enumerate(lines[1:], 1):
             if line.strip() in ("---", "..."):
-                return _without_duplicate_title_heading("".join(lines[idx + 1 :]), file_name, title)
-    return _without_duplicate_title_heading(text, file_name, title)
+                return "".join(lines[idx + 1 :])
+    return text
+
+
+def _note_body_text(markdown_text, file_name="", title=""):
+    return _without_duplicate_title_heading(_strip_note_front_matter_text(markdown_text), file_name, title)
 
 
 def _preview_text(value, max_chars=NOTE_CARD_PREVIEW_CHARS):
@@ -2733,15 +2633,9 @@ def view_note_route(note_id):
         if note_state:
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
-        note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
-        for key in ("title", "color", "date_created", "area", "important", "is_template", "is_important", "source_note_id"):
-            if note_metadata.get(key):
-                note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
     breadcrumb_area = note.get("area") or note.get("derived_area")
     note_body_text = _note_body_text(note_text, note.get("file_name"), note.get("title"))
-    front_matter_raw = _front_matter_block_text(note_text)
-    front_matter = _parse_note_front_matter_text(note_text) if front_matter_raw else {}
     content_html = ""
     hex_rows = []
     inspect_result = {"tokens": [], "summary": {}}
@@ -2807,8 +2701,6 @@ def view_note_route(note_id):
             ("metadata", "Metadata"),
         ],
         note_metadata_rows=_note_metadata_rows(note, note_path, file_exists),
-        front_matter_items=list(front_matter.items()),
-        front_matter_raw=front_matter_raw,
         sample_lines=note_settings["sample_lines"],
         message=request.args.get("message", ""),
         project_options=projects_mod.project_list(statuses=("planned", "active")),
@@ -2832,17 +2724,14 @@ def note_popout_route(note_id):
     note_body_text = ""
     content_html = ""
     if file_exists:
-        note_text = _read_note_file(note_path)
+        note_text_raw = _read_note_file(note_path)
+        note_text = _strip_note_front_matter_text(note_text_raw)
         note_state = _note_file_state(note_path)
         if note_state:
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
-        note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
-        for key in ("title", "color", "date_created", "area", "important", "is_template", "is_important", "source_note_id"):
-            if note_metadata.get(key):
-                note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
-        note_body_text = _note_body_text(note_text, note.get("file_name"), note.get("title"))
+        note_body_text = _note_body_text(note_text_raw, note.get("file_name"), note.get("title"))
 
         def _asset_url(asset_name):
             return url_for("notes.note_asset_route", note_id=note_id, asset_path=asset_name)
@@ -2929,14 +2818,6 @@ def _update_note_title_content(note_path, old_title, new_title):
     if not text:
         return
     updated = text
-    escaped_title = (new_title or "").replace('"', '\\"')
-    if updated.startswith("---"):
-        updated = re.sub(
-            r'(?m)^title:\s*(?:"(?:\\"|[^"])*"|[^\r\n]*)\s*$',
-            f'title: "{escaped_title}"',
-            updated,
-            count=1,
-        )
     lines = updated.splitlines(keepends=True)
     start_idx = 0
     if lines and lines[0].strip() == "---":
@@ -2974,22 +2855,21 @@ def _update_note_file_metadata(note_id, note, file_name, folder_path, area=None,
         stat = None
         size = note.get("size") or ""
         date_modified = note.get("date_modified") or ""
-    metadata = _note_metadata_from_file(note_path, stat=stat, fallback_area=area or note.get("area") or "")
     values_map = {col: note.get(col, "") for col in tbl["col_list"]}
     values_map.update(
         {
             "file_name": file_name,
             "path": folder_path,
             "size": size,
-            "title": metadata.get("title") or values_map.get("title") or os.path.splitext(file_name)[0],
-            "color": metadata.get("color") or values_map.get("color", ""),
-            "date_created": metadata.get("date_created") or values_map.get("date_created", ""),
+            "title": values_map.get("title") or os.path.splitext(file_name)[0],
+            "color": values_map.get("color", ""),
+            "date_created": values_map.get("date_created", ""),
             "date_modified": date_modified,
-            "area": metadata.get("area") or values_map.get("area", ""),
-            "important": metadata.get("important") or values_map.get("important", ""),
-            "is_template": metadata.get("is_template") or values_map.get("is_template", "false"),
-            "is_important": metadata.get("is_important") or values_map.get("is_important", "false"),
-            "source_note_id": metadata.get("source_note_id") or values_map.get("source_note_id", ""),
+            "area": values_map.get("area", ""),
+            "important": _note_bool_text(values_map.get("important")),
+            "is_template": _note_bool_text(values_map.get("is_template")),
+            "is_important": _note_bool_text(values_map.get("is_important")),
+            "source_note_id": values_map.get("source_note_id", ""),
         }
     )
     if area is not None:
@@ -3081,16 +2961,6 @@ def _assign_note_area(note_id, area_id):
     if not areas_mod.area_get(area_id, owner_user_id=owner_user_id):
         raise ValueError("Selected area was not found.")
 
-    note_path = _build_note_path(note)
-    folder_path = _normalize_note_path(note.get("path")) or (os.path.dirname(note_path) if note_path else "")
-    file_name = note.get("file_name") or (os.path.basename(note_path) if note_path else "")
-    content = None
-    if note_path and os.path.isfile(note_path):
-        _set_note_front_matter_field(note_path, "area", area_id, aliases=["area_id", "folder", "sidebar_tab", "project", "project_id", "proj"])
-        content = _read_note_file(note_path)
-        if folder_path and file_name:
-            return _update_note_file_metadata(note_id, note, file_name, folder_path, area=area_id, content=content)
-
     values_map = {col: note.get(col, "") for col in tbl["col_list"]}
     values_map["area"] = area_id
     values = [values_map.get(col, "") for col in tbl["col_list"]]
@@ -3098,22 +2968,20 @@ def _assign_note_area(note_id, area_id):
 
 
 def _set_note_color(note_id, color):
-    note, _ = _get_note_record(note_id)
-    if not note:
+    note, tbl = _get_note_record(note_id)
+    if not note or not tbl:
         raise ValueError("Note not found.")
-    note_path = _build_note_path(note)
-    if not note_path or not os.path.isfile(note_path):
-        raise ValueError("Note file not found.")
     color = (color or "").strip()
     allowed = {label.lower() for label, _style in NOTE_COLOR_OPTIONS}
     if color.lower() not in allowed and not NOTE_COLOR_HEX_RE.match(color):
         raise ValueError("Select a valid note color.")
-    updated_state = _set_note_front_matter_field(note_path, "color", color, aliases=["colour"])
-    folder_path = _normalize_note_path(note.get("path")) or os.path.dirname(note_path)
-    file_name = note.get("file_name") or os.path.basename(note_path)
-    content = _read_note_file(note_path)
-    _update_note_file_metadata(note_id, note, file_name, folder_path, content=content)
-    return updated_state
+    values_map = {col: note.get(col, "") for col in tbl["col_list"]}
+    values_map["color"] = color
+    values = [values_map.get(col, "") for col in tbl["col_list"]]
+    if not data.update_record(data._get_conn(), tbl["name"], note_id, tbl["col_list"], values):
+        raise ValueError("Unable to update note color.")
+    note_path = _build_note_path(note)
+    return _note_file_state(note_path) if note_path and os.path.isfile(note_path) else None
 
 
 def _derived_area_for_note_id(note_id):
@@ -3475,22 +3343,20 @@ def _create_note_record(title, area_id="", path_prefix="", body_content=None, is
         size = ""
         stat = None
         date_modified = ""
-    metadata = _note_metadata_from_file(created["full_path"], stat=stat, fallback_area=area_id)
-
     values_map = {
         "file_name": created["file_name"],
         "path": created["folder_path"],
         "folder_id": "",
         "size": size,
-        "title": metadata.get("title") or created["title"],
-        "color": metadata.get("color") or DEFAULT_NOTE_COLOR,
-        "date_created": metadata.get("date_created") or created["created_utc"],
+        "title": created["title"],
+        "color": DEFAULT_NOTE_COLOR,
+        "date_created": created["created_utc"],
         "date_modified": date_modified,
-        "area": metadata.get("area") or area_id,
-        "important": metadata.get("important") or _note_bool_text(is_important),
-        "is_template": metadata.get("is_template") or _note_bool_text(is_template),
-        "is_important": metadata.get("is_important") or _note_bool_text(is_important),
-        "source_note_id": metadata.get("source_note_id") or "",
+        "area": area_id,
+        "important": _note_bool_text(is_important),
+        "is_template": _note_bool_text(is_template),
+        "is_important": _note_bool_text(is_important),
+        "source_note_id": "",
     }
     values = [values_map.get(col, "") for col in tbl["col_list"]]
     note_id = data.add_record(data.conn, tbl["name"], tbl["col_list"], values)
@@ -3670,15 +3536,12 @@ def edit_note_route(note_id):
     note_path = _build_note_path(note) if note else ""
     file_exists = bool(note_path and os.path.isfile(note_path))
     if file_exists:
-        note_text = _read_note_file(note_path)
+        note_text_raw = _read_note_file(note_path)
+        note_text = _strip_note_front_matter_text(note_text_raw)
         note_state = _note_file_state(note_path)
         if note_state:
             note["size"] = note_state["size"]
             note["date_modified"] = note_state["date_modified"]
-        note_metadata = _note_metadata_from_file(note_path, fallback_area=note.get("area") or "")
-        for key in ("title", "color", "date_created", "area", "important", "is_template", "is_important", "source_note_id"):
-            if note_metadata.get(key):
-                note[key] = note_metadata.get(key)
         _apply_note_display_fields(note)
     if note and tbl:
         try:
@@ -3721,9 +3584,6 @@ def save_note_route(note_id):
     content = payload.get("content")
     if content is None:
         return jsonify({"error": "Missing content."}), 400
-    metadata_fields = _note_metadata_fields_for_content(payload.get("metadata") or {})
-    if metadata_fields:
-        content = _set_note_front_matter_fields_text(content, metadata_fields)
     note, tbl = _get_note_record(note_id)
     if not note:
         return jsonify({"error": "Note not found."}), 404
@@ -3747,7 +3607,12 @@ def save_note_route(note_id):
                     "sha256": current_state.get("sha256") if current_state else "",
                 }), 409
     try:
-        saved_state = _write_note_file_content(note_path, content)
+        current_text = _read_note_file(note_path)
+    except OSError as exc:
+        return jsonify({"error": f"Unable to read note: {exc}"}), 500
+    should_write_file = current_text != content
+    try:
+        saved_state = _write_note_file_content(note_path, content) if should_write_file else current_state
     except OSError as exc:
         return jsonify({"error": f"Unable to save note: {exc}"}), 500
     if saved_state:
@@ -3762,6 +3627,12 @@ def save_note_route(note_id):
         sha256 = ""
 
     if tbl:
+        metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        if "is_template" in metadata:
+            note["is_template"] = _note_bool_text(metadata.get("is_template"))
+        if "is_important" in metadata:
+            note["is_important"] = _note_bool_text(metadata.get("is_important"))
+            note["important"] = _note_bool_text(metadata.get("is_important"))
         _update_note_file_metadata(
             note_id,
             note,

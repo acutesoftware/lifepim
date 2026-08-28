@@ -97,22 +97,6 @@
               <tr><th>{{ label }}</th><td>{{ value }}</td></tr>
             {% endfor %}
           </table>
-
-          <h4>Front Matter</h4>
-          {% if front_matter_items %}
-            <table class="note-metadata-table">
-              {% for key, value in front_matter_items %}
-                <tr><th>{{ key }}</th><td>{{ value }}</td></tr>
-              {% endfor %}
-            </table>
-          {% else %}
-            <p class="note-empty-state">No front matter found.</p>
-          {% endif %}
-
-          {% if front_matter_raw %}
-            <h4>Raw Front Matter</h4>
-            <pre class="note-text-content">{{ front_matter_raw }}</pre>
-          {% endif %}
         </div>
       {% elif file_exists %}
         {% if render_mode == 'markdown' %}
