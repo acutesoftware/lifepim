@@ -1,9 +1,11 @@
-<div class="links-drawer open"
+{% set drawer_initial_open = link_initial_open|default(true) %}
+<div class="links-drawer{% if drawer_initial_open %} open{% endif %}"
      tabindex="0"
      data-record-type="{{ link_record_type }}"
      data-record-id="{{ link_record_id }}"
      data-record-title="{{ link_record_title }}"
      data-context-type="{{ link_context_type }}"
+     data-initial-open="{{ 'true' if drawer_initial_open else 'false' }}"
      data-mode="{{ link_mode or 'outgoing' }}">
   <div class="links-drawer-resize" aria-hidden="true"></div>
   <div class="links-drawer-header">

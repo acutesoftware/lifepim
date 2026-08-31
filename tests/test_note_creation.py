@@ -571,6 +571,18 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn(f"lifepim-note-{note_id}", html)
         self.assertIn("Pop Out", html)
 
+    def test_note_view_links_drawer_defaults_closed(self):
+        note_dir = os.path.join(self.tmpdir.name, "links_drawer_closed")
+        note_id, _created = self._create_note_record("links drawer closed", note_dir, area="")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{note_id}")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('class="links-drawer"', html)
+        self.assertNotIn('class="links-drawer open"', html)
+        self.assertIn('data-initial-open="false"', html)
+
     def test_note_popout_route_renders_minimal_note_window(self):
         note_dir = os.path.join(self.tmpdir.name, "popout_view")
         note_id, created = self._create_note_record("Book Ideas", note_dir, area="")

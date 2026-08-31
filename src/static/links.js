@@ -156,8 +156,9 @@
     if (storedWidth) {
       applyDrawerWidth(storedWidth);
     }
-    setDrawerOpen(!linksDrawerDisabled());
     const requestedMode = getRequestedDrawerMode();
+    const initialOpen = requestedMode ? true : drawer.dataset.initialOpen !== "false";
+    setDrawerOpen(initialOpen && !linksDrawerDisabled());
     const initialMode =
       requestedMode ||
       (drawer.dataset.mode === "incoming" ? "incoming" : "outgoing");
