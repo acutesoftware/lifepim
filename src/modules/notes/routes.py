@@ -1341,7 +1341,7 @@ def _area_folder_display_items(area, area_folders, view_mode, sort_col, sort_dir
         add_item(folder.get("path_prefix") or "", source="linked", folder=folder)
 
     for path_value in _distinct_note_folder_paths(area, None, template_filter=template_filter):
-        if _note_root_for_sync_path(path_value):
+        if _detected_note_folder_is_syncable(path_value):
             add_item(path_value, source="detected")
 
     return items
@@ -4507,16 +4507,45 @@ def _distinct_note_folder_paths(area=None, folder_filter=None, template_filter="
     return [row["path"] for row in rows if row["path"]]
 
 
+def _note_folder_path_known_in_scope(path_value, area=None, template_filter="notes"):
+    path_value = _normalize_note_path(path_value)
+    if not path_value:
+        return False
+    path_key = user_paths.path_key(path_value)
+    return any(
+        user_paths.path_key(known_path) == path_key
+        for known_path in _distinct_note_folder_paths(area, None, template_filter=template_filter)
+    )
+
+
+def _detected_note_folder_is_syncable(path_value):
+    path_value = _normalize_note_path(path_value)
+    if not path_value:
+        return False
+    if _note_root_for_sync_path(path_value):
+        return True
+    return os.path.isdir(path_value)
+
+
 def _note_sync_scope_paths(area=None, folder_filter=None, template_filter="notes"):
     paths = []
 
-    def add_path(path_value):
+    def add_path(path_value, *, allow_detected_folder=False):
         path_value = _normalize_note_path(path_value)
-        if path_value and _note_root_for_sync_path(path_value):
+        if not path_value:
+            return
+        if _note_root_for_sync_path(path_value) or (allow_detected_folder and os.path.isdir(path_value)):
             paths.append(path_value)
 
     if folder_filter:
-        add_path(folder_filter)
+        add_path(
+            folder_filter,
+            allow_detected_folder=_note_folder_path_known_in_scope(
+                folder_filter,
+                area,
+                template_filter=template_filter,
+            ),
+        )
     elif area:
         if area.lower() != "unmapped":
             _area_info, area_folders = _area_context(area)
@@ -4527,7 +4556,7 @@ def _note_sync_scope_paths(area=None, folder_filter=None, template_filter="notes
                     continue
                 add_path(folder.get("path_prefix") or "")
         for path_value in _distinct_note_folder_paths(area, None, template_filter=template_filter):
-            add_path(path_value)
+            add_path(path_value, allow_detected_folder=True)
     elif (template_filter or "notes") == "templates":
         for path_value in _distinct_note_folder_paths(None, None, template_filter=template_filter):
             add_path(path_value)

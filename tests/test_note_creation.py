@@ -1508,6 +1508,27 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn(notes_routes._normalize_note_path(food_dir), html)
         self.assertNotIn("No folders linked to this area.", html)
 
+    def test_area_folder_inset_shows_detected_external_note_folders(self):
+        external_dir = os.path.join(self.tmpdir.name, "external_work", "draft")
+        areas_mod.area_upsert(
+            {
+                "area_id": "make/write",
+                "tab": "MAKE",
+                "group_name": "MAKE",
+                "area_name": "Writing",
+            },
+            conn=self.conn,
+        )
+        self._create_note_record("chapter", external_dir, area="make/write")
+
+        response = self._notes_test_app().test_client().get("/notes/table?area=make/write")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Detected from notes", html)
+        self.assertIn(notes_routes._normalize_note_path(external_dir), html)
+        self.assertNotIn("No folders linked to this area.", html)
+
     def test_unfiltered_header_keeps_full_sync_label(self):
         response = self._notes_test_app().test_client().get("/notes/table")
         html = response.get_data(as_text=True)
@@ -1542,6 +1563,73 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(captured, [notes_routes._normalize_note_path(food_dir)])
         self.assertEqual(fallback_areas, ["food"])
+
+    def test_sync_route_filtered_area_includes_detected_external_note_folders(self):
+        external_dir = os.path.join(self.tmpdir.name, "external_work", "draft")
+        areas_mod.area_upsert(
+            {
+                "area_id": "make/write",
+                "tab": "MAKE",
+                "group_name": "MAKE",
+                "area_name": "Writing",
+            },
+            conn=self.conn,
+        )
+        self._create_note_record("chapter", external_dir, area="make/write")
+
+        captured = []
+        fallback_areas = []
+
+        def fake_sync(paths, fallback_area=""):
+            captured.extend(paths)
+            fallback_areas.append(fallback_area)
+            return {"paths": len(paths), "folders": len(paths), "notes": 1, "missing": 0}
+
+        app = self._notes_test_app()
+        with patch.object(notes_routes, "full_sync_note_folders", side_effect=AssertionError("full sync")):
+            with patch.object(notes_routes, "sync_note_folders", side_effect=fake_sync):
+                response = app.test_client().post(
+                    "/notes/sync",
+                    data={"area": "make/write", "next": "/notes/table?area=make/write"},
+                )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(captured, [notes_routes._normalize_note_path(external_dir)])
+        self.assertEqual(fallback_areas, ["make/write"])
+
+    def test_sync_route_folder_filter_allows_known_detected_external_folder(self):
+        external_dir = os.path.join(self.tmpdir.name, "external_work", "draft")
+        areas_mod.area_upsert(
+            {
+                "area_id": "make/write",
+                "tab": "MAKE",
+                "group_name": "MAKE",
+                "area_name": "Writing",
+            },
+            conn=self.conn,
+        )
+        self._create_note_record("chapter", external_dir, area="make/write")
+
+        captured = []
+
+        def fake_sync(paths, fallback_area=""):
+            captured.extend(paths)
+            return {"paths": len(paths), "folders": len(paths), "notes": 1, "missing": 0}
+
+        app = self._notes_test_app()
+        with patch.object(notes_routes, "full_sync_note_folders", side_effect=AssertionError("full sync")):
+            with patch.object(notes_routes, "sync_note_folders", side_effect=fake_sync):
+                response = app.test_client().post(
+                    "/notes/sync",
+                    data={
+                        "area": "make/write",
+                        "folder": external_dir,
+                        "next": "/notes/table?area=make/write",
+                    },
+                )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(captured, [notes_routes._normalize_note_path(external_dir)])
 
     def test_sync_route_unfiltered_uses_full_sync(self):
         calls = []
