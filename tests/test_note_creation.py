@@ -362,6 +362,22 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(row["content_text"], "\nBody text")
         self.assertNotIn("is_template", row["content_text"])
 
+    def test_note_search_index_rebuild_skips_deleted_note_folder(self):
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes")
+        deleted_dir = os.path.join(note_dir, "deleted")
+        keep_id, _ = self._create_note_record("keep indexed", note_dir, area="")
+        deleted_id, _ = self._create_note_record("deleted indexed", deleted_dir, area="Games")
+
+        result = note_search_index.rebuild_index(self.conn)
+
+        indexed_ids = {
+            row["note_id"]
+            for row in self.conn.execute("SELECT note_id FROM lp_note_search_index").fetchall()
+        }
+        self.assertIn(keep_id, indexed_ids)
+        self.assertNotIn(deleted_id, indexed_ids)
+        self.assertEqual(result["indexed"], 1)
+
     def test_fetch_notes_does_not_read_front_matter(self):
         note_dir = os.path.join(self.tmpdir.name, "metadata_only")
         note_id, _ = self._create_note_record("metadata_only", note_dir, area="")
@@ -373,6 +389,18 @@ class TestNoteCreation(unittest.TestCase):
             notes = notes_routes._fetch_notes("unmapped")
 
         self.assertIn(note_id, {note.get("id") for note in notes})
+
+    def test_fetch_notes_excludes_deleted_note_folder(self):
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "50-Fun", "51-Games")
+        deleted_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "deleted")
+        keep_id, _ = self._create_note_record("keep visible", note_dir, area="Games")
+        deleted_id, _ = self._create_note_record("deleted hidden", deleted_dir, area="Games")
+
+        notes = notes_routes._fetch_notes("Games")
+
+        note_ids = {note.get("id") for note in notes}
+        self.assertIn(keep_id, note_ids)
+        self.assertNotIn(deleted_id, note_ids)
 
     def test_refresh_note_color_metadata_backfills_blank_color_from_file(self):
         note_dir = os.path.join(self.tmpdir.name, "color_refresh")
@@ -1166,6 +1194,36 @@ class TestNoteCreation(unittest.TestCase):
         count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
         self.assertEqual(count, 2)
 
+    def test_sync_note_rows_skips_deleted_folder(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        deleted_dir = os.path.join(notes_root, "deleted")
+        os.makedirs(deleted_dir, exist_ok=True)
+        with open(os.path.join(notes_root, "keep.md"), "w", encoding="utf-8") as handle:
+            handle.write("keep")
+        with open(os.path.join(deleted_dir, "deleted.md"), "w", encoding="utf-8") as handle:
+            handle.write("---\nproject: Games\n---\ntrash")
+
+        result = notes_routes._sync_note_rows(notes_root)
+
+        tbl = common_utils.get_table_def("notes")
+        rows = self.conn.execute(f"SELECT file_name, path FROM {tbl['name']}").fetchall()
+        self.assertEqual(result["scanned"], 1)
+        self.assertEqual({row["file_name"] for row in rows}, {"keep.md"})
+        self.assertTrue(all("deleted" not in notes_routes._normalize_note_path(row["path"]).lower().split("\\") for row in rows))
+
+    def test_collect_note_import_rows_skips_deleted_folder(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        deleted_dir = os.path.join(notes_root, "deleted")
+        os.makedirs(deleted_dir, exist_ok=True)
+        with open(os.path.join(notes_root, "keep.md"), "w", encoding="utf-8") as handle:
+            handle.write("keep")
+        with open(os.path.join(deleted_dir, "deleted.md"), "w", encoding="utf-8") as handle:
+            handle.write("trash")
+
+        rows = notes_routes._collect_note_import_rows(notes_root, "Games")
+
+        self.assertEqual([row["file_name"] for row in rows], ["keep.md"])
+
     def test_note_folder_full_sync_indexes_hierarchy(self):
         notes_root = os.path.join(self.tmpdir.name, "folder_index")
         os.makedirs(os.path.join(notes_root, "A"), exist_ok=True)
@@ -1185,6 +1243,25 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIsNone(rows[""]["parent_id"])
         self.assertEqual(rows["B/C"]["parent_id"], rows["B"]["id"])
         self.assertEqual(rows["B/C"]["is_missing"], 0)
+
+    def test_note_folder_full_sync_skips_deleted_folder_index(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        os.makedirs(os.path.join(notes_root, "deleted"), exist_ok=True)
+        os.makedirs(os.path.join(notes_root, "A"), exist_ok=True)
+        with open(os.path.join(notes_root, "deleted", "trash.md"), "w", encoding="utf-8") as handle:
+            handle.write("trash")
+
+        result = notes_routes.full_sync_note_folders([notes_root])
+
+        relative_paths = {
+            row["relative_path"]
+            for row in self.conn.execute(
+                "SELECT relative_path FROM lp_note_folders WHERE root_path = ?",
+                (notes_routes._normalize_note_path(notes_root),),
+            ).fetchall()
+        }
+        self.assertEqual(result["notes"], 0)
+        self.assertEqual(relative_paths, {"", "A"})
 
     def test_note_folder_tree_reconciles_notes_once_for_subtree(self):
         notes_root = os.path.join(self.tmpdir.name, "folder_single_reconcile")
@@ -1527,6 +1604,36 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Detected from notes", html)
         self.assertIn(notes_routes._normalize_note_path(external_dir), html)
+        self.assertNotIn("No folders linked to this area.", html)
+
+    def test_area_folder_inset_hides_detected_children_under_linked_folder(self):
+        external_root = os.path.join(self.tmpdir.name, "external_work")
+        child_dir = os.path.join(external_root, "draft")
+        areas_mod.area_upsert(
+            {
+                "area_id": "make/write",
+                "tab": "MAKE",
+                "group_name": "MAKE",
+                "area_name": "Writing",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add(
+            "make/write",
+            external_root,
+            folder_role="include",
+            create_type="markdown",
+            conn=self.conn,
+        )
+        self._create_note_record("chapter", child_dir, area="make/write")
+
+        response = self._notes_test_app().test_client().get("/notes/table?area=make/write")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(notes_routes._normalize_note_path(external_root), html)
+        self.assertNotIn("Detected from notes", html)
+        self.assertNotIn(notes_routes._normalize_note_path(child_dir), html)
         self.assertNotIn("No folders linked to this area.", html)
 
     def test_unfiltered_header_keeps_full_sync_label(self):

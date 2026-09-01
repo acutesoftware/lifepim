@@ -73,6 +73,14 @@ class TestSearchSecurity(unittest.TestCase):
             "INSERT INTO lp_note_search_index (note_id, file_path, title, content_text, indexed_at) "
             "VALUES (2, 'C:\\notes\\user-one-visible.md', 'user-one-visible.md', 'secret phrase from user one', '2026-01-01T00:00:00Z')"
         )
+        self.conn.execute(
+            "INSERT INTO lp_notes (id, file_name, path, area, owner_user_id, visibility, is_public) "
+            "VALUES (4, 'deleted-visible.md', 'C:\\notes\\deleted', 'private', 1, 'private', 0)"
+        )
+        self.conn.execute(
+            "INSERT INTO lp_note_search_index (note_id, file_path, title, content_text, indexed_at) "
+            "VALUES (4, 'C:\\notes\\deleted\\deleted-visible.md', 'deleted-visible.md', 'secret phrase from deleted note', '2026-01-01T00:00:00Z')"
+        )
         self.conn.commit()
 
     def tearDown(self):
@@ -115,6 +123,13 @@ class TestSearchSecurity(unittest.TestCase):
         results = search.search_note_content("secret phrase from user one", route="notes")
 
         self.assertIn("user-one-visible.md", self._result_titles(results))
+
+    def test_note_content_search_excludes_deleted_note_folder(self):
+        self._search_as(1)
+
+        results = search.search_note_content("secret phrase from deleted note", route="notes")
+
+        self.assertNotIn("deleted-visible.md", self._result_titles(results))
 
     def test_content_catalog_results_are_prioritised_in_metadata_search(self):
         self._search_as(1)

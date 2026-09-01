@@ -7,6 +7,7 @@ import os
 import sqlite3
 
 from common import data
+from common import user_paths
 
 
 SCHEMA_SQL = """
@@ -71,6 +72,11 @@ def upsert_note(
     conn = ensure_schema(conn)
     if not note_id or not note_path:
         return False
+    if user_paths.is_deleted_note_path(note_path):
+        conn.execute("DELETE FROM lp_note_search_index WHERE note_id = ?", (note_id,))
+        if commit:
+            conn.commit()
+        return False
     try:
         stat = os.stat(note_path)
     except OSError:
@@ -116,6 +122,9 @@ def rebuild_index(conn: sqlite3.Connection | None = None) -> dict:
         note = dict(row)
         note_path = note_full_path(note)
         if not note_path or not note_path.lower().endswith(".md"):
+            skipped += 1
+            continue
+        if user_paths.is_deleted_note_path(note_path):
             skipped += 1
             continue
         if not os.path.isfile(note_path):

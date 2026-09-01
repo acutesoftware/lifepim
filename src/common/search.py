@@ -2,6 +2,7 @@ from common import config as cfg
 from common import content_catalog
 from common import data
 from common import note_search_index
+from common import user_paths
 from common.utils import get_table_def, get_tabs
 
 
@@ -400,11 +401,20 @@ def _search_note_content_index(terms, area=None, route=None, limit=None):
     where_clause = " AND ".join(term_conditions) or "1=1"
     visibility_clause, visibility_params = _visible_table_condition(conn, "lp_notes", "n")
     params.extend(visibility_params)
+    deleted_conditions = []
+    for column_expr in ("n.path", "idx.file_path"):
+        deleted_conditions.append(
+            f"lower(rtrim(replace(COALESCE({column_expr}, ''), '/', '\\'))) LIKE ?"
+        )
+        deleted_conditions.append(
+            f"lower(rtrim(replace(COALESCE({column_expr}, ''), '/', '\\'))) LIKE ?"
+        )
+        params.extend(["%\\deleted", "%\\deleted\\%"])
     sql = (
         "SELECT idx.note_id, idx.title, idx.content_text, idx.file_path, n.area "
         "FROM lp_note_search_index idx "
         "LEFT JOIN lp_notes n ON n.id = idx.note_id "
-        f"WHERE ({where_clause}) AND ({visibility_clause}) "
+        f"WHERE ({where_clause}) AND ({visibility_clause}) AND NOT ({' OR '.join(deleted_conditions)}) "
         "ORDER BY idx.title"
     )
     if fetch_limit:
@@ -417,6 +427,8 @@ def _search_note_content_index(terms, area=None, route=None, limit=None):
     results = []
     for row in rows:
         item = dict(row)
+        if user_paths.is_deleted_note_path(item.get("file_path") or ""):
+            continue
         snippet_len = getattr(cfg, "SEARCH_CONTENT_SNIPPET_LEN", 200)
         snippet = _build_snippet(item.get("content_text") or "", terms, max_len=snippet_len)
         results.append(

@@ -103,6 +103,17 @@ def path_startswith(path_value, prefix):
     return bool(base and (path == base or path.startswith(base + "/")))
 
 
+def path_has_segment(path_value, segment):
+    wanted = (segment or "").strip().lower()
+    if not wanted:
+        return False
+    return any(part.lower() == wanted for part in split_path(path_value))
+
+
+def is_deleted_note_path(path_value):
+    return path_has_segment(path_value, "deleted")
+
+
 def is_absolute_path(path_value):
     path_norm = normalize_path(path_value)
     if not path_norm:

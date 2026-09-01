@@ -397,6 +397,18 @@ def _path_startswith(path_value, prefix):
     return user_paths.path_startswith(path_value, prefix)
 
 
+def _is_deleted_note_path(path_value):
+    return user_paths.is_deleted_note_path(path_value)
+
+
+def _prune_deleted_note_dirs(root_path, dirs):
+    dirs[:] = [
+        dirname
+        for dirname in dirs
+        if not _is_deleted_note_path(os.path.join(root_path, dirname))
+    ]
+
+
 def _replace_path_prefix(path_value, old_prefix, new_prefix):
     path_norm = _normalize_note_path(path_value)
     old_norm = _normalize_note_path(old_prefix)
@@ -909,6 +921,12 @@ def _notes_base_condition(area, folder_path=None, template_filter="notes"):
     visibility_condition, visibility_params = security.visible_record_condition("t", current_user)
     condition = f"({condition}) AND {visibility_condition}"
     params.extend(visibility_params)
+    condition = (
+        f"({condition}) "
+        "AND lower(rtrim(replace(COALESCE(t.path, ''), '/', '\\'))) NOT LIKE ? "
+        "AND lower(rtrim(replace(COALESCE(t.path, ''), '/', '\\'))) NOT LIKE ?"
+    )
+    params.extend(["%\\deleted", "%\\deleted\\%"])
     return condition, params
 
 
@@ -1318,6 +1336,7 @@ def _note_folder_panel_items(area, folder_filter, area_folders, view_mode, sort_
 def _area_folder_display_items(area, area_folders, view_mode, sort_col, sort_dir, template_filter="notes"):
     items = []
     seen = set()
+    covered_by_linked = []
 
     def add_item(path_value, *, source, folder=None):
         path_value = _normalize_note_path(path_value)
@@ -1338,10 +1357,20 @@ def _area_folder_display_items(area, area_folders, view_mode, sort_col, sort_dir
         items.append(item)
 
     for folder in area_folders or []:
-        add_item(folder.get("path_prefix") or "", source="linked", folder=folder)
+        path_value = _normalize_note_path(folder.get("path_prefix") or "")
+        add_item(path_value, source="linked", folder=folder)
+        if (
+            path_value
+            and int(folder.get("is_enabled") or 0) == 1
+            and (folder.get("folder_role") or "") in NOTE_FOLDER_SYNC_ROLES
+        ):
+            covered_by_linked.append(path_value)
 
     for path_value in _distinct_note_folder_paths(area, None, template_filter=template_filter):
-        if _detected_note_folder_is_syncable(path_value):
+        if (
+            _detected_note_folder_is_syncable(path_value)
+            and not any(_path_startswith(path_value, linked_path) for linked_path in covered_by_linked)
+        ):
             add_item(path_value, source="detected")
 
     return items
@@ -3815,7 +3844,11 @@ def import_notes_folder_route():
 
 def _collect_note_import_rows(folder_path, area):
     rows = []
-    for root, _, files in os.walk(folder_path):
+    for root, dirs, files in os.walk(folder_path):
+        if _is_deleted_note_path(root):
+            dirs[:] = []
+            continue
+        _prune_deleted_note_dirs(root, dirs)
         for name in files:
             if not name.lower().endswith(".md"):
                 continue
@@ -4067,6 +4100,17 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
         raise ValueError("Folder not found.")
 
     conn = data._get_conn()
+    if _is_deleted_note_path(folder_path):
+        return {
+            "folder_path": folder_path,
+            "scanned": 0,
+            "inserted": 0,
+            "updated": 0,
+            "unchanged": 0,
+            "missing": 0,
+            "duplicates": 0,
+            "renamed": 0,
+        }
     area_fallbacks = [] if fallback_area else _sync_area_fallbacks(conn, _current_owner_user_id())
     root_lower = folder_path.rstrip("\\").lower()
     existing = {}
@@ -4080,6 +4124,8 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
         row_dict = dict(row)
         row_path = _normalize_note_path(row_dict.get("path"))
         if not row_path:
+            continue
+        if _is_deleted_note_path(row_path):
             continue
         row_path_lower = row_path.lower()
         if recursive:
@@ -4098,19 +4144,25 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
 
     scan_roots = []
     if recursive:
-        scan_roots = list(os.walk(folder_path))
+        for root, dirs, files in os.walk(folder_path):
+            if _is_deleted_note_path(root):
+                dirs[:] = []
+                continue
+            _prune_deleted_note_dirs(root, dirs)
+            scan_roots.append((root, dirs, files))
     else:
         names = []
-        try:
-            with os.scandir(folder_path) as entries:
-                for entry in entries:
-                    try:
-                        if entry.is_file() and entry.name.lower().endswith(".md"):
-                            names.append(entry.name)
-                    except OSError:
-                        continue
-        except OSError:
-            names = []
+        if not _is_deleted_note_path(folder_path):
+            try:
+                with os.scandir(folder_path) as entries:
+                    for entry in entries:
+                        try:
+                            if entry.is_file() and entry.name.lower().endswith(".md"):
+                                names.append(entry.name)
+                        except OSError:
+                            continue
+            except OSError:
+                names = []
         scan_roots = [(folder_path, [], names)]
 
     scanned = inserted = updated = unchanged = renamed = 0
@@ -4461,9 +4513,15 @@ def add_note_folder_tree(root_path, folder_path, parent_id=None, fallback_area="
     folder_path = _normalize_note_path(folder_path)
     if not root_path or not folder_path or not os.path.isdir(folder_path):
         return {"folders": 0, "notes": 0}
+    if _is_deleted_note_path(folder_path):
+        return {"folders": 0, "notes": 0}
     folders = 0
     parent_by_path = {_note_folder_rel_path(root_path, folder_path): parent_id}
     for current_root, dirs, _files in os.walk(folder_path):
+        if _is_deleted_note_path(current_root):
+            dirs[:] = []
+            continue
+        _prune_deleted_note_dirs(current_root, dirs)
         current_root = _normalize_note_path(current_root)
         relative_path = _note_folder_rel_path(root_path, current_root)
         current_parent_id = parent_by_path.get(relative_path)
@@ -4522,6 +4580,8 @@ def _detected_note_folder_is_syncable(path_value):
     path_value = _normalize_note_path(path_value)
     if not path_value:
         return False
+    if _is_deleted_note_path(path_value):
+        return False
     if _note_root_for_sync_path(path_value):
         return True
     return os.path.isdir(path_value)
@@ -4533,6 +4593,8 @@ def _note_sync_scope_paths(area=None, folder_filter=None, template_filter="notes
     def add_path(path_value, *, allow_detected_folder=False):
         path_value = _normalize_note_path(path_value)
         if not path_value:
+            return
+        if _is_deleted_note_path(path_value):
             return
         if _note_root_for_sync_path(path_value) or (allow_detected_folder and os.path.isdir(path_value)):
             paths.append(path_value)
