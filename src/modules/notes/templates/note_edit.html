@@ -1,6 +1,18 @@
 {% extends 'layout.html' %}
 {% block module_content %}
-  {% if not note %}
+  {% if web_clip %}
+    <div class="note-edit">
+      <p>Source: <a href="{{ web_clip.source_url }}" target="_blank" rel="noopener noreferrer">{{ web_clip.source_url }}</a></p>
+      <p>Extracted using: <strong>{{ web_method }}</strong></p>
+      <p><label>Title: <input id="web-clip-title" value="{{ web_clip.title }}" maxlength="1000" style="width:80%;"></label></p>
+      <p>Filename: {{ web_filename }}</p>
+      {% if web_clip.html %}<p>An HTML archive will be saved beside the note.</p>{% endif %}
+      {% if web_clip.warnings %}<ul>{% for warning in web_clip.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
+      {% include "_note_editor.html" %}
+      <button type="button" id="web-clip-cancel" data-url="{{ url_for('notes.web_clip_cancel', token=web_token) }}">Cancel</button>
+    </div>
+    <script src="{{ url_for('static', filename='note_editor.js') }}"></script>
+  {% elif not note %}
     <p>No note selected. Use "New Note" from the Notes list to create one.</p>
   {% else %}
     <div class="note-edit" data-note-id="{{ note.id }}">
@@ -63,44 +75,7 @@
       {% if not file_exists %}
         <p>File not found: {{ note_path }}</p>
       {% else %}
-        <div id="note-edit-status" style="margin:8px 0; font-size: 0.9em; color:#555;">Saved</div>
-        <div class="note-markdown-toolbar" aria-label="Markdown controls">
-          <button type="button" data-md-action="bold" title="Bold">B</button>
-          <button type="button" data-md-action="italic" title="Italic">I</button>
-          <button type="button" data-md-action="strike" title="Strikethrough">S</button>
-          <button type="button" data-md-action="inline-code" title="Inline code">`</button>
-          <button type="button" data-md-action="h1" title="Heading 1">H1</button>
-          <button type="button" data-md-action="h2" title="Heading 2">H2</button>
-          <button type="button" data-md-action="bullet" title="Bullet list">-</button>
-          <button type="button" data-md-action="numbered" title="Numbered list">1.</button>
-          <button type="button" data-md-action="task" title="Task item">[]</button>
-          <button type="button" data-md-action="quote" title="Blockquote">&gt;</button>
-          <button type="button" data-md-action="code-block" title="Code block">```</button>
-          <button type="button" data-md-action="link" title="Link">Link</button>
-          <button type="button" data-md-action="image" title="Markdown image">Image</button>
-          <button type="button" data-md-action="browse-image" title="Browse local image">Browse image</button>
-          <button type="button" data-md-action="lifepim-image" title="LifePIM image tag">[img]</button>
-          <button type="button" data-md-action="table" title="Table">Table</button>
-          <button type="button" data-icon-picker-target="note-editor" data-icon-picker-mode="insert" title="Add icon">😀</button>
-        </div>
-        <textarea id="note-editor"
-                  data-note-id="{{ note.id }}"
-                  data-save-url="{{ url_for('notes.save_note_route', note_id=note.id) }}"
-                  data-upload-image-url="{{ url_for('notes.upload_note_image_route', note_id=note.id) }}"
-                  data-wiki-search-url="{{ url_for('notes.wiki_search_route') }}"
-                  data-wiki-preview-url="{{ url_for('notes.wiki_preview_route', note_id=note.id) }}"
-                  data-file-mtime-ns="{{ note_state.mtime_ns if note_state else '' }}"
-                  data-file-hash="{{ note_state.sha256 if note_state else '' }}"
-                  style="width:100%; min-height:60vh; font-family:inherit;">{{ note_text }}</textarea>
-        <div id="note-wiki-popup" class="note-wiki-popup" hidden></div>
-        <div class="note-editor-preview-shell">
-          <div class="note-editor-preview-title">Preview</div>
-          <div id="note-editor-preview" class="note-rendered-content note-editor-preview"></div>
-        </div>
-        <div style="margin-top:6px; font-size:0.85em; color:#777;">
-          Autosaves after you pause typing.
-          <button type="button" id="note-save-now" style="margin-left:8px;">Save now</button>
-        </div>
+        {% include "_note_editor.html" %}
       {% endif %}
       </div>
       {% set project_assign_record_type = "note" %}

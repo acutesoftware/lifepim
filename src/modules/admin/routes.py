@@ -6,6 +6,7 @@ import sqlite3
 from flask import Blueprint, abort, jsonify, render_template, request, redirect, url_for
 from flask_login import current_user
 
+from common import areas as areas_mod
 from common import data as db
 from common import config as cfg
 from common import media_migration
@@ -509,6 +510,7 @@ def settings_route():
                     "freeze_headers": request.form.get("freeze_headers") == "1",
                     "map_names_english": request.form.get("map_names_english") == "1",
                     "mobile_font_size": request.form.get("mobile_font_size"),
+                    "default_area": request.form.get("default_area", settings_mod.get_setting("general.default_area", "", conn)),
                 },
                 conn,
             )
@@ -695,6 +697,7 @@ def settings_route():
         media_settings=media_settings,
         audio_settings=audio_settings,
         general_settings=general_settings,
+        default_area_options=areas_mod.areas_list_sidebar(conn=conn),
         places_settings=places_settings,
         note_settings=note_settings,
         logger_settings=logger_settings,

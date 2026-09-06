@@ -19,6 +19,7 @@
   const previewEl = qs("#note-editor-preview");
   const metadataInputs = Array.from(document.querySelectorAll("[data-note-metadata-field]"));
   const noteId = editor.dataset.noteId || "";
+  const webDraft = editor.dataset.webDraft === "true";
   const saveUrl = editor.dataset.saveUrl || "";
   const uploadImageUrl = editor.dataset.uploadImageUrl || "";
   const wikiSearchUrl = editor.dataset.wikiSearchUrl || "";
@@ -522,6 +523,7 @@
   }
 
   function scheduleSave() {
+    if (webDraft) { schedulePreview(); return; }
     if (!saveUrl) {
       return;
     }
@@ -580,21 +582,32 @@
     }
     const content = editor.value;
     const metadata = metadataPayload();
-    if (content === lastSaved && !metadataChanged()) {
+    if (!webDraft && content === lastSaved && !metadataChanged()) {
       return;
     }
     inflight = true;
+    if (webDraft) {
+      editor.readOnly = true;
+      qs("#web-clip-title").disabled = true;
+      saveNowBtn.disabled = true;
+    }
     setStatus("Saving...");
     try {
       writeDraft();
       const resp = await fetch(saveUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, metadata, base_mtime_ns: fileMtimeNs, base_hash: fileHash }),
+        body: JSON.stringify({ content, metadata, title: webDraft ? qs("#web-clip-title").value : undefined, base_mtime_ns: fileMtimeNs, base_hash: fileHash }),
       });
       const data = await resp.json();
       if (!resp.ok) {
         throw new Error(data.error || "Unable to save note.");
+      }
+      if (webDraft && data.open_url) {
+        lastSaved = editor.value;
+        if (data.warnings && data.warnings.length) window.alert(data.warnings.join("\n"));
+        window.location.href = data.open_url;
+        return;
       }
       lastSaved = content;
       lastSavedMetadata = metadata;
@@ -625,9 +638,14 @@
       }
     } catch (err) {
       writeDraft();
-      setStatus(`${err.message || "Save failed."} Local draft kept in this browser.`, true);
+      setStatus(webDraft ? (err.message || "Save failed.") : `${err.message || "Save failed."} Local draft kept in this browser.`, true);
     } finally {
       inflight = false;
+      if (webDraft) {
+        editor.readOnly = false;
+        qs("#web-clip-title").disabled = false;
+        saveNowBtn.disabled = false;
+      }
       if (pending) {
         pending = false;
         if (editor.value !== lastSaved) {
@@ -637,6 +655,20 @@
     }
   }
 
+  const cancelWeb = qs("#web-clip-cancel");
+  if (cancelWeb) cancelWeb.addEventListener("click", async () => {
+    if (inflight) return;
+    cancelWeb.disabled = true;
+    try {
+      const response = await fetch(cancelWeb.dataset.url, { method: "POST" });
+      if (!response.ok) throw new Error("Could not cancel preview.");
+      lastSaved = editor.value;
+      window.location.href = "/notes";
+    } catch (err) {
+      setStatus(err.message, true);
+      cancelWeb.disabled = false;
+    }
+  });
   restoreDraftIfNeeded();
   schedulePreview();
   editor.addEventListener("input", () => {
@@ -677,7 +709,7 @@
     }
   });
   editor.addEventListener("blur", () => {
-    if (editor.value !== lastSaved) {
+    if (!webDraft && editor.value !== lastSaved) {
       void doSave();
     }
   });

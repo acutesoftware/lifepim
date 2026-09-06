@@ -371,6 +371,15 @@
         <h4>General</h4>
         <form method="post" action="{{ url_for('admin.settings_route') }}" class="settings-form">
           <input type="hidden" name="tab" value="general">
+          <label>Default Area
+            <select name="default_area">
+              <option value="">Not configured</option>
+              {% for option in default_area_options %}
+              <option value="{{ option.area_id }}" {% if general_settings.default_area == option.area_id %}selected{% endif %}>{{ option.area_name }} ({{ option.area_id }})</option>
+              {% endfor %}
+            </select>
+          </label>
+          <p class="settings-empty">Webpage notes are saved in this Area's default Notes folder.</p>
           <div class="settings-fieldset">
             <label>
               <input type="checkbox" name="freeze_headers" value="1" {% if general_settings.freeze_headers %}checked{% endif %}>

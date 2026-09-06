@@ -19,3 +19,8 @@ Werkzeug==3.1.6
 argon2-cffi==23.1.0
 waitress==3.0.2
 xlrd==2.0.2
+
+# Webpage Notes (browser rendering and SingleFile remain optional)
+requests>=2.32,<3
+trafilatura>=2.2,<3
+Pillow>=11,<13

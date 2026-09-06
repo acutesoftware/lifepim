@@ -268,6 +268,58 @@ View modes:
 | Sample | Shows the first and last configured number of lines. |
 | Metadata | Shows database metadata from `lp_notes`. |
 
+### New Note from Webpage
+
+Choose **Add Note → From Webpage**, paste an HTTP/HTTPS URL, choose a method, and click **Fetch Page**.
+Local websites (including localhost and NAS addresses) are supported.
+
+- **Auto** tries Reader / Article Extract, then Rendered Page, then Web Archive, stopping after the first success.
+- **Reader / Article Extract** extracts readable Markdown without launching a browser.
+- **Rendered Page** runs JavaScript in a temporary headless Chromium session, then extracts readable Markdown.
+- **Web Archive** uses SingleFile to preserve a standalone HTML snapshot and also creates Markdown. If readable extraction fails, the Markdown explains that the archive is available.
+
+The preview uses the existing Notes Markdown editor. Edit the title and content, then press **Save**.
+Typing or leaving the editor field does not save a webpage preview. **Cancel** discards it without creating a Note, Place, or final files.
+Previews expire after one hour or an application restart; keep the preview open until saved.
+
+Set **Admin → Settings → General → Default Area** before saving. That Area must have an enabled default Notes folder in its Folders panel.
+Webpage notes use this general default even when another Area is selected in the sidebar. Missing configuration produces an error and leaves the preview available for retry.
+
+Saved filenames use `web_snip_<site>_<descriptive_title>_<yyyymmdd>.md`; repeated clips use `_02`, `_03`, etc.
+The Markdown contains a readable Source/Captured footer and remains a normal file without application YAML front matter.
+Extracted article images are downloaded where practical into a sibling `<note_stem>.assets` directory and referenced relatively.
+Tracking pixels and small images are skipped, and failed image downloads retain the original reference with a warning.
+Downloads have size, count, and time limits.
+
+Web Archive also writes `<note_stem>.archive.html` beside the note, linked from the Markdown.
+Archives opened through Notes use a browser sandbox so archived scripts cannot run with LifePIM's origin.
+The standalone archive file remains usable directly from disk.
+
+Save creates or reuses an Internet Place (`lp_places.place_type = url`) for the supplied URL and adds an existing generic `lp_links` Note-to-Place relationship.
+URL comparison preserves query parameters and path case, while ignoring hostname case, fragments and a trailing slash.
+Existing Place titles are retained unless blank. Capture provenance is stored in the normal note row's `capture_metadata` JSON column.
+The Note, Place, and relationship are saved in one SQLite transaction; failed saves remove newly created files and retain the preview for retry.
+
+Reader dependencies are in the root `requirements.txt`. Optional rendering setup:
+
+```powershell
+.venv/Scripts/python.exe -m pip install playwright
+.venv/Scripts/python.exe -m playwright install chromium
+```
+
+For archiving, install the official [SingleFile CLI](https://github.com/gildas-lormeau/single-file-cli).
+Put its standalone executable on PATH or beside the virtual environment's Python executable (Windows: `.venv/Scripts/single-file.exe`).
+An npm installation is also supported; Windows shims are resolved to the Node entry point without passing URLs through a shell.
+SingleFile can use the Playwright Chromium installation or discover system Chrome.
+Missing optional support is reported only when requested, and does not prevent ordinary Notes or Reader extraction from working.
+
+Automated coverage uses local HTML and mocked failures. To also run the actual Chromium and browser UI tests:
+
+```powershell
+$env:LIFEPIM_TEST_BROWSER = '1'
+.venv/Scripts/python.exe -m unittest discover -s tests -p test_notes_webclip.py
+```
+
 ### Add Notes
 
 New notes can be created from the Notes UI. The app writes a new `.md` file into the selected area's default notes folder and inserts a matching row into `lp_notes`.

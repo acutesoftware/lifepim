@@ -2811,6 +2811,12 @@ def note_asset_route(note_id, asset_path):
     full_path = _resolve_note_asset_path(note, asset_path, note_path=note_path)
     if not full_path:
         abort(404)
+    if full_path.lower().endswith(".archive.html"):
+        # Archived third-party scripts must not run with LifePIM's origin.
+        response = send_file(full_path)
+        response.headers["Content-Security-Policy"] = "sandbox; default-src 'none'; img-src data: blob:; style-src 'unsafe-inline' data:; font-src data:"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
     return send_file(full_path)
 
 
@@ -4117,7 +4123,7 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
     existing_by_folder = {}
     duplicates = 0
     rows = conn.execute(
-        f"SELECT id, {', '.join(tbl['col_list'])} FROM {tbl['name']} "
+        f"SELECT id, capture_metadata, {', '.join(tbl['col_list'])} FROM {tbl['name']} "
         "WHERE COALESCE(path, '') != ''"
     ).fetchall()
     for row in rows:
@@ -4223,7 +4229,8 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
                         "file_name": name,
                         "path": root_norm,
                         "size": size,
-                        "title": metadata.get("title") or os.path.splitext(name)[0],
+                        "title": (current.get("title") if current.get("capture_metadata") else "")
+                        or metadata.get("title") or os.path.splitext(name)[0],
                         "color": metadata.get("color") or current.get("color", ""),
                         "date_created": metadata.get("date_created") or current.get("date_created", ""),
                         "date_modified": date_modified,
@@ -5353,3 +5360,8 @@ def _parse_size(value):
         return int(text) if text and text.isdigit() else None
     except (TypeError, ValueError):
         return None
+
+
+# Register the optional webpage workflow on the existing Notes blueprint.
+from modules.notes.web_clip_routes import register as _register_web_clip_routes
+_register_web_clip_routes(notes_bp)

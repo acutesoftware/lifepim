@@ -32,6 +32,7 @@ CALENDAR_THUMBNAIL_LIMIT_MAX = 20
 
 
 GENERAL_DEFAULTS = {
+    "general.default_area": ("", "General", "Default Area"),
     "general.freeze_headers": ("0", "General", "Freeze headers"),
     "general.map_names_english": ("1", "General", "Map names English"),
     "general.mobile_font_size": ("14", "General", "Mobile font size"),
@@ -237,6 +238,7 @@ def get_calendar_view_settings(conn=None):
 
 def get_general_settings(conn=None):
     return {
+        "default_area": get_setting("general.default_area", "", conn),
         "freeze_headers": _as_bool(get_setting("general.freeze_headers", "0", conn)),
         "map_names_english": _as_bool(get_setting("general.map_names_english", "1", conn)),
         "mobile_font_size": normalize_mobile_font_size(
@@ -538,6 +540,12 @@ def save_general_settings(values, conn=None):
             "Mobile font size",
         ),
     }
+    if "default_area" in values:
+        from common import areas
+        area_id = str(values.get("default_area") or "").strip()
+        if area_id and not areas.area_get(area_id, conn=conn):
+            raise ValueError("Default Area not found.")
+        updates["general.default_area"] = (area_id, "Default Area")
     for key, (value, label) in updates.items():
         set_setting(key, value, "General", label, conn)
 

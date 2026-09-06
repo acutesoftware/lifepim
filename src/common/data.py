@@ -202,6 +202,7 @@ def _normalize_area_write_columns(conn, tbl_name, cols, vals):
 
 
 NOTE_SCHEMA_COLUMNS = {
+    "capture_metadata": "TEXT",
     "file_name": "TEXT",
     "path": "TEXT",
     "folder_id": "INTEGER",

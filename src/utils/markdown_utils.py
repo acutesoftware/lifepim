@@ -319,11 +319,25 @@ def _render_fallback_markdown(text):
     return "<br>".join(blocks)
 
 
+def _convert_archive_links(text, asset_resolver):
+    if not asset_resolver:
+        return text
+
+    def replace(match):
+        target = _markdown_link_target(match.group(2))
+        if not target.lower().endswith(".archive.html") or _is_absolute_link_target(target):
+            return match.group(0)
+        return f"[{match.group(1)}]({asset_resolver(target)})"
+
+    return _MARKDOWN_LINK_RE.sub(replace, text)
+
+
 def render_markdown(text, asset_resolver=None, allow_html=True, wiki_link_resolver=None, link_resolver=None):
     if text is None:
         return ""
     if not allow_html:
         text = html.escape(text, quote=False)
+    text = _convert_archive_links(text, asset_resolver)
     text = _convert_note_images(text, asset_resolver)
     text = _convert_obsidian_wiki_links(text, wiki_link_resolver)
     text = _convert_markdown_note_links(text, link_resolver)

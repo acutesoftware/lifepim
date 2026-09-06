@@ -462,7 +462,9 @@
         const label = menu.dataset.sidebarLabel || "";
         const createTemplateDefault = menu.dataset.templateDefault === "true";
         menu.selectedIndex = 0;
-        if (action === "blank") {
+        if (action === "webpage") {
+          window.location.href = "/notes/web";
+        } else if (action === "blank") {
           create_new_note(label, createTemplateDefault ? "New Template" : "", { isTemplate: createTemplateDefault });
         } else if (action === "template") {
           chooseTemplate(label);
