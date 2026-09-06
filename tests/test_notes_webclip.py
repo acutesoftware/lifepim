@@ -49,6 +49,33 @@ class TestExtraction(unittest.TestCase):
         self.assertNotIn('BUY NOW', value.markdown)
         self.assertNotIn('Privacy policy', value.markdown)
 
+    def test_recipe_jsonld_retains_ingredients_and_collapsed_steps(self):
+        recipe = {'@type': ['CreativeWork', 'Recipe'], 'name': 'Toast & herbs',
+                  'author': {'@type': 'Person', 'name': 'Example Cook'}, 'prepTime': 'PT5M',
+                  'image': [{'@type': 'ImageObject', 'url': '/toast.jpg'}],
+                  'recipeIngredient': ['2 slices of bread', '1 spoon of herbs'],
+                  'recipeInstructions': [{'@type': 'HowToSection', 'name': 'Prepare', 'itemListElement': [
+                      {'@type': 'HowToStep', 'text': 'Toast the bread.'},
+                      {'@type': 'HowToStep', 'text': '<p>Sprinkle the herbs over the warm toast.</p>'}]}]}
+        html = '<html><title>Toast &amp; herbs</title><script type="application/ld+json">' + json.dumps({'@graph': [recipe]}) + '</script><article><p>A short preview.</p><a href="#">Read more</a><div hidden>Other content</div></article></html>'
+        for method in (1, 2, 4):
+            value = clip.extract_html(html, 'https://example.com/recipe', method)
+            self.assertTrue(value.success)
+            self.assertEqual(value.title, 'Toast & herbs')
+            self.assertIn('## Ingredients\n\n- 2 slices of bread\n- 1 spoon of herbs', value.markdown)
+            self.assertIn('2. Sprinkle the herbs over the warm toast.', value.markdown)
+            self.assertIn('### Prepare', value.markdown)
+            self.assertIn('Prep time: 5 min', value.markdown)
+            self.assertEqual(value.images, ['https://example.com/toast.jpg'])
+
+    def test_incomplete_recipe_does_not_replace_valid_article(self):
+        for script in ['{invalid json', json.dumps({'@type': 'Recipe', 'name': 'Incomplete', 'recipeIngredient': ['bread']})]:
+            html = ARTICLE.replace('<body>', '<body><script type="application/ld+json">' + script + '</script>')
+            value = clip.extract_html(html, 'https://example.com/', 1)
+            self.assertTrue(value.success)
+            self.assertIn('digital documents', value.markdown)
+            self.assertNotIn('## Ingredients', value.markdown)
+
     def test_short_structured_page_and_boilerplate(self):
         self.assertTrue(clip.is_web_content_useful('This short article explains how to store plain text documents safely for many years.', 'Short article', True))
         self.assertFalse(clip.is_web_content_useful('Sign in Accept cookies Subscribe Privacy policy ' * 5, 'Menu', True))
@@ -95,6 +122,13 @@ class TestExtraction(unittest.TestCase):
     def test_archive_keeps_snapshot_when_extraction_fails(self):
         output_paths = []
         def archive(command, **kwargs):
+            self.assertEqual(command[command.index('--browser-wait-until') + 1], 'domContentLoaded')
+            load = int(command[command.index('--browser-load-max-time') + 1])
+            capture = int(command[command.index('--browser-capture-max-time') + 1])
+            self.assertLess(load + capture + 1500, clip.ARCHIVE_PROCESS_SECONDS * 1000)
+            self.assertEqual(command[command.index('--browser-single-process') + 1], 'false')
+            self.assertEqual(command[command.index('--remove-frames') + 1], 'true')
+            self.assertEqual(command[command.index('--load-deferred-images') + 1], 'false')
             output = Path(command[-1])
             output_paths.append(output)
             output.write_text('<html><title>Snapshot</title><body>Short</body></html>', encoding='utf-8')
@@ -166,6 +200,17 @@ class TestWebSave(unittest.TestCase):
         self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM lp_notes').fetchone()[0], 0)
         self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM lp_places').fetchone()[0], 0)
         self.assertFalse(self.target.exists())
+
+    def test_explicit_failure_reports_method_without_falling_back(self):
+        for method, adapter in [(1, 'extract_reader'), (2, 'extract_rendered'), (4, 'archive_webpage')]:
+            with patch.object(clip, adapter, side_effect=clip.WebClipError('Controlled failure')) as selected:
+                response = self.client.post('/notes/api/web/fetch', json={'url': 'https://example.com/', 'method': method})
+            self.assertEqual(response.status_code, 422)
+            self.assertEqual(selected.call_count, 1)
+            self.assertEqual(response.json['method_requested'], method)
+            self.assertEqual(response.json['method_used'], method)
+            self.assertIn(clip.METHOD_LABELS[method], response.json['error'])
+            self.assertEqual(response.json['warnings'], ['Controlled failure'])
 
     def test_save_duplicate_place_collision_archive_and_metadata(self):
         value = result(4)
@@ -250,8 +295,15 @@ class TestWebSave(unittest.TestCase):
         server = make_server('127.0.0.1', 0, self.app)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
+        release_archive = threading.Event()
         try:
-            with patch.object(clip, 'fetch_web_note', side_effect=lambda *args: result()), patch.object(web, 'get_tabs', return_value=[]), patch.object(web, 'get_side_tabs', return_value=[]), patch.object(routes.security, 'can_edit_note', return_value=True):
+            requested_methods = []
+            def fake_fetch(url, method):
+                requested_methods.append(method)
+                if method == 4:
+                    release_archive.wait(8)
+                return result(method)
+            with patch.object(clip, 'fetch_web_note', side_effect=fake_fetch), patch.object(web, 'get_tabs', return_value=[]), patch.object(web, 'get_side_tabs', return_value=[]), patch.object(routes.security, 'can_edit_note', return_value=True):
                 with sync_playwright() as pw:
                     browser = pw.chromium.launch()
                     page = browser.new_page()
@@ -262,7 +314,19 @@ class TestWebSave(unittest.TestCase):
                     page.on('dialog', dialog_handler)
                     origin = f'http://127.0.0.1:{server.server_port}'
                     page.goto(origin + '/notes/web', wait_until='domcontentloaded')
+                    self.assertIn('?v=', page.locator('script[src*="note_web_fetch.js"]').get_attribute('src'))
+                    # A proxy/HTML error must clear the busy state rather than leave
+                    # an apparently completed browser tab with a stuck fetch message.
+                    page.route('**/notes/api/web/fetch', lambda route: route.fulfill(status=502, content_type='text/html', body='Gateway error'))
                     page.locator('input[name=url]').fill('http://localhost/article')
+                    page.locator('select[name=method]').select_option('4')
+                    page.get_by_role('button', name='Fetch Page', exact=True).click()
+                    page.wait_for_function("document.querySelector('#web-fetch-status').textContent.includes('HTTP 502')")
+                    self.assertFalse(page.locator('#web-fetch-progress').is_visible())
+                    self.assertTrue(page.get_by_role('button', name='Fetch Page', exact=True).is_enabled())
+                    page.unroute('**/notes/api/web/fetch')
+                    page.locator('input[name=url]').fill('http://localhost/article')
+                    page.locator('select[name=method]').select_option('2')
                     page.get_by_role('button', name='Fetch Page', exact=True).click()
                     page.wait_for_url('**/notes/web/preview/**')
                     page.locator('#web-clip-title').fill('Browser title')
@@ -276,7 +340,13 @@ class TestWebSave(unittest.TestCase):
                     # A second preview can be edited and cancelled without an autosave.
                     page.goto(origin + '/notes/web', wait_until='domcontentloaded')
                     page.locator('input[name=url]').fill('http://localhost/article')
+                    page.locator('select[name=method]').select_option('4')
                     page.get_by_role('button', name='Fetch Page', exact=True).click()
+                    self.assertTrue(page.locator('#web-fetch-progress').is_visible())
+                    self.assertIn('Fetching using Web Archive', page.locator('#web-fetch-status').inner_text())
+                    self.assertFalse(page.locator('select[name=method]').is_enabled())
+                    page.wait_for_function("/[1-9]\\d*s elapsed/.test(document.querySelector('#web-fetch-status').textContent)")
+                    release_archive.set()
                     page.wait_for_url('**/notes/web/preview/**')
                     page.locator('#note-editor').fill('Discard this')
                     page.get_by_role('button', name='Cancel', exact=True).click()
@@ -284,9 +354,11 @@ class TestWebSave(unittest.TestCase):
                     page.wait_for_timeout(200)
                     self.assertEqual(shared.execute('SELECT COUNT(*) FROM lp_notes').fetchone()[0], 1)
                     self.assertFalse(web._drafts)
+                    self.assertEqual(requested_methods, [2, 4])
                     self.assertFalse(dialogs)
                     browser.close()
         finally:
+            release_archive.set()
             server.shutdown()
             thread.join()
             server.server_close()

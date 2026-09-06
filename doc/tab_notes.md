@@ -278,6 +278,14 @@ Local websites (including localhost and NAS addresses) are supported.
 - **Rendered Page** runs JavaScript in a temporary headless Chromium session, then extracts readable Markdown.
 - **Web Archive** uses SingleFile to preserve a standalone HTML snapshot and also creates Markdown. If readable extraction fails, the Markdown explains that the archive is available.
 
+Recipe pages with published schema.org Recipe data retain their ingredients and ordered method steps, including steps hidden behind a “Read more” presentation. This works with any extraction method and does not depend on website-specific selectors. Separate article text, such as cooking tips, is retained when the article extractor returns it.
+
+An explicit method selection runs only that method. The fetch status and failure message identify the selected method. Some sites refuse automated Chromium requests with HTTP 401/403 even when Reader or Web Archive works; that refusal is reported without silently changing methods.
+
+While fetching, the page shows an indeterminate progress bar and elapsed seconds, and disables the fetch controls until a response arrives. The browser tab's own loading spinner does not track this background request. The fetch script has a versioned URL so a new deployment does not reuse an older cached script. If the server returns an unexpected HTML response or stops responding, the page shows an error and restores the controls.
+
+Web Archive waits for document loading rather than an idle network, and uses normal Chromium processes on Windows. Navigation and capture have separate time limits within the overall 75-second process limit. Embedded frames and automatic scrolling to load deferred images are omitted to avoid hanging on advertising or continuously loading resources; the preview reports this limitation. Article image preservation for the Markdown note remains a separate save step.
+
 The preview uses the existing Notes Markdown editor. Edit the title and content, then press **Save**.
 Typing or leaving the editor field does not save a webpage preview. **Cancel** discards it without creating a Note, Place, or final files.
 Previews expire after one hour or an application restart; keep the preview open until saved.

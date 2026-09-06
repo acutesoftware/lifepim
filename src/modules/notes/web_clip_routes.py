@@ -181,6 +181,7 @@ def register(bp):
     def web_clip_page():
         return render_template('note_web_fetch.html', active_tab='notes', tabs=get_tabs(),
                                side_tabs=get_side_tabs(), methods=clip.METHOD_LABELS,
+                               web_fetch_version=(Path(__file__).resolve().parents[2] / 'static' / 'note_web_fetch.js').stat().st_mtime_ns,
                                content_title='New Note from Webpage')
 
     @bp.route('/api/web/fetch', methods=['POST'])
@@ -192,7 +193,11 @@ def register(bp):
                    extra={'url': url, 'method': payload.get('method', 0)}, conn=data._get_conn())
             result = clip.fetch_web_note(url, payload.get('method', 0))
             if not result.success:
-                return jsonify(success=False, error='The webpage could not be extracted.', warnings=result.warnings), 422
+                requested = payload.get('method', 0)
+                label = clip.METHOD_LABELS[requested]
+                error = 'Auto could not extract this webpage.' if requested == 0 else f'{label} could not extract this webpage.'
+                return jsonify(success=False, error=error, method_requested=requested,
+                               method_used=result.method_used, warnings=result.warnings), 422
             with _lock:
                 _cleanup()
                 if len(_drafts) >= 16:

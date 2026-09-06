@@ -4,6 +4,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 import base64
+import json
 import logging
 import os
 import re
@@ -21,6 +22,9 @@ WEB_METHOD_RENDERED = 2
 WEB_METHOD_ARCHIVE = 4
 METHOD_LABELS = {0: "Auto", 1: "Reader / Article Extract", 2: "Rendered Page", 4: "Web Archive"}
 MAX_HTML = 20 * 1024 * 1024
+ARCHIVE_LOAD_MS = 20000
+ARCHIVE_CAPTURE_MS = 45000
+ARCHIVE_PROCESS_SECONDS = 75
 IMAGE_RE = re.compile(r'!\[([^\]\n]*)\]\((<?[^\s)]+>?)(?:\s+"[^"]*")?\)')
 log = logging.getLogger(__name__)
 
@@ -100,6 +104,114 @@ def is_web_content_useful(markdown, title="", structured=False):
     return bool(paragraphs and (len(text) >= 200 or (structured and title and len(text) >= 60)))
 
 
+def _recipe_content(tree, url, page_title):
+    """Read public schema.org Recipe data, including content hidden by 'read more'.
+
+    Article extractors often discard ingredient lists and short instruction blocks.
+    This uses the site's published structured data, without site-specific selectors.
+    """
+    from lxml import html as lhtml
+    from html import escape, unescape
+
+    def text(value):
+        if not isinstance(value, (str, int, float)):
+            return ''
+        fragment = lhtml.fragment_fromstring(str(value), create_parent='div')
+        for element in fragment.xpath('.//script|.//style'):
+            element.drop_tree()
+        return escape(' '.join(fragment.text_content().split()), quote=False)
+
+    def steps(value, depth=0):
+        if depth > 15:
+            return []
+        if isinstance(value, list):
+            return [step for item in value for step in steps(item, depth + 1)]
+        if isinstance(value, dict):
+            children = value.get('itemListElement')
+            if children:
+                heading = text(value.get('name'))
+                return ([('section', heading)] if heading else []) + steps(children, depth + 1)
+            content = text(value.get('text') or value.get('name'))
+            return [('step', content)] if content else []
+        if isinstance(value, str):
+            fragment = lhtml.fragment_fromstring(value, create_parent='div')
+            lines = [element.text_content() for element in fragment.xpath('.//li')]
+            return [('step', text(line)) for line in (lines or value.splitlines()) if text(line)]
+        return []
+
+    candidates = []
+    for script in tree.xpath('//script[translate(@type,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="application/ld+json"]/text()'):
+        try:
+            pending = [json.loads(script)]
+        except (ValueError, RecursionError):
+            continue
+        visited = 0
+        while pending and visited < 10000:
+            node = pending.pop()
+            visited += 1
+            if isinstance(node, list):
+                pending.extend(reversed(node))
+            elif isinstance(node, dict):
+                types = node.get('@type', [])
+                types = types if isinstance(types, list) else [types]
+                if any(str(kind).rstrip('/').rsplit('/', 1)[-1].rsplit(':', 1)[-1] == 'Recipe' for kind in types):
+                    ingredients = node.get('recipeIngredient')
+                    if isinstance(ingredients, str):
+                        ingredients = ingredients.splitlines()
+                    if isinstance(ingredients, list):
+                        ingredients = [text(item) for item in ingredients if isinstance(item, str) and text(item)]
+                        method = steps(node.get('recipeInstructions'))
+                        if ingredients and any(kind == 'step' for kind, _ in method):
+                            candidates.append((node, ingredients, method))
+                pending.extend(reversed(list(node.values())))
+    if not candidates:
+        return None
+    def title_key(value):
+        return re.sub(r'\W+', '', str(value).casefold())
+    candidates.sort(key=lambda item: title_key(item[0].get('name')) == title_key(page_title), reverse=True)
+    recipe, ingredients, method = candidates[0]
+    title = unescape(text(recipe.get('name'))) or page_title
+    parts = []
+    description = text(recipe.get('description'))
+    if description:
+        parts.append(description)
+    for label, key in [('Servings', 'recipeYield'), ('Prep time', 'prepTime'), ('Cook time', 'cookTime'), ('Total time', 'totalTime')]:
+        value = recipe.get(key)
+        if isinstance(value, list):
+            value = ', '.join(str(item) for item in value if isinstance(item, (str, int)))
+        value = text(value)
+        if value:
+            # ISO 8601 durations are common recipe metadata; make them readable.
+            duration = re.fullmatch(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', value)
+            if duration:
+                value = ' '.join(f'{n} {unit}' for n, unit in zip(duration.groups(), ('hr', 'min', 'sec')) if n)
+            parts.append(f'{label}: {value}')
+    image = recipe.get('image', [])
+    image = image if isinstance(image, list) else [image]
+    images = []
+    for item in image:
+        source = item.get('url') or item.get('contentUrl') if isinstance(item, dict) else item
+        if isinstance(source, str):
+            source = urljoin(url, source)
+            if urlsplit(source).scheme in {'http', 'https'}:
+                images.append(source)
+                parts.append(f'![Recipe image]({source})')
+                break  # Multiple image sizes usually refer to the same photograph.
+    parts += ['## Ingredients', '\n'.join(f'- {item}' for item in ingredients), '## Method']
+    number = 0
+    for kind, value in method:
+        if kind == 'section':
+            parts.append(f'### {value}')
+        else:
+            number += 1
+            parts.append(f'{number}. {value}')
+    author = recipe.get('author', '')
+    author = author if isinstance(author, list) else [author]
+    author = ', '.join(text(item.get('name') if isinstance(item, dict) else item) for item in author)
+    return WebClipResult(success=True, title=title, markdown='\n\n'.join(parts), author=unescape(author),
+                         published_date=text(recipe.get('datePublished')), images=images)
+
+
 def extract_html(html, url, method):
     try:
         import trafilatura
@@ -116,6 +228,11 @@ def extract_html(html, url, method):
     structured = bool(tree.xpath('//article|//main'))
     metadata = trafilatura.extract_metadata(tree, default_url=url)
     title = (metadata.title if metadata else "") or ""
+    try:
+        recipe = _recipe_content(tree, url, title)
+    except Exception:
+        log.debug('Ignoring unusable recipe metadata', exc_info=True)
+        recipe = None
     body = trafilatura.extract(tree, url=url, output_format="markdown", include_comments=False,
                                include_tables=True, include_links=True, include_images=True,
                                include_formatting=True, favor_precision=True) or ""
@@ -127,7 +244,16 @@ def extract_html(html, url, method):
         result.author = metadata.author or ""
         result.published_date = metadata.date or ""
         result.site_name = metadata.sitename or result.site_name
-    result.success = is_web_content_useful(body, title, structured)
+    if recipe:
+        result.title = title = recipe.title
+        result.author = recipe.author or result.author
+        result.published_date = recipe.published_date or result.published_date
+        # The structured recipe is authoritative; retain genuinely separate article
+        # content (such as cooking tips), without duplicating a recipe already extracted.
+        if body and not re.search(r'(?im)^#{1,6}\s+(?:ingredients|method|instructions)\b', body):
+            recipe.markdown += '\n\n## More from this page\n\n' + body
+        body = result.markdown = recipe.markdown
+    result.success = bool(recipe) or is_web_content_useful(body, title, structured)
     result.images = list(dict.fromkeys(m.group(2).strip('<>') for m in IMAGE_RE.finditer(body)))
     if not result.success:
         result.warnings.append(f"{METHOD_LABELS[method]} could not identify useful page content.")
@@ -154,6 +280,8 @@ def extract_rendered(url):
                 # Local HTTP sites are allowed; other resource schemes are not navigations.
                 response = page.goto(url, wait_until="domcontentloaded", timeout=25000)
                 if response and response.status >= 400:
+                    if response.status in {401, 403}:
+                        raise WebClipError(f"Rendered Page was refused by the website (HTTP {response.status}). Try Reader / Article Extract or Web Archive.")
                     raise WebClipError(f"The webpage returned HTTP {response.status}.")
                 page.wait_for_timeout(1500)
                 final = validate_url(page.url)
@@ -194,7 +322,7 @@ def _run_archive(command):
                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
                           start_new_session=not windows) as process:
         try:
-            _, stderr = process.communicate(timeout=75)
+            _, stderr = process.communicate(timeout=ARCHIVE_PROCESS_SECONDS)
         except subprocess.TimeoutExpired:
             # Stop the browser children too, before the temporary directory is cleaned.
             try:
@@ -228,6 +356,15 @@ def archive_webpage(url):
             raise WebClipError("Install the standalone SingleFile executable for Web Archive support.")
         command = [node, str(script)]
     command += _archive_browser_args()
+    # Busy advertising/analytics requests may never become idle. Give navigation and
+    # capture separate budgets that fit inside the outer process deadline.
+    command += ['--browser-single-process', 'false',
+                '--browser-wait-until', 'domContentLoaded',
+                '--browser-wait-delay', '1500',
+                '--browser-load-max-time', str(ARCHIVE_LOAD_MS),
+                '--browser-capture-max-time', str(ARCHIVE_CAPTURE_MS),
+                '--remove-frames', 'true',
+                '--load-deferred-images', 'false']
     with tempfile.TemporaryDirectory(prefix="lifepim-web-") as tmp:
         output = Path(tmp) / "page.html"
         try:
@@ -239,7 +376,15 @@ def archive_webpage(url):
                 raise WebClipError("Web Archive did not produce a usable snapshot.")
         except subprocess.TimeoutExpired as exc:
             raise WebClipError("Web Archive timed out.") from exc
-        except (OSError, subprocess.CalledProcessError) as exc:
+        except subprocess.CalledProcessError as exc:
+            diagnostic = (exc.stderr or b'').decode('utf-8', errors='replace') if isinstance(exc.stderr, bytes) else str(exc.stderr or '')
+            log.warning('SingleFile failed (exit %s): %s', exc.returncode, diagnostic[-2000:])
+            if 'capture timeout' in diagnostic.lower():
+                raise WebClipError("Web Archive timed out while collecting page resources.") from exc
+            if 'load timeout' in diagnostic.lower():
+                raise WebClipError("Web Archive timed out while loading the webpage.") from exc
+            raise WebClipError("Could not archive webpage.") from exc
+        except OSError as exc:
             raise WebClipError("Could not archive webpage.") from exc
     final_url = url
     saved_url = re.search(r'Page saved with SingleFile\s+url:\s*(\S+)', html[:8192])
@@ -260,6 +405,7 @@ def archive_webpage(url):
     result.source_url = url
     result.final_url = final_url
     result.html = html
+    result.warnings.append('The archive omits embedded frames and images that require scrolling to load.')
     return result
 
 

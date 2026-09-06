@@ -1,11 +1,12 @@
 {% extends 'layout.html' %}
 {% block module_content %}
-<form id="web-clip-fetch" action="{{ url_for('notes.web_clip_fetch') }}">
+<form id="web-clip-fetch" method="post" action="{{ url_for('notes.web_clip_fetch') }}">
   <p><label>URL: <input type="url" name="url" required placeholder="https://example.com/article" style="width:75%;"></label></p>
   <p><label>Method: <select name="method">{% for value, label in methods.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></p>
   <button type="submit">Fetch Page</button>
   <a href="{{ url_for('notes.list_notes_route') }}">Cancel</a>
+  <progress id="web-fetch-progress" hidden aria-label="Fetching webpage"></progress>
   <p id="web-fetch-status" role="status" aria-live="polite"></p>
 </form>
-<script src="{{ url_for('static', filename='note_web_fetch.js') }}"></script>
+<script src="{{ url_for('static', filename='note_web_fetch.js', v=web_fetch_version) }}"></script>
 {% endblock %}
