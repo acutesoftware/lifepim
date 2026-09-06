@@ -4142,9 +4142,12 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
         existing[key] = row_dict
         existing_by_folder.setdefault(row_path_lower, {})[key] = row_dict
 
+    def scan_error(error):
+        raise error
+
     scan_roots = []
     if recursive:
-        for root, dirs, files in os.walk(folder_path):
+        for root, dirs, files in os.walk(folder_path, onerror=scan_error):
             if _is_deleted_note_path(root):
                 dirs[:] = []
                 continue
@@ -4152,17 +4155,10 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
             scan_roots.append((root, dirs, files))
     else:
         names = []
-        if not _is_deleted_note_path(folder_path):
-            try:
-                with os.scandir(folder_path) as entries:
-                    for entry in entries:
-                        try:
-                            if entry.is_file() and entry.name.lower().endswith(".md"):
-                                names.append(entry.name)
-                        except OSError:
-                            continue
-            except OSError:
-                names = []
+        with os.scandir(folder_path) as entries:
+            for entry in entries:
+                if entry.is_file() and entry.name.lower().endswith(".md"):
+                    names.append(entry.name)
         scan_roots = [(folder_path, [], names)]
 
     scanned = inserted = updated = unchanged = renamed = 0
@@ -4318,7 +4314,30 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
                         pass
                     inserted += 1
 
-    missing = len([key for key in existing.keys() if key not in seen])
+    # Only prune confirmed absent files after a complete, successful scan.
+    # A failed stat/read must never be interpreted as a deleted note.
+    missing = 0
+    missing_ids = []
+    for row in rows:
+        row_dict = dict(row)
+        key = _note_full_path_key(row_dict.get("path"), row_dict.get("file_name"))
+        if key not in existing or key in seen:
+            continue
+        try:
+            os.stat(os.path.join(row_dict["path"], row_dict["file_name"]))
+        except FileNotFoundError:
+            missing_ids.append(row_dict["id"])
+        except OSError:
+            continue
+    # Recheck the root before pruning (e.g. a disconnected network drive).
+    os.stat(folder_path)
+    for note_id in missing_ids:
+        if not data.delete_record(conn, tbl["name"], note_id):
+            raise RuntimeError(f"Could not remove missing note {note_id}.")
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'lp_note_search_index'").fetchone():
+            conn.execute("DELETE FROM lp_note_search_index WHERE note_id = ?", (note_id,))
+        missing += 1
+    conn.commit()
     return {
         "folder_path": folder_path,
         "scanned": scanned,
@@ -4335,7 +4354,7 @@ def _sync_notes_message(result):
     return (
         f"Synced notes folder {result['folder_path']}: scanned {result['scanned']}, "
         f"inserted {result['inserted']}, updated {result['updated']}, "
-        f"renamed {result.get('renamed', 0)}, unchanged {result['unchanged']}, missing on disk {result['missing']}, "
+        f"renamed {result.get('renamed', 0)}, unchanged {result['unchanged']}, removed missing {result['missing']}, "
         f"duplicate DB rows ignored {result['duplicates']}."
     )
 

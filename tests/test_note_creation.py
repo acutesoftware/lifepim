@@ -1151,7 +1151,7 @@ class TestNoteCreation(unittest.TestCase):
         self.assertNotIn(games_note_id, sport_ids)
         self.assertNotIn(travel_note_id, sport_ids)
 
-    def test_sync_note_rows_is_idempotent_and_counts_missing(self):
+    def test_sync_note_rows_is_idempotent_and_removes_missing(self):
         notes_dir = os.path.join(self.tmpdir.name, "sync_notes")
         os.makedirs(notes_dir, exist_ok=True)
         note_path = os.path.join(notes_dir, "external.md")
@@ -1192,7 +1192,40 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(result["inserted"], 1)
         self.assertEqual(result["missing"], 1)
         count = self.conn.execute(f"SELECT COUNT(1) AS cnt FROM {tbl['name']}").fetchone()["cnt"]
-        self.assertEqual(count, 2)
+        self.assertEqual(count, 1)
+
+    def test_sync_removes_multiple_renames_and_deleted_subfolder_only_in_scope(self):
+        root = os.path.join(self.tmpdir.name, "sync_scope")
+        child = os.path.join(root, "child")
+        other = os.path.join(self.tmpdir.name, "other")
+        os.makedirs(child)
+        os.makedirs(other)
+        for folder, name in [(root, "a.md"), (root, "b.md"), (child, "gone.md"), (other, "outside.md")]:
+            with open(os.path.join(folder, name), "w") as handle:
+                handle.write("content")
+        notes_routes._sync_note_rows(root)
+        notes_routes._sync_note_rows(other)
+        os.rename(os.path.join(root, "a.md"), os.path.join(root, "new-a.md"))
+        os.rename(os.path.join(root, "b.md"), os.path.join(root, "new-b.md"))
+        os.remove(os.path.join(child, "gone.md"))
+        os.rmdir(child)
+        result = notes_routes._sync_note_rows(root)
+        self.assertEqual(result["missing"], 3)
+        names = {row[0] for row in self.conn.execute("SELECT file_name FROM lp_notes")}
+        self.assertEqual(names, {"new-a.md", "new-b.md", "outside.md"})
+        self.assertEqual(notes_routes._sync_note_rows(root)["inserted"], 0)
+
+    def test_sync_scan_failure_preserves_records(self):
+        root = os.path.join(self.tmpdir.name, "unreadable")
+        os.makedirs(root)
+        with open(os.path.join(root, "a.md"), "w") as handle:
+            handle.write("content")
+        notes_routes._sync_note_rows(root)
+        for recursive in (False, True):
+            with patch.object(notes_routes.os, "scandir", side_effect=PermissionError("unreadable")):
+                with self.assertRaises(PermissionError):
+                    notes_routes._sync_note_rows(root, recursive=recursive)
+            self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM lp_notes").fetchone()[0], 1)
 
     def test_sync_note_rows_skips_deleted_folder(self):
         notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")

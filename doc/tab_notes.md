@@ -128,7 +128,7 @@ When a changed folder is scanned, LifePIM reconciles the immediate contents of t
 
 - new `.md` files are added to `lp_notes`
 - renamed files in the same folder are detected conservatively and the existing note row is preserved where possible
-- deleted files are counted as missing, following the existing non-destructive Notes sync behavior
+- confirmed deleted files are removed from `lp_notes` and the note content search cache
 - new subfolders are discovered and indexed recursively once
 - deleted subfolders are marked missing in `lp_note_folders`
 
@@ -186,7 +186,7 @@ Use Full Sync when:
 - a network drive was unavailable during a previous check
 - you want an authoritative repair pass
 
-Full Sync is idempotent and safe to run repeatedly. It adds and updates note rows, but it follows the existing Notes convention for missing files: missing-on-disk notes are counted, not automatically deleted from `lp_notes`.
+Full Sync is idempotent and safe to run repeatedly. It adds and updates note rows and removes confirmed missing-on-disk rows within the scanned scope. Directory scan failures abort reconciliation; file access errors do not authorize deletion. Source files are never deleted by sync.
 
 ### Notebooks and Books
 
@@ -226,7 +226,7 @@ Notebook contents are managed separately from metadata:
 
 `Available Notes` only offers notes whose markdown source file exists on disk. This prevents stale `lp_notes` rows from being added after a file has been renamed, moved, or deleted outside LifePIM. If a browser already has an old Available Notes form open and that file no longer exists, LifePIM rejects the add action and asks you to sync the folder.
 
-When a note file is renamed outside LifePIM and the containing folder is synced, LifePIM tries to preserve the existing note ID for a conservative same-folder rename. The rename check only applies when a folder has exactly one missing markdown file and one new markdown file with the same recorded size. Broader changes are treated as a new file plus a missing old file, so stale missing rows remain non-destructive but are not offered in Available Notes.
+When a note file is renamed outside LifePIM and the containing folder is synced, LifePIM tries to preserve the existing note ID for a conservative same-folder rename. The rename check only applies when a folder has exactly one missing markdown file and one new markdown file with the same recorded size. Broader changes are treated as new files plus removal of the missing old rows, so the folder list matches disk. These replacements receive new note IDs.
 
 `Notebook` and `Book` use the same underlying collection model and controls. The difference is intent and filtering:
 
