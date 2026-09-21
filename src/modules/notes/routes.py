@@ -1216,21 +1216,36 @@ def _note_folder_breadcrumb(folder_path, area=None):
                 }
             ]
         return [{"label": "notes", "url": url_for("notes.list_notes_table_route")}]
-    parts = [part for part in folder_path.replace("/", "\\").split("\\") if part]
-    root_idx = None
-    for idx in range(len(parts) - 1):
-        if parts[idx].lower() == "data" and parts[idx + 1].lower() == "notes":
-            root_idx = idx + 1
-            break
-    if root_idx is None:
-        return []
+    root_path = _notes_root_from_path(folder_path)
+    root_label = "notes"
+    if not root_path:
+        matching_roots = []
+        if area:
+            try:
+                matching_roots = [
+                    _normalize_note_path(folder.get("path_prefix") or "")
+                    for folder in areas_mod.area_folders_list(area)
+                    if folder.get("is_enabled", 1)
+                    and user_paths.path_startswith(
+                        folder_path,
+                        folder.get("path_prefix") or "",
+                    )
+                ]
+            except Exception:
+                matching_roots = []
+        root_path = max(matching_roots, key=lambda path: len(user_paths.split_path(path)), default="")
+        if not root_path:
+            root_path = folder_path
+        root_parts = user_paths.split_path(root_path)
+        root_label = root_parts[-1] if root_parts else root_path
 
-    root_parts = parts[: root_idx + 1]
-    rel_parts = parts[root_idx + 1 :]
-    current = "\\".join(root_parts)
+    folder_parts = user_paths.split_path(folder_path)
+    root_parts = user_paths.split_path(root_path)
+    rel_parts = folder_parts[len(root_parts) :]
+    current = root_path
     crumbs = [
         {
-            "label": "notes",
+            "label": root_label,
             "url": url_for(
                 "notes.list_notes_table_route",
                 **_notes_url_args(folder_path=current),
@@ -1238,7 +1253,7 @@ def _note_folder_breadcrumb(folder_path, area=None):
         }
     ]
     for part in rel_parts:
-        current = current + "\\" + part
+        current = user_paths.join_path(current, part)
         crumbs.append(
             {
                 "label": part,

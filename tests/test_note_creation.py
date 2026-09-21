@@ -1325,6 +1325,61 @@ class TestNoteCreation(unittest.TestCase):
 
         self.assertEqual(root, r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes")
 
+    def test_note_folder_breadcrumb_supports_lan_user_notes_root(self):
+        app = self._notes_test_app()
+        folder_path = r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes\60-Design\61-Writing"
+
+        with app.test_request_context():
+            breadcrumb = notes_routes._note_folder_breadcrumb(folder_path)
+
+        self.assertEqual(
+            [crumb["label"] for crumb in breadcrumb],
+            ["notes", "60-Design", "61-Writing"],
+        )
+        self.assertIn("folder=N:%5Cduncan%5CLifePIM_Data%5CDATA%5Clan_users%5Cmmob%5Cnotes", breadcrumb[0]["url"])
+
+    def test_note_folder_breadcrumb_still_supports_legacy_notes_root(self):
+        app = self._notes_test_app()
+        folder_path = r"N:\duncan\LifePIM_Data\DATA\notes\60-Design\61-Writing"
+
+        with app.test_request_context():
+            breadcrumb = notes_routes._note_folder_breadcrumb(folder_path)
+
+        self.assertEqual(
+            [crumb["label"] for crumb in breadcrumb],
+            ["notes", "60-Design", "61-Writing"],
+        )
+
+    def test_note_folder_breadcrumb_uses_mapped_root_outside_notes_tree(self):
+        app = self._notes_test_app()
+        mapped_root = r"D:\DATA_LLM\dev\yourdataforlife"
+        folder_path = mapped_root + r"\draft2_PRINCIPLES"
+        areas_mod.area_folder_add(
+            "make/write",
+            mapped_root,
+            folder_role="include",
+            conn=self.conn,
+        )
+
+        with app.test_request_context():
+            breadcrumb = notes_routes._note_folder_breadcrumb(folder_path, "make/write")
+
+        self.assertEqual(
+            [crumb["label"] for crumb in breadcrumb],
+            ["yourdataforlife", "draft2_PRINCIPLES"],
+        )
+        self.assertIn("folder=D:%5CDATA_LLM%5Cdev%5Cyourdataforlife", breadcrumb[0]["url"])
+
+    def test_note_folder_breadcrumb_links_unmapped_folder_as_fallback(self):
+        app = self._notes_test_app()
+        folder_path = r"D:\external\standalone"
+
+        with app.test_request_context():
+            breadcrumb = notes_routes._note_folder_breadcrumb(folder_path, "make/write")
+
+        self.assertEqual([crumb["label"] for crumb in breadcrumb], ["standalone"])
+        self.assertIn("folder=D:%5Cexternal%5Cstandalone", breadcrumb[0]["url"])
+
     def test_notes_root_path_derives_lan_user_notes_root(self):
         tbl = common_utils.get_table_def("notes")
         note_path = r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes\40-Dev"
