@@ -1,10 +1,13 @@
 import os
 import re
 import hashlib
+import base64
+import mimetypes
 import shutil
 import subprocess
 import sys
 import tempfile
+from io import BytesIO
 from difflib import SequenceMatcher
 from datetime import datetime, timezone
 from urllib.parse import urlencode, unquote
@@ -2471,26 +2474,114 @@ def _note_source_options(area, collection_items, query=""):
     return options
 
 
-def _notebook_continuous_entries(collection_items):
+def _notebook_continuous_entries(collection_items, *, inline_assets=False):
     entries = []
     for item in collection_items or []:
-        if item.get("entry_kind") == "item" and item.get("item_type") == "note" and item.get("is_visible", True):
+        if not item.get("is_visible", True):
+            continue
+        entry_kind = item.get("entry_kind")
+        entry_id = f"notebook-entry-{item.get('collection_item_id')}"
+        if entry_kind == "heading":
+            entries.append(
+                {
+                    "kind": "heading",
+                    "anchor": entry_id,
+                    "title": item.get("display_title") or "Section",
+                    "html": "",
+                }
+            )
+        elif entry_kind == "divider":
+            entries.append({"kind": "divider", "anchor": entry_id, "title": "", "html": ""})
+        elif entry_kind == "item" and item.get("item_type") == "note":
             summary = item.get("summary") or {}
             note_id = _safe_int(item.get("item_id"))
             note = _load_note_by_id(note_id) if note_id is not None else None
             text = ""
+            content_html = ""
             if note:
                 note_path = _build_note_path(note)
                 if note_path and os.path.isfile(note_path):
                     text = _note_body_text(_read_note_file(note_path), note.get("file_name"), note.get("title"))
+
+                    def _notebook_asset_url(asset_name, current_note=note, current_note_id=note_id, current_note_path=note_path):
+                        if inline_assets:
+                            asset_file = _resolve_note_asset_path(current_note, asset_name, note_path=current_note_path)
+                            if asset_file:
+                                try:
+                                    mime_type = mimetypes.guess_type(asset_file)[0] or "application/octet-stream"
+                                    with open(asset_file, "rb") as handle:
+                                        encoded = base64.b64encode(handle.read()).decode("ascii")
+                                    return f"data:{mime_type};base64,{encoded}"
+                                except OSError:
+                                    pass
+                        return url_for(
+                            "notes.note_asset_route",
+                            note_id=current_note_id,
+                            asset_path=asset_name,
+                        )
+
+                    content_html = markdown_utils.render_markdown(
+                        text,
+                        asset_resolver=_notebook_asset_url,
+                        wiki_link_resolver=lambda title, target_note_id=None, current_note=note: _resolve_note_wiki_link(
+                            title,
+                            target_note_id=target_note_id,
+                            current_note=current_note,
+                        ),
+                        link_resolver=lambda target, current_note=note: _resolve_markdown_note_link(current_note, target),
+                    )
             entries.append(
                 {
+                    "kind": "note",
+                    "anchor": entry_id,
                     "title": item.get("display_title") or summary.get("title") or f"Note {item.get('item_id')}",
                     "text": text,
+                    "html": content_html,
                     "open_url": summary.get("open_url") or "",
                 }
             )
     return entries
+
+
+def _render_notebook_pdf(html):
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise RuntimeError("PDF publishing requires Playwright and its Chromium browser.") from exc
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page()
+                page.set_content(html, wait_until="networkidle")
+                mermaid_count = page.locator("pre > code.language-mermaid").count()
+                if mermaid_count:
+                    mermaid_script = os.path.join(current_app.static_folder, "mermaid_render.js")
+                    page.add_script_tag(path=mermaid_script)
+                    page.wait_for_function(
+                        """expected =>
+                            document.querySelectorAll('.mermaid-diagram').length
+                            + document.querySelectorAll('.mermaid-error').length >= expected
+                        """,
+                        arg=mermaid_count,
+                        timeout=30000,
+                    )
+                return page.pdf(
+                    format="A4",
+                    print_background=True,
+                    display_header_footer=True,
+                    header_template="<span></span>",
+                    footer_template=(
+                        '<div style="width:100%;font-size:9px;color:#666;text-align:center;">'
+                        '<span class="pageNumber"></span> / <span class="totalPages"></span>'
+                        "</div>"
+                    ),
+                    margin={"top": "18mm", "right": "18mm", "bottom": "20mm", "left": "18mm"},
+                )
+            finally:
+                browser.close()
+    except Exception as exc:
+        raise RuntimeError(f"Could not create the notebook PDF: {exc}") from exc
 
 
 def _load_note_by_id(note_id):
@@ -2593,8 +2684,11 @@ def notes_collections_route():
         selected = collections_mod.get_collection(selected_collection_id)
     collection_items = collections_mod.get_collection_items(selected["collection_id"]) if selected else []
     source_query = request.args.get("q", "")
-    reading_mode = request.args.get("read") == "1"
-    notebook_edit_mode = request.args.get("edit") == "1"
+    notebook_mode = (request.args.get("mode") or "").strip().lower()
+    if notebook_mode not in {"contents", "edit", "read"}:
+        notebook_mode = "read" if request.args.get("read") == "1" else "edit" if request.args.get("edit") == "1" else "contents"
+    reading_mode = notebook_mode == "read"
+    notebook_edit_mode = notebook_mode == "edit"
     context = _notes_list_context(
         area=area,
         folder_filter="",
@@ -2619,10 +2713,11 @@ def notes_collections_route():
             "collections": notebooks,
             "selected_collection": selected,
             "collection_items": collection_items,
-            "source_notes": _note_source_options(area, collection_items, source_query) if selected else [],
+            "source_notes": _note_source_options(area, collection_items, source_query) if selected and not reading_mode else [],
             "continuous_entries": _notebook_continuous_entries(collection_items) if selected and reading_mode else [],
             "reading_mode": reading_mode,
             "notebook_edit_mode": notebook_edit_mode,
+            "notebook_mode": notebook_mode,
             "message": message,
             "error": error,
             "active_status": active_status,
@@ -2638,6 +2733,50 @@ def notes_collections_route():
     resp = make_response(render_template("notes_collections.html", **context))
     resp.set_cookie("notes_view", "collections")
     return resp
+
+
+@notes_bp.route('/notebooks/<int:collection_id>/publish.pdf')
+def publish_notebook_route(collection_id):
+    _ensure_notes_schema()
+    collections_mod.ensure_collections_schema(data._get_conn())
+    notebook = collections_mod.get_collection(collection_id)
+    if not notebook or notebook.get("collection_domain") != "notes":
+        abort(404)
+    entries = _notebook_continuous_entries(
+        collections_mod.get_collection_items(collection_id),
+        inline_assets=True,
+    )
+    if not any(entry.get("kind") == "note" and entry.get("html") for entry in entries):
+        return redirect(
+            url_for(
+                "notes.notes_collections_route",
+                collection_id=collection_id,
+                message="This notebook has no readable notes to publish.",
+            )
+        )
+    publication_html = render_template(
+        "notebook_publish.html",
+        notebook=notebook,
+        entries=entries,
+        published_at=datetime.now(),
+    )
+    try:
+        pdf_bytes = _render_notebook_pdf(publication_html)
+    except RuntimeError as exc:
+        return redirect(
+            url_for(
+                "notes.notes_collections_route",
+                collection_id=collection_id,
+                message=str(exc),
+            )
+        )
+    filename = secure_filename(notebook.get("collection_name") or "notebook") or "notebook"
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"{filename}.pdf",
+    )
 
 @notes_bp.route('/view/<int:note_id>')
 def view_note_route(note_id):

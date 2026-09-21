@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ notebook.collection_name }}</title>
+  <style>
+    @page { size: A4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #202124; font-family: Georgia, "Times New Roman", serif; font-size: 11.5pt; line-height: 1.55; }
+    .cover { min-height: 230mm; display: flex; flex-direction: column; justify-content: center; text-align: center; page-break-after: always; }
+    .cover h1 { margin: 0 0 12mm; font-size: 30pt; line-height: 1.15; }
+    .cover p { color: #555; font-style: italic; }
+    .publication-contents { page-break-after: always; }
+    .publication-contents h2 { font-size: 22pt; }
+    .publication-contents ol { padding-left: 7mm; }
+    .publication-contents li { margin: 2mm 0; }
+    .section-heading { margin-top: 12mm; page-break-after: avoid; font-size: 22pt; }
+    .chapter { page-break-before: always; }
+    .chapter h1 { margin: 0 0 9mm; font-size: 24pt; line-height: 1.2; }
+    .chapter h2, .chapter h3, .chapter h4 { page-break-after: avoid; }
+    p, li { orphans: 3; widows: 3; }
+    pre, code { font-family: Consolas, "Courier New", monospace; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 4mm; background: #f3f4f5; border: 1px solid #ddd; page-break-inside: avoid; }
+    blockquote { margin-left: 4mm; padding-left: 4mm; border-left: 2px solid #aaa; color: #555; }
+    img { display: block; max-width: 100%; max-height: 220mm; margin: 4mm auto; object-fit: contain; }
+    .mermaid-diagram { margin: 6mm 0; text-align: center; page-break-inside: avoid; }
+    .mermaid-diagram svg { display: inline-block; max-width: 100%; height: auto; }
+    .mermaid-error { margin: 3mm 0 0; padding: 2mm; border-left: 2px solid #b36b00; background: #fff4df; color: #704300; font-size: 9pt; }
+    table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+    th, td { border: 1px solid #bbb; padding: 2mm; vertical-align: top; }
+    a { color: inherit; text-decoration: none; }
+    hr { border: 0; border-top: 1px solid #aaa; margin: 12mm 0; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>{{ notebook.collection_name }}</h1>
+    {% if notebook.description %}<p>{{ notebook.description }}</p>{% endif %}
+  </section>
+  <section class="publication-contents">
+    <h2>Contents</h2>
+    <ol>
+      {% for entry in entries %}
+        {% if entry.kind != 'divider' %}<li>{{ entry.title }}</li>{% endif %}
+      {% endfor %}
+    </ol>
+  </section>
+  {% for entry in entries %}
+    {% if entry.kind == 'heading' %}
+      <h2 class="section-heading">{{ entry.title }}</h2>
+    {% elif entry.kind == 'divider' %}
+      <hr>
+    {% else %}
+      <article class="chapter">
+        <h1>{{ entry.title }}</h1>
+        {{ entry.html|safe }}
+      </article>
+    {% endif %}
+  {% endfor %}
+</body>
+</html>

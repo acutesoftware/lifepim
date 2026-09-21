@@ -1380,6 +1380,51 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual([crumb["label"] for crumb in breadcrumb], ["standalone"])
         self.assertIn("folder=D:%5Cexternal%5Cstandalone", breadcrumb[0]["url"])
 
+    def test_notebook_read_mode_renders_markdown_with_contents_and_no_source_pane(self):
+        projects_mod.ensure_projects_schema(self.conn)
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "Notebook")
+        note_id, created = self._create_note_record("Reader chapter", note_dir)
+        with open(created["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("# Reader chapter\n\nThis is **rendered** content.")
+        notebook_id = collections_mod.create_collection(
+            {"collection_name": "Reader Book", "collection_domain": "notes", "collection_type": "notebook"},
+            conn=self.conn,
+        )
+        collections_mod.add_item_to_collection(notebook_id, "note", note_id, conn=self.conn)
+        app = self._notes_test_app()
+
+        response = app.test_client().get(f"/notes/notebooks?collection_id={notebook_id}&mode=read")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('class="notebook-reader"', html)
+        self.assertIn('href="#notebook-entry-', html)
+        self.assertIn("<strong>rendered</strong>", html)
+        self.assertNotIn("Available Notes", html)
+        self.assertNotIn("<pre>This is", html)
+
+    def test_notebook_publish_downloads_generated_pdf(self):
+        projects_mod.ensure_projects_schema(self.conn)
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "Notebook")
+        note_id, created = self._create_note_record("Published chapter", note_dir)
+        with open(created["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("Published **chapter**.")
+        notebook_id = collections_mod.create_collection(
+            {"collection_name": "Published Book", "collection_domain": "notes", "collection_type": "notebook"},
+            conn=self.conn,
+        )
+        collections_mod.add_item_to_collection(notebook_id, "note", note_id, conn=self.conn)
+        app = self._notes_test_app()
+
+        with patch.object(notes_routes, "_render_notebook_pdf", return_value=b"%PDF-test") as render_pdf:
+            response = app.test_client().get(f"/notes/notebooks/{notebook_id}/publish.pdf")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/pdf")
+        self.assertIn("Published_Book.pdf", response.headers["Content-Disposition"])
+        self.assertTrue(response.data.startswith(b"%PDF"))
+        self.assertIn("<strong>chapter</strong>", render_pdf.call_args.args[0])
+
     def test_notes_root_path_derives_lan_user_notes_root(self):
         tbl = common_utils.get_table_def("notes")
         note_path = r"N:\duncan\LifePIM_Data\DATA\lan_users\mmob\notes\40-Dev"

@@ -9,7 +9,7 @@
     <div class="settings-error">{{ error }}</div>
   {% endif %}
 
-  <div class="collection-workspace notebook-workspace{% if not selected_collection %} collection-workspace-list-only{% endif %}">
+  <div class="collection-workspace notebook-workspace{% if not selected_collection %} collection-workspace-list-only{% endif %}{% if reading_mode %} notebook-reading-mode{% endif %}">
     <section class="collection-pane collection-toolbar-pane">
       <div class="collection-pane-header">
         <h4>Notebooks</h4>
@@ -36,6 +36,12 @@
 
     <section class="collection-pane collection-content-pane">
       {% if selected_collection %}
+        <nav class="notebook-mode-nav" aria-label="Notebook view">
+          <a class="note-button{% if notebook_mode == 'contents' %} active{% endif %}" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), mode='contents') }}">Contents</a>
+          <a class="note-button{% if notebook_mode == 'edit' %} active{% endif %}" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), mode='edit') }}">Edit</a>
+          <a class="note-button{% if notebook_mode == 'read' %} active{% endif %}" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), mode='read') }}">Read</a>
+          <a class="note-button" href="{{ url_for('notes.publish_notebook_route', collection_id=selected_collection.collection_id) }}">Publish</a>
+        </nav>
         {% if notebook_edit_mode %}
           <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}" class="collection-detail-form" enctype="multipart/form-data">
             <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
@@ -49,7 +55,7 @@
                 {% endfor %}
               </select>
               <button type="submit">Save</button>
-              <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', '')) }}">Cancel</a>
+              <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), mode='contents') }}">Cancel</a>
             </div>
             <textarea name="description" rows="2" placeholder="Description">{{ selected_collection.description or '' }}</textarea>
 
@@ -116,8 +122,6 @@
               <div class="collection-summary-title">
                 <h4>{{ selected_collection.collection_name }}</h4>
                 <span>{{ selected_collection.type_label }}</span>
-                <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, status=active_status, type=request.args.get('type', ''), edit=1) }}">Edit</a>
-                <a class="note-button" href="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id, read=1) }}">Read</a>
               </div>
               <div class="collection-summary-meta">
                 {% if selected_collection.description %}
@@ -144,6 +148,36 @@
           </div>
         {% endif %}
 
+        {% if reading_mode %}
+          <div class="notebook-reader">
+            <nav class="notebook-reader-contents" aria-label="Notebook contents">
+              <strong>Contents</strong>
+              {% for entry in continuous_entries %}
+                {% if entry.kind != 'divider' %}
+                  <a class="notebook-reader-link notebook-reader-link-{{ entry.kind }}" href="#{{ entry.anchor }}">{{ entry.title }}</a>
+                {% endif %}
+              {% else %}
+                <span>No readable notes.</span>
+              {% endfor %}
+            </nav>
+            <main class="notebook-reader-pages">
+              {% for entry in continuous_entries %}
+                {% if entry.kind == 'heading' %}
+                  <h2 id="{{ entry.anchor }}" class="notebook-reader-heading">{{ entry.title }}</h2>
+                {% elif entry.kind == 'divider' %}
+                  <hr id="{{ entry.anchor }}">
+                {% else %}
+                  <article id="{{ entry.anchor }}" class="notebook-reader-chapter">
+                    <h1>{{ entry.title }}</h1>
+                    <div class="note-markdown notebook-reader-markdown">{{ entry.html|safe }}</div>
+                  </article>
+                {% endif %}
+              {% else %}
+                <p class="project-empty-state">No readable notes in this notebook.</p>
+              {% endfor %}
+            </main>
+          </div>
+        {% else %}
         <div class="collection-actions">
           <form method="post" action="{{ url_for('notes.notes_collections_route', area=area, collection_id=selected_collection.collection_id) }}">
             <input type="hidden" name="collection_id" value="{{ selected_collection.collection_id }}">
@@ -193,20 +227,6 @@
             <li class="project-empty-state">No entries yet.</li>
           {% endfor %}
         </ol>
-
-        {% if continuous_entries %}
-          <div class="collection-reading">
-            {% for entry in continuous_entries %}
-              <article>
-                <h4>{{ entry.title }}</h4>
-                <pre>{{ entry.text }}</pre>
-              </article>
-            {% endfor %}
-          </div>
-        {% elif reading_mode %}
-          <div class="collection-reading">
-            <p class="project-empty-state">No readable notes in this notebook.</p>
-          </div>
         {% endif %}
       {% else %}
         <div class="collection-overview">
@@ -236,7 +256,7 @@
       {% endif %}
     </section>
 
-    {% if selected_collection %}
+    {% if selected_collection and not reading_mode %}
       <aside class="collection-pane collection-source-pane">
         <h4>Available Notes</h4>
         <form method="get" action="{{ url_for('notes.notes_collections_route') }}" class="collection-filter-form">

@@ -54,6 +54,14 @@ class TestMarkdownUtils(unittest.TestCase):
         self.assertIn("DATA\n\u251c\u2500\u2500 Overview", rendered)
         self.assertNotIn("<p><code>", rendered)
 
+    def test_mermaid_fence_is_marked_for_browser_rendering(self):
+        rendered = markdown_utils.render_markdown(
+            "```mermaid\nflowchart TD\n    Start --> Finish\n```"
+        )
+
+        self.assertIn('<code class="language-mermaid">', rendered)
+        self.assertIn("flowchart TD", rendered)
+
     def test_fallback_fenced_tree_renders_as_code_block(self):
         previous_md_lib = markdown_utils.md_lib
         try:
