@@ -108,6 +108,20 @@ D:\DATA_LLM\SAMPLE_DATA\lifepim_desktop_data\lifepim.db
 
 Change the config before bootstrapping a different machine or data profile.
 
+## Privacy
+
+LifePIM stores personal metadata such as note titles and paths, tasks, calendar
+events, contacts, Areas, tags, and indexed file/media details. Structured data
+is kept in the local SQLite database configured by `DB_FILE`; notes and other
+file-backed content remain in their configured folders, while operational logs
+and temporary import files are written locally on the same computer.
+
+LifePIM Desktop does not upload or synchronize this information to
+LifePIM.com, or to any other external or cloud server. Optional Pocket sync is
+directly between your devices on your local network. Features you explicitly
+ask to retrieve public web content or prices may contact those public services,
+but they do not upload your LifePIM database or local personal metadata.
+
 ## Run
 
 Recommended Windows launcher from the repository root:

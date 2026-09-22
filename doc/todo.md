@@ -20,14 +20,14 @@ Generated from a repository review on 2026-06-15.
 - [ ] Decide whether LifePIM will store passwords at all. `doc/config_layout.md` lists password-related admin/web data; if implemented, use an encrypted vault design rather than ordinary database rows or markdown files.
 - [ ] Review bundled CSV/sample data in `data/` and `tests/` for personal information before publishing releases. Contact, note, event, place, money, and file-path tables can easily contain private metadata.
 - [ ] Avoid logging sensitive content. `common.data` and user-history logging can store before/after row snapshots; redact note text, contact details, file paths, password records, API keys, and other high-risk fields before writing `sys_user_log`.
-- [ ] Add a privacy note to the README explaining what local metadata is collected, where it is stored, and what, if anything, is uploaded to lifepim.com.
+- [X] Add a privacy note to the README explaining what local metadata is collected, where it is stored, and note that nothing is loaded to any external server
 
 ## Security
 
-- [ ] Add an explicit authentication/authorization boundary for the Flask app, even if intended for desktop-only use. `flask-httpauth` is listed in `setup.py`, but routes are currently unauthenticated.
-- [ ] Disable debug mode for normal launches. `src/app.py` runs `app.run(debug=True)` when executed directly; make debug configurable and default it off.
-- [ ] Bind only to localhost in all launch scripts and document the expected URL. Confirm no script starts Flask on `0.0.0.0` without authentication.
-- [ ] Add CSRF protection for browser form actions and JSON mutation endpoints. The app has many POST/PUT/PATCH/DELETE endpoints and currently no visible CSRF mechanism.
+- [X] Add an explicit authentication/authorization boundary for the Flask app, even if intended for desktop-only use. `flask-httpauth` is listed in `setup.py`, but routes are currently unauthenticated.
+- [X] Disable debug mode for normal launches. `src/app.py` runs `app.run(debug=True)` when executed directly; make debug configurable and default it off.
+- [X] Bind only to localhost in all launch scripts and document the expected URL. Confirm no script starts Flask on `0.0.0.0` without authentication.
+- [X] Add CSRF protection for browser form actions and JSON mutation endpoints. The app has many POST/PUT/PATCH/DELETE endpoints and currently no visible CSRF mechanism.
 - [ ] Convert GET delete routes to POST or DELETE with CSRF protection. Current examples include calendar, notes, tasks, contacts, places, files, apps, audio, data, goals, how, and 3D delete routes.
 - [ ] Validate filesystem paths against configured allowed roots before reading, writing, importing, or serving files. Current import routes accept user-supplied folders/paths, and file-serving routes read paths from the database.
 - [ ] Harden media/audio/note file serving. `send_file` is used for note assets, media files, and audio files; require allowed root checks and deny serving sensitive file types outside the LifePIM data area.
@@ -39,7 +39,7 @@ Generated from a repository review on 2026-06-15.
 
 ## Development
 
-- [ ] Update setup and run instructions. `README.md` still mentions `python web_server.py`, while the current entry point appears to be `src/app.py` / `src/RUN_DESKTOP.BAT`.
+- [X] Update setup and run instructions. `README.md` still mentions `python web_server.py`, while the current entry point appears to be `src/app.py` / `src/RUN_DESKTOP.BAT`.
 - [ ] Replace hardcoded config with environment or profile-based configuration. Include defaults for DB path, data root, upload temp folder, debug flag, port, and external API base URL.
 - [ ] Finish area/tab mapping coverage. Existing notes in `doc/config_layout.md` call out mapping every CSV file and database table to a submenu/area.
 - [ ] Complete the common task/table model from `doc/config_layout.md`: areas, tags, reminders, passwords/vault decision, budgets, expenses, incomes, checklists, recipes, shopping lists, fuel logs, medical info, warranties, licenses, manuals, bookmarks, journals, logs, meetings, and appointments.
@@ -51,4 +51,17 @@ Generated from a repository review on 2026-06-15.
 - [ ] Clean encoding issues in docs/config comments. Several documents and comments display mojibake for icons; convert files consistently to UTF-8 and verify rendering.
 - [ ] Decide module ownership for old scripts. `scripts/dev` and `scripts/prod` include legacy utilities; mark each as supported, migrated, or archived.
 - [ ] Add linting/formatting/type checks to the developer workflow. Suggested baseline: `ruff`, `black`, and a small CI job that runs the unit tests.
-- [ ] Review `tests/LOAD_TESTING.py`, which is currently modified in the worktree, before committing unrelated todo/doc changes.
+- [X] Review `tests/LOAD_TESTING.py`, which is currently modified in the worktree, before committing unrelated todo/doc changes.
+
+
+## Issues to fix in the future
+
+### Shared database connections
+
+See doc/tech_notes.md > Databases
+
+Issue:
+current concurrency limitation: Waitress runs eight threads against one process-wide SQLite connection; check_same_thread=False permits this but does not independently isolate overlapping transactions.
+
+Solution:
+process-wide connection + check_same_thread=False + 8 Waitress threads → replace with request-local connections.
