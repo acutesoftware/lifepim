@@ -93,6 +93,50 @@ class TestAreas(unittest.TestCase):
         self.assertEqual(rows[0]["area_folder_id"], folder2)
         self.assertEqual(rows[0]["is_write_enabled"], 1)
 
+    def test_set_default_works_inside_existing_transaction(self):
+        area_id = "make/write"
+        areas.area_upsert(
+            {
+                "area_id": area_id,
+                "tab": "MAKE",
+                "group_name": "MAKE",
+                "area_name": "Writing",
+            },
+            conn=self.conn,
+        )
+        folder1 = areas.area_folder_add(
+            area_id,
+            r"C:\\Notes\\WritingOne",
+            folder_role="default",
+            conn=self.conn,
+        )
+        folder2 = areas.area_folder_add(
+            area_id,
+            r"C:\\Notes\\WritingTwo",
+            folder_role="include",
+            conn=self.conn,
+        )
+        self.conn.execute(
+            "UPDATE lp_areas SET notes = ? WHERE area_id = ?",
+            ("pending request work", area_id),
+        )
+        self.assertTrue(self.conn.in_transaction)
+
+        result = areas.area_folder_set_default(area_id, folder2, conn=self.conn)
+
+        self.assertTrue(result)
+        rows = self.conn.execute(
+            "SELECT area_folder_id, folder_role, is_write_enabled FROM lp_area_folders "
+            "WHERE area_id = ? ORDER BY area_folder_id",
+            (area_id,),
+        ).fetchall()
+        by_id = {row["area_folder_id"]: dict(row) for row in rows}
+        self.assertEqual(by_id[folder1]["folder_role"], "include")
+        self.assertEqual(by_id[folder1]["is_write_enabled"], 0)
+        self.assertEqual(by_id[folder2]["folder_role"], "default")
+        self.assertEqual(by_id[folder2]["is_write_enabled"], 1)
+        self.assertFalse(self.conn.in_transaction)
+
     def test_default_folder_get(self):
         area_id = "fun.sport"
         areas.area_upsert(

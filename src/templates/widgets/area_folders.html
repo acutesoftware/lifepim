@@ -21,6 +21,17 @@
       </select>
       <button type="submit">Add</button>
     </form>
+    {% if detected_folder_count %}
+      <form method="post" action="{{ url_for('notes.remove_detected_note_folders_route') }}" class="area-folder-form" onsubmit="return confirm('Remove every detected folder from this Area? Note assignments will be cleared; files will not be deleted.');">
+        <input type="hidden" name="area" value="{{ area_info.area_id }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <select name="folder_cleanup_action" required>
+          <option value="">Detected folder actions...</option>
+          <option value="remove_all">Remove all detected folders</option>
+        </select>
+        <button type="submit">Apply</button>
+      </form>
+    {% endif %}
     {% if folder_items %}
       <table border="1" cellpadding="4" class="area-folders-table">
         <tr>
@@ -62,6 +73,12 @@
                   <button type="submit">Sync</button>
                 </form>
                 <a href="{{ folder.view_url }}">View</a>
+                <form method="post" action="{{ url_for('notes.remove_detected_note_folders_route') }}" style="display:inline;">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                  <input type="hidden" name="area" value="{{ area_info.area_id }}">
+                  <input type="hidden" name="folder" value="{{ folder.path_prefix }}">
+                  <button type="submit" onclick="return confirm('Remove this detected folder from the Area? Note assignments will be cleared; files will not be deleted.');">Remove from Area</button>
+                </form>
               {% else %}
                 <form method="post" action="{{ url_for('notes.sync_area_folder_route', area_folder_id=folder.area_folder_id) }}" style="display:inline;">
                   <input type="hidden" name="next" value="{{ request.full_path }}">

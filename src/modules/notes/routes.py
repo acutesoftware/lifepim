@@ -367,10 +367,25 @@ def _note_metadata_from_file(note_path, stat=None, fallback_area=""):
     )
     if not date_created and stat is not None:
         date_created = _file_created_at(stat)
-    area = _front_matter_value(
+    # Modern ``area`` metadata is explicit and should travel with a note.  The
+    # older aliases (especially ``folder``) describe the source system's old
+    # categorisation and must not override an Area folder selected for an
+    # import/sync; doing so makes successfully synced files disappear from the
+    # Area that owns their configured folder.
+    explicit_area = _front_matter_value(front_matter, ("area", "area_id"))
+    legacy_area = _front_matter_value(
         front_matter,
-        ("area", "area_id", "folder", "sidebar_tab", "project", "project_id", "proj"),
-    ) or fallback_area
+        ("folder", "sidebar_tab", "project", "project_id", "proj"),
+    )
+    if explicit_area:
+        area = explicit_area
+        area_source = "explicit"
+    elif fallback_area:
+        area = fallback_area
+        area_source = "fallback"
+    else:
+        area = legacy_area
+        area_source = "legacy" if legacy_area else ""
     area = utils_normalize_area_param(area)
     if area.lower() in {"all", "all notes", "all areas", "all projects", "untitled"}:
         area = ""
@@ -380,6 +395,7 @@ def _note_metadata_from_file(note_path, stat=None, fallback_area=""):
         "date_created": date_created,
         "date_modified": date_modified,
         "area": area,
+        "area_source": area_source,
         "important": _front_matter_bool_text(_front_matter_value(front_matter, ("important", "is_important"))),
         "is_template": _note_bool_text(_front_matter_value(front_matter, ("is_template", "template"))),
         "is_important": _note_bool_text(_front_matter_value(front_matter, ("is_important", "important"))),
@@ -1354,7 +1370,6 @@ def _note_folder_panel_items(area, folder_filter, area_folders, view_mode, sort_
 def _area_folder_display_items(area, area_folders, view_mode, sort_col, sort_dir, template_filter="notes"):
     items = []
     seen = set()
-    covered_by_linked = []
 
     def add_item(path_value, *, source, folder=None):
         path_value = _normalize_note_path(path_value)
@@ -1377,19 +1392,13 @@ def _area_folder_display_items(area, area_folders, view_mode, sort_col, sort_dir
     for folder in area_folders or []:
         path_value = _normalize_note_path(folder.get("path_prefix") or "")
         add_item(path_value, source="linked", folder=folder)
-        if (
-            path_value
-            and int(folder.get("is_enabled") or 0) == 1
-            and (folder.get("folder_role") or "") in NOTE_FOLDER_SYNC_ROLES
-        ):
-            covered_by_linked.append(path_value)
 
-    for path_value in _distinct_note_folder_paths(area, None, template_filter=template_filter):
-        if (
-            _detected_note_folder_is_syncable(path_value)
-            and not any(_path_startswith(path_value, linked_path) for linked_path in covered_by_linked)
-        ):
-            add_item(path_value, source="detected")
+    for path_value in _detected_note_folder_paths(
+        area,
+        area_folders,
+        template_filter=template_filter,
+    ):
+        add_item(path_value, source="detected")
 
     return items
 
@@ -1429,6 +1438,14 @@ def _notes_list_context(
     sort_dir = _normalize_note_sort_dir(sort_dir)
     note_breadcrumb = _note_folder_breadcrumb(folder_filter, area)
     sync_is_full = not area and not folder_filter and (template_filter or "notes") == "notes"
+    area_folder_display_items = _area_folder_display_items(
+        area,
+        area_folders,
+        view_mode,
+        sort_col,
+        sort_dir,
+        template_filter=template_filter,
+    )
     return {
         "active_tab": "notes",
         "tabs": get_tabs(),
@@ -1438,13 +1455,9 @@ def _notes_list_context(
         "content_html": "",
         "area_info": area_info,
         "area_folders": area_folders,
-        "area_folder_display_items": _area_folder_display_items(
-            area,
-            area_folders,
-            view_mode,
-            sort_col,
-            sort_dir,
-            template_filter=template_filter,
+        "area_folder_display_items": area_folder_display_items,
+        "detected_folder_count": sum(
+            1 for folder in area_folder_display_items if folder.get("source") == "detected"
         ),
         "area": area,
         "folder_filter": folder_filter,
@@ -4378,6 +4391,13 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
                 seen.add(_note_full_path_key(current.get("path"), current.get("file_name")))
             if current:
                 values_map = {col: current.get(col, "") for col in tbl["col_list"]}
+                synced_area = metadata.get("area") or current.get("area", "")
+                if metadata.get("area_source") == "legacy":
+                    # Legacy folder/project aliases seed old imports, but once a
+                    # row exists the database value is the user's editable Area
+                    # assignment.  In particular, keep an intentionally cleared
+                    # Area from returning on the next full sync.
+                    synced_area = current.get("area", "")
                 values_map.update(
                     {
                         "file_name": name,
@@ -4388,7 +4408,7 @@ def _sync_note_rows(folder_path, fallback_area="", recursive=True):
                         "color": metadata.get("color") or current.get("color", ""),
                         "date_created": metadata.get("date_created") or current.get("date_created", ""),
                         "date_modified": date_modified,
-                        "area": metadata.get("area") or current.get("area", ""),
+                        "area": synced_area,
                         "important": metadata.get("important") or current.get("important", ""),
                         "is_template": metadata.get("is_template") or current.get("is_template", "false"),
                         "is_important": metadata.get("is_important") or current.get("is_important", "false"),
@@ -4767,6 +4787,83 @@ def _detected_note_folder_is_syncable(path_value):
     return os.path.isdir(path_value)
 
 
+def _detected_note_folder_paths(area, area_folders, template_filter="all"):
+    covered_by_linked = []
+    for folder in area_folders or []:
+        path_value = _normalize_note_path(folder.get("path_prefix") or "")
+        if (
+            path_value
+            and int(folder.get("is_enabled") or 0) == 1
+            and (folder.get("folder_role") or "") in NOTE_FOLDER_SYNC_ROLES
+        ):
+            covered_by_linked.append(path_value)
+
+    return [
+        path_value
+        for path_value in _distinct_note_folder_paths(
+            area,
+            None,
+            template_filter=template_filter,
+        )
+        if _detected_note_folder_is_syncable(path_value)
+        and not any(_path_startswith(path_value, linked_path) for linked_path in covered_by_linked)
+    ]
+
+
+def _remove_detected_note_folders_from_area(area, folder_path=None):
+    area_info, area_folders = _area_context(area)
+    if not area_info:
+        raise ValueError("Area not found.")
+
+    detected_paths = _detected_note_folder_paths(
+        area_info["area_id"],
+        area_folders,
+        template_filter="all",
+    )
+    if folder_path:
+        requested_key = user_paths.path_key(_normalize_note_path(folder_path))
+        detected_paths = [
+            path_value
+            for path_value in detected_paths
+            if user_paths.path_key(path_value) == requested_key
+        ]
+        if not detected_paths:
+            raise ValueError("Detected folder not found in this Area.")
+    if not detected_paths:
+        return {"folders": 0, "notes": 0}
+
+    exact_area_values = []
+    seen_areas = set()
+    for value in (area_info.get("area_id"), area_info.get("area_name"), area):
+        value = (value or "").strip()
+        if value and value.lower() not in seen_areas:
+            exact_area_values.append(value)
+            seen_areas.add(value.lower())
+
+    conn = data._get_conn()
+    tbl = get_table_def("notes")
+    if not tbl:
+        raise ValueError("Notes table not found.")
+    area_placeholders = ", ".join(["?"] * len(exact_area_values))
+    path_placeholders = ", ".join(["?"] * len(detected_paths))
+    visibility_condition, visibility_params = security.visible_record_condition("t", current_user)
+    rows = conn.execute(
+        f"SELECT t.id FROM {tbl['name']} t "
+        f"WHERE t.area COLLATE NOCASE IN ({area_placeholders}) "
+        f"AND lower(rtrim(replace(t.path, '/', '\\'))) IN ({path_placeholders}) "
+        f"AND {visibility_condition}",
+        exact_area_values + [path_value.lower() for path_value in detected_paths] + visibility_params,
+    ).fetchall()
+    note_ids = [row["id"] for row in rows]
+    if note_ids:
+        conn.executemany(
+            f"UPDATE {tbl['name']} SET area = '' WHERE id = ?",
+            [(note_id,) for note_id in note_ids],
+        )
+        conn.commit()
+    return {"folders": len(detected_paths), "notes": len(note_ids)}
+
+
 def _note_sync_scope_paths(area=None, folder_filter=None, template_filter="notes"):
     paths = []
 
@@ -5111,6 +5208,40 @@ def _auto_check_visible_note_folders(area=None, folder_filter=None):
         except Exception:
             pass
     return {"checked": 0, "dirty": 0, "missing": 0, "refreshed": 0, "new_subtrees": 0, "notes": 0}
+
+
+@notes_bp.route('/detected-folders/remove', methods=["POST"])
+def remove_detected_note_folders_route():
+    area = _normalize_area(request.form.get("area"))
+    folder_path = _normalize_folder_filter(request.form.get("folder"))
+    remove_all = request.form.get("folder_cleanup_action") == "remove_all"
+    next_url = request.form.get("next") or url_for("notes.list_notes_route", area=area)
+    try:
+        if not area or area.lower() == "unmapped":
+            raise ValueError("Select an Area first.")
+        if not folder_path and not remove_all:
+            raise ValueError("Select a detected-folder cleanup action.")
+        result = _remove_detected_note_folders_from_area(
+            area,
+            folder_path=None if remove_all else folder_path,
+        )
+        msg = (
+            f"Removed {result['folders']} detected folder(s) from this Area; "
+            f"{result['notes']} note assignment(s) cleared. Files were not deleted."
+        )
+        try:
+            lg_usr(
+                action="notes_detected_folders_removed",
+                entity_type="lp_notes",
+                extra={"area": area, **result},
+                conn=data._get_conn(),
+            )
+        except Exception:
+            pass
+    except Exception as exc:
+        msg = f"Detected folder cleanup failed: {exc}"
+    sep = "&" if "?" in next_url else "?"
+    return redirect(f"{next_url}{sep}{urlencode({'message': msg})}")
 
 
 @notes_bp.route('/sync', methods=["POST"])

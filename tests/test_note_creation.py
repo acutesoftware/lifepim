@@ -1716,7 +1716,84 @@ class TestNoteCreation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Detected from notes", html)
         self.assertIn(notes_routes._normalize_note_path(food_dir), html)
+        self.assertIn("Remove from Area", html)
+        self.assertIn("Remove all detected folders", html)
         self.assertNotIn("No folders linked to this area.", html)
+
+    def test_remove_one_detected_folder_clears_only_its_area_assignments(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        first_dir = os.path.join(notes_root, "First")
+        second_dir = os.path.join(notes_root, "Second")
+        areas_mod.area_upsert(
+            {
+                "area_id": "food",
+                "tab": "HOME",
+                "group_name": "HOME",
+                "area_name": "Food",
+            },
+            conn=self.conn,
+        )
+        first_id, first_file = self._create_note_record("first recipe", first_dir, area="food")
+        second_id, _ = self._create_note_record("second recipe", second_dir, area="food")
+
+        response = self._notes_test_app().test_client().post(
+            "/notes/detected-folders/remove",
+            data={"area": "food", "folder": first_dir, "next": "/notes/table?area=food"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        rows = self.conn.execute(
+            "SELECT id, area FROM lp_notes WHERE id IN (?, ?)",
+            (first_id, second_id),
+        ).fetchall()
+        areas = {row["id"]: row["area"] for row in rows}
+        self.assertEqual(areas[first_id], "")
+        self.assertEqual(areas[second_id], "food")
+        self.assertTrue(os.path.isfile(first_file["full_path"]))
+
+    def test_remove_all_detected_folders_keeps_linked_folder_assignments(self):
+        notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
+        linked_dir = os.path.join(notes_root, "Linked")
+        detected_one = os.path.join(notes_root, "DetectedOne")
+        detected_two = os.path.join(notes_root, "DetectedTwo")
+        areas_mod.area_upsert(
+            {
+                "area_id": "food",
+                "tab": "HOME",
+                "group_name": "HOME",
+                "area_name": "Food",
+            },
+            conn=self.conn,
+        )
+        areas_mod.area_folder_add(
+            "food",
+            linked_dir,
+            folder_role="include",
+            create_type="markdown",
+            conn=self.conn,
+        )
+        linked_id, _ = self._create_note_record("linked recipe", linked_dir, area="food")
+        first_id, _ = self._create_note_record("detected one", detected_one, area="food")
+        second_id, _ = self._create_note_record("detected two", detected_two, area="Food")
+
+        response = self._notes_test_app().test_client().post(
+            "/notes/detected-folders/remove",
+            data={
+                "area": "food",
+                "folder_cleanup_action": "remove_all",
+                "next": "/notes/table?area=food",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        rows = self.conn.execute(
+            "SELECT id, area FROM lp_notes WHERE id IN (?, ?, ?)",
+            (linked_id, first_id, second_id),
+        ).fetchall()
+        areas = {row["id"]: row["area"] for row in rows}
+        self.assertEqual(areas[linked_id], "food")
+        self.assertEqual(areas[first_id], "")
+        self.assertEqual(areas[second_id], "")
 
     def test_area_folder_inset_shows_detected_external_note_folders(self):
         external_dir = os.path.join(self.tmpdir.name, "external_work", "draft")
@@ -1934,6 +2011,49 @@ class TestNoteCreation(unittest.TestCase):
         tbl = common_utils.get_table_def("notes")
         row = self.conn.execute(f"SELECT area FROM {tbl['name']} WHERE file_name = ?", ("area-note.md",)).fetchone()
         self.assertEqual(row["area"], "fun/games")
+
+    def test_sync_note_rows_area_folder_overrides_legacy_folder_metadata(self):
+        notes_dir = os.path.join(self.tmpdir.name, "sync_legacy_area")
+        os.makedirs(notes_dir, exist_ok=True)
+        note_path = os.path.join(notes_dir, "legacy-area-note.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write("---\nfolder: Home\n---\n\nLegacy area note")
+
+        result = notes_routes._sync_note_rows(notes_dir, fallback_area="fun/food")
+
+        self.assertEqual(result["inserted"], 1)
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(
+            f"SELECT area FROM {tbl['name']} WHERE file_name = ?",
+            ("legacy-area-note.md",),
+        ).fetchone()
+        self.assertEqual(row["area"], "fun/food")
+
+        self.conn.execute(f"UPDATE {tbl['name']} SET area = '' WHERE file_name = ?", ("legacy-area-note.md",))
+        self.conn.commit()
+        notes_routes._sync_note_rows(notes_dir)
+        row = self.conn.execute(
+            f"SELECT area FROM {tbl['name']} WHERE file_name = ?",
+            ("legacy-area-note.md",),
+        ).fetchone()
+        self.assertEqual(row["area"], "")
+
+    def test_sync_note_rows_preserves_explicit_area_metadata(self):
+        notes_dir = os.path.join(self.tmpdir.name, "sync_explicit_area")
+        os.makedirs(notes_dir, exist_ok=True)
+        note_path = os.path.join(notes_dir, "explicit-area-note.md")
+        with open(note_path, "w", encoding="utf-8") as handle:
+            handle.write("---\narea: pers/health\nfolder: Home\n---\n\nExplicit area note")
+
+        result = notes_routes._sync_note_rows(notes_dir, fallback_area="fun/food")
+
+        self.assertEqual(result["inserted"], 1)
+        tbl = common_utils.get_table_def("notes")
+        row = self.conn.execute(
+            f"SELECT area FROM {tbl['name']} WHERE file_name = ?",
+            ("explicit-area-note.md",),
+        ).fetchone()
+        self.assertEqual(row["area"], "pers/health")
 
     def test_sync_note_rows_uses_area_folder_mapping_fallback(self):
         notes_root = os.path.join(self.tmpdir.name, "sync_area_root")

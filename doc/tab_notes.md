@@ -90,6 +90,18 @@ Folder panel actions:
 | `Set Default` | Makes a non-default saved folder the write/default folder. | Not shown because detected rows are not saved rules. |
 | `Disable` / `Enable` | Toggles the saved folder rule. | Not shown. |
 | `Remove` | Removes the saved folder rule. | Not shown. |
+| `Remove from Area` | Not shown. | Clears this Area from the indexed notes in that exact folder. It does not delete note records or Markdown files. |
+
+When detected folders are present, the `Detected folder actions` menu also provides
+`Remove all detected folders`. This clears the current Area assignment from notes in
+every detected folder while leaving explicitly linked folders untouched. Cleared notes
+appear under `Unmapped`. A later sync does not restore an old legacy `folder:` value,
+although an explicit modern `area:` value in a Markdown file remains authoritative.
+
+An Area can have multiple folder rules: one enabled `Default` write folder and any
+number of `Included`, `Archive`, or `Output` folders. Different Areas can each use
+different folders. Avoid linking the same physical folder to several Areas because a
+note has only one materialized Area assignment.
 
 When no explicit folder rules and no detected note folders exist for the selected area, the panel shows:
 

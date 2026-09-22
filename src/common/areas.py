@@ -1107,19 +1107,30 @@ def area_folder_set_default(area_id, area_folder_id, conn=None, owner_user_id=No
     if not selected:
         return False
     now = _utc_now()
-    conn.execute("BEGIN")
-    conn.execute(
-        "UPDATE lp_area_folders SET folder_role = 'include', is_write_enabled = 0, updated_utc = ? "
-        "WHERE owner_user_id IS ? AND area_id = ? AND folder_role = 'default'",
-        (now, owner_user_id, area_id),
-    )
-    conn.execute(
-        "UPDATE lp_area_folders SET folder_role = 'default', is_write_enabled = 1, "
-        "is_enabled = 1, updated_utc = ? "
-        "WHERE area_folder_id = ? AND owner_user_id IS ? AND area_id = ?",
-        (now, area_folder_id, owner_user_id, area_id),
-    )
-    conn.commit()
+    # A request can reach this operation with work already pending on the
+    # shared SQLite connection.  BEGIN would then raise "cannot start a
+    # transaction within a transaction" and turn Set Default into a 500.
+    # SAVEPOINT is atomic and works both inside and outside a transaction.
+    savepoint = "area_folder_set_default"
+    conn.execute(f"SAVEPOINT {savepoint}")
+    try:
+        conn.execute(
+            "UPDATE lp_area_folders SET folder_role = 'include', is_write_enabled = 0, updated_utc = ? "
+            "WHERE owner_user_id IS ? AND area_id = ? AND folder_role = 'default'",
+            (now, owner_user_id, area_id),
+        )
+        conn.execute(
+            "UPDATE lp_area_folders SET folder_role = 'default', is_write_enabled = 1, "
+            "is_enabled = 1, updated_utc = ? "
+            "WHERE area_folder_id = ? AND owner_user_id IS ? AND area_id = ?",
+            (now, area_folder_id, owner_user_id, area_id),
+        )
+        conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+        conn.commit()
+    except Exception:
+        conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+        conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+        raise
     return True
 
 
