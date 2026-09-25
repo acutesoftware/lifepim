@@ -1250,8 +1250,8 @@ def _note_folder_breadcrumb(folder_path, area=None):
         )
     if not root_path:
         matching_roots = []
-        if area:
-            try:
+        try:
+            if area:
                 matching_roots = [
                     _normalize_note_path(folder.get("path_prefix") or "")
                     for folder in areas_mod.area_folders_list(area)
@@ -1261,13 +1261,25 @@ def _note_folder_breadcrumb(folder_path, area=None):
                         folder.get("path_prefix") or "",
                     )
                 ]
-            except Exception:
-                matching_roots = []
+            else:
+                areas_mod.ensure_areas_schema(data._get_conn())
+                rows = data._get_conn().execute(
+                    "SELECT path_prefix FROM lp_area_folders "
+                    "WHERE owner_user_id IS ? AND is_enabled = 1",
+                    (_current_owner_user_id(),),
+                ).fetchall()
+                matching_roots = [
+                    _normalize_note_path(row["path_prefix"] or "")
+                    for row in rows
+                    if user_paths.path_startswith(folder_path, row["path_prefix"] or "")
+                ]
+        except Exception:
+            matching_roots = []
         root_path = max(matching_roots, key=lambda path: len(user_paths.split_path(path)), default="")
         if not root_path:
             root_path = folder_path
-        root_parts = user_paths.split_path(root_path)
-        root_label = root_parts[-1] if root_parts else root_path
+            root_parts = user_paths.split_path(root_path)
+            root_label = root_parts[-1] if root_parts else root_path
 
     folder_parts = user_paths.split_path(folder_path)
     root_parts = user_paths.split_path(root_path)

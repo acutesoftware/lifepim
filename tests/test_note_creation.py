@@ -1353,7 +1353,7 @@ class TestNoteCreation(unittest.TestCase):
     def test_note_folder_breadcrumb_uses_mapped_root_outside_notes_tree(self):
         app = self._notes_test_app()
         mapped_root = r"D:\DATA_LLM\dev\yourdataforlife"
-        folder_path = mapped_root + r"\draft2_PRINCIPLES"
+        folder_path = mapped_root + r"\draft\2_PRINCIPLES"
         areas_mod.area_folder_add(
             "make/write",
             mapped_root,
@@ -1366,9 +1366,30 @@ class TestNoteCreation(unittest.TestCase):
 
         self.assertEqual(
             [crumb["label"] for crumb in breadcrumb],
-            ["yourdataforlife", "draft2_PRINCIPLES"],
+            ["notes", "draft", "2_PRINCIPLES"],
         )
         self.assertIn("folder=D:%5CDATA_LLM%5Cdev%5Cyourdataforlife", breadcrumb[0]["url"])
+
+    def test_note_folder_breadcrumb_finds_mapped_root_after_folder_navigation_drops_area(self):
+        app = self._notes_test_app()
+        mapped_root = r"D:\DATA_LLM\dev\yourdataforlife"
+        folder_path = mapped_root + r"\draft\3_YOUR_DATA"
+        areas_mod.area_folder_add(
+            "make/write",
+            mapped_root,
+            folder_role="include",
+            conn=self.conn,
+        )
+
+        with app.test_request_context():
+            breadcrumb = notes_routes._note_folder_breadcrumb(folder_path)
+
+        self.assertEqual(
+            [crumb["label"] for crumb in breadcrumb],
+            ["notes", "draft", "3_YOUR_DATA"],
+        )
+        self.assertIn("folder=D:%5CDATA_LLM%5Cdev%5Cyourdataforlife", breadcrumb[0]["url"])
+        self.assertIn("folder=D:%5CDATA_LLM%5Cdev%5Cyourdataforlife%5Cdraft", breadcrumb[1]["url"])
 
     def test_note_folder_breadcrumb_uses_configured_notes_root_without_area_filter(self):
         app = self._notes_test_app()
