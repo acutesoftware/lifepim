@@ -1370,6 +1370,24 @@ class TestNoteCreation(unittest.TestCase):
         )
         self.assertIn("folder=D:%5CDATA_LLM%5Cdev%5Cyourdataforlife", breadcrumb[0]["url"])
 
+    def test_note_folder_breadcrumb_uses_configured_notes_root_without_area_filter(self):
+        app = self._notes_test_app()
+        notes_root = r"D:\DATA_LLM\dev\yourdataforlife"
+        folder_path = notes_root + r"\draft\2_PRINCIPLES"
+
+        with (
+            patch.object(notes_routes, "_known_note_root_candidates", return_value=[notes_root]),
+            app.test_request_context(),
+        ):
+            breadcrumb = notes_routes._note_folder_breadcrumb(folder_path)
+
+        self.assertEqual(
+            [crumb["label"] for crumb in breadcrumb],
+            ["notes", "draft", "2_PRINCIPLES"],
+        )
+        self.assertIn("folder=D:%5CDATA_LLM%5Cdev%5Cyourdataforlife", breadcrumb[0]["url"])
+        self.assertIn("folder=D:%5CDATA_LLM%5Cdev%5Cyourdataforlife%5Cdraft", breadcrumb[1]["url"])
+
     def test_note_folder_breadcrumb_links_unmapped_folder_as_fallback(self):
         app = self._notes_test_app()
         folder_path = r"D:\external\standalone"

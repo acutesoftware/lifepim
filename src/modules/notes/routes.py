@@ -1238,6 +1238,17 @@ def _note_folder_breadcrumb(folder_path, area=None):
     root_path = _notes_root_from_path(folder_path)
     root_label = "notes"
     if not root_path:
+        matching_note_roots = [
+            _normalize_note_path(candidate)
+            for candidate in _known_note_root_candidates(create_dirs=False)
+            if user_paths.path_startswith(folder_path, candidate)
+        ]
+        root_path = max(
+            matching_note_roots,
+            key=lambda path: len(user_paths.split_path(path)),
+            default="",
+        )
+    if not root_path:
         matching_roots = []
         if area:
             try:
