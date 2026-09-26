@@ -48,6 +48,7 @@ SOURCE_SEEDS = [
     ("birthdays", "Birthdays", "generated", "rebuild", 0, 7300, "#e377c2", "#ffffff", "cake", 30, 1, 1),
     ("holidays_au", "Australian Public Holidays", "imported", "rebuild", 1825, 3650, "#2ca02c", "#ffffff", "flag", 40, 1, 1),
     ("holidays_sa", "South Australian Public Holidays", "imported", "rebuild", 1825, 3650, "#17becf", "#ffffff", "flag", 41, 1, 1),
+    ("external_events", "External Events", "imported", "manual", None, None, "#0f766e", "#ffffff", "link", 45, 1, 1),
     ("tasks", "Task Deadlines", "linked", "incremental", None, None, "#d62728", "#ffffff", "deadline", 50, 1, 0),
     ("files", "File Activity", "metadata", "incremental", None, None, "#7f7f7f", "#ffffff", "file", 100, 0, 0),
     ("media", "Photos and Videos", "metadata", "incremental", None, None, "#ff7f0e", "#ffffff", "image", 90, 0, 0),
@@ -79,6 +80,13 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
     if conn.row_factory is None:
         conn.row_factory = sqlite3.Row
     if not force and _schema_ready(conn):
+        expected_sources = {seed[0] for seed in SOURCE_SEEDS}
+        existing_sources = {
+            row["source_key"] for row in conn.execute("SELECT source_key FROM lp_calendar_sources").fetchall()
+        }
+        if not expected_sources.issubset(existing_sources):
+            seed_calendar_sources(conn)
+            conn.commit()
         return
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(
@@ -280,8 +288,8 @@ def run_calendar_migration(conn: sqlite3.Connection | None = None) -> None:
     ensure_calendar_schema(conn, force=True)
     project_all_manual_events(conn)
     refresh_calendar_source("recurring", conn=conn, full_rebuild=True)
-    refresh_calendar_source("holidays_au", conn=conn, full_rebuild=True)
-    refresh_calendar_source("holidays_sa", conn=conn, full_rebuild=True)
+    # Holiday rows are explicit imports. Do not silently replace the user's
+    # selected years during startup/migration.
     rebuild_calendar_day_stats(conn=conn)
     conn.commit()
 
@@ -816,13 +824,25 @@ def _refresh_birthdays(conn: sqlite3.Connection, result: RefreshResult) -> Refre
 
 
 def _refresh_holidays(conn: sqlite3.Connection, source_key: str, result: RefreshResult) -> RefreshResult:
-    deleted = conn.execute("DELETE FROM lp_calendar_items WHERE source_key = ?", [source_key]).rowcount
+    deleted = delete_imported_calendar_items(source_key, conn=conn)
     source_id = _source_id(conn, source_key)
     source = _source_row(conn, source_key)
-    start_horizon, end_horizon = _horizon(source)
+    config = _source_config(source)
+    imported_ranges = config.get("imported_year_ranges") or []
+    if imported_ranges:
+        years = [
+            year
+            for start_year, end_year in imported_ranges
+            for year in range(int(start_year), int(end_year) + 1)
+        ]
+        start_horizon = date(min(years), 1, 1)
+        end_horizon = date(max(years), 12, 31)
+    else:
+        start_horizon, end_horizon = _horizon(source)
+        years = list(range(start_horizon.year, end_horizon.year + 1))
     jurisdiction = "AU-SA" if source_key == "holidays_sa" else "AU"
     count = 0
-    for year in range(start_horizon.year, end_horizon.year + 1):
+    for year in years:
         for holiday_date, name in _holidays_for_year(year, jurisdiction):
             if holiday_date < start_horizon or holiday_date > end_horizon:
                 continue
@@ -848,6 +868,128 @@ def _refresh_holidays(conn: sqlite3.Connection, source_key: str, result: Refresh
     return result
 
 
+def preview_holiday_import(source_key: str, start_year: int, end_year: int) -> list[dict]:
+    if source_key not in {"holidays_au", "holidays_sa"}:
+        raise ValueError("Unknown holiday source.")
+    start_year, end_year = _validated_year_range(start_year, end_year)
+    jurisdiction = "AU-SA" if source_key == "holidays_sa" else "AU"
+    return [
+        {
+            "title": name,
+            "start_date": holiday_date.isoformat(),
+            "end_date": holiday_date.isoformat(),
+            "all_day": 1,
+            "blocks_time": 0,
+            "event_type": "holiday",
+            "category": jurisdiction,
+            "area": "General",
+            "status": "active",
+            "source": source_key,
+        }
+        for year in range(start_year, end_year + 1)
+        for holiday_date, name in _holidays_for_year(year, jurisdiction)
+    ]
+
+
+def import_holidays(
+    source_key: str,
+    start_year: int,
+    end_year: int,
+    conn: sqlite3.Connection | None = None,
+) -> RefreshResult:
+    """Replace one holiday source for an exact inclusive year range."""
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    start_year, end_year = _validated_year_range(start_year, end_year)
+    events = preview_holiday_import(source_key, start_year, end_year)
+    result = RefreshResult(source_key=source_key, started_at=_now())
+    source_id = _source_id(conn, source_key)
+    jurisdiction = "AU-SA" if source_key == "holidays_sa" else "AU"
+    conn.execute("SAVEPOINT holiday_import")
+    try:
+        result.rows_deleted = delete_imported_calendar_items(
+            source_key,
+            from_date=f"{start_year:04d}-01-01",
+            to_date=f"{end_year:04d}-12-31",
+            conn=conn,
+        )
+        for event in events:
+            occurrence_key = f"holiday:{jurisdiction}:{event['start_date']}:{event['title']}"
+            event["id"] = occurrence_key
+            _upsert_item(conn, source_id, source_key, event, occurrence_key, "holiday", None)
+        result.rows_inserted = len(events)
+        source = _source_row(conn, source_key)
+        config = _source_config(source)
+        ranges = list(config.get("imported_year_ranges") or [])
+        ranges.append([start_year, end_year])
+        config["imported_year_ranges"] = _merge_year_ranges(ranges)
+        config["holiday_jurisdiction"] = jurisdiction
+        _save_source_config(conn, source_key, config)
+        result.status = "current"
+        result.message = f"Imported {len(events)} holidays for {start_year}-{end_year}."
+        _touch_source(conn, source_key, result.status, result.rows_inserted, result.message)
+        conn.execute("RELEASE SAVEPOINT holiday_import")
+        conn.commit()
+    except Exception:
+        conn.execute("ROLLBACK TO SAVEPOINT holiday_import")
+        conn.execute("RELEASE SAVEPOINT holiday_import")
+        raise
+    result.completed_at = _now()
+    return result
+
+
+def delete_imported_calendar_items(
+    source_key: str,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    source_sub_id: str | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> int:
+    """Delete an exactly scoped imported projection, including its day rows."""
+    conn = db._get_conn() if conn is None else conn
+    where = ["source_key = ?"]
+    params = [source_key]
+    if from_date:
+        where.append("start_date >= ?")
+        params.append(from_date)
+    if to_date:
+        where.append("start_date <= ?")
+        params.append(to_date)
+    if source_sub_id is not None:
+        where.append("source_sub_id = ?")
+        params.append(source_sub_id)
+    predicate = " AND ".join(where)
+    conn.execute(
+        f"DELETE FROM lp_calendar_item_days WHERE calendar_item_id IN "
+        f"(SELECT id FROM lp_calendar_items WHERE {predicate})",
+        params,
+    )
+    return conn.execute(f"DELETE FROM lp_calendar_items WHERE {predicate}", params).rowcount
+
+
+def _validated_year_range(start_year, end_year) -> tuple[int, int]:
+    try:
+        start_year, end_year = int(start_year), int(end_year)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Enter valid start and end years.") from exc
+    if not (1 <= start_year <= 9999 and 1 <= end_year <= 9999):
+        raise ValueError("Years must be between 1 and 9999.")
+    if start_year > end_year:
+        raise ValueError("The start year must not be after the end year.")
+    return start_year, end_year
+
+
+def _merge_year_ranges(ranges) -> list[list[int]]:
+    clean = sorted((int(start), int(end)) for start, end in ranges)
+    merged = []
+    for start, end in clean:
+        if merged and start <= merged[-1][1] + 1:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return merged
+
+
 def _holidays_for_year(year: int, jurisdiction: str) -> list[tuple[date, str]]:
     easter = _easter_sunday(year)
     holidays = [
@@ -856,21 +998,36 @@ def _holidays_for_year(year: int, jurisdiction: str) -> list[tuple[date, str]]:
         (easter - timedelta(days=2), "Good Friday"),
         (easter + timedelta(days=1), "Easter Monday"),
         (date(year, 4, 25), "Anzac Day"),
-        (_first_monday(year, 10), "Labour Day"),
-        (date(year, 12, 25), "Christmas Day"),
-        (date(year, 12, 26), "Boxing Day"),
     ]
+    holidays.extend(_christmas_public_holidays(year, "Proclamation Day" if jurisdiction == "AU-SA" else "Boxing Day"))
     if jurisdiction == "AU-SA":
         holidays.extend(
             [
                 (_second_monday(year, 3), "Adelaide Cup Day"),
-                (easter + timedelta(days=1), "Easter Monday (SA)"),
-                (_second_monday(year, 6), "King's Birthday"),
-                (date(year, 12, 24), "Christmas Eve (SA)"),
-                (date(year, 12, 31), "New Year's Eve (SA)"),
+                (easter - timedelta(days=1), "Easter Saturday"),
+                (_second_monday(year, 6), "King's Birthday" if year >= 2023 else "Queen's Birthday"),
+                (_first_monday(year, 10), "Labour Day"),
+                (date(year, 12, 24), "Christmas Eve (7pm to midnight)"),
+                (date(year, 12, 31), "New Year's Eve (7pm to midnight)"),
             ]
         )
     return sorted(set(holidays), key=lambda item: (item[0], item[1]))
+
+
+def _christmas_public_holidays(year: int, day_after_name: str) -> list[tuple[date, str]]:
+    christmas = date(year, 12, 25)
+    day_after = date(year, 12, 26)
+    holidays = [(christmas, "Christmas Day"), (day_after, day_after_name)]
+    occupied = {christmas, day_after}
+    for actual, name in ((christmas, "Christmas Day"), (day_after, day_after_name)):
+        if actual.weekday() < 5:
+            continue
+        substitute = actual + timedelta(days=1)
+        while substitute.weekday() >= 5 or substitute in occupied:
+            substitute += timedelta(days=1)
+        occupied.add(substitute)
+        holidays.append((substitute, f"Additional public holiday for {name}"))
+    return holidays
 
 
 def _upsert_item(
@@ -890,7 +1047,7 @@ def _upsert_item(
         "source_id": source_id,
         "source_key": source_key,
         "source_record_id": source_record_id,
-        "source_sub_id": None,
+        "source_sub_id": event.get("source_sub_id"),
         "occurrence_key": occurrence_key,
         "recurrence_parent_id": recurrence_parent_id,
         "item_kind": item_kind,

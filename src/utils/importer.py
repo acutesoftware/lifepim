@@ -35,14 +35,49 @@ def _resolve_value(mapping_value, row):
     return ""
 
 
-def save_upload(file_storage):
+def save_upload(file_storage, suffix=".csv"):
     if file_storage is None or file_storage.filename == "":
         return ""
     os.makedirs(tmp_dir, exist_ok=True)
-    handle, path = tempfile.mkstemp(prefix="import_", suffix=".csv", dir=tmp_dir)
+    if not suffix.startswith(".") or any(char not in ".abcdefghijklmnopqrstuvwxyz0123456789" for char in suffix):
+        suffix = ".dat"
+    handle, path = tempfile.mkstemp(prefix="import_", suffix=suffix, dir=tmp_dir)
     os.close(handle)
     file_storage.save(path)
     return path
+
+
+def is_saved_upload(path, suffix=None):
+    """Return True only for an existing file created in the import temp folder."""
+    if not path:
+        return False
+    try:
+        resolved = os.path.realpath(path)
+        root = os.path.realpath(tmp_dir)
+        if os.path.commonpath([resolved, root]) != root or not os.path.isfile(resolved):
+            return False
+    except (OSError, ValueError):
+        return False
+    return not suffix or resolved.lower().endswith(suffix.lower())
+
+
+def preview_table_import(lp_tbl_name, csv_file_name, csv_cols_to_map):
+    """Return the target rows produced by a CSV mapping without changing the database."""
+    if not is_saved_upload(csv_file_name, ".csv"):
+        raise ValueError("Please load the CSV file again.")
+    tbl = next((t for t in cfg.table_def if t["name"] == lp_tbl_name), None)
+    if not tbl:
+        raise ValueError(f"Unknown table: {lp_tbl_name}")
+    if len(csv_cols_to_map) != len(tbl["col_list"]):
+        raise ValueError("csv_cols_to_map length must match table column list")
+    preview = []
+    with open(csv_file_name, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            preview.append(
+                {column: _resolve_value(mapping, row) for column, mapping in zip(tbl["col_list"], csv_cols_to_map)}
+            )
+    return preview
 
 
 def read_csv_headers(csv_file_name):

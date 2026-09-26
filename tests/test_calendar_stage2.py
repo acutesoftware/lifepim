@@ -8,6 +8,7 @@ if root_folder not in os.sys.path:
     os.sys.path.append(root_folder)
 
 from modules.calendar.services import calendar_index
+from modules.calendar.services import external_events
 
 
 def memory_conn():
@@ -114,8 +115,87 @@ class CalendarStage2Tests(unittest.TestCase):
             calendar_index.refresh_calendar_source("holidays_sa", conn=conn, full_rebuild=True)
             self.assertTrue(conn.execute("SELECT 1 FROM lp_calendar_items WHERE source_key = 'holidays_au'").fetchone())
             self.assertTrue(conn.execute("SELECT 1 FROM lp_calendar_items WHERE source_key = 'holidays_sa'").fetchone())
+            au_titles = {row["title"] for row in conn.execute("SELECT title FROM lp_calendar_items WHERE source_key = 'holidays_au'")}
+            sa_titles = {row["title"] for row in conn.execute("SELECT title FROM lp_calendar_items WHERE source_key = 'holidays_sa'")}
+            self.assertNotIn("Labour Day", au_titles)
+            self.assertIn("Labour Day", sa_titles)
+            self.assertIn("Easter Saturday", sa_titles)
         finally:
             conn.close()
+
+    def test_holiday_import_replaces_only_selected_source_and_years(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            calendar_index.import_holidays("holidays_sa", 2025, 2026, conn)
+            sa_2025_count = conn.execute(
+                "SELECT COUNT(1) FROM lp_calendar_items WHERE source_key = 'holidays_sa' AND start_date LIKE '2025-%'"
+            ).fetchone()[0]
+            conn.execute(
+                "INSERT INTO lp_calendar_items (source_id, source_key, occurrence_key, item_kind, title, "
+                "start_date, end_date, projected_at) "
+                "SELECT id, 'holidays_au', 'keep-au-2025', 'holiday', 'Keep AU', "
+                "'2025-01-02', '2025-01-02', 'now' FROM lp_calendar_sources WHERE source_key = 'holidays_au'"
+            )
+            conn.execute(
+                "INSERT INTO lp_calendar_items (source_id, source_key, occurrence_key, item_kind, title, "
+                "start_date, end_date, projected_at) "
+                "SELECT id, 'holidays_sa', 'keep-sa-2024', 'holiday', 'Keep SA prior year', "
+                "'2024-01-02', '2024-01-02', 'now' FROM lp_calendar_sources WHERE source_key = 'holidays_sa'"
+            )
+            result = calendar_index.import_holidays("holidays_sa", 2025, 2025, conn)
+            self.assertEqual(result.rows_deleted, sa_2025_count)
+            imported_count = conn.execute(
+                "SELECT COUNT(1) FROM lp_calendar_items WHERE source_key = 'holidays_sa'"
+            ).fetchone()[0]
+            calendar_index.run_calendar_migration(conn)
+            self.assertEqual(
+                conn.execute("SELECT COUNT(1) FROM lp_calendar_items WHERE source_key = 'holidays_sa'").fetchone()[0],
+                imported_count,
+            )
+            self.assertTrue(conn.execute("SELECT 1 FROM lp_calendar_items WHERE occurrence_key = 'keep-au-2025'").fetchone())
+            self.assertTrue(conn.execute("SELECT 1 FROM lp_calendar_items WHERE occurrence_key = 'keep-sa-2024'").fetchone())
+            self.assertTrue(
+                conn.execute("SELECT 1 FROM lp_calendar_items WHERE source_key = 'holidays_sa' AND start_date LIKE '2026-%'").fetchone()
+            )
+        finally:
+            conn.close()
+
+    def test_external_ics_preview_and_reimport_are_scoped_by_calendar_name(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            calendar_name, events = external_events.parse_ics(
+                "BEGIN:VCALENDAR\nX-WR-CALNAME:Household\nBEGIN:VEVENT\n"
+                "UID:bins-1\nDTSTART;VALUE=DATE:20260924\nDTEND;VALUE=DATE:20260925\n"
+                "SUMMARY:Bins\nEND:VEVENT\nEND:VCALENDAR\n"
+            )
+            self.assertEqual(calendar_name, "Household")
+            self.assertEqual(events[0]["start_date"], "2026-09-24")
+            first = external_events.replace_external_events(events, calendar_name, conn)
+            second = external_events.replace_external_events(events, calendar_name, conn)
+            self.assertEqual(first["inserted"], 1)
+            self.assertEqual(second["deleted"], 1)
+            self.assertEqual(
+                conn.execute("SELECT COUNT(1) FROM lp_calendar_items WHERE source_key = 'external_events'").fetchone()[0],
+                1,
+            )
+        finally:
+            conn.close()
+
+    def test_external_ics_expands_recurrence_and_exdates_for_selected_years(self):
+        _, events = external_events.parse_ics(
+            "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:bins-series\n"
+            "DTSTART;VALUE=DATE:20260903\nDTEND;VALUE=DATE:20260904\n"
+            "RRULE:FREQ=WEEKLY;INTERVAL=2\nEXDATE;VALUE=DATE:20261001\n"
+            "SUMMARY:Bins\nEND:VEVENT\nEND:VCALENDAR\n",
+            2026,
+            2026,
+        )
+        dates = {event["start_date"] for event in events}
+        self.assertIn("2026-09-03", dates)
+        self.assertIn("2026-09-17", dates)
+        self.assertNotIn("2026-10-01", dates)
 
     def test_day_stats_upsert_is_idempotent(self):
         conn = memory_conn()

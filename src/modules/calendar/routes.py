@@ -12,6 +12,7 @@ from common.utils import get_tabs, get_side_tabs, get_table_def, paginate_items,
 import common.config as cfg
 from utils import importer
 from modules.calendar.services import calendar_index
+from modules.calendar.services import external_events
 
 
 calendar_bp = Blueprint(
@@ -21,6 +22,10 @@ calendar_bp = Blueprint(
     template_folder="templates",
     static_folder="static",
 )
+
+EVENT_SOURCE_KEYS = {
+    "manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "external_events", "tasks"
+}
 
 
 def _month_nav(year, month):
@@ -206,7 +211,7 @@ def _parse_day_sources(args):
         raw_sources = args.get("sources", "")
         selected = {part.strip() for part in raw_sources.split(",") if part.strip()}
         if any(key in args for key in ("show_events", "show_files", "show_usage")):
-            for key in ("manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "tasks"):
+            for key in EVENT_SOURCE_KEYS:
                 if legacy_sources["events"]:
                     selected.add(key)
                 else:
@@ -224,7 +229,7 @@ def _parse_day_sources(args):
         selected = {part.strip() for part in args.getlist("source") if part.strip()}
     else:
         selected = {key for key, enabled in source_defaults.items() if enabled}
-        for key in ("manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "tasks"):
+        for key in EVENT_SOURCE_KEYS:
             if legacy_sources["events"]:
                 selected.add(key)
             else:
@@ -239,7 +244,7 @@ def _parse_day_sources(args):
         else:
             selected.discard("usage")
         if "show_events" in args:
-            for key in ("manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "tasks"):
+            for key in EVENT_SOURCE_KEYS:
                 if legacy_sources["events"]:
                     selected.add(key)
                 else:
@@ -258,7 +263,7 @@ def _parse_day_sources(args):
     valid_keys = {row["source_key"] for row in source_rows}
     selected = selected & valid_keys
     media_selected = bool({"files", "media", "audio"} & selected)
-    event_selected = bool({"manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "tasks"} & selected)
+    event_selected = bool(EVENT_SOURCE_KEYS & selected)
     sources = {
         **legacy_sources,
         "events": event_selected,
@@ -1332,6 +1337,7 @@ def import_events_route():
     headers = []
     mappings = {}
     imported = None
+    preview_rows = None
     error = ""
     if request.method == "POST":
         csv_path = request.form.get("csv_path", "").strip()
@@ -1340,7 +1346,7 @@ def import_events_route():
             csv_path = importer.save_upload(upload)
         action = request.form.get("action", "load")
         headers = _read_csv_headers(csv_path)
-        if action == "import" and tbl:
+        if action in {"preview", "import"} and tbl:
             mappings = {col: request.form.get(f"map_{col}", "") for col in tbl["col_list"]}
             map_list = []
             for col in tbl["col_list"]:
@@ -1350,8 +1356,13 @@ def import_events_route():
                 map_list.append(choice)
             try:
                 importer.set_token("curr_area_selected", area)
-                imported = importer.import_to_table(tbl["name"], csv_path, map_list)
-                calendar_index.run_calendar_migration(data.conn)
+                preview_rows = importer.preview_table_import(tbl["name"], csv_path, map_list)
+                if action == "import":
+                    if request.form.get("confirmed") != "1":
+                        raise ValueError("Preview the CSV before importing it.")
+                    imported = importer.import_to_table(tbl["name"], csv_path, map_list)
+                    calendar_index.run_calendar_migration(data.conn)
+                    preview_rows = None
             except Exception as exc:
                 error = str(exc)
         else:
@@ -1369,8 +1380,103 @@ def import_events_route():
         csv_headers=headers,
         mappings=mappings,
         imported=imported,
+        preview_rows=preview_rows,
         error=error,
         today=date.today(),
+    )
+
+
+@calendar_bp.route("/import/holidays/<source_key>", methods=["GET", "POST"])
+def import_holidays_route(source_key):
+    if source_key not in {"holidays_au", "holidays_sa"}:
+        return redirect(url_for("calendar.month_view_route", area=_request_area()))
+    area = _request_area_form() or _request_area() or ""
+    current_year = date.today().year
+    start_year = request.form.get("start_year", current_year)
+    end_year = request.form.get("end_year", current_year)
+    preview_rows = None
+    result = None
+    error = ""
+    if request.method == "POST":
+        action = request.form.get("action", "preview")
+        try:
+            preview_rows = calendar_index.preview_holiday_import(source_key, start_year, end_year)
+            if action == "import":
+                if request.form.get("confirmed") != "1":
+                    raise ValueError("Preview the holidays before importing them.")
+                result = calendar_index.import_holidays(source_key, start_year, end_year, data.conn)
+                preview_rows = None
+        except Exception as exc:
+            error = str(exc)
+    label = "SA public holidays" if source_key == "holidays_sa" else "Australian public holidays"
+    return render_template(
+        "calendar_import_holidays.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=f"Import {label}",
+        content_html="",
+        area=area,
+        today=date.today(),
+        source_key=source_key,
+        source_label=label,
+        start_year=start_year,
+        end_year=end_year,
+        preview_rows=preview_rows,
+        result=result,
+        error=error,
+    )
+
+
+@calendar_bp.route("/import/external", methods=["GET", "POST"])
+def import_external_events_route():
+    area = _request_area_form() or _request_area() or ""
+    upload_path = ""
+    source_name = ""
+    preview_rows = None
+    result = None
+    error = ""
+    current_year = date.today().year
+    start_year = request.form.get("start_year", current_year - 1)
+    end_year = request.form.get("end_year", current_year + 5)
+    if request.method == "POST":
+        upload = request.files.get("calendar_file")
+        original_name = (upload.filename if upload and upload.filename else "").strip()
+        upload_path = request.form.get("upload_path", "").strip()
+        if upload and upload.filename:
+            upload_path = importer.save_upload(upload, suffix=".ics")
+        source_name = request.form.get("source_name", "").strip()
+        action = request.form.get("action", "preview")
+        try:
+            if not importer.is_saved_upload(upload_path, ".ics"):
+                raise ValueError("Choose an iCalendar (.ics) file.")
+            calendar_name, preview_rows = external_events.parse_ics_file(upload_path, start_year, end_year)
+            if not preview_rows:
+                raise ValueError("The iCalendar file contains no events.")
+            source_name = source_name or calendar_name or os.path.splitext(original_name)[0] or "External calendar"
+            if action == "import":
+                if request.form.get("confirmed") != "1":
+                    raise ValueError("Preview the external events before importing them.")
+                result = external_events.replace_external_events(preview_rows, source_name, data.conn)
+                preview_rows = None
+        except Exception as exc:
+            error = str(exc)
+    return render_template(
+        "calendar_import_external.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Import external events",
+        content_html="",
+        area=area,
+        today=date.today(),
+        upload_path=upload_path,
+        source_name=source_name,
+        start_year=start_year,
+        end_year=end_year,
+        preview_rows=preview_rows,
+        result=result,
+        error=error,
     )
 
 

@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="calendar-controls">
+    <a class="calendar-add-main" href="{{ url_for('calendar.month_view_route', area=area) }}">Back to Calendar</a>
+    {% include "widgets/wid_calendar_import_menu.html" %}
+  </div>
+
+  <h3>Import {{ source_label }}</h3>
+  {% if result %}
+    <p>Imported {{ result.rows_inserted }} holidays. Replaced {{ result.rows_deleted }} existing {{ source_label }} rows in {{ start_year }}–{{ end_year }}.</p>
+  {% elif preview_rows is not none %}
+    <p><strong>{{ preview_rows|length }} holidays will be imported.</strong></p>
+    <p>Continuing will first remove only existing {{ source_label }} rows dated from {{ start_year }}-01-01 through {{ end_year }}-12-31.</p>
+    <div class="calendar-import-preview">
+      <table>
+        <thead><tr><th>Date</th><th>Holiday</th><th>Jurisdiction</th></tr></thead>
+        <tbody>
+        {% for row in preview_rows %}
+          <tr><td>{{ row.start_date }}</td><td>{{ row.title }}</td><td>{{ row.category }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form method="post">
+      <input type="hidden" name="area" value="{{ area }}">
+      <input type="hidden" name="start_year" value="{{ start_year }}">
+      <input type="hidden" name="end_year" value="{{ end_year }}">
+      <input type="hidden" name="confirmed" value="1">
+      <button type="submit" name="action" value="import">OK — Replace and import</button>
+      <a class="calendar-nav" href="{{ url_for('calendar.month_view_route', area=area) }}">Cancel</a>
+    </form>
+  {% else %}
+    <form method="post" class="calendar-import-form">
+      <input type="hidden" name="area" value="{{ area }}">
+      <label>From year <input type="number" name="start_year" min="1" max="9999" required value="{{ start_year }}"></label>
+      <label>To year <input type="number" name="end_year" min="1" max="9999" required value="{{ end_year }}"></label>
+      <button type="submit" name="action" value="preview">Preview Import</button>
+    </form>
+  {% endif %}
+  {% if error %}<p class="calendar-import-error">{{ error }}</p>{% endif %}
+{% endblock %}

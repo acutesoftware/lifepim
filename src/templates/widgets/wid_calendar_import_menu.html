@@ -1,0 +1,9 @@
+<details class="calendar-import-menu">
+  <summary class="calendar-add-main">Import</summary>
+  <div class="calendar-import-menu-items">
+    <a href="{{ url_for('calendar.import_events_route', area=area) }}">Import CSV</a>
+    <a href="{{ url_for('calendar.import_holidays_route', source_key='holidays_sa', area=area) }}">Import SA holidays</a>
+    <a href="{{ url_for('calendar.import_holidays_route', source_key='holidays_au', area=area) }}">Import AU public holidays</a>
+    <a href="{{ url_for('calendar.import_external_events_route', area=area) }}">Import external events (.ics)</a>
+  </div>
+</details>

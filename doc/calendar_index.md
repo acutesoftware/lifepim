@@ -235,6 +235,24 @@ activity counts rather than missing event rows.
 
 ## Adding A Source
 
+### Explicit imports
+
+Calendar's Import menu supports CSV, Australian public holidays, South
+Australian public holidays, and external iCalendar (`.ics`) events. Every path
+shows the rows before an OK/Cancel decision.
+
+Holiday imports are stored directly in `lp_calendar_items` under
+`holidays_au` or `holidays_sa`. A confirmed re-import deletes only rows with the
+same `source_key` whose `start_date` is inside the selected inclusive year
+range, then inserts the previewed replacement rows in one transaction. Startup
+migration does not regenerate holiday rows.
+
+External iCalendar events use the `external_events` source. The calendar name
+is hashed into `source_sub_id`; re-importing the same name replaces only that
+sub-source, allowing several external calendars to coexist behind the External
+Events filter. `RRULE` series are expanded for the recurrence year range chosen
+on the preview form, with `EXDATE` exclusions applied.
+
 There are two source patterns.
 
 Use indexed calendar items when each source record is a real event the user

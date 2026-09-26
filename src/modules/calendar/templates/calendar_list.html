@@ -13,7 +13,7 @@
   <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=now.strftime('%Y-%m-%d'), area=area) }}">Today</a>
   {% include "widgets/wid_calendar_jump.html" %}
   <a class="calendar-add-main" href="{{ url_for('calendar.add_event_route', date=now.strftime('%Y-%m-%d'), area=area) }}">Add Event</a>
-  <a class="calendar-add-main" href="{{ url_for('calendar.import_events_route', area=area) }}">Import Events</a>
+  {% include "widgets/wid_calendar_import_menu.html" %}
 </div>
 
 <form method="get" action="{{ url_for('calendar.list_view_route') }}" class="calendar-source-box">

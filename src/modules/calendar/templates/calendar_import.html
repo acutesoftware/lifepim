@@ -8,7 +8,8 @@
       <a href="{{ url_for('calendar.year_view_route', year=today.year, area=area) }}">Yearly</a>
     </div>
     <a class="calendar-add-main" href="{{ url_for('calendar.month_view_route', area=area) }}">Back to Calendar</a>
+    {% include "widgets/wid_calendar_import_menu.html" %}
   </div>
 
-  {% include "widgets/wid_import_data.html" %}
+  {% include "widgets/wid_calendar_import_csv.html" %}
 {% endblock %}

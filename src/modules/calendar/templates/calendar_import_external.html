@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="calendar-controls">
+    <a class="calendar-add-main" href="{{ url_for('calendar.month_view_route', area=area) }}">Back to Calendar</a>
+    {% include "widgets/wid_calendar_import_menu.html" %}
+  </div>
+
+  <h3>Import external events</h3>
+  {% if result %}
+    <p>Imported {{ result.inserted }} events from {{ result.source_name }}. Replaced {{ result.deleted }} earlier events from the same external calendar.</p>
+  {% elif preview_rows is not none %}
+    <p><strong>{{ preview_rows|length }} event(s) will be imported from “{{ source_name }}”.</strong></p>
+    <p>Re-importing with the same calendar name replaces only that external calendar's earlier events.</p>
+    <div class="calendar-import-preview">
+      <table>
+        <thead><tr><th>Date</th><th>Time</th><th>Event</th><th>Location</th></tr></thead>
+        <tbody>
+        {% for row in preview_rows %}
+          <tr><td>{{ row.start_date }}</td><td>{{ row.start_time }}</td><td>{{ row.title }}</td><td>{{ row.location }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form method="post">
+      <input type="hidden" name="area" value="{{ area }}">
+      <input type="hidden" name="upload_path" value="{{ upload_path }}">
+      <input type="hidden" name="source_name" value="{{ source_name }}">
+      <input type="hidden" name="start_year" value="{{ start_year }}">
+      <input type="hidden" name="end_year" value="{{ end_year }}">
+      <input type="hidden" name="confirmed" value="1">
+      <button type="submit" name="action" value="import">OK — Replace and import</button>
+      <a class="calendar-nav" href="{{ url_for('calendar.month_view_route', area=area) }}">Cancel</a>
+    </form>
+  {% else %}
+    <form method="post" enctype="multipart/form-data" class="calendar-import-form">
+      <input type="hidden" name="area" value="{{ area }}">
+      <label>iCalendar file <input type="file" name="calendar_file" accept=".ics,text/calendar" required></label>
+      <label>Calendar name (optional) <input type="text" name="source_name" value="{{ source_name }}" placeholder="Uses the name in the file"></label>
+      <label>Recurring events from year <input type="number" name="start_year" min="1" max="9999" required value="{{ start_year }}"></label>
+      <label>Recurring events to year <input type="number" name="end_year" min="1" max="9999" required value="{{ end_year }}"></label>
+      <button type="submit" name="action" value="preview">Preview Import</button>
+    </form>
+  {% endif %}
+  {% if error %}<p class="calendar-import-error">{{ error }}</p>{% endif %}
+{% endblock %}

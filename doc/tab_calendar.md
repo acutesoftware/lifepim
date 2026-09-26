@@ -19,7 +19,9 @@ Architecture details are in `doc/calendar_index.md`.
 | Agenda | `/calendar/list` | Indexed item search, filters, sorting, and pagination. |
 | Summary | `/calendar/summary` | Upcoming items, grouped counts, stats, and source status. |
 | Add/Edit | `/calendar/add`, `/calendar/edit/<id>` | Writes authoritative event rows and immediately updates projections. |
-| Import | `/calendar/import` | Legacy CSV imports remain supported and trigger Calendar migration/projection. |
+| Import CSV | `/calendar/import` | CSV imports remain supported. Mapped rows are previewed before confirmation and then trigger Calendar migration/projection. |
+| Import public holidays | `/calendar/import/holidays/<source_key>` | Previews and imports an inclusive year range for the AU or SA source. Confirmation replaces only that source's rows inside the selected years. |
+| Import external events | `/calendar/import/external` | Previews an iCalendar (`.ics`) file. Re-importing the same calendar name replaces only that external calendar's prior rows. |
 
 `/calendar/list` remains the compatibility route, but the UI labels it Agenda.
 
