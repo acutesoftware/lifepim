@@ -58,26 +58,18 @@
       {% if sort_col == 'area' %} {{ '^' if sort_dir == 'asc' else 'v' }}{% endif %}
     </th>
     <th>Videos</th>
-    <th>Actions</th>
   </tr>
   {% for ev in events %}
   <tr class="link-draggable" data-record-type="event" data-record-id="{{ ev.id }}" data-record-title="{{ ev.title }}">
     <td><input type="checkbox" class="link-select" data-record-type="event" data-record-id="{{ ev.id }}" data-record-title="{{ ev.title }}"></td>
     <td>{{ ev.date }}</td>
     <td>{{ ev.time }}</td>
-    <td>{{ ev.title }}</td>
+    <td>{% include "widgets/wid_calendar_event_link.html" %}</td>
     <td>{{ ev.area }}</td>
     <td>
       {% for item in videos_by_date.get(ev.date, []) %}
         <a href="{{ url_for('media.media_file_route', media_id=item.media_id) }}" title="{{ item.filename }}">{{ item.filename }}</a>{% if not loop.last %}<br>{% endif %}
       {% endfor %}
-    </td>
-    <td>
-      {% if ev.can_edit is not defined or ev.can_edit %}
-      <a href="{{ url_for('calendar.view_event_route', event_id=ev.id, area=area) }}">View</a> |
-      <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id, area=area) }}">Edit</a> |
-      <form method="post" action="{{ url_for('calendar.delete_event_route', event_id=ev.id, area=area) }}" style="display:inline;" onsubmit="return confirm('Delete event?');"><button type="submit">Del</button></form>
-      {% endif %}
     </td>
   </tr>
   {% endfor %}

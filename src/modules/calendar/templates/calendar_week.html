@@ -69,14 +69,7 @@
       <td class="calendar-cell" style="background: {{ cell_bg }};">
         {% for ev in all_day_events.get(day, []) %}
         <div class="calendar-event">
-          <span class="calendar-title-text"{% if ev.source_key == 'birthdays' or ev.event_type == 'birthday' %} style="color:{{ birthday_text_colour }};font-weight:bold;font-size:{{ birthday_font_size }}px;"{% elif is_weekend and ev.source_key in ('holidays_au', 'holidays_sa') %} style="color:#218739;font-weight:600;"{% endif %}>{{ ev.title }}</span>
-          {% if ev.can_edit is not defined or ev.can_edit %}
-          <span class="calendar-actions">
-            <a href="{{ url_for('calendar.view_event_route', event_id=ev.id) }}">View</a>
-            <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
-            <form method="post" action="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=day.year, month=day.month, area=area) }}" style="display:inline;" onsubmit="return confirm('Delete event?');"><button type="submit">Del</button></form>
-          </span>
-          {% endif %}
+          {% include "widgets/wid_calendar_event_link.html" %}
         </div>
         {% endfor %}
         {% if day_sources.files and media_by_day.get(day) %}
@@ -132,14 +125,7 @@
       <td class="calendar-cell" style="background: {{ cell_bg if is_birthday or is_holiday or is_weekend or today == day else slot_bg }};">
         {% for ev in timed_events.get(day, {}).get(slot.minutes, []) %}
         <div class="calendar-event">
-          <span class="calendar-title-text"{% if ev.source_key == 'birthdays' or ev.event_type == 'birthday' %} style="color:{{ birthday_text_colour }};font-weight:bold;font-size:{{ birthday_font_size }}px;"{% elif is_weekend and ev.source_key in ('holidays_au', 'holidays_sa') %} style="color:#218739;font-weight:600;"{% endif %}>{{ ev.title }}</span>
-          {% if ev.can_edit is not defined or ev.can_edit %}
-          <span class="calendar-actions">
-            <a href="{{ url_for('calendar.view_event_route', event_id=ev.id) }}">View</a>
-            <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
-            <form method="post" action="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=day.year, month=day.month, area=area) }}" style="display:inline;" onsubmit="return confirm('Delete event?');"><button type="submit">Del</button></form>
-          </span>
-          {% endif %}
+          {% include "widgets/wid_calendar_event_link.html" %}
         </div>
         {% endfor %}
       </td>

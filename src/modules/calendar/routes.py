@@ -132,10 +132,13 @@ def _fetch_agenda_items(
     params = []
     where = ["ci.is_visible = 1", "cs.enabled = 1"]
     _append_area_filter(where, params, "ci.area", area)
-    source_list = [s for s in (source_keys or []) if s]
-    if source_list:
-        where.append("ci.source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
-        params.extend(source_list)
+    if source_keys is not None:
+        source_list = [s for s in source_keys if s]
+        if source_list:
+            where.append("ci.source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
+            params.extend(source_list)
+        else:
+            where.append("0 = 1")
     if start_date:
         where.append("ci.end_date >= ?")
         params.append(start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else start_date)
@@ -1052,17 +1055,14 @@ def summary_view_route():
         "area": "area",
         "source": "source_key",
     }.items():
-        rows = data.conn.execute(
-            f"""
-            SELECT COALESCE({col}, '') AS label, COUNT(1) AS cnt
-            FROM lp_calendar_items
-            WHERE is_visible = 1 AND status != 'cancelled' AND start_date >= ? AND start_date < ?
-            GROUP BY COALESCE({col}, '')
-            ORDER BY cnt DESC, label
-            """,
-            [today.strftime("%Y-%m-%d"), next_30.strftime("%Y-%m-%d")],
-        ).fetchall()
-        grouped[group_key] = [dict(row) for row in rows]
+        counts = {}
+        for item in next_30_items:
+            label = item.get(col) or ""
+            counts[label] = counts.get(label, 0) + 1
+        grouped[group_key] = [
+            {"label": label, "cnt": count}
+            for label, count in sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))
+        ]
     _refresh_recent_day_stats(source_keys)
     source_status = calendar_index.fetch_calendar_sources(data.conn)
     stats = calendar_index.fetch_calendar_day_stats(today, next_30, sources=source_keys, conn=data.conn)
@@ -1253,10 +1253,45 @@ def view_event_route(event_id):
         content_title=event.get("title") or "Event",
         content_html="",
         event=event,
+        editable=True,
         area=event.get("area"),
         view_date=view_date,
         project_options=projects_mod.project_list(statuses=("planned", "active")),
         record_projects=projects_mod.record_projects("event", event_id),
+    )
+
+
+@calendar_bp.route("/item/<int:item_id>")
+def view_item_route(item_id):
+    """Show an imported or generated Calendar item that has no editable event row."""
+    _ensure_calendar_index()
+    row = data.conn.execute(
+        "SELECT ci.*, ci.start_date AS item_date, cs.source_name, "
+        "cs.default_color, cs.default_text_color, cs.default_icon "
+        "FROM lp_calendar_items ci "
+        "JOIN lp_calendar_sources cs ON cs.source_key = ci.source_key "
+        "WHERE ci.id = ?",
+        (item_id,),
+    ).fetchone()
+    if not row:
+        return redirect(url_for("calendar.month_view_route"))
+    event = _event_from_index_row(row)
+    if event.get("can_edit"):
+        return redirect(url_for("calendar.view_event_route", event_id=event["id"]))
+    view_date = _parse_date_param(event.get("date")) or date.today()
+    return render_template(
+        "calendar_view.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title=event.get("title") or "Calendar item",
+        content_html="",
+        event=event,
+        editable=False,
+        area=event.get("area"),
+        view_date=view_date,
+        project_options=[],
+        record_projects=[],
     )
 
 
@@ -1582,6 +1617,7 @@ def _event_from_row(row):
 
 def _event_from_index_row(row):
     event = dict(row)
+    event["calendar_item_id"] = event.get("id")
     event["date"] = event.get("item_date") or event.get("start_date")
     event["time"] = event.get("start_time") or ""
     event["detail"] = event.get("content", "")

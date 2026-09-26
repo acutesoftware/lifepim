@@ -1,0 +1,13 @@
+{% set event_is_birthday = ev.source_key == 'birthdays' or ev.event_type == 'birthday' %}
+{% set event_is_weekend_holiday = (is_weekend | default(false)) and ev.source_key in ('holidays_au', 'holidays_sa') %}
+{% if ev.can_edit is not defined or ev.can_edit %}
+  {% set event_url = url_for('calendar.view_event_route', event_id=ev.id) %}
+{% else %}
+  {% set event_url = url_for('calendar.view_item_route', item_id=ev.calendar_item_id) %}
+{% endif %}
+<a class="calendar-event-link" href="{{ event_url }}"
+   {% if event_is_birthday %}style="color:{{ birthday_text_colour | default('#b00020') }};font-weight:bold;font-size:{{ birthday_font_size | default(11) }}px;"
+   {% elif event_is_weekend_holiday %}style="color:#218739;font-weight:600;"
+   {% elif ev.color %}style="color:{{ ev.color }};"
+   {% elif ev.default_color %}style="color:{{ ev.default_color }};"
+   {% endif %}>{{ ev.title }}</a>

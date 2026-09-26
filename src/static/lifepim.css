@@ -2507,11 +2507,19 @@ button.calendar-nav {
 }
 
 .calendar-event {
-  background: #f9f9ff;
-  border: 1px solid #d8d8ef;
-  border-radius: 3px;
-  padding: 2px 3px;
+  padding: 1px 0;
   font-size: 11px;
+  line-height: 1.25;
+}
+
+.calendar-event-link {
+  color: #174f86;
+  text-decoration: none;
+}
+
+.calendar-event-link:hover,
+.calendar-event-link:focus {
+  text-decoration: underline;
 }
 
 .calendar-time {
@@ -2519,22 +2527,24 @@ button.calendar-nav {
   margin-right: 4px;
 }
 
-.calendar-actions {
-  margin-left: 6px;
-  font-size: 10px;
+.calendar-delete-form {
+  display: inline;
+  margin: 0;
 }
 
-.calendar-actions a {
-  color: #444;
-  text-decoration: none;
-  margin-left: 4px;
+.calendar-delete-button {
+  padding: 2px 6px;
+  border: 1px solid #b85b5b;
+  border-radius: 3px;
+  color: #8a1f1f;
+  background: #fff7f7;
+  font: inherit;
+  cursor: pointer;
 }
 
-.calendar-add {
-  align-self: flex-start;
-  font-size: 10px;
-  text-decoration: none;
-  color: #555;
+.calendar-read-only-note {
+  color: #666;
+  font-size: 12px;
 }
 
 .calendar-grid.weekly-view .calendar-cell {

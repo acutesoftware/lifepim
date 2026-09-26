@@ -45,7 +45,7 @@ EVENT_COLUMNS = {
 SOURCE_SEEDS = [
     ("manual", "Manual Events", "event", "immediate", None, None, "#1f77b4", "#ffffff", "calendar", 10, 1, 1),
     ("recurring", "Recurring Events", "generated", "rebuild", 730, 3650, "#9467bd", "#ffffff", "repeat", 20, 1, 1),
-    ("birthdays", "Birthdays", "generated", "rebuild", 0, 7300, "#e377c2", "#ffffff", "cake", 30, 1, 1),
+    ("birthdays", "Birthdays", "generated", "rebuild", 7300, 7300, "#e377c2", "#ffffff", "cake", 30, 1, 1),
     ("holidays_au", "Australian Public Holidays", "imported", "rebuild", 1825, 3650, "#2ca02c", "#ffffff", "flag", 40, 1, 1),
     ("holidays_sa", "South Australian Public Holidays", "imported", "rebuild", 1825, 3650, "#17becf", "#ffffff", "flag", 41, 1, 1),
     ("external_events", "External Events", "imported", "manual", None, None, "#0f766e", "#ffffff", "link", 45, 1, 1),
@@ -66,6 +66,7 @@ BIRTHDAY_EVENT_SQL = (
     "(upper(COALESCE(recurrence_rule, '')) LIKE '%FREQ=YEARLY%' "
     "AND lower(trim(COALESCE(title, ''))) LIKE '%birthday'))"
 )
+BIRTHDAY_HORIZON_MIGRATION_KEY = "full_year_projection_v1"
 
 
 @dataclass
@@ -89,9 +90,10 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
         existing_sources = {
             row["source_key"] for row in conn.execute("SELECT source_key FROM lp_calendar_sources").fetchall()
         }
-        if not expected_sources.issubset(existing_sources):
+        sources_added = not expected_sources.issubset(existing_sources)
+        if sources_added:
             seed_calendar_sources(conn)
-            conn.commit()
+        birthday_window_changed = _upgrade_birthday_source_window(conn)
         stale_birthdays = conn.execute(
             "SELECT 1 FROM lp_calendar_items ci "
             "JOIN lp_calendar_events ce ON CAST(ce.id AS TEXT) = ci.source_record_id "
@@ -100,7 +102,9 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
         ).fetchone()
         if stale_birthdays:
             _refresh_recurring(conn, RefreshResult(source_key="recurring", started_at=_now()))
+        if stale_birthdays or birthday_window_changed:
             _refresh_birthdays(conn, RefreshResult(source_key="birthdays", started_at=_now()))
+        if sources_added or stale_birthdays or birthday_window_changed:
             conn.commit()
         return
     conn.execute("PRAGMA foreign_keys = ON")
@@ -236,7 +240,10 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
         """
     )
     seed_calendar_sources(conn)
+    birthday_window_changed = _upgrade_birthday_source_window(conn)
     migrate_existing_calendar_events(conn)
+    if birthday_window_changed:
+        _refresh_birthdays(conn, RefreshResult(source_key="birthdays", started_at=_now()))
     conn.commit()
     _mark_schema_ready(conn)
 
@@ -547,10 +554,13 @@ def fetch_calendar_items_for_days(
         "cs.enabled = 1",
         "ci.status != 'cancelled'",
     ]
-    source_list = [s for s in (sources or []) if s]
-    if source_list:
-        where.append("ci.source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
-        params.extend(source_list)
+    if sources is not None:
+        source_list = [s for s in sources if s]
+        if source_list:
+            where.append("ci.source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
+            params.extend(source_list)
+        else:
+            where.append("0 = 1")
     if area:
         if area.lower() == "unmapped":
             where.append("(COALESCE(ci.area, '') = '' OR lower(ci.area) = lower(?))")
@@ -585,10 +595,13 @@ def fetch_calendar_day_stats(
     ensure_calendar_schema(conn)
     params: list = [_date_s(start_date), _date_s(end_date)]
     where = ["stat_date >= ?", "stat_date < ?"]
-    source_list = [s for s in (sources or []) if s]
-    if source_list:
-        where.append("source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
-        params.extend(source_list)
+    if sources is not None:
+        source_list = [s for s in sources if s]
+        if source_list:
+            where.append("source_key IN (" + ",".join(["?"] * len(source_list)) + ")")
+            params.extend(source_list)
+        else:
+            where.append("0 = 1")
     rows = conn.execute(
         "SELECT * FROM lp_calendar_day_stats WHERE " + " AND ".join(where) + " ORDER BY stat_date, source_key, metric_key",
         params,
@@ -819,6 +832,11 @@ def _refresh_birthdays(conn: sqlite3.Connection, result: RefreshResult) -> Refre
     source_id = _source_id(conn, "birthdays")
     source = _source_row(conn, "birthdays")
     start_horizon, end_horizon = _horizon(source)
+    # Birthday entries represent calendar dates, so include complete boundary
+    # years. A rolling day horizon otherwise drops birthdays that have already
+    # occurred this year and makes them appear to start next year.
+    start_horizon = date(start_horizon.year, 1, 1)
+    end_horizon = date(end_horizon.year, 12, 31)
     rows = conn.execute(
         f"SELECT * FROM lp_calendar_events WHERE {BIRTHDAY_EVENT_SQL} "
         "AND COALESCE(status, 'active') != 'cancelled'"
@@ -1258,6 +1276,7 @@ def _insert_item_days(conn: sqlite3.Connection, item_id: int, start_s: str, end_
 
 
 def _item_to_event(item: dict) -> dict:
+    item["calendar_item_id"] = item.get("id")
     item["date"] = item.get("item_date") or item.get("start_date")
     item["time"] = item.get("start_time") or ""
     item["detail"] = item.get("content") or ""
@@ -1459,6 +1478,25 @@ def _save_source_config(conn, source_key, config: dict) -> None:
         "UPDATE lp_calendar_sources SET config_json = ? WHERE source_key = ?",
         (json.dumps(config, sort_keys=True), source_key),
     )
+
+
+def _upgrade_birthday_source_window(conn: sqlite3.Connection) -> bool:
+    """Upgrade the original future-only birthday source without clobbering later user settings."""
+    row = _source_row(conn, "birthdays")
+    if not row:
+        return False
+    config = _source_config(row)
+    if config.get(BIRTHDAY_HORIZON_MIGRATION_KEY):
+        return False
+    changed = row["horizon_past_days"] in (None, 0)
+    if changed:
+        conn.execute(
+            "UPDATE lp_calendar_sources SET horizon_past_days = ? WHERE source_key = 'birthdays'",
+            (7300,),
+        )
+    config[BIRTHDAY_HORIZON_MIGRATION_KEY] = True
+    _save_source_config(conn, "birthdays", config)
+    return changed
 
 
 def _mark_day_stats_baseline(conn, source_key, stat_rows) -> None:

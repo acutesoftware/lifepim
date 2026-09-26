@@ -41,6 +41,35 @@ class CalendarStage2Tests(unittest.TestCase):
             calendar_routes.data.conn = original_conn
             conn.close()
 
+    def test_explicit_empty_source_selection_returns_no_items_or_stats(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            event_id = calendar_index.create_calendar_event(
+                {"title": "Visible only with a source", "start_date": "2026-09-26"},
+                conn,
+            )
+            visible_items = calendar_index.fetch_calendar_items_for_days(
+                "2026-09-26", "2026-09-27", sources=None, conn=conn
+            )
+            self.assertTrue(visible_items)
+            self.assertEqual(visible_items[0]["id"], str(event_id))
+            self.assertIsInstance(visible_items[0]["calendar_item_id"], int)
+            self.assertEqual(
+                calendar_index.fetch_calendar_items_for_days(
+                    "2026-09-26", "2026-09-27", sources=set(), conn=conn
+                ),
+                [],
+            )
+            self.assertEqual(
+                calendar_index.fetch_calendar_day_stats(
+                    "2026-09-26", "2026-09-27", sources=set(), conn=conn
+                ),
+                [],
+            )
+        finally:
+            conn.close()
+
     def test_schema_sources_indexes_and_cascade(self):
         conn = memory_conn()
         try:
@@ -172,8 +201,57 @@ class CalendarStage2Tests(unittest.TestCase):
             self.assertEqual(listed[0]["month_day"], "04/23")
             calendar_index.save_birthday("Duncan James", "05/24", event_id, conn)
             self.assertEqual(calendar_index.fetch_birthdays(conn)[0]["month_day"], "05/24")
+            projected_titles = {
+                row["title"]
+                for row in conn.execute(
+                    "SELECT title FROM lp_calendar_items WHERE source_key = 'birthdays' AND source_record_id = ?",
+                    (str(event_id),),
+                )
+            }
+            self.assertEqual(projected_titles, {"Duncan James's Birthday"})
             self.assertTrue(calendar_index.delete_birthday(event_id, conn))
             self.assertFalse(conn.execute("SELECT 1 FROM lp_calendar_events WHERE id = ?", (event_id,)).fetchone())
+        finally:
+            conn.close()
+
+    def test_birthdays_project_for_the_whole_current_year(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            event_id = calendar_index.save_birthday("Earlier This Year", "01/15", conn=conn)
+            occurrence = conn.execute(
+                "SELECT title FROM lp_calendar_items "
+                "WHERE source_key = 'birthdays' AND source_record_id = ? AND start_date = ?",
+                (str(event_id), f"{date.today().year}-01-15"),
+            ).fetchone()
+            self.assertIsNotNone(occurrence)
+            self.assertEqual(occurrence["title"], "Earlier This Year's Birthday")
+        finally:
+            conn.close()
+
+    def test_existing_future_only_birthday_source_is_upgraded_once(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            event_id = calendar_index.save_birthday("Existing Birthday", "02/19", conn=conn)
+            conn.execute(
+                "UPDATE lp_calendar_sources SET horizon_past_days = 0, config_json = NULL "
+                "WHERE source_key = 'birthdays'"
+            )
+            conn.execute("DELETE FROM lp_calendar_items WHERE source_key = 'birthdays'")
+            calendar_index.ensure_calendar_schema(conn)
+            source = conn.execute(
+                "SELECT horizon_past_days, config_json FROM lp_calendar_sources WHERE source_key = 'birthdays'"
+            ).fetchone()
+            self.assertEqual(source["horizon_past_days"], 7300)
+            self.assertIn(calendar_index.BIRTHDAY_HORIZON_MIGRATION_KEY, source["config_json"])
+            self.assertTrue(
+                conn.execute(
+                    "SELECT 1 FROM lp_calendar_items "
+                    "WHERE source_key = 'birthdays' AND source_record_id = ? AND start_date = ?",
+                    (str(event_id), f"{date.today().year}-02-19"),
+                ).fetchone()
+            )
         finally:
             conn.close()
 

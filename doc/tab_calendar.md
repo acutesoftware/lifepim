@@ -23,6 +23,8 @@ Architecture details are in `doc/calendar_index.md`.
 | Import public holidays | `/calendar/import/holidays/<source_key>` | Previews and imports an inclusive year range for the AU or SA source. Confirmation replaces only that source's rows inside the selected years. |
 | Import external events | `/calendar/import/external` | Previews an iCalendar (`.ics`) file. Re-importing the same calendar name replaces only that external calendar's prior rows. |
 | Edit Birthdays | `/calendar/birthdays` | Adds, edits, and deletes annual all-day birthday events using a name and MM/DD. |
+| View event | `/calendar/view/<event_id>` | Shows an editable Calendar event. Edit and Delete actions are located on this page. |
+| View indexed item | `/calendar/item/<item_id>` | Shows a read-only imported or generated item, such as a public holiday or external event without an authoritative event row. |
 
 `/calendar/list` remains the compatibility route, but the UI labels it Agenda.
 
@@ -36,7 +38,24 @@ Birthdays are authoritative rows in `lp_calendar_events` with
 through the `birthdays` source. Explicit source selections take precedence over
 legacy grouped filters, so the Birthdays checkbox remains effective while
 navigating between months. Birthday cells use the background, text colour, and
-font size configured in Settings > Calendar.
+font size configured in Settings > Calendar. Birthday projections cover whole
+calendar years and default to 20 years before and after today. Existing
+future-only birthday source settings are upgraded once, which ensures birthdays
+that have already occurred in the current year remain visible. Editing a name
+rebuilds the generated occurrences, so the new name is used on every year.
+
+Calendar grids now show each event as one uncluttered title link instead of a
+boxed event with separate View, Edit, and Delete controls. The link opens view
+mode. Editable events expose Edit and Delete there; imported/generated items
+without an authoritative event record are read-only and identify their source.
+The Month view has one Add Event action in its toolbar and no per-day `+ Add`
+links.
+
+The toolbar `...` menu contains CSV import, AU and SA public-holiday import,
+external iCalendar import, and Edit Birthdays. Every import presents a preview
+before confirmation. Re-importing public holidays first removes only the chosen
+jurisdiction and selected year range; re-importing an external calendar replaces
+only rows belonging to the supplied calendar name.
 
 ## Source Filters
 
@@ -49,6 +68,42 @@ The source filter is driven by `lp_calendar_sources`. Query parameters support:
 
 Default visibility, enabled state, colours, icons, priority, horizons, and
 refresh state are managed in Settings -> Calendar.
+
+### Checkbox reference
+
+The `Calendars / Sources` form submits one repeated `source` value for each
+checked box plus `source_filter=1`. Therefore each visible checkbox selects its
+exact `source_key`; clearing every box intentionally selects no sources. Only
+enabled sources can return indexed events. Date range, `is_visible`,
+non-cancelled status, and the current Area filter are then applied to indexed
+items. A normal Area selection includes that Area and its child Areas;
+`Unmapped` matches blank/unmapped values.
+
+| Checkbox | Source key | What it includes | Additional source filters or notes |
+|---|---|---|---|
+| Manual Events | `manual` | Non-recurring events entered in Calendar and stored in `lp_calendar_events`. | Indexed by event dates; cancelled/hidden rows are excluded. Area filtering applies. |
+| Recurring Events | `recurring` | Generated occurrences for recurring Calendar events. | Birthdays are explicitly excluded and appear only under Birthdays. Projection is limited by the source past/future horizon. |
+| Birthdays | `birthdays` | Annual all-day birthday occurrences entered through Edit Birthdays, plus compatible legacy yearly events whose title ends in Birthday. | Uses full boundary years, maps 29 February to 28 February in non-leap years, and uses the birthday colours/font from Settings > Calendar. |
+| Australian Public Holidays | `holidays_au` | Imported national AU public holidays for the confirmed year range. | Does not include SA-only holidays such as Adelaide Cup or SA Labour Day. Re-import replaces this source only in the selected years. |
+| South Australian Public Holidays | `holidays_sa` | Imported SA holidays, including applicable national holidays and SA-specific dates. | Re-import replaces this source only in the selected years. Weekday cells use the configured holiday background; weekend holidays retain the weekend background and use green text. |
+| External Events | `external_events` | Occurrences imported from an `.ics` calendar for the chosen year range. | Recurrence and excluded dates are expanded during import. Re-import replacement is scoped to the external calendar name. These items are read-only in Calendar. |
+| Task Deadlines | `tasks` | Indexed task deadline items, when provided by a task adapter. | Registered but not visible by default. There is currently no refresh adapter, so checking it normally returns no items unless task projections already exist. |
+| File Activity | `files` | Daily counts from `lp_files.mtime_utc` and non-media file details on an opened day. | Deleted file rows are excluded when `is_deleted` exists. In Month/Week previews this selection also enables image/video previews from `lp_media`. |
+| Photos and Videos | `media` | Daily photo/video counts and image/video previews from `lp_media`. | Only `media_type` image/video rows are previewed, using `mtime_utc` as the displayed Calendar date. |
+| Audio | `audio` | Daily audio counts and audio previews from `lp_audio`. | Uses `date_modified` as the Calendar date. |
+| Usage | `usage` | Intended usage/activity data. | Registered but no adapter is currently wired, so it shows no records. |
+
+The opened Day view currently treats File Activity, Photos and Videos, and
+Audio as one detail group: selecting any one enables the shared file/media
+detail loaders. Month and Week previews are more source-specific, except that
+File Activity deliberately enables image/video previews as noted above.
+
+When the page has no explicit source selection, checkboxes start from each
+source's `visible_by_default` setting. Navigation carries the exact selection in
+the comma-separated `sources` parameter. The older `show_events`, `show_files`,
+and `show_usage` parameters are compatibility groups; they are used only when
+an explicit `source`/`sources` selection is absent, and explicit source choices
+always win.
 
 ## Event Writes
 

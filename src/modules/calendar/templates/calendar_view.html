@@ -11,7 +11,12 @@
       <a href="{{ url_for('calendar.summary_view_route', area=area) }}">Summary</a>
     </div>
     <a class="calendar-nav" href="{{ url_for('calendar.day_view_route', date=view_date.strftime('%Y-%m-%d'), area=area) }}">Back</a>
+    {% if editable %}
     <a class="calendar-add-main" href="{{ url_for('calendar.edit_event_route', event_id=event.id, area=area) }}">Edit</a>
+    <form method="post" action="{{ url_for('calendar.delete_event_route', event_id=event.id, year=view_date.year, month=view_date.month, area=area) }}" class="calendar-delete-form" onsubmit="return confirm('Delete this event?');">
+      <button type="submit" class="calendar-delete-button">Delete</button>
+    </form>
+    {% endif %}
   </div>
 
   <table border="1" cellpadding="5">
@@ -20,7 +25,12 @@
     <tr><th>Time</th><td>{{ event.time }}</td></tr>
     <tr><th>Detail</th><td>{{ event.detail }}</td></tr>
     <tr><th>Area</th><td>{{ event.area }}</td></tr>
+    {% if event.source_name %}<tr><th>Source</th><td>{{ event.source_name }}</td></tr>{% endif %}
   </table>
+  {% if not editable %}
+  <p class="calendar-read-only-note">This imported or generated item is read-only. Manage it through its Calendar source or import screen.</p>
+  {% endif %}
+  {% if editable %}
   {% set project_assign_record_type = "event" %}
   {% set project_assign_record_id = event.id %}
   {% set project_assign_record_title = event.title %}
@@ -31,4 +41,5 @@
   {% set link_context_type = "event_detail" %}
   {% set link_mode = "outgoing" %}
   {% include "widgets/links_drawer.html" %}
+  {% endif %}
 {% endblock %}

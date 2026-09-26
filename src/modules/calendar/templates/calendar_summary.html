@@ -20,7 +20,7 @@
     <h4>Today</h4>
     <ul>
       {% for item in today_items %}
-      <li>{{ item.time }} {{ item.title }} {% if item.can_edit %}<a href="{{ url_for('calendar.view_event_route', event_id=item.id) }}">View</a>{% endif %}</li>
+      <li>{{ item.time }} {% with ev=item %}{% include "widgets/wid_calendar_event_link.html" %}{% endwith %}</li>
       {% else %}
       <li>No indexed items today.</li>
       {% endfor %}
@@ -29,7 +29,7 @@
     <h4>Tomorrow</h4>
     <ul>
       {% for item in tomorrow_items %}
-      <li>{{ item.time }} {{ item.title }}</li>
+      <li>{{ item.time }} {% with ev=item %}{% include "widgets/wid_calendar_event_link.html" %}{% endwith %}</li>
       {% else %}
       <li>No indexed items tomorrow.</li>
       {% endfor %}

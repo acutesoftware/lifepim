@@ -46,7 +46,7 @@
     <tr>
       <td>{{ ev.date }}</td>
       <td>{{ ev.time }}</td>
-      <td>{{ ev.title }}</td>
+      <td>{% include "widgets/wid_calendar_event_link.html" %}</td>
       <td>{{ ev.area }}</td>
     </tr>
     {% endfor %}

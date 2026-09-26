@@ -33,14 +33,7 @@
       {% for ev in events %}
       <li style="padding:6px 0;">
         {% if ev.time %}<strong>{{ ev.time }}</strong>{% endif %}
-        <span>{{ ev.title }}</span>
-        {% if ev.can_edit is not defined or ev.can_edit %}
-        <span class="calendar-actions">
-          <a href="{{ url_for('calendar.view_event_route', event_id=ev.id) }}">View</a>
-          <a href="{{ url_for('calendar.edit_event_route', event_id=ev.id) }}">Edit</a>
-          <form method="post" action="{{ url_for('calendar.delete_event_route', event_id=ev.id, year=day_date.year, month=day_date.month, area=area) }}" style="display:inline;" onsubmit="return confirm('Delete event?');"><button type="submit">Del</button></form>
-        </span>
-        {% endif %}
+        {% include "widgets/wid_calendar_event_link.html" %}
       </li>
       {% endfor %}
     </ul>
