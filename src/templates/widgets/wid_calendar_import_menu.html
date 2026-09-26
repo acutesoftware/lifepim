@@ -1,6 +1,8 @@
 <details class="calendar-import-menu">
-  <summary class="calendar-add-main">Import</summary>
+  <summary class="calendar-add-main" aria-label="More calendar actions" title="More calendar actions">…</summary>
   <div class="calendar-import-menu-items">
+    <a href="{{ url_for('calendar.birthdays_route', area=area) }}">Edit Birthdays</a>
+    <div class="calendar-import-menu-separator"></div>
     <a href="{{ url_for('calendar.import_events_route', area=area) }}">Import CSV</a>
     <a href="{{ url_for('calendar.import_holidays_route', source_key='holidays_sa', area=area) }}">Import SA holidays</a>
     <a href="{{ url_for('calendar.import_holidays_route', source_key='holidays_au', area=area) }}">Import AU public holidays</a>

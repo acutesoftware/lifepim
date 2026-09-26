@@ -60,17 +60,30 @@ class TestSettingsSchema(unittest.TestCase):
                     "usage": False,
                     "thumbnail_size": "large",
                     "thumbnail_limit": "30",
+                    "holiday_colour": "#CDEECD",
+                    "birthday_background_colour": "#FFF2A0",
+                    "birthday_text_colour": "#A00020",
+                    "birthday_font_size": "18",
                 },
                 conn,
             )
             saved = settings.get_calendar_view_settings(conn)
             self.assertEqual(saved["thumbnail_size"], "large")
             self.assertEqual(saved["thumbnail_limit"], 20)
+            self.assertEqual(saved["holiday_colour"], "#cdeecd")
+            self.assertEqual(saved["birthday_background_colour"], "#fff2a0")
+            self.assertEqual(saved["birthday_text_colour"], "#a00020")
+            self.assertEqual(saved["birthday_font_size"], 18)
 
             settings.save_calendar_view_settings({"events": False, "files": True, "usage": False}, conn)
             saved = settings.get_calendar_view_settings(conn)
             self.assertEqual(saved["thumbnail_size"], "large")
             self.assertEqual(saved["thumbnail_limit"], 20)
+            self.assertEqual(saved["holiday_colour"], "#cdeecd")
+            self.assertEqual(saved["birthday_background_colour"], "#fff2a0")
+            self.assertEqual(saved["birthday_text_colour"], "#a00020")
+            self.assertEqual(saved["birthday_font_size"], 18)
+            self.assertEqual(settings.normalize_calendar_holiday_colour("not-a-colour"), "#dff3df")
         finally:
             conn.close()
 

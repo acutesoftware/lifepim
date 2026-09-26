@@ -253,6 +253,19 @@ sub-source, allowing several external calendars to coexist behind the External
 Events filter. `RRULE` series are expanded for the recurrence year range chosen
 on the preview form, with `EXDATE` exclusions applied.
 
+Calendar routes derive holiday dates only from the currently selected
+`holidays_au` and `holidays_sa` items. Weekday holiday cells use
+`calendar.display.holiday_colour` (configured in Settings > Calendar); weekend
+holiday cells retain the normal weekend background and use green holiday text.
+
+Birthdays are managed at `/calendar/birthdays`. The form stores a standard
+`lp_calendar_events` row anchored in leap year 2000, with
+`event_type='birthday'`, `source='birthdays'`, and a yearly rule containing the
+selected month/day. The birthday projector owns the generated occurrences;
+the general recurring projector excludes birthday rows to prevent duplicates.
+Legacy annual records whose trimmed title ends in `Birthday` are recognized as
+birthday records and can be normalized by saving them in the birthday editor.
+
 There are two source patterns.
 
 Use indexed calendar items when each source record is a real event the user

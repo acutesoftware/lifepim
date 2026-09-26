@@ -2297,6 +2297,31 @@ button.calendar-nav {
   background: #f2f2f2;
 }
 
+.calendar-import-menu-separator {
+  border-top: 1px solid #ddd;
+  margin: 3px 0;
+}
+
+.calendar-birthday-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 110px auto;
+  gap: 8px;
+  align-items: end;
+  max-width: 620px;
+  margin-bottom: 14px;
+}
+
+.calendar-birthday-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.calendar-birthday-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .calendar-import-form {
   display: grid;
   gap: 10px;

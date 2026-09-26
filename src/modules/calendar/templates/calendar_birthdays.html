@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="calendar-controls">
+    <a class="calendar-add-main" href="{{ url_for('calendar.month_view_route', area=area) }}">Back to Calendar</a>
+    {% include "widgets/wid_calendar_import_menu.html" %}
+  </div>
+
+  <h3>Edit Birthdays</h3>
+  <p>Birthdays are annual, all-day Calendar events. Enter the date as MM/DD.</p>
+  {% if message %}<p>{{ message }}</p>{% endif %}
+  {% if error %}<p class="calendar-import-error">{{ error }}</p>{% endif %}
+
+  <form method="post" class="calendar-birthday-form">
+    <input type="hidden" name="area" value="{{ area }}">
+    <label>Name <input type="text" name="name" required placeholder="Duncan"></label>
+    <label>MM/DD <input type="text" name="month_day" required pattern="[0-9]{2}/[0-9]{2}" placeholder="04/23"></label>
+    <button type="submit" name="action" value="add">Add Birthday</button>
+  </form>
+
+  {% if birthdays %}
+  <div class="tabular-scroll">
+    <table class="settings-table">
+      <thead><tr><th>Name</th><th>MM/DD</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for birthday in birthdays %}
+        <tr>
+          <td colspan="3">
+            <form method="post" class="calendar-birthday-form" style="margin:0;max-width:none;">
+              <input type="hidden" name="area" value="{{ area }}">
+              <input type="hidden" name="event_id" value="{{ birthday.id }}">
+              <label><span class="sr-only">Name</span><input type="text" name="name" required value="{{ birthday.name }}"></label>
+              <label><span class="sr-only">MM/DD</span><input type="text" name="month_day" required pattern="[0-9]{2}/[0-9]{2}" value="{{ birthday.month_day }}"></label>
+              <span class="calendar-birthday-actions">
+                <button type="submit" name="action" value="update">Save</button>
+                <button type="submit" name="action" value="delete" onclick="return confirm('Delete this birthday?');">Delete</button>
+              </span>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p>No birthdays have been added.</p>
+  {% endif %}
+{% endblock %}

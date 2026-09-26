@@ -210,22 +210,7 @@ def _parse_day_sources(args):
     if "sources" in args:
         raw_sources = args.get("sources", "")
         selected = {part.strip() for part in raw_sources.split(",") if part.strip()}
-        if any(key in args for key in ("show_events", "show_files", "show_usage")):
-            for key in EVENT_SOURCE_KEYS:
-                if legacy_sources["events"]:
-                    selected.add(key)
-                else:
-                    selected.discard(key)
-            for key in ("files", "media", "audio"):
-                if legacy_sources["files"]:
-                    selected.add(key)
-                else:
-                    selected.discard(key)
-            if legacy_sources["usage"]:
-                selected.add("usage")
-            else:
-                selected.discard("usage")
-    elif hasattr(args, "getlist") and args.getlist("source"):
+    elif hasattr(args, "getlist") and (args.getlist("source") or args.get("source_filter") == "1"):
         selected = {part.strip() for part in args.getlist("source") if part.strip()}
     else:
         selected = {key for key, enabled in source_defaults.items() if enabled}
@@ -355,7 +340,15 @@ def _calendar_media_settings(conn):
         "thumbnail_size": settings["thumbnail_size"],
         "thumbnail_limit": settings["thumbnail_limit"],
         "thumbnail_class": f"calendar-thumb-{settings['thumbnail_size']}",
+        "holiday_colour": settings["holiday_colour"],
+        "birthday_background_colour": settings["birthday_background_colour"],
+        "birthday_text_colour": settings["birthday_text_colour"],
+        "birthday_font_size": settings["birthday_font_size"],
     }
+
+
+def _is_birthday_event(event):
+    return event.get("source_key") == "birthdays" or str(event.get("event_type") or "").lower() == "birthday"
 
 
 def _refresh_recent_day_stats(source_keys):
@@ -707,12 +700,18 @@ def month_view_route():
     end_day = date(next_year, next_month, 1)
     events = _fetch_events(area=area, start_date=first_day, end_date=end_day, source_keys=source_keys)
     events_by_day = {}
+    holiday_days = set()
+    birthday_days = set()
     for event in events:
         try:
             day = int(event["date"].split("-")[2])
         except (IndexError, ValueError, AttributeError):
             continue
         events_by_day.setdefault(day, []).append(event)
+        if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
+            holiday_days.add(day)
+        if _is_birthday_event(event):
+            birthday_days.add(day)
     _refresh_recent_day_stats(source_keys)
     stats = calendar_index.fetch_calendar_day_stats(first_day, end_day, sources=source_keys, conn=data.conn)
     stat_days = {int(item["stat_date"].split("-")[2]) for item in stats if item.get("stat_date")}
@@ -740,6 +739,12 @@ def month_view_route():
         events_by_day=events_by_day,
         media_by_day=media_by_day,
         days_with_events=set(events_by_day.keys()) | stat_days,
+        holiday_days=holiday_days,
+        holiday_colour=media_settings["holiday_colour"],
+        birthday_days=birthday_days,
+        birthday_background_colour=media_settings["birthday_background_colour"],
+        birthday_text_colour=media_settings["birthday_text_colour"],
+        birthday_font_size=media_settings["birthday_font_size"],
         days_with_images=stat_days,
         today=date.today(),
         prev_year=prev_year,
@@ -778,12 +783,18 @@ def week_view_route():
     week_end = week_start + timedelta(days=7)
     events = _fetch_events(area=area, start_date=week_start, end_date=week_end, source_keys=source_keys)
     events_by_day = {}
+    holiday_days = set()
+    birthday_days = set()
     for event in events:
         try:
             day = datetime.strptime(event.get("date", ""), "%Y-%m-%d").date()
         except (ValueError, TypeError):
             continue
         events_by_day.setdefault(day, []).append(event)
+        if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
+            holiday_days.add(day)
+        if _is_birthday_event(event):
+            birthday_days.add(day)
     week_days = [week_start + timedelta(days=offset) for offset in range(7)]
     media_by_day = (
         _order_grouped_calendar_media(_group_media_by_date(_fetch_image_media(data.conn, week_start, week_end, source_keys=source_keys)))
@@ -819,6 +830,12 @@ def week_view_route():
         timeslots=timeslots,
         timed_events=timed_events,
         all_day_events=all_day_events,
+        holiday_days=holiday_days,
+        holiday_colour=media_settings["holiday_colour"],
+        birthday_days=birthday_days,
+        birthday_background_colour=media_settings["birthday_background_colour"],
+        birthday_text_colour=media_settings["birthday_text_colour"],
+        birthday_font_size=media_settings["birthday_font_size"],
         media_by_day=media_by_day,
         prev_week=prev_week,
         next_week=next_week,
@@ -872,12 +889,18 @@ def day_view_route():
     month_end = date(next_year, next_month, 1)
     month_events = _fetch_events(area=area, start_date=month_start, end_date=month_end, source_keys=source_keys)
     events_by_day = {}
+    holiday_days = set()
+    birthday_days = set()
     for event in month_events:
         try:
             day = int(event["date"].split("-")[2])
         except (IndexError, ValueError, AttributeError):
             continue
         events_by_day.setdefault(day, []).append(event)
+        if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
+            holiday_days.add(day)
+        if _is_birthday_event(event):
+            birthday_days.add(day)
     _refresh_recent_day_stats(source_keys)
     month_stats = calendar_index.fetch_calendar_day_stats(month_start, month_end, sources=source_keys, conn=data.conn)
     days_with_images = {int(item["stat_date"].split("-")[2]) for item in month_stats if item.get("stat_date")}
@@ -912,6 +935,12 @@ def day_view_route():
         list_to=anchor,
         **_calendar_jump_context("day", anchor, area, day_source_params),
         days_with_events=set(events_by_day.keys()) | days_with_images,
+        holiday_days=holiday_days,
+        holiday_colour=media_settings["holiday_colour"],
+        birthday_days=birthday_days,
+        birthday_background_colour=media_settings["birthday_background_colour"],
+        birthday_text_colour=media_settings["birthday_text_colour"],
+        birthday_font_size=media_settings["birthday_font_size"],
         days_with_images=days_with_images,
         today=date.today(),
         area=area,
@@ -936,12 +965,18 @@ def year_view_route():
     year_stats = calendar_index.fetch_calendar_day_stats(year_start, year_end, sources=source_keys, conn=data.conn)
     year_events = _fetch_events(area=area, start_date=year_start, end_date=year_end, source_keys=source_keys)
     event_days_by_month = {}
+    holiday_days_by_month = {}
+    birthday_days_by_month = {}
     for event in year_events:
         try:
             event_day = datetime.strptime(event.get("date", ""), "%Y-%m-%d").date()
         except (ValueError, TypeError):
             continue
         event_days_by_month.setdefault(event_day.month, set()).add(event_day.day)
+        if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
+            holiday_days_by_month.setdefault(event_day.month, set()).add(event_day.day)
+        if _is_birthday_event(event):
+            birthday_days_by_month.setdefault(event_day.month, set()).add(event_day.day)
     media_days_by_month = {}
     for item in year_stats:
         try:
@@ -961,6 +996,8 @@ def year_view_route():
                 "month_weeks": month_weeks,
                 "days_with_events": event_days | days_with_images,
                 "days_with_images": days_with_images,
+                "holiday_days": holiday_days_by_month.get(month, set()),
+                "birthday_days": birthday_days_by_month.get(month, set()),
             }
         )
     return render_template(
@@ -987,6 +1024,10 @@ def year_view_route():
         col_bg_day=cfg.CAL_COL_BG_DAY,
         col_bg_weekend=cfg.CAL_COL_BG_WEEKEND,
         col_bg_today=cfg.CAL_COL_BG_TODAY,
+        holiday_colour=settings_mod.get_calendar_view_settings(data.conn)["holiday_colour"],
+        birthday_background_colour=settings_mod.get_calendar_view_settings(data.conn)["birthday_background_colour"],
+        birthday_text_colour=settings_mod.get_calendar_view_settings(data.conn)["birthday_text_colour"],
+        birthday_font_size=settings_mod.get_calendar_view_settings(data.conn)["birthday_font_size"],
     )
 
 
@@ -1327,6 +1368,53 @@ def delete_event_route(event_id):
             )
         return redirect(url_for("calendar.month_view_route", area=area or event.get("area")))
     return redirect(url_for("calendar.month_view_route", area=area))
+
+
+@calendar_bp.route("/birthdays", methods=["GET", "POST"])
+def birthdays_route():
+    _ensure_calendar_index()
+    area = _request_area_form() or _request_area() or ""
+    message = request.args.get("message", "")
+    error = ""
+    if request.method == "POST":
+        action = request.form.get("action", "add")
+        try:
+            if action == "delete":
+                event_id = int(request.form.get("event_id", ""))
+                if not calendar_index.delete_birthday(event_id, data.conn):
+                    raise ValueError("Birthday not found.")
+                message = "Birthday deleted."
+            elif action == "update":
+                event_id = int(request.form.get("event_id", ""))
+                calendar_index.save_birthday(
+                    request.form.get("name", ""), request.form.get("month_day", ""), event_id, data.conn
+                )
+                message = "Birthday updated."
+            else:
+                calendar_index.save_birthday(
+                    request.form.get("name", ""), request.form.get("month_day", ""), conn=data.conn
+                )
+                message = "Birthday added."
+            return redirect(url_for("calendar.birthdays_route", area=area, message=message))
+        except (TypeError, ValueError) as exc:
+            error = str(exc)
+    # Reclassify legacy annual entries whose title ends in "Birthday" and make
+    # the dedicated source authoritative for their projections.
+    calendar_index.refresh_calendar_source("recurring", conn=data.conn, full_rebuild=True)
+    calendar_index.refresh_calendar_source("birthdays", conn=data.conn, full_rebuild=True)
+    return render_template(
+        "calendar_birthdays.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Edit Birthdays",
+        content_html="",
+        area=area,
+        birthdays=calendar_index.fetch_birthdays(data.conn),
+        message=message,
+        error=error,
+        today=date.today(),
+    )
 
 
 @calendar_bp.route("/import", methods=["GET", "POST"])

@@ -24,11 +24,19 @@ CALENDAR_VIEW_DEFAULTS = {
     "calendar.view.usage": ("0", "Calendar", "Show usage"),
     "calendar.media.thumbnail_size": ("small", "Calendar", "Thumbnail size"),
     "calendar.media.thumbnail_limit": ("5", "Calendar", "Thumbnails per day"),
+    "calendar.display.holiday_colour": ("#dff3df", "Calendar", "Holiday highlight colour"),
+    "calendar.display.birthday_background_colour": ("#fff3a3", "Calendar", "Birthday background colour"),
+    "calendar.display.birthday_text_colour": ("#b00020", "Calendar", "Birthday text colour"),
+    "calendar.display.birthday_font_size": ("12", "Calendar", "Birthday text size"),
 }
 
 CALENDAR_THUMBNAIL_SIZES = {"small", "medium", "large"}
 CALENDAR_THUMBNAIL_LIMIT_DEFAULT = 5
 CALENDAR_THUMBNAIL_LIMIT_MAX = 20
+CALENDAR_HOLIDAY_COLOUR_DEFAULT = "#dff3df"
+CALENDAR_BIRTHDAY_BACKGROUND_DEFAULT = "#fff3a3"
+CALENDAR_BIRTHDAY_TEXT_DEFAULT = "#b00020"
+CALENDAR_BIRTHDAY_FONT_SIZE_DEFAULT = 12
 
 
 GENERAL_DEFAULTS = {
@@ -232,6 +240,20 @@ def get_calendar_view_settings(conn=None):
         ),
         "thumbnail_limit": normalize_calendar_thumbnail_limit(
             get_setting("calendar.media.thumbnail_limit", str(CALENDAR_THUMBNAIL_LIMIT_DEFAULT), conn)
+        ),
+        "holiday_colour": normalize_calendar_holiday_colour(
+            get_setting("calendar.display.holiday_colour", CALENDAR_HOLIDAY_COLOUR_DEFAULT, conn)
+        ),
+        "birthday_background_colour": normalize_calendar_colour(
+            get_setting("calendar.display.birthday_background_colour", CALENDAR_BIRTHDAY_BACKGROUND_DEFAULT, conn),
+            CALENDAR_BIRTHDAY_BACKGROUND_DEFAULT,
+        ),
+        "birthday_text_colour": normalize_calendar_colour(
+            get_setting("calendar.display.birthday_text_colour", CALENDAR_BIRTHDAY_TEXT_DEFAULT, conn),
+            CALENDAR_BIRTHDAY_TEXT_DEFAULT,
+        ),
+        "birthday_font_size": normalize_calendar_birthday_font_size(
+            get_setting("calendar.display.birthday_font_size", str(CALENDAR_BIRTHDAY_FONT_SIZE_DEFAULT), conn)
         ),
     }
 
@@ -570,6 +592,32 @@ def save_calendar_view_settings(sources, conn=None):
             "Calendar",
             "Thumbnails per day",
         )
+    if "holiday_colour" in sources:
+        updates["calendar.display.holiday_colour"] = (
+            normalize_calendar_holiday_colour(sources.get("holiday_colour")),
+            "Calendar",
+            "Holiday highlight colour",
+        )
+    if "birthday_background_colour" in sources:
+        updates["calendar.display.birthday_background_colour"] = (
+            normalize_calendar_colour(
+                sources.get("birthday_background_colour"), CALENDAR_BIRTHDAY_BACKGROUND_DEFAULT
+            ),
+            "Calendar",
+            "Birthday background colour",
+        )
+    if "birthday_text_colour" in sources:
+        updates["calendar.display.birthday_text_colour"] = (
+            normalize_calendar_colour(sources.get("birthday_text_colour"), CALENDAR_BIRTHDAY_TEXT_DEFAULT),
+            "Calendar",
+            "Birthday text colour",
+        )
+    if "birthday_font_size" in sources:
+        updates["calendar.display.birthday_font_size"] = (
+            str(normalize_calendar_birthday_font_size(sources.get("birthday_font_size"))),
+            "Calendar",
+            "Birthday text size",
+        )
     now = _utc_now()
     for key, (value, category, label) in updates.items():
         conn.execute(
@@ -583,6 +631,28 @@ def save_calendar_view_settings(sources, conn=None):
             (key, value, category, label, now),
         )
     conn.commit()
+
+
+def normalize_calendar_holiday_colour(value):
+    return normalize_calendar_colour(value, CALENDAR_HOLIDAY_COLOUR_DEFAULT)
+
+
+def normalize_calendar_colour(value, fallback):
+    colour = str(value or "").strip()
+    if (
+        colour.startswith("#")
+        and len(colour) in {4, 7}
+        and all(char in "0123456789abcdefABCDEF" for char in colour[1:])
+    ):
+        return colour.lower()
+    return fallback
+
+
+def normalize_calendar_birthday_font_size(value):
+    try:
+        return max(8, min(32, int(value)))
+    except (TypeError, ValueError):
+        return CALENDAR_BIRTHDAY_FONT_SIZE_DEFAULT
 
 
 def list_settings(conn=None):

@@ -477,6 +477,10 @@ def settings_route():
                     "usage": request.form.get("show_usage") == "1",
                     "thumbnail_size": request.form.get("thumbnail_size"),
                     "thumbnail_limit": request.form.get("thumbnail_limit"),
+                    "holiday_colour": request.form.get("holiday_colour"),
+                    "birthday_background_colour": request.form.get("birthday_background_colour"),
+                    "birthday_text_colour": request.form.get("birthday_text_colour"),
+                    "birthday_font_size": request.form.get("birthday_font_size"),
                 }
                 settings_mod.save_calendar_view_settings(sources, conn)
                 message = "Calendar source settings saved."
@@ -501,6 +505,10 @@ def settings_route():
                     "usage": request.form.get("show_usage") == "1",
                     "thumbnail_size": request.form.get("thumbnail_size"),
                     "thumbnail_limit": request.form.get("thumbnail_limit"),
+                    "holiday_colour": request.form.get("holiday_colour"),
+                    "birthday_background_colour": request.form.get("birthday_background_colour"),
+                    "birthday_text_colour": request.form.get("birthday_text_colour"),
+                    "birthday_font_size": request.form.get("birthday_font_size"),
                 }
                 settings_mod.save_calendar_view_settings(sources, conn)
                 message = "Calendar settings saved."

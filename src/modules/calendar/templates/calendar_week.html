@@ -30,11 +30,16 @@
       {% set has_events = (events_by_day.get(day, []) | length > 0) or (day_sources.files and media_by_day.get(day)) %}
       {% set is_today = today == day %}
       {% set is_weekend = day.weekday() >= 5 %}
+      {% set is_holiday = day in holiday_days %}
+      {% set is_birthday = day in birthday_days %}
       {% set cell_bg = col_bg_day %}
-      {% if is_weekend %}
+      {% if is_birthday %}
+        {% set cell_bg = birthday_background_colour %}
+      {% elif is_holiday and not is_weekend %}
+        {% set cell_bg = holiday_colour %}
+      {% elif is_weekend %}
         {% set cell_bg = col_bg_weekend %}
-      {% endif %}
-      {% if is_today %}
+      {% elif is_today %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
       <th
@@ -49,17 +54,22 @@
       <td>All-day</td>
       {% for day in week_days %}
       {% set is_weekend = day.weekday() >= 5 %}
+      {% set is_holiday = day in holiday_days %}
+      {% set is_birthday = day in birthday_days %}
       {% set cell_bg = col_bg_day %}
-      {% if is_weekend %}
+      {% if is_birthday %}
+        {% set cell_bg = birthday_background_colour %}
+      {% elif is_holiday and not is_weekend %}
+        {% set cell_bg = holiday_colour %}
+      {% elif is_weekend %}
         {% set cell_bg = col_bg_weekend %}
-      {% endif %}
-      {% if today == day %}
+      {% elif today == day %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
       <td class="calendar-cell" style="background: {{ cell_bg }};">
         {% for ev in all_day_events.get(day, []) %}
         <div class="calendar-event">
-          <span class="calendar-title-text">{{ ev.title }}</span>
+          <span class="calendar-title-text"{% if ev.source_key == 'birthdays' or ev.event_type == 'birthday' %} style="color:{{ birthday_text_colour }};font-weight:bold;font-size:{{ birthday_font_size }}px;"{% elif is_weekend and ev.source_key in ('holidays_au', 'holidays_sa') %} style="color:#218739;font-weight:600;"{% endif %}>{{ ev.title }}</span>
           {% if ev.can_edit is not defined or ev.can_edit %}
           <span class="calendar-actions">
             <a href="{{ url_for('calendar.view_event_route', event_id=ev.id) }}">View</a>
@@ -107,17 +117,22 @@
       <td>{{ slot.label }}</td>
       {% for day in week_days %}
       {% set is_weekend = day.weekday() >= 5 %}
+      {% set is_holiday = day in holiday_days %}
+      {% set is_birthday = day in birthday_days %}
       {% set cell_bg = col_bg_day %}
-      {% if is_weekend %}
+      {% if is_birthday %}
+        {% set cell_bg = birthday_background_colour %}
+      {% elif is_holiday and not is_weekend %}
+        {% set cell_bg = holiday_colour %}
+      {% elif is_weekend %}
         {% set cell_bg = col_bg_weekend %}
-      {% endif %}
-      {% if today == day %}
+      {% elif today == day %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
-      <td class="calendar-cell" style="background: {{ cell_bg if is_weekend or today == day else slot_bg }};">
+      <td class="calendar-cell" style="background: {{ cell_bg if is_birthday or is_holiday or is_weekend or today == day else slot_bg }};">
         {% for ev in timed_events.get(day, {}).get(slot.minutes, []) %}
         <div class="calendar-event">
-          <span class="calendar-title-text">{{ ev.title }}</span>
+          <span class="calendar-title-text"{% if ev.source_key == 'birthdays' or ev.event_type == 'birthday' %} style="color:{{ birthday_text_colour }};font-weight:bold;font-size:{{ birthday_font_size }}px;"{% elif is_weekend and ev.source_key in ('holidays_au', 'holidays_sa') %} style="color:#218739;font-weight:600;"{% endif %}>{{ ev.title }}</span>
           {% if ev.can_edit is not defined or ev.can_edit %}
           <span class="calendar-actions">
             <a href="{{ url_for('calendar.view_event_route', event_id=ev.id) }}">View</a>

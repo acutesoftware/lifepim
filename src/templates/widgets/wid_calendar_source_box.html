@@ -1,4 +1,5 @@
 <form class="calendar-source-box" method="get" action="{{ source_action_url }}">
+  <input type="hidden" name="source_filter" value="1">
   {% for field in source_hidden_fields %}
     <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
   {% endfor %}

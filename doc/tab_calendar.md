@@ -22,8 +22,21 @@ Architecture details are in `doc/calendar_index.md`.
 | Import CSV | `/calendar/import` | CSV imports remain supported. Mapped rows are previewed before confirmation and then trigger Calendar migration/projection. |
 | Import public holidays | `/calendar/import/holidays/<source_key>` | Previews and imports an inclusive year range for the AU or SA source. Confirmation replaces only that source's rows inside the selected years. |
 | Import external events | `/calendar/import/external` | Previews an iCalendar (`.ics`) file. Re-importing the same calendar name replaces only that external calendar's prior rows. |
+| Edit Birthdays | `/calendar/birthdays` | Adds, edits, and deletes annual all-day birthday events using a name and MM/DD. |
 
 `/calendar/list` remains the compatibility route, but the UI labels it Agenda.
+
+Weekday dates containing a selected AU or SA holiday use the configurable
+Holiday highlight colour from Settings > Calendar. Weekend holiday dates keep
+the weekend background; their holiday label (or date number in compact year
+views) is shown in green instead.
+
+Birthdays are authoritative rows in `lp_calendar_events` with
+`event_type='birthday'` and an annual recurrence rule, but are projected only
+through the `birthdays` source. Explicit source selections take precedence over
+legacy grouped filters, so the Birthdays checkbox remains effective while
+navigating between months. Birthday cells use the background, text colour, and
+font size configured in Settings > Calendar.
 
 ## Source Filters
 

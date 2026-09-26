@@ -61,6 +61,11 @@ DEFAULT_RECENT_STATS_PAST_DAYS = 45
 DEFAULT_RECENT_STATS_FUTURE_DAYS = 1
 DEFAULT_RECENT_STATS_MAX_AGE_HOURS = 24
 STATS_BASELINE_CONFIG_KEY = "stats_baseline_built_at"
+BIRTHDAY_EVENT_SQL = (
+    "(lower(COALESCE(event_type, '')) = 'birthday' OR "
+    "(upper(COALESCE(recurrence_rule, '')) LIKE '%FREQ=YEARLY%' "
+    "AND lower(trim(COALESCE(title, ''))) LIKE '%birthday'))"
+)
 
 
 @dataclass
@@ -86,6 +91,16 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
         }
         if not expected_sources.issubset(existing_sources):
             seed_calendar_sources(conn)
+            conn.commit()
+        stale_birthdays = conn.execute(
+            "SELECT 1 FROM lp_calendar_items ci "
+            "JOIN lp_calendar_events ce ON CAST(ce.id AS TEXT) = ci.source_record_id "
+            f"WHERE ci.source_key = 'recurring' AND {BIRTHDAY_EVENT_SQL.replace('event_type', 'ce.event_type').replace('recurrence_rule', 'ce.recurrence_rule').replace('title', 'ce.title')} "
+            "LIMIT 1"
+        ).fetchone()
+        if stale_birthdays:
+            _refresh_recurring(conn, RefreshResult(source_key="recurring", started_at=_now()))
+            _refresh_birthdays(conn, RefreshResult(source_key="birthdays", started_at=_now()))
             conn.commit()
         return
     conn.execute("PRAGMA foreign_keys = ON")
@@ -288,6 +303,7 @@ def run_calendar_migration(conn: sqlite3.Connection | None = None) -> None:
     ensure_calendar_schema(conn, force=True)
     project_all_manual_events(conn)
     refresh_calendar_source("recurring", conn=conn, full_rebuild=True)
+    refresh_calendar_source("birthdays", conn=conn, full_rebuild=True)
     # Holiday rows are explicit imports. Do not silently replace the user's
     # selected years during startup/migration.
     rebuild_calendar_day_stats(conn=conn)
@@ -331,7 +347,7 @@ def delete_projected_event(event_id: int, conn: sqlite3.Connection | None = None
     conn = db._get_conn() if conn is None else conn
     ensure_calendar_schema(conn)
     conn.execute(
-        "DELETE FROM lp_calendar_items WHERE source_key IN ('manual', 'recurring') AND source_record_id = ?",
+        "DELETE FROM lp_calendar_items WHERE source_key IN ('manual', 'recurring', 'birthdays') AND source_record_id = ?",
         [str(event_id)],
     )
     conn.commit()
@@ -627,7 +643,9 @@ def create_calendar_event(values: dict, conn: sqlite3.Connection | None = None) 
         [normalized.get(col) for col in cols],
     )
     event_id = cur.lastrowid
-    if normalized.get("recurrence_rule"):
+    if normalized.get("event_type") == "birthday":
+        refresh_calendar_source("birthdays", conn=conn, full_rebuild=True)
+    elif normalized.get("recurrence_rule"):
         refresh_calendar_source("recurring", conn=conn, full_rebuild=True)
     else:
         project_manual_event(event_id, conn)
@@ -646,7 +664,10 @@ def update_calendar_event(event_id: int, values: dict, conn: sqlite3.Connection 
         [normalized.get(col) for col in cols] + [event_id],
     )
     delete_projected_event(event_id, conn)
-    if normalized.get("recurrence_rule"):
+    if normalized.get("event_type") == "birthday":
+        refresh_calendar_source("birthdays", conn=conn, full_rebuild=True)
+        refresh_calendar_source("recurring", conn=conn, full_rebuild=True)
+    elif normalized.get("recurrence_rule"):
         refresh_calendar_source("recurring", conn=conn, full_rebuild=True)
     else:
         project_manual_event(event_id, conn)
@@ -695,7 +716,8 @@ def _refresh_recurring(conn: sqlite3.Connection, result: RefreshResult) -> Refre
     source = _source_row(conn, "recurring")
     start_horizon, end_horizon = _horizon(source)
     rows = conn.execute(
-        "SELECT * FROM lp_calendar_events WHERE COALESCE(recurrence_rule, '') != '' AND COALESCE(status, 'active') != 'cancelled'"
+        "SELECT * FROM lp_calendar_events WHERE COALESCE(recurrence_rule, '') != '' "
+        f"AND NOT {BIRTHDAY_EVENT_SQL} AND COALESCE(status, 'active') != 'cancelled'"
     ).fetchall()
     count = 0
     messages = []
@@ -798,7 +820,8 @@ def _refresh_birthdays(conn: sqlite3.Connection, result: RefreshResult) -> Refre
     source = _source_row(conn, "birthdays")
     start_horizon, end_horizon = _horizon(source)
     rows = conn.execute(
-        "SELECT * FROM lp_calendar_events WHERE event_type = 'birthday' AND COALESCE(status, 'active') != 'cancelled'"
+        f"SELECT * FROM lp_calendar_events WHERE {BIRTHDAY_EVENT_SQL} "
+        "AND COALESCE(status, 'active') != 'cancelled'"
     ).fetchall()
     count = 0
     for row in rows:
@@ -821,6 +844,99 @@ def _refresh_birthdays(conn: sqlite3.Connection, result: RefreshResult) -> Refre
     if _table_exists(conn, "lp_people"):
         result.message = "People birthday adapter is not enabled for this schema yet; event birthdays projected."
     return result
+
+
+def fetch_birthdays(conn: sqlite3.Connection | None = None) -> list[dict]:
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    rows = conn.execute(
+        f"SELECT * FROM lp_calendar_events WHERE {BIRTHDAY_EVENT_SQL} "
+        "AND COALESCE(status, 'active') != 'cancelled' "
+        "ORDER BY substr(start_date, 6, 5), lower(title), id"
+    ).fetchall()
+    birthdays = []
+    for row in rows:
+        item = dict(row)
+        title = (item.get("title") or "").strip()
+        item["name"] = _birthday_name(title)
+        parsed = _parse_date(item.get("start_date") or item.get("event_date"))
+        item["month_day"] = parsed.strftime("%m/%d") if parsed else ""
+        birthdays.append(item)
+    return birthdays
+
+
+def save_birthday(
+    name: str,
+    month_day: str,
+    event_id: int | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> int:
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    clean_name = " ".join(str(name or "").strip().split())
+    if not clean_name:
+        raise ValueError("Enter a name.")
+    try:
+        parsed = datetime.strptime(str(month_day or "").strip(), "%m/%d").date()
+    except ValueError as exc:
+        raise ValueError("Enter the birthday as MM/DD, for example 04/23.") from exc
+    anchor = date(2000, parsed.month, parsed.day).isoformat()
+    values = {
+        "title": f"{clean_name}'s Birthday",
+        "start_date": anchor,
+        "end_date": anchor,
+        "all_day": 1,
+        "blocks_time": 0,
+        "event_type": "birthday",
+        "category": "Birthday",
+        "area": "General",
+        "status": "active",
+        "recurrence_rule": f"FREQ=YEARLY;BYMONTH={parsed.month};BYMONTHDAY={parsed.day}",
+        "recurrence_start_date": anchor,
+        "source": "birthdays",
+    }
+    if event_id is None:
+        return create_calendar_event(values, conn)
+    row = conn.execute(
+        f"SELECT id FROM lp_calendar_events WHERE id = ? AND {BIRTHDAY_EVENT_SQL}",
+        (event_id,),
+    ).fetchone()
+    if not row:
+        raise ValueError("Birthday not found.")
+    update_calendar_event(event_id, values, conn)
+    return event_id
+
+
+def delete_birthday(event_id: int, conn: sqlite3.Connection | None = None) -> bool:
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    row = conn.execute(
+        f"SELECT id FROM lp_calendar_events WHERE id = ? AND {BIRTHDAY_EVENT_SQL}",
+        (event_id,),
+    ).fetchone()
+    if not row:
+        return False
+    item_rows = conn.execute(
+        "SELECT id FROM lp_calendar_items WHERE source_key IN ('birthdays', 'recurring') AND source_record_id = ?",
+        (str(event_id),),
+    ).fetchall()
+    for item in item_rows:
+        conn.execute("DELETE FROM lp_calendar_item_days WHERE calendar_item_id = ?", (item["id"],))
+    conn.execute(
+        "DELETE FROM lp_calendar_items WHERE source_key IN ('birthdays', 'recurring') AND source_record_id = ?",
+        (str(event_id),),
+    )
+    conn.execute("DELETE FROM lp_calendar_events WHERE id = ?", (event_id,))
+    conn.commit()
+    return True
+
+
+def _birthday_name(title: str) -> str:
+    title = (title or "").strip()
+    for suffix in ("'s Birthday", "’s Birthday", " Birthday"):
+        if title.lower().endswith(suffix.lower()):
+            return title[: -len(suffix)].strip()
+    return title
 
 
 def _refresh_holidays(conn: sqlite3.Connection, source_key: str, result: RefreshResult) -> RefreshResult:

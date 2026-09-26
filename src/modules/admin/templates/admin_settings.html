@@ -87,6 +87,26 @@
             </div>
           </div>
           <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Holiday Highlighting</div>
+            <label>
+              Holiday highlight colour
+              <input type="color" name="holiday_colour" value="{{ calendar_view.holiday_colour }}">
+            </label>
+            <small>Weekday holiday cells use this background. Weekend holiday cells retain the weekend background and use this colour for the holiday text.</small>
+            <label>
+              Birthday background colour
+              <input type="color" name="birthday_background_colour" value="{{ calendar_view.birthday_background_colour }}">
+            </label>
+            <label>
+              Birthday text colour
+              <input type="color" name="birthday_text_colour" value="{{ calendar_view.birthday_text_colour }}">
+            </label>
+            <label>
+              Birthday text size (px)
+              <input type="number" name="birthday_font_size" min="8" max="32" value="{{ calendar_view.birthday_font_size }}">
+            </label>
+          </div>
+          <div class="settings-fieldset">
             <div class="settings-fieldset-title">Calendar Media Thumbnails</div>
             <label>
               Thumbnail size

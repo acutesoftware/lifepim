@@ -2,6 +2,8 @@ import os
 import sqlite3
 import unittest
 from datetime import date
+from flask import Flask
+from werkzeug.datastructures import MultiDict
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
 if root_folder not in os.sys.path:
@@ -9,6 +11,7 @@ if root_folder not in os.sys.path:
 
 from modules.calendar.services import calendar_index
 from modules.calendar.services import external_events
+from modules.calendar import routes as calendar_routes
 
 
 def memory_conn():
@@ -19,6 +22,25 @@ def memory_conn():
 
 
 class CalendarStage2Tests(unittest.TestCase):
+    def test_explicit_source_list_is_not_overridden_by_legacy_event_flag(self):
+        conn = memory_conn()
+        original_conn = calendar_routes.data.conn
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            calendar_routes.data.conn = conn
+            with Flask(__name__).test_request_context("/"):
+                sources, params = calendar_routes._parse_day_sources(
+                    MultiDict([("sources", "manual,recurring"), ("show_events", "1")])
+                )
+                self.assertEqual(sources["selected"], {"manual", "recurring"})
+                self.assertNotIn("birthdays", sources["selected"])
+                self.assertEqual(params["sources"], "manual,recurring")
+                sources, _ = calendar_routes._parse_day_sources(MultiDict([("source_filter", "1")]))
+                self.assertEqual(sources["selected"], set())
+        finally:
+            calendar_routes.data.conn = original_conn
+            conn.close()
+
     def test_schema_sources_indexes_and_cascade(self):
         conn = memory_conn()
         try:
@@ -120,6 +142,67 @@ class CalendarStage2Tests(unittest.TestCase):
             self.assertNotIn("Labour Day", au_titles)
             self.assertIn("Labour Day", sa_titles)
             self.assertIn("Easter Saturday", sa_titles)
+        finally:
+            conn.close()
+
+    def test_birthday_editor_records_project_only_through_birthday_source(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            event_id = calendar_index.save_birthday("Duncan", "04/23", conn=conn)
+            event = conn.execute("SELECT * FROM lp_calendar_events WHERE id = ?", (event_id,)).fetchone()
+            self.assertEqual(event["title"], "Duncan's Birthday")
+            self.assertEqual(event["event_type"], "birthday")
+            self.assertEqual(event["start_date"], "2000-04-23")
+            self.assertIn("FREQ=YEARLY", event["recurrence_rule"])
+            self.assertTrue(
+                conn.execute(
+                    "SELECT 1 FROM lp_calendar_items WHERE source_key = 'birthdays' AND source_record_id = ?",
+                    (str(event_id),),
+                ).fetchone()
+            )
+            self.assertFalse(
+                conn.execute(
+                    "SELECT 1 FROM lp_calendar_items WHERE source_key = 'recurring' AND source_record_id = ?",
+                    (str(event_id),),
+                ).fetchone()
+            )
+            listed = calendar_index.fetch_birthdays(conn)
+            self.assertEqual(listed[0]["name"], "Duncan")
+            self.assertEqual(listed[0]["month_day"], "04/23")
+            calendar_index.save_birthday("Duncan James", "05/24", event_id, conn)
+            self.assertEqual(calendar_index.fetch_birthdays(conn)[0]["month_day"], "05/24")
+            self.assertTrue(calendar_index.delete_birthday(event_id, conn))
+            self.assertFalse(conn.execute("SELECT 1 FROM lp_calendar_events WHERE id = ?", (event_id,)).fetchone())
+        finally:
+            conn.close()
+
+    def test_legacy_yearly_birthday_title_is_reclassified_to_birthday_projection(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            event_id = calendar_index.create_calendar_event(
+                {
+                    "title": "Duncans Birthday",
+                    "start_date": "2000-04-23",
+                    "recurrence_rule": "FREQ=YEARLY",
+                },
+                conn,
+            )
+            calendar_index.refresh_calendar_source("recurring", conn=conn, full_rebuild=True)
+            calendar_index.refresh_calendar_source("birthdays", conn=conn, full_rebuild=True)
+            self.assertFalse(
+                conn.execute(
+                    "SELECT 1 FROM lp_calendar_items WHERE source_key = 'recurring' AND source_record_id = ?",
+                    (str(event_id),),
+                ).fetchone()
+            )
+            self.assertTrue(
+                conn.execute(
+                    "SELECT 1 FROM lp_calendar_items WHERE source_key = 'birthdays' AND source_record_id = ?",
+                    (str(event_id),),
+                ).fetchone()
+            )
         finally:
             conn.close()
 
