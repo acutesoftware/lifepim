@@ -231,10 +231,16 @@ def delete_setting(key, conn=None):
 
 
 def get_calendar_view_settings(conn=None):
+    saved_source_keys = get_setting("calendar.view.sources", None, conn)
     return {
         "events": _as_bool(get_setting("calendar.view.events", "1", conn)),
         "files": _as_bool(get_setting("calendar.view.files", "0", conn)),
         "usage": _as_bool(get_setting("calendar.view.usage", "0", conn)),
+        "source_keys": (
+            [key for key in str(saved_source_keys).split(",") if key]
+            if saved_source_keys is not None
+            else None
+        ),
         "thumbnail_size": normalize_calendar_thumbnail_size(
             get_setting("calendar.media.thumbnail_size", "small", conn)
         ),
@@ -580,6 +586,13 @@ def save_calendar_view_settings(sources, conn=None):
         "calendar.view.files": ("1" if sources.get("files") else "0", "Calendar", "Show files/images"),
         "calendar.view.usage": ("1" if sources.get("usage") else "0", "Calendar", "Show usage"),
     }
+    if "source_keys" in sources:
+        source_keys = sorted({str(key).strip() for key in sources.get("source_keys", []) if str(key).strip()})
+        updates["calendar.view.sources"] = (
+            ",".join(source_keys),
+            "Calendar",
+            "Selected calendar sources",
+        )
     if "thumbnail_size" in sources:
         updates["calendar.media.thumbnail_size"] = (
             normalize_calendar_thumbnail_size(sources.get("thumbnail_size")),

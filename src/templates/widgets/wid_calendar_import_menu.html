@@ -1,6 +1,6 @@
-<details class="calendar-import-menu">
+<details class="calendar-import-menu" data-calendar-import-menu>
   <summary class="calendar-add-main" aria-label="More calendar actions" title="More calendar actions">…</summary>
-  <div class="calendar-import-menu-items">
+  <div class="calendar-import-menu-items" data-calendar-import-menu-items>
     <a href="{{ url_for('calendar.birthdays_route', area=area) }}">Edit Birthdays</a>
     <div class="calendar-import-menu-separator"></div>
     <a href="{{ url_for('calendar.import_events_route', area=area) }}">Import CSV</a>
@@ -9,3 +9,35 @@
     <a href="{{ url_for('calendar.import_external_events_route', area=area) }}">Import external events (.ics)</a>
   </div>
 </details>
+<script>
+(() => {
+  const script = document.currentScript;
+  const menu = script ? script.previousElementSibling : null;
+  const items = menu ? menu.querySelector("[data-calendar-import-menu-items]") : null;
+  if (!menu || !items || menu.dataset.calendarImportMenuReady === "1") {
+    return;
+  }
+  menu.dataset.calendarImportMenuReady = "1";
+
+  const updateAlignment = () => {
+    items.classList.remove("calendar-import-menu-items-align-start");
+    if (!menu.open) {
+      return;
+    }
+
+    const triggerBounds = menu.getBoundingClientRect();
+    const content = menu.closest(".content");
+    const contentBounds = content ? content.getBoundingClientRect() : null;
+    const leftEdge = Math.max(0, contentBounds ? contentBounds.left : 0);
+    const rightEdge = Math.min(window.innerWidth, contentBounds ? contentBounds.right : window.innerWidth);
+    const menuWidth = items.getBoundingClientRect().width;
+    const fitsToLeft = triggerBounds.right - menuWidth >= leftEdge;
+    const fitsToRight = triggerBounds.left + menuWidth <= rightEdge;
+
+    items.classList.toggle("calendar-import-menu-items-align-start", !fitsToLeft && fitsToRight);
+  };
+
+  menu.addEventListener("toggle", () => window.requestAnimationFrame(updateAlignment));
+  window.addEventListener("resize", updateAlignment);
+})();
+</script>

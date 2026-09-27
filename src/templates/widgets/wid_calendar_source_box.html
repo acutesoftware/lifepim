@@ -1,14 +1,110 @@
-<form class="calendar-source-box" method="get" action="{{ source_action_url }}">
+<form class="calendar-source-box" method="get" action="{{ source_action_url }}" data-calendar-source-form>
   <input type="hidden" name="source_filter" value="1">
   {% for field in source_hidden_fields %}
     <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
   {% endfor %}
   <span class="calendar-source-caption">Calendars / Sources:</span>
-  {% for source in day_sources.rows %}
-    <label>
-      <input type="checkbox" name="source" value="{{ source.source_key }}" {% if source.source_key in day_sources.selected %}checked{% endif %}>
-      {{ source.source_name }}
-    </label>
-  {% endfor %}
+  <div class="calendar-source-groups" role="group" aria-label="Calendar source groups">
+    {% for group in day_sources.groups %}
+      <label>
+        <input
+          type="checkbox"
+          data-calendar-source-group
+          data-source-keys="{{ group.source_keys|join(' ') }}"
+          {% if group.state == 'all' %}checked{% endif %}>
+        {{ group.label }}
+      </label>
+    {% endfor %}
+  </div>
+  <button type="button" class="calendar-source-custom-open" data-calendar-source-custom-open>Custom…</button>
   <button type="submit">Apply</button>
+
+  <dialog class="calendar-source-dialog" data-calendar-source-dialog>
+    <div class="calendar-source-dialog-header">
+      <h4>Calendars / Sources</h4>
+      <button type="button" class="calendar-source-dialog-close" data-calendar-source-custom-close aria-label="Close">×</button>
+    </div>
+    <p>Select any combination. Group checkboxes update automatically.</p>
+    <div class="calendar-source-custom-list">
+      {% for source in day_sources.rows %}
+        <label>
+          <input
+            type="checkbox"
+            name="source"
+            value="{{ source.source_key }}"
+            data-calendar-source-input
+            {% if source.source_key in day_sources.selected %}checked{% endif %}>
+          {{ source.source_name }}
+        </label>
+      {% endfor %}
+    </div>
+    <div class="calendar-source-dialog-actions">
+      <button type="button" data-calendar-source-custom-close>Done</button>
+    </div>
+  </dialog>
 </form>
+<script>
+(() => {
+  const script = document.currentScript;
+  const form = script ? script.previousElementSibling : null;
+  if (!form || form.dataset.calendarSourceReady === "1") {
+    return;
+  }
+  form.dataset.calendarSourceReady = "1";
+
+  const sourceInputs = Array.from(form.querySelectorAll("[data-calendar-source-input]"));
+  const groupInputs = Array.from(form.querySelectorAll("[data-calendar-source-group]"));
+  const sourceByKey = new Map(sourceInputs.map((input) => [input.value, input]));
+  const dialog = form.querySelector("[data-calendar-source-dialog]");
+  const openButton = form.querySelector("[data-calendar-source-custom-open]");
+
+  const keysForGroup = (groupInput) => (
+    groupInput.dataset.sourceKeys.split(/\s+/).filter(Boolean)
+  );
+
+  const updateGroup = (groupInput) => {
+    const inputs = keysForGroup(groupInput).map((key) => sourceByKey.get(key)).filter(Boolean);
+    const selectedCount = inputs.filter((input) => input.checked).length;
+    groupInput.checked = inputs.length > 0 && selectedCount === inputs.length;
+    groupInput.indeterminate = selectedCount > 0 && selectedCount < inputs.length;
+    groupInput.setAttribute("aria-checked", groupInput.indeterminate ? "mixed" : String(groupInput.checked));
+  };
+
+  const updateGroups = () => groupInputs.forEach(updateGroup);
+
+  groupInputs.forEach((groupInput) => {
+    groupInput.addEventListener("change", () => {
+      const checked = groupInput.checked;
+      keysForGroup(groupInput).forEach((key) => {
+        const sourceInput = sourceByKey.get(key);
+        if (sourceInput) {
+          sourceInput.checked = checked;
+        }
+      });
+      updateGroups();
+    });
+  });
+  sourceInputs.forEach((sourceInput) => sourceInput.addEventListener("change", updateGroups));
+
+  if (dialog && openButton) {
+    openButton.addEventListener("click", () => {
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute("open", "");
+      }
+    });
+    form.querySelectorAll("[data-calendar-source-custom-close]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (typeof dialog.close === "function") {
+          dialog.close();
+        } else {
+          dialog.removeAttribute("open");
+        }
+      });
+    });
+  }
+
+  updateGroups();
+})();
+</script>

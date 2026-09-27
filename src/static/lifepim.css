@@ -2286,6 +2286,11 @@ button.calendar-nav {
   box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.2);
 }
 
+.calendar-import-menu-items.calendar-import-menu-items-align-start {
+  right: auto;
+  left: 0;
+}
+
 .calendar-import-menu-items a {
   display: block;
   padding: 6px 10px;
@@ -2559,6 +2564,7 @@ button.calendar-nav {
 
 .calendar-source-box {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin: 0;
@@ -2573,7 +2579,15 @@ button.calendar-nav {
   font-weight: bold;
 }
 
-.calendar-source-box label {
+.calendar-source-groups {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-source-groups label,
+.calendar-source-custom-list label {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -2582,6 +2596,67 @@ button.calendar-nav {
 .calendar-source-box button {
   font-size: 11px;
   padding: 1px 6px;
+}
+
+.calendar-source-custom-open {
+  cursor: pointer;
+}
+
+.calendar-source-dialog {
+  width: min(360px, calc(100vw - 32px));
+  box-sizing: border-box;
+  border: 1px solid #aaa;
+  border-radius: 5px;
+  padding: 12px;
+  color: #222;
+  background: #fff;
+}
+
+.calendar-source-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.calendar-source-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calendar-source-dialog-header h4,
+.calendar-source-dialog p {
+  margin: 0 0 10px;
+}
+
+.calendar-source-dialog-close {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px !important;
+  line-height: 1;
+}
+
+.calendar-source-custom-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.calendar-source-custom-list label {
+  align-items: flex-start;
+}
+
+.calendar-source-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+@media (max-width: 479px) {
+  .calendar-source-custom-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .calendar-media-grid {

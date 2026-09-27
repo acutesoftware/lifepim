@@ -41,6 +41,49 @@ class CalendarStage2Tests(unittest.TestCase):
             calendar_routes.data.conn = original_conn
             conn.close()
 
+    def test_grouped_source_selection_is_mapped_and_restored_individually(self):
+        conn = memory_conn()
+        original_conn = calendar_routes.data.conn
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            calendar_routes.data.conn = conn
+            with Flask(__name__).test_request_context("/"):
+                sources, params = calendar_routes._parse_day_sources(
+                    MultiDict(
+                        [
+                            ("source_filter", "1"),
+                            ("source", "manual"),
+                            ("source", "birthdays"),
+                            ("source", "media"),
+                            ("source", "external_events"),
+                        ]
+                    )
+                )
+                self.assertEqual(
+                    sources["selected"],
+                    {"manual", "birthdays", "media", "external_events"},
+                )
+                self.assertEqual(params["show_events"], "1")
+                self.assertEqual(params["show_files"], "1")
+                states = {group["key"]: group["state"] for group in sources["groups"]}
+                self.assertEqual(
+                    states,
+                    {"events": "mixed", "files": "mixed", "pc_usage": "none", "external": "mixed"},
+                )
+
+                restored, _ = calendar_routes._parse_day_sources(MultiDict())
+                self.assertEqual(restored["selected"], sources["selected"])
+        finally:
+            calendar_routes.data.conn = original_conn
+            conn.close()
+
+    def test_calendar_source_groups_preserve_requested_identifiers(self):
+        groups = {key: tuple(source_keys) for key, _label, source_keys in calendar_routes.CALENDAR_SOURCE_GROUPS}
+        self.assertEqual(groups["events"], ("manual", "recurring", "birthdays", "tasks"))
+        self.assertEqual(groups["files"], ("audio", "media", "files"))
+        self.assertEqual(groups["pc_usage"], ("usage",))
+        self.assertEqual(groups["external"], ("holidays_au", "holidays_sa", "external_events"))
+
     def test_explicit_empty_source_selection_returns_no_items_or_stats(self):
         conn = memory_conn()
         try:

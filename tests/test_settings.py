@@ -83,6 +83,25 @@ class TestSettingsSchema(unittest.TestCase):
             self.assertEqual(saved["birthday_background_colour"], "#fff2a0")
             self.assertEqual(saved["birthday_text_colour"], "#a00020")
             self.assertEqual(saved["birthday_font_size"], 18)
+            self.assertIsNone(saved["source_keys"])
+
+            settings.save_calendar_view_settings(
+                {
+                    "events": True,
+                    "files": False,
+                    "usage": False,
+                    "source_keys": {"tasks", "birthdays", "manual"},
+                },
+                conn,
+            )
+            saved = settings.get_calendar_view_settings(conn)
+            self.assertEqual(saved["source_keys"], ["birthdays", "manual", "tasks"])
+
+            settings.save_calendar_view_settings(
+                {"events": False, "files": False, "usage": False, "source_keys": set()},
+                conn,
+            )
+            self.assertEqual(settings.get_calendar_view_settings(conn)["source_keys"], [])
             self.assertEqual(settings.normalize_calendar_holiday_colour("not-a-colour"), "#dff3df")
         finally:
             conn.close()

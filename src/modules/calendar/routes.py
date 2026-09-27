@@ -27,6 +27,13 @@ EVENT_SOURCE_KEYS = {
     "manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "external_events", "tasks"
 }
 
+CALENDAR_SOURCE_GROUPS = (
+    ("events", "Events", ("manual", "recurring", "birthdays", "tasks")),
+    ("files", "Files", ("audio", "media", "files")),
+    ("pc_usage", "PC Usage", ("usage",)),
+    ("external", "External", ("holidays_au", "holidays_sa", "external_events")),
+)
+
 
 def _month_nav(year, month):
     prev_month = month - 1
@@ -210,11 +217,15 @@ def _parse_day_sources(args):
         "usage": checked("show_usage", defaults["usage"]),
     }
     selected = set()
+    selection_was_applied = False
     if "sources" in args:
         raw_sources = args.get("sources", "")
         selected = {part.strip() for part in raw_sources.split(",") if part.strip()}
     elif hasattr(args, "getlist") and (args.getlist("source") or args.get("source_filter") == "1"):
         selected = {part.strip() for part in args.getlist("source") if part.strip()}
+        selection_was_applied = args.get("source_filter") == "1"
+    elif defaults["source_keys"] is not None:
+        selected = set(defaults["source_keys"])
     else:
         selected = {key for key, enabled in source_defaults.items() if enabled}
         for key in EVENT_SOURCE_KEYS:
@@ -252,6 +263,12 @@ def _parse_day_sources(args):
     selected = selected & valid_keys
     media_selected = bool({"files", "media", "audio"} & selected)
     event_selected = bool(EVENT_SOURCE_KEYS & selected)
+    source_groups = []
+    for key, label, configured_keys in CALENDAR_SOURCE_GROUPS:
+        group_keys = tuple(source_key for source_key in configured_keys if source_key in valid_keys)
+        selected_count = len(set(group_keys) & selected)
+        state = "all" if group_keys and selected_count == len(group_keys) else "mixed" if selected_count else "none"
+        source_groups.append({"key": key, "label": label, "source_keys": group_keys, "state": state})
     sources = {
         **legacy_sources,
         "events": event_selected,
@@ -259,13 +276,24 @@ def _parse_day_sources(args):
         "usage": "usage" in selected,
         "selected": selected,
         "rows": source_rows,
+        "groups": source_groups,
     }
+    if selection_was_applied:
+        settings_mod.save_calendar_view_settings(
+            {
+                "events": event_selected,
+                "files": media_selected,
+                "usage": "usage" in selected,
+                "source_keys": selected,
+            },
+            data.conn,
+        )
     if any(key in args for key in ("show_events", "show_files", "show_usage")):
         settings_mod.save_calendar_view_settings(legacy_sources, data.conn)
     params = {
-        "show_events": "1" if legacy_sources["events"] else "0",
-        "show_files": "1" if legacy_sources["files"] else "0",
-        "show_usage": "1" if legacy_sources["usage"] else "0",
+        "show_events": "1" if event_selected else "0",
+        "show_files": "1" if media_selected else "0",
+        "show_usage": "1" if "usage" in selected else "0",
         "sources": ",".join(sorted(selected)),
     }
     return sources, params
