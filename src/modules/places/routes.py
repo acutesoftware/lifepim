@@ -838,7 +838,6 @@ def list_places_map_route():
         items=items,
         markers=markers,
         area=area,
-        map_names_english=settings_mod.get_general_settings().get("map_names_english", True),
     )
 
 

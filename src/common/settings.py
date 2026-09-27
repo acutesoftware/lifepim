@@ -42,7 +42,6 @@ CALENDAR_BIRTHDAY_FONT_SIZE_DEFAULT = 12
 GENERAL_DEFAULTS = {
     "general.default_area": ("", "General", "Default Area"),
     "general.freeze_headers": ("0", "General", "Freeze headers"),
-    "general.map_names_english": ("1", "General", "Map names English"),
     "general.mobile_font_size": ("14", "General", "Mobile font size"),
 }
 
@@ -268,7 +267,6 @@ def get_general_settings(conn=None):
     return {
         "default_area": get_setting("general.default_area", "", conn),
         "freeze_headers": _as_bool(get_setting("general.freeze_headers", "0", conn)),
-        "map_names_english": _as_bool(get_setting("general.map_names_english", "1", conn)),
         "mobile_font_size": normalize_mobile_font_size(
             get_setting("general.mobile_font_size", "14", conn)
         ),
@@ -562,7 +560,6 @@ def save_general_settings(values, conn=None):
     ensure_settings_schema(conn)
     updates = {
         "general.freeze_headers": ("1" if values.get("freeze_headers") else "0", "Freeze headers"),
-        "general.map_names_english": ("1" if values.get("map_names_english") else "0", "Map names English"),
         "general.mobile_font_size": (
             str(normalize_mobile_font_size(values.get("mobile_font_size"))),
             "Mobile font size",

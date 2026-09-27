@@ -516,7 +516,6 @@ def settings_route():
             settings_mod.save_general_settings(
                 {
                     "freeze_headers": request.form.get("freeze_headers") == "1",
-                    "map_names_english": request.form.get("map_names_english") == "1",
                     "mobile_font_size": request.form.get("mobile_font_size"),
                     "default_area": request.form.get("default_area", settings_mod.get_setting("general.default_area", "", conn)),
                 },

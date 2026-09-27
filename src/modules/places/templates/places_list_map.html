@@ -1,6 +1,5 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <div>
     <a href="{{ url_for('places.list_places_table_route', area=area) }}">Table</a> |
     <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a> |
@@ -8,7 +7,19 @@
   </div>
 
   {% if markers %}
-    <div id="places-map" class="places-map"></div>
+    <div id="places-map" class="places-map places-local-map" aria-label="Local map of places">
+      <div class="places-local-map-controls" aria-label="Map controls">
+        <button type="button" data-map-action="zoom-in" title="Zoom in">+</button>
+        <button type="button" data-map-action="zoom-out" title="Zoom out">−</button>
+        <button type="button" data-map-action="reset" title="Show all places">⌂</button>
+      </div>
+      <div class="places-local-map-status">Loading local map…</div>
+    </div>
+    <p class="places-local-map-credit">
+      Offline overview map made with bundled
+      <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a>
+      public-domain data. Towns and boundaries are approximate; no map service is contacted.
+    </p>
   {% else %}
     <p class="places-map-empty">No places with GPS coordinates.</p>
   {% endif %}
@@ -24,66 +35,15 @@
     {% endfor %}
   </ul>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  {% if markers %}
+  <script src="{{ url_for('static', filename='places_local_map.js') }}"></script>
   <script>
-  const markers = {{ markers | tojson }};
-  const mapNamesEnglish = {{ map_names_english | tojson }};
-  const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (ch) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;"
-  }[ch]));
-  const escapeAttr = escapeHtml;
-  if (markers.length) {
-    const map = L.map("places-map");
-    const tileLayer = mapNamesEnglish
-      ? {
-          url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-          attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        }
-      : {
-          url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          attribution: "&copy; OpenStreetMap contributors"
-        };
-    L.tileLayer(tileLayer.url, {
-      maxZoom: 19,
-      attribution: tileLayer.attribution
-    }).addTo(map);
-    const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lon]));
-    map.fitBounds(bounds, {padding: [20, 20]});
-    markers.forEach((m) => {
-      const marker = L.marker([m.lat, m.lon]).addTo(map);
-      const label = escapeHtml(m.name || "View place");
-      const detailRows = (m.details || []).map((line) => (
-        '<div class="places-map-tooltip-row">' + escapeHtml(line) + "</div>"
-      )).join("");
-      const tooltipHtml = (
-        '<div class="places-map-tooltip-title">' + label + "</div>" + detailRows
-      );
-      marker.bindTooltip(tooltipHtml, {
-        className: "places-map-tooltip",
-        direction: "top",
-        offset: [0, -8],
-        opacity: 0.96,
-        sticky: true
-      });
-      const actionLinks = [
-        '<a href="' + escapeAttr(m.url) + '">View place</a>',
-        ...((m.actions || []).map((action) => (
-          '<a href="' + escapeAttr(action.url) + '" target="_blank" rel="noopener noreferrer">' +
-          escapeHtml(action.label) +
-          "</a>"
-        )))
-      ].join("");
-      marker.bindPopup(
-        '<div class="places-map-popup">' +
-          '<div class="places-map-popup-title">' + label + "</div>" +
-          '<div class="places-map-popup-actions">' + actionLinks + "</div>" +
-        "</div>"
-      );
+    window.initPlacesLocalMap({
+      elementId: "places-map",
+      markers: {{ markers | tojson }},
+      baseDataUrl: {{ url_for('static', filename='map_data/natural_earth_base.json') | tojson }},
+      townsDataUrl: {{ url_for('static', filename='map_data/natural_earth_towns.json') | tojson }}
     });
-  }
   </script>
+  {% endif %}
 {% endblock %}

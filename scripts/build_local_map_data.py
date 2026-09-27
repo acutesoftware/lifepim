@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""Build the small, browser-ready Natural Earth files used by Places maps."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from urllib.request import Request, urlopen
+
+
+NATURAL_EARTH_VERSION = "5.1.2"
+NATURAL_EARTH_REF = "f1890d9f152c896d250a77557a5751a93d494776"
+SOURCE_ROOT = (
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/"
+    f"{NATURAL_EARTH_REF}/geojson"
+)
+OUTPUT_DIR = Path(__file__).resolve().parents[1] / "src" / "static" / "map_data"
+
+SOURCES = {
+    "land": "ne_50m_land.geojson",
+    "lakes": "ne_50m_lakes.geojson",
+    "boundaries": "ne_50m_admin_0_boundary_lines_land.geojson",
+    "towns": "ne_10m_populated_places_simple.geojson",
+}
+
+
+def download_geojson(filename: str) -> dict:
+    request = Request(
+        f"{SOURCE_ROOT}/{filename}",
+        headers={"User-Agent": "LifePIM-local-map-data-builder/1.0"},
+    )
+    with urlopen(request, timeout=60) as response:
+        return json.load(response)
+
+
+def geometries(collection: dict) -> list[dict]:
+    return [feature["geometry"] for feature in collection.get("features", [])]
+
+
+def build() -> None:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    source_data = {name: download_geojson(filename) for name, filename in SOURCES.items()}
+
+    base = {
+        "naturalEarthVersion": NATURAL_EARTH_VERSION,
+        "land": geometries(source_data["land"]),
+        "lakes": geometries(source_data["lakes"]),
+        "boundaries": geometries(source_data["boundaries"]),
+    }
+    towns = []
+    for feature in source_data["towns"].get("features", []):
+        geometry = feature.get("geometry") or {}
+        coordinates = geometry.get("coordinates") or []
+        if geometry.get("type") != "Point" or len(coordinates) < 2:
+            continue
+        properties = feature.get("properties") or {}
+        name = properties.get("name") or properties.get("nameascii")
+        if not name:
+            continue
+        towns.append(
+            [
+                round(float(coordinates[0]), 5),
+                round(float(coordinates[1]), 5),
+                str(name),
+                int(properties.get("scalerank") or 10),
+                int(properties.get("pop_max") or 0),
+            ]
+        )
+
+    json_options = {"ensure_ascii": False, "separators": (",", ":")}
+    (OUTPUT_DIR / "natural_earth_base.json").write_text(
+        json.dumps(base, **json_options), encoding="utf-8"
+    )
+    (OUTPUT_DIR / "natural_earth_towns.json").write_text(
+        json.dumps(towns, **json_options), encoding="utf-8"
+    )
+    print(f"Wrote {len(towns)} towns and local base-map geometry to {OUTPUT_DIR}")
+
+
+if __name__ == "__main__":
+    build()

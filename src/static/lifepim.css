@@ -4390,6 +4390,189 @@ button.calendar-nav {
   margin: 6px 0;
 }
 
+.places-local-map {
+  position: relative;
+  overflow: hidden;
+  background: #dcecf4;
+  isolation: isolate;
+}
+
+.places-local-map > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.places-local-ocean {
+  fill: #dcecf4;
+}
+
+.places-local-grid {
+  fill: none;
+  stroke: #c8dce6;
+  stroke-width: 1;
+}
+
+.places-local-land {
+  fill: #e8ecd6;
+  fill-rule: evenodd;
+  stroke: #899783;
+  stroke-width: 1.1;
+}
+
+.places-local-boundary {
+  fill: none;
+  stroke: #a7aa9c;
+  stroke-width: 0.75;
+  stroke-dasharray: 3 2;
+}
+
+.places-local-lake {
+  fill: #dcecf4;
+  fill-rule: evenodd;
+  stroke: #adcbd9;
+  stroke-width: 0.75;
+}
+
+.places-local-town-dot {
+  fill: #515b65;
+  stroke: #fff;
+  stroke-width: 0.7;
+}
+
+.places-local-town-label {
+  fill: #313940;
+  font: 13px Arial, sans-serif;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.places-local-map-controls {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #999;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.places-local-map-controls button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #bbb;
+  background: #fff;
+  color: #111;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.places-local-map-controls button:last-child {
+  border-bottom: 0;
+  font-size: 18px;
+}
+
+.places-local-map-controls button:hover,
+.places-local-map-controls button:focus-visible {
+  background: #edf4f7;
+}
+
+.places-local-map-status {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #4b5358;
+}
+
+.places-local-map-error {
+  color: #8b1d1d;
+}
+
+.places-local-map-credit {
+  margin: 2px 0 8px;
+  color: #666;
+  font-size: 12px;
+}
+
+.places-local-marker {
+  position: absolute;
+  z-index: 4;
+  width: 28px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -100%);
+  cursor: pointer;
+}
+
+.places-local-marker > span {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: #2785bd;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  transform: rotate(-45deg);
+}
+
+.places-local-marker > span::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.places-local-marker:hover > span,
+.places-local-marker:focus-visible > span {
+  background: #145f8c;
+  transform: rotate(-45deg) scale(1.12);
+}
+
+.places-local-popup {
+  position: absolute;
+  z-index: 6;
+  min-width: 180px;
+  max-width: min(320px, 72%);
+  padding: 10px 30px 10px 12px;
+  border: 1px solid #888;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.places-local-popup-close {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  padding: 1px 5px;
+  border: 0;
+  background: transparent;
+  color: #555;
+  font-size: 20px;
+  cursor: pointer;
+}
+
 .places-map-empty {
   margin: 6px 0;
   color: #666;

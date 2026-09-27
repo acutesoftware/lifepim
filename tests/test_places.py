@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import sys
 import unittest
@@ -123,6 +124,38 @@ class TestPlaces(unittest.TestCase):
         self.assertEqual(result["address_street"], "North Terrace")
         self.assertEqual(result["suburb"], "Adelaide")
         self.assertEqual(result["country"], "Australia")
+
+    def test_places_map_uses_only_bundled_map_data(self):
+        template_path = os.path.join(
+            root_folder, "modules", "places", "templates", "places_list_map.html"
+        )
+        script_path = os.path.join(root_folder, "static", "places_local_map.js")
+        with open(template_path, encoding="utf-8") as source:
+            template = source.read()
+        with open(script_path, encoding="utf-8") as source:
+            script = source.read()
+
+        self.assertNotIn("leaflet", template.lower())
+        self.assertNotIn("tileLayer", template)
+        remote_urls = [
+            token for token in script.replace('"http://www.w3.org/2000/svg"', "").split()
+            if token.startswith(("http://", "https://"))
+        ]
+        self.assertEqual(remote_urls, [])
+        self.assertIn("map_data/natural_earth_base.json", template)
+        self.assertIn("map_data/natural_earth_towns.json", template)
+
+    def test_bundled_map_data_contains_towns_and_land(self):
+        data_folder = os.path.join(root_folder, "static", "map_data")
+        with open(os.path.join(data_folder, "natural_earth_base.json"), encoding="utf-8") as source:
+            base = json.load(source)
+        with open(os.path.join(data_folder, "natural_earth_towns.json"), encoding="utf-8") as source:
+            towns = json.load(source)
+
+        self.assertTrue(base["land"])
+        self.assertTrue(base["boundaries"])
+        self.assertIn("Adelaide", {town[2] for town in towns})
+        self.assertGreater(len(towns), 7000)
 
     def test_import_url_lines_adds_normalized_places_with_titles(self):
         _create_places_table(self.conn)
