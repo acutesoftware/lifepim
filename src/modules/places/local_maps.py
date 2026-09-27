@@ -34,13 +34,19 @@ SOURCE_ROOT = "https://download.geofabrik.de/australia-oceania/australia"
 INDEX_VERSION = 1
 
 DETAIL_LAYERS = {
-    "roads": ("gis_osm_roads_free", 1, 3500),
-    "railways": ("gis_osm_railways_free", 1, 1200),
-    "waterways": ("gis_osm_waterways_free", 1, 1800),
-    "places": ("gis_osm_places_free", 1, 800),
-    "landuse": ("gis_osm_landuse_a_free", 2, 1500),
-    "water": ("gis_osm_water_a_free", 2, 1800),
-    "buildings": ("gis_osm_buildings_a_free", 3, 3000),
+    "roads": ("gis_osm_roads_free", 1),
+    "railways": ("gis_osm_railways_free", 1),
+    "waterways": ("gis_osm_waterways_free", 1),
+    "places": ("gis_osm_places_free", 1),
+    "landuse": ("gis_osm_landuse_a_free", 2),
+    "water": ("gis_osm_water_a_free", 2),
+    "buildings": ("gis_osm_buildings_a_free", 3),
+}
+
+DETAIL_LIMITS = {
+    1: {"roads": 1200, "railways": 300, "waterways": 600, "places": 250},
+    2: {"roads": 1800, "railways": 500, "waterways": 800, "places": 350, "landuse": 600, "water": 700},
+    3: {"roads": 2200, "railways": 500, "waterways": 700, "places": 300, "landuse": 800, "water": 700, "buildings": 1800},
 }
 
 _download_lock = threading.RLock()
@@ -250,7 +256,7 @@ def _ensure_spatial_indexes(path: Path) -> None:
     with closing(sqlite3.connect(path)) as conn:
         conn.execute("PRAGMA synchronous=OFF")
         conn.execute("PRAGMA journal_mode=MEMORY")
-        for _layer_name, (table_name, _detail, _limit) in DETAIL_LAYERS.items():
+        for _layer_name, (table_name, _detail) in DETAIL_LAYERS.items():
             exists = conn.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
             ).fetchone()
@@ -304,20 +310,22 @@ class _WkbReader:
         raw_type = self.unpack("I", byte_order)[0]
         geometry_type = raw_type % 1000
         dimensions = 3 if 1000 <= raw_type < 2000 else 2
+        def point():
+            return [round(value, 6) for value in self.unpack("d" * dimensions, byte_order)[:2]]
         if geometry_type == 1:
-            return {"type": "Point", "coordinates": list(self.unpack("d" * dimensions, byte_order)[:2])}
+            return {"type": "Point", "coordinates": point()}
         if geometry_type == 2:
             count = self.unpack("I", byte_order)[0]
             return {
                 "type": "LineString",
-                "coordinates": [list(self.unpack("d" * dimensions, byte_order)[:2]) for _ in range(count)],
+                "coordinates": [point() for _ in range(count)],
             }
         if geometry_type == 3:
             ring_count = self.unpack("I", byte_order)[0]
             rings = []
             for _ in range(ring_count):
                 point_count = self.unpack("I", byte_order)[0]
-                rings.append([list(self.unpack("d" * dimensions, byte_order)[:2]) for _ in range(point_count)])
+                rings.append([point() for _ in range(point_count)])
             return {"type": "Polygon", "coordinates": rings}
         child_type = {4: "MultiPoint", 5: "MultiLineString", 6: "MultiPolygon", 7: "GeometryCollection"}.get(geometry_type)
         if child_type:
@@ -355,9 +363,10 @@ def query_features(bounds: tuple[float, float, float, float], detail: int) -> di
             continue
         path = pack_path(pack["id"])
         with closing(sqlite3.connect(path)) as conn:
-            for layer_name, (table_name, minimum_detail, limit) in DETAIL_LAYERS.items():
+            for layer_name, (table_name, minimum_detail) in DETAIL_LAYERS.items():
                 if detail < minimum_detail:
                     continue
+                limit = DETAIL_LIMITS[detail][layer_name]
                 index_name = f"lifepim_rtree_{table_name}"
                 exists = conn.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (index_name,)

@@ -17,9 +17,11 @@ SOURCE_ROOT = (
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "src" / "static" / "map_data"
 
 SOURCES = {
-    "land": "ne_50m_land.geojson",
-    "lakes": "ne_50m_lakes.geojson",
-    "boundaries": "ne_50m_admin_0_boundary_lines_land.geojson",
+    # The overview disappears behind local street detail at close zoom levels,
+    # so 110m geometry is both sufficient and much faster to redraw.
+    "land": "ne_110m_land.geojson",
+    "lakes": "ne_110m_lakes.geojson",
+    "boundaries": "ne_110m_admin_0_boundary_lines_land.geojson",
     "countries": "ne_50m_admin_0_countries.geojson",
     "towns": "ne_10m_populated_places_simple.geojson",
 }

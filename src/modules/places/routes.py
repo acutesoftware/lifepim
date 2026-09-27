@@ -885,7 +885,12 @@ def local_map_features_route():
     span = max(max_lon - min_lon, max_lat - min_lat)
     if span > 4:
         return jsonify({"enabled": True, "detail": 0, "message": "Zoom in for downloaded street detail."})
-    detail = 1 if span > 0.8 else (2 if span > 0.18 else 3)
+    automatic_detail = 1 if span > 0.8 else (2 if span > 0.18 else 3)
+    try:
+        requested_detail = int(request.args.get("detail", automatic_detail))
+    except (TypeError, ValueError):
+        requested_detail = automatic_detail
+    detail = requested_detail if requested_detail in {1, 2, 3} else automatic_detail
     features = local_maps.query_features(bounds, detail)
     features.update(enabled=True, detail=detail)
     return jsonify(features)

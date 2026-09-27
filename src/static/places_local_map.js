@@ -324,23 +324,50 @@
     svg.appendChild(labels);
   }
 
-  function loadStreetDetails(options, frame, requestNumber, latestRequest) {
-    if (!options.streetDetailsEnabled || !options.streetDetailsUrl || Math.max(frame.bounds.lonSpan, frame.bounds.latSpan) > 4) {
-      return;
-    }
+  function streetDetailLevel(bounds) {
+    const span = Math.max(bounds.lonSpan, bounds.latSpan);
+    if (span > 4) return 0;
+    if (span > 0.8) return 1;
+    if (span > 0.18) return 2;
+    return 3;
+  }
+
+  function expandedStreetBounds(bounds) {
+    const span = Math.max(bounds.lonSpan, bounds.latSpan);
+    const factor = span > 2.5 ? 1 : 1.4;
+    const extraLon = bounds.lonSpan * (factor - 1) / 2;
+    const extraLat = bounds.latSpan * (factor - 1) / 2;
+    return {
+      minLon: Math.max(-180, bounds.minLon - extraLon),
+      maxLon: Math.min(180, bounds.maxLon + extraLon),
+      minLat: Math.max(-85, bounds.minLat - extraLat),
+      maxLat: Math.min(85, bounds.maxLat + extraLat),
+    };
+  }
+
+  function cachedStreetDetails(cache, bounds, detail) {
+    return cache && cache.detail === detail &&
+      cache.bounds.minLon <= bounds.minLon && cache.bounds.maxLon >= bounds.maxLon &&
+      cache.bounds.minLat <= bounds.minLat && cache.bounds.maxLat >= bounds.maxLat;
+  }
+
+  function loadStreetDetails(options, frame, queryBounds, detail, requestNumber, latestRequest, signal, onLoaded) {
     const params = new URLSearchParams({
-      min_lon: frame.bounds.minLon,
-      min_lat: frame.bounds.minLat,
-      max_lon: frame.bounds.maxLon,
-      max_lat: frame.bounds.maxLat,
+      min_lon: queryBounds.minLon,
+      min_lat: queryBounds.minLat,
+      max_lon: queryBounds.maxLon,
+      max_lat: queryBounds.maxLat,
+      detail,
     });
-    fetch(`${options.streetDetailsUrl}?${params}`).then((response) => {
+    fetch(`${options.streetDetailsUrl}?${params}`, {signal}).then((response) => {
       if (!response.ok) throw new Error(`Local street detail returned ${response.status}`);
       return response.json();
     }).then((details) => {
       if (requestNumber !== latestRequest() || !frame.svg.isConnected) return;
+      onLoaded({bounds: queryBounds, detail, details});
       drawStreetDetails(frame.svg, details, frame.project);
-    }).catch(() => {
+    }).catch((error) => {
+      if (error.name === "AbortError") return;
       // The bundled overview remains usable if an optional pack is unavailable.
     });
   }
@@ -434,6 +461,9 @@
     let zoom = 1;
     let streetRequest = 0;
     let streetTimer = null;
+    let streetController = null;
+    let streetCache = null;
+    let redrawFrame = null;
     Promise.all([
       fetch(options.baseDataUrl).then((response) => {
         if (!response.ok) throw new Error(`Local base map returned ${response.status}`);
@@ -445,13 +475,39 @@
       }),
     ]).then(([base, towns]) => {
       status.remove();
-      const redraw = () => {
+      const redrawNow = () => {
+        redrawFrame = null;
         const frame = render(container, options.markers, base, towns, view, zoom);
         const requestNumber = ++streetRequest;
         if (streetTimer) clearTimeout(streetTimer);
+        const detail = streetDetailLevel(frame.bounds);
+        if (!options.streetDetailsEnabled || !options.streetDetailsUrl || !detail) {
+          if (streetController) streetController.abort();
+          return;
+        }
+        if (cachedStreetDetails(streetCache, frame.bounds, detail)) {
+          if (streetController) streetController.abort();
+          drawStreetDetails(frame.svg, streetCache.details, frame.project);
+          return;
+        }
         streetTimer = setTimeout(() => {
-          loadStreetDetails(options, frame, requestNumber, () => streetRequest);
+          if (streetController) streetController.abort();
+          streetController = new AbortController();
+          loadStreetDetails(
+            options,
+            frame,
+            expandedStreetBounds(frame.bounds),
+            detail,
+            requestNumber,
+            () => streetRequest,
+            streetController.signal,
+            (cache) => { streetCache = cache; }
+          );
         }, 180);
+      };
+      const redraw = () => {
+        if (redrawFrame !== null) return;
+        redrawFrame = window.requestAnimationFrame(redrawNow);
       };
       const showView = (nextView) => {
         Object.assign(view, nextView);

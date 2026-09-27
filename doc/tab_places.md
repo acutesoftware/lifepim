@@ -34,7 +34,9 @@ downloaded detail is progressively added:
 The map requests only the features inside the current viewport from LifePIM's
 local server. The server reads those features directly from SQLite/GeoPackage
 spatial indexes and returns them to the browser as geometry for the local SVG
-map. No third-party API is involved in this display path.
+map. A slightly larger viewport is cached in the browser so short pans normally
+redraw without another database request. Superseded zoom requests are cancelled.
+No third-party API is involved in this display path.
 
 ## Places map menu
 
