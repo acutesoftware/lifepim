@@ -586,13 +586,17 @@ def settings_route():
                 except Exception as exc:
                     message = f"Note search index rebuild failed: {exc}"
         elif active_settings_tab == "places":
-            settings_mod.save_places_settings(
-                {
-                    "virtual_worlds": request.form.get("virtual_worlds", ""),
-                },
-                conn,
-            )
-            message = "Places settings saved."
+            try:
+                settings_mod.save_places_settings(
+                    {
+                        "virtual_worlds": request.form.get("virtual_worlds", ""),
+                        "local_map_cache_dir": request.form.get("local_map_cache_dir", ""),
+                    },
+                    conn,
+                )
+                message = "Places settings saved."
+            except ValueError as exc:
+                message = f"Places settings were not saved: {exc}"
         elif active_settings_tab == "config":
             names = request.form.getlist("config_name")
             existing_override_names = {

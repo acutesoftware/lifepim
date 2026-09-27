@@ -144,6 +144,14 @@ class TestPlaces(unittest.TestCase):
         self.assertEqual(remote_urls, [])
         self.assertIn("map_data/natural_earth_base.json", template)
         self.assertIn("map_data/natural_earth_towns.json", template)
+        self.assertIn('data-map-action="country"', template)
+        self.assertIn('data-map-action="place"', template)
+        self.assertIn('data-map-action="fit-saved"', template)
+        self.assertIn("data-places-map-menu", template)
+        self.assertIn("streetDetailsUrl", template)
+        self.assertIn('addEventListener("pointerdown"', script)
+        self.assertIn('addEventListener("pointermove"', script)
+        self.assertIn("zoomAtPoint", script)
 
     def test_bundled_map_data_contains_towns_and_land(self):
         data_folder = os.path.join(root_folder, "static", "map_data")
@@ -154,6 +162,8 @@ class TestPlaces(unittest.TestCase):
 
         self.assertTrue(base["land"])
         self.assertTrue(base["boundaries"])
+        self.assertGreater(len(base["countries"]), 200)
+        self.assertIn("Australia", {country[0] for country in base["countries"]})
         self.assertIn("Adelaide", {town[2] for town in towns})
         self.assertGreater(len(towns), 7000)
 

@@ -20,6 +20,7 @@ SOURCES = {
     "land": "ne_50m_land.geojson",
     "lakes": "ne_50m_lakes.geojson",
     "boundaries": "ne_50m_admin_0_boundary_lines_land.geojson",
+    "countries": "ne_50m_admin_0_countries.geojson",
     "towns": "ne_10m_populated_places_simple.geojson",
 }
 
@@ -37,15 +38,43 @@ def geometries(collection: dict) -> list[dict]:
     return [feature["geometry"] for feature in collection.get("features", [])]
 
 
+def coordinate_bounds(geometry: dict) -> list[float] | None:
+    points = []
+
+    def collect(value):
+        if value and isinstance(value[0], (int, float)):
+            points.append(value)
+            return
+        for child in value:
+            collect(child)
+
+    collect(geometry.get("coordinates") or [])
+    if not points:
+        return None
+    longitudes = [float(point[0]) for point in points]
+    latitudes = [float(point[1]) for point in points]
+    return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
+
+
 def build() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     source_data = {name: download_geojson(filename) for name, filename in SOURCES.items()}
+
+    countries = []
+    for feature in source_data["countries"].get("features", []):
+        properties = feature.get("properties") or {}
+        name = properties.get("NAME_EN") or properties.get("NAME") or properties.get("ADMIN")
+        bounds = coordinate_bounds(feature.get("geometry") or {})
+        if name and bounds:
+            countries.append([str(name), *[round(value, 5) for value in bounds]])
+    countries.sort(key=lambda country: country[0].casefold())
 
     base = {
         "naturalEarthVersion": NATURAL_EARTH_VERSION,
         "land": geometries(source_data["land"]),
         "lakes": geometries(source_data["lakes"]),
         "boundaries": geometries(source_data["boundaries"]),
+        "countries": countries,
     }
     towns = []
     for feature in source_data["towns"].get("features", []):
@@ -74,7 +103,10 @@ def build() -> None:
     (OUTPUT_DIR / "natural_earth_towns.json").write_text(
         json.dumps(towns, **json_options), encoding="utf-8"
     )
-    print(f"Wrote {len(towns)} towns and local base-map geometry to {OUTPUT_DIR}")
+    print(
+        f"Wrote {len(towns)} towns, {len(countries)} country extents, "
+        f"and local base-map geometry to {OUTPUT_DIR}"
+    )
 
 
 if __name__ == "__main__":

@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import sqlite3
 
+from common import config as cfg
 from common import data as db
 from common import user_paths
 
@@ -108,6 +110,16 @@ PLACES_DEFAULTS = {
         json.dumps(PLACES_DEFAULT_VIRTUAL_WORLDS, ensure_ascii=True),
         "Places",
         "Virtual world names",
+    ),
+    "places.local_street_maps_enabled": (
+        "0",
+        "Places",
+        "Enable downloaded street-map detail",
+    ),
+    "places.local_map_cache_dir": (
+        "",
+        "Places",
+        "Local map cache directory",
     ),
 }
 
@@ -355,18 +367,58 @@ def get_places_settings(conn=None):
     return {
         "virtual_worlds": worlds,
         "virtual_worlds_text": "\n".join(worlds),
+        "local_street_maps_enabled": _as_bool(
+            get_setting("places.local_street_maps_enabled", "0", conn)
+        ),
+        "local_map_cache_dir": places_map_cache_dir(conn),
     }
+
+
+def default_places_map_cache_dir():
+    repository_root = Path(__file__).resolve().parents[2]
+    candidate = Path(cfg.data_folder).expanduser().resolve() / "MapCache" / "places"
+    if candidate == repository_root or repository_root in candidate.parents:
+        system_cache = os.getenv("LOCALAPPDATA") or os.getenv("XDG_CACHE_HOME")
+        candidate = Path(system_cache).resolve() / "LifePIM" / "MapCache" / "places" if system_cache else (
+            Path.home().resolve() / ".cache" / "LifePIM" / "MapCache" / "places"
+        )
+    return str(candidate)
+
+
+def normalize_places_map_cache_dir(value):
+    raw = os.path.expandvars(os.path.expanduser(str(value or "").strip().strip('"')))
+    path = Path(raw or default_places_map_cache_dir()).resolve()
+    repository_root = Path(__file__).resolve().parents[2]
+    if path == repository_root or repository_root in path.parents:
+        raise ValueError("The local map cache directory must be outside the LifePIM source repository.")
+    return str(path)
+
+
+def places_map_cache_dir(conn=None):
+    environment_path = os.getenv("LIFEPIM_MAP_CACHE_DIR", "").strip()
+    if environment_path:
+        return normalize_places_map_cache_dir(environment_path)
+    configured = get_setting("places.local_map_cache_dir", "", conn)
+    return normalize_places_map_cache_dir(configured)
 
 
 def save_places_settings(values, conn=None):
     conn = db._get_conn() if conn is None else conn
     ensure_settings_schema(conn)
     worlds = normalize_places_virtual_worlds(values.get("virtual_worlds", ""))
+    cache_path = normalize_places_map_cache_dir(values.get("local_map_cache_dir", ""))
     set_setting(
         "places.virtual_worlds",
         json.dumps(worlds, ensure_ascii=True),
         "Places",
         "Virtual world names",
+        conn,
+    )
+    set_setting(
+        "places.local_map_cache_dir",
+        cache_path,
+        "Places",
+        "Local map cache directory",
         conn,
     )
 

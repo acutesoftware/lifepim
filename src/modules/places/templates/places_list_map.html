@@ -1,9 +1,27 @@
 {% extends "layout.html" %}
 {% block module_content %}
-  <div>
+  <div class="places-map-toolbar">
     <a href="{{ url_for('places.list_places_table_route', area=area) }}">Table</a> |
     <a href="{{ url_for('places.list_places_map_route', area=area) }}">Map</a> |
     <a href="{{ url_for('places.add_place_route', area=area) }}">Add Place</a>
+    <label class="places-map-more">
+      Places
+      <select data-places-map-menu aria-label="More Places map actions">
+        <option value="">...</option>
+        <option value="toggle-detail">{{ 'Disable' if local_maps_enabled else 'Enable' }} downloaded street detail</option>
+        <option value="download-sa">Download/cache South Australia (~144 MB)</option>
+        <option value="download-au">Download/cache Australia (~1.9 GB)</option>
+      </select>
+    </label>
+    <span class="places-map-pack-summary" data-map-pack-summary>
+      Street detail: {{ 'on' if local_maps_enabled else 'off' }};
+      {{ local_map_status.installed|length }} local pack{{ '' if local_map_status.installed|length == 1 else 's' }}.
+    </span>
+  </div>
+  {% if map_message %}<p class="places-map-message">{{ map_message }}</p>{% endif %}
+  <div class="places-map-download-status" data-map-download-status {% if not local_map_status.running %}hidden{% endif %}>
+    <span data-map-download-message>{{ local_map_status.message }}</span>
+    <progress data-map-download-progress max="100" value="0"></progress>
   </div>
 
   {% if markers %}
@@ -11,7 +29,12 @@
       <div class="places-local-map-controls" aria-label="Map controls">
         <button type="button" data-map-action="zoom-in" title="Zoom in">+</button>
         <button type="button" data-map-action="zoom-out" title="Zoom out">−</button>
-        <button type="button" data-map-action="reset" title="Show all places">⌂</button>
+        <button type="button" data-map-action="fit-saved" title="Show all saved places">⌂</button>
+        <button type="button" data-map-action="world" title="Show the world">◎</button>
+      </div>
+      <div class="places-local-map-jump" aria-label="Jump to a map location">
+        <label>Country <select data-map-action="country"><option value="">Choose…</option></select></label>
+        <label>Saved place <select data-map-action="place"><option value="">Choose…</option></select></label>
       </div>
       <div class="places-local-map-status">Loading local map…</div>
     </div>
@@ -19,6 +42,9 @@
       Offline overview map made with bundled
       <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a>
       public-domain data. Towns and boundaries are approximate; no map service is contacted.
+      {% if local_map_status.installed %}
+        Downloaded street detail: © OpenStreetMap contributors, processed by Geofabrik (ODbL).
+      {% endif %}
     </p>
   {% else %}
     <p class="places-map-empty">No places with GPS coordinates.</p>
@@ -35,15 +61,19 @@
     {% endfor %}
   </ul>
 
-  {% if markers %}
   <script src="{{ url_for('static', filename='places_local_map.js') }}"></script>
   <script>
     window.initPlacesLocalMap({
       elementId: "places-map",
       markers: {{ markers | tojson }},
       baseDataUrl: {{ url_for('static', filename='map_data/natural_earth_base.json') | tojson }},
-      townsDataUrl: {{ url_for('static', filename='map_data/natural_earth_towns.json') | tojson }}
+      townsDataUrl: {{ url_for('static', filename='map_data/natural_earth_towns.json') | tojson }},
+      streetDetailsEnabled: {{ local_maps_enabled | tojson }},
+      streetDetailsUrl: {{ url_for('places.local_map_features_route') | tojson }},
+      localMapSettingsUrl: {{ url_for('places.local_map_settings_route') | tojson }},
+      localMapDownloadSaUrl: {{ url_for('places.local_map_cache_route', scope='sa') | tojson }},
+      localMapDownloadAuUrl: {{ url_for('places.local_map_cache_route', scope='au') | tojson }},
+      localMapStatusUrl: {{ url_for('places.local_map_cache_status_route') | tojson }}
     });
   </script>
-  {% endif %}
 {% endblock %}

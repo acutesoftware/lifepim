@@ -1,6 +1,9 @@
 import os
+from pathlib import Path
 import sqlite3
+import tempfile
 import unittest
+from unittest.mock import patch
 
 root_folder = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + ".." + os.sep + "src")
 if root_folder not in os.sys.path:
@@ -233,19 +236,43 @@ class TestSettingsSchema(unittest.TestCase):
         conn.row_factory = sqlite3.Row
         try:
             places_settings = settings.get_places_settings(conn)
+            self.assertFalse(places_settings["local_street_maps_enabled"])
+            self.assertTrue(Path(places_settings["local_map_cache_dir"]).is_absolute())
             self.assertEqual(
                 places_settings["virtual_worlds"],
                 ["Alrona", "World of Warcraft", "Stardew Valley"],
             )
 
-            settings.save_places_settings(
-                {"virtual_worlds": "Alrona\nMinecraft\nMinecraft\nStardew Valley"},
-                conn,
-            )
+            with tempfile.TemporaryDirectory() as map_cache:
+                settings.save_places_settings(
+                    {
+                        "virtual_worlds": "Alrona\nMinecraft\nMinecraft\nStardew Valley",
+                        "local_map_cache_dir": map_cache,
+                    },
+                    conn,
+                )
+                self.assertEqual(settings.get_places_settings(conn)["local_map_cache_dir"], str(Path(map_cache).resolve()))
             saved = settings.get_places_settings(conn)
             self.assertEqual(saved["virtual_worlds"], ["Alrona", "Minecraft", "Stardew Valley"])
+            settings.set_setting("places.local_street_maps_enabled", "1", conn=conn)
+            self.assertTrue(settings.get_places_settings(conn)["local_street_maps_enabled"])
         finally:
             conn.close()
+
+    def test_places_map_cache_rejects_repository_paths(self):
+        repository_root = Path(root_folder).parent
+        with self.assertRaises(ValueError):
+            settings.normalize_places_map_cache_dir(repository_root / "map-cache")
+
+    def test_places_map_cache_default_falls_back_outside_repository(self):
+        repository_root = Path(root_folder).parent
+        with tempfile.TemporaryDirectory() as system_cache, patch.object(
+            settings.cfg, "data_folder", str(repository_root / "data")
+        ), patch.dict(os.environ, {"LOCALAPPDATA": system_cache}):
+            cache_path = Path(settings.default_places_map_cache_dir())
+
+        self.assertNotEqual(cache_path, repository_root)
+        self.assertNotIn(repository_root, cache_path.parents)
 
 
 if __name__ == "__main__":

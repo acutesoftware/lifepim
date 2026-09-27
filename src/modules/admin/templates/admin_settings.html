@@ -210,6 +210,17 @@
             </label>
             <p class="settings-empty">Enter one virtual world name per line. These appear as Virtual Place types in the Places Add/Edit form.</p>
           </div>
+          <div class="settings-fieldset">
+            <div class="settings-fieldset-title">Offline Map Storage</div>
+            <label>
+              Map cache directory
+              <input type="text" name="local_map_cache_dir" value="{{ places_settings.local_map_cache_dir }}">
+            </label>
+            <p class="settings-empty">
+              Downloaded GeoPackages and temporary download files are stored here. The directory must be outside the LifePIM source repository.
+              Set the <code>LIFEPIM_MAP_CACHE_DIR</code> environment variable to override this setting for the current installation.
+            </p>
+          </div>
           <button type="submit">Save Places settings</button>
         </form>
       {% elif active_settings_tab == 'notes' %}

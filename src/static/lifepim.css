@@ -4390,17 +4390,64 @@ button.calendar-nav {
   margin: 6px 0;
 }
 
+.places-map-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.places-map-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+}
+
+.places-map-more select {
+  max-width: 290px;
+}
+
+.places-map-pack-summary {
+  color: #666;
+  font-size: 12px;
+}
+
+.places-map-message,
+.places-map-download-status {
+  margin: 5px 0;
+  padding: 6px 8px;
+  border: 1px solid #ccd7dd;
+  border-radius: 4px;
+  background: #f4f8fa;
+}
+
+.places-map-download-status progress {
+  width: min(320px, 45vw);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
 .places-local-map {
   position: relative;
   overflow: hidden;
   background: #dcecf4;
   isolation: isolate;
+  cursor: grab;
+  user-select: none;
 }
 
 .places-local-map > svg {
   display: block;
   width: 100%;
   height: 100%;
+  transform: translate(var(--map-pan-x, 0), var(--map-pan-y, 0));
+  will-change: transform;
+  touch-action: none;
+}
+
+.places-local-map.is-dragging {
+  cursor: grabbing;
 }
 
 .places-local-ocean {
@@ -4432,6 +4479,82 @@ button.calendar-nav {
   fill-rule: evenodd;
   stroke: #adcbd9;
   stroke-width: 0.75;
+}
+
+.places-street-landuse {
+  fill: rgba(214, 224, 193, 0.78);
+  fill-rule: evenodd;
+  stroke: #c4cfaa;
+  stroke-width: 0.45;
+}
+
+.places-street-water {
+  fill: #c9e2ee;
+  fill-rule: evenodd;
+  stroke: #9fc8da;
+  stroke-width: 0.55;
+}
+
+.places-street-buildings {
+  fill: #d8ccc2;
+  fill-rule: evenodd;
+  stroke: #b9a99d;
+  stroke-width: 0.5;
+}
+
+.places-street-waterways {
+  fill: none;
+  stroke: #78b9d5;
+  stroke-width: 1.2;
+}
+
+.places-street-railways {
+  fill: none;
+  stroke: #676767;
+  stroke-width: 1.1;
+  stroke-dasharray: 4 3;
+}
+
+.places-street-road {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.places-street-road-minor {
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.places-street-road-secondary {
+  stroke: #f6e7a9;
+  stroke-width: 2.2;
+}
+
+.places-street-road-primary {
+  stroke: #f3c783;
+  stroke-width: 2.8;
+}
+
+.places-street-road-trunk,
+.places-street-road-motorway {
+  stroke: #e8a270;
+  stroke-width: 3.4;
+}
+
+.places-street-road-label,
+.places-street-place-label {
+  fill: #394047;
+  font: 11px Arial, sans-serif;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.places-street-place-label {
+  font-size: 13px;
+  font-weight: bold;
 }
 
 .places-local-town-dot {
@@ -4485,6 +4608,36 @@ button.calendar-nav {
   background: #edf4f7;
 }
 
+.places-local-map-jump {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: calc(100% - 64px);
+  padding: 6px 8px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.places-local-map-jump label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #333;
+  font-size: 12px;
+}
+
+.places-local-map-jump select {
+  max-width: 190px;
+  min-width: 120px;
+}
+
 .places-local-map-status {
   position: absolute;
   z-index: 2;
@@ -4515,7 +4668,10 @@ button.calendar-nav {
   padding: 0;
   border: 0;
   background: transparent;
-  transform: translate(-50%, -100%);
+  transform: translate(
+    calc(-50% + var(--map-pan-x, 0px)),
+    calc(-100% + var(--map-pan-y, 0px))
+  );
   cursor: pointer;
 }
 
@@ -4571,6 +4727,17 @@ button.calendar-nav {
   color: #555;
   font-size: 20px;
   cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .places-local-map-jump {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .places-local-map-jump select {
+    max-width: 145px;
+  }
 }
 
 .places-map-empty {

@@ -11,6 +11,7 @@ from common import data as db
 from common import config as cfg
 from common import projects as projects_mod
 from common import settings as settings_mod
+from modules.places import local_maps
 from common.utils import (
     get_side_tabs,
     get_table_def,
@@ -821,6 +822,7 @@ def list_places_map_route():
             {
                 "id": item.get("id"),
                 "name": item.get("name") or "",
+                "country": item.get("country") or "",
                 "details": _build_marker_details(item, lat, lon),
                 "actions": _build_external_map_links(item, lat, lon),
                 "lat": lat,
@@ -828,6 +830,7 @@ def list_places_map_route():
                 "url": url_for("places.view_place_route", place_id=item.get("id"), area=area),
             }
         )
+    places_settings = settings_mod.get_places_settings()
     return render_template(
         "places_list_map.html",
         active_tab="places",
@@ -838,7 +841,54 @@ def list_places_map_route():
         items=items,
         markers=markers,
         area=area,
+        local_maps_enabled=places_settings.get("local_street_maps_enabled", False),
+        local_map_status=local_maps.status(),
+        map_message=request.args.get("map_message", ""),
     )
+
+
+@places_bp.route("/map/local-settings", methods=["POST"])
+def local_map_settings_route():
+    payload = request.get_json(silent=True) or request.form
+    enabled = str(payload.get("enabled", "")).strip().lower() in {"1", "true", "yes", "on"}
+    settings_mod.set_setting(
+        "places.local_street_maps_enabled",
+        "1" if enabled else "0",
+        "Places",
+        "Enable downloaded street-map detail",
+    )
+    return jsonify({"ok": True, "enabled": enabled})
+
+
+@places_bp.route("/map/local-cache/<scope>", methods=["POST"])
+def local_map_cache_route(scope):
+    ok, message = local_maps.start_download(scope)
+    return jsonify({"ok": ok, "message": message, "status": local_maps.status()}), (200 if ok else 409)
+
+
+@places_bp.route("/map/local-cache/status")
+def local_map_cache_status_route():
+    return jsonify(local_maps.status())
+
+
+@places_bp.route("/map/local-features")
+def local_map_features_route():
+    if not settings_mod.get_places_settings().get("local_street_maps_enabled", False):
+        return jsonify({"enabled": False})
+    try:
+        bounds = tuple(float(request.args[name]) for name in ("min_lon", "min_lat", "max_lon", "max_lat"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid map bounds."}), 400
+    min_lon, min_lat, max_lon, max_lat = bounds
+    if not (-180 <= min_lon < max_lon <= 180 and -85 <= min_lat < max_lat <= 85):
+        return jsonify({"error": "Map bounds are outside the supported range."}), 400
+    span = max(max_lon - min_lon, max_lat - min_lat)
+    if span > 4:
+        return jsonify({"enabled": True, "detail": 0, "message": "Zoom in for downloaded street detail."})
+    detail = 1 if span > 0.8 else (2 if span > 0.18 else 3)
+    features = local_maps.query_features(bounds, detail)
+    features.update(enabled=True, detail=detail)
+    return jsonify(features)
 
 
 @places_bp.route("/view/<int:place_id>")
