@@ -24,14 +24,17 @@ calendar_bp = Blueprint(
 )
 
 EVENT_SOURCE_KEYS = {
-    "manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "external_events", "tasks"
+    "manual", "recurring", "birthdays", "holidays_au", "holidays_sa", "school_terms_sa",
+    "external_events", "tasks"
 }
+
+SCHOOL_HOLIDAY_COLOUR = "#dceeff"
 
 CALENDAR_SOURCE_GROUPS = (
     ("events", "Events", ("manual", "recurring", "birthdays", "tasks")),
     ("files", "Files", ("audio", "media", "files")),
     ("pc_usage", "PC Usage", ("usage",)),
-    ("external", "External", ("holidays_au", "holidays_sa", "external_events")),
+    ("external", "External", ("holidays_au", "holidays_sa", "school_terms_sa", "external_events")),
 )
 
 
@@ -137,7 +140,11 @@ def _fetch_agenda_items(
 ):
     _ensure_calendar_index()
     params = []
-    where = ["ci.is_visible = 1", "cs.enabled = 1"]
+    where = [
+        "ci.is_visible = 1",
+        "cs.enabled = 1",
+        "(ci.source_key != 'school_terms_sa' OR ci.event_type = 'school_term_marker')",
+    ]
     _append_area_filter(where, params, "ci.area", area)
     if source_keys is not None:
         source_list = [s for s in source_keys if s]
@@ -732,11 +739,17 @@ def month_view_route():
     events = _fetch_events(area=area, start_date=first_day, end_date=end_day, source_keys=source_keys)
     events_by_day = {}
     holiday_days = set()
+    school_holiday_days = set()
     birthday_days = set()
     for event in events:
         try:
             day = int(event["date"].split("-")[2])
         except (IndexError, ValueError, AttributeError):
+            continue
+        if event.get("event_type") == "school_holiday":
+            school_holiday_days.add(day)
+            continue
+        if event.get("source_key") == "school_terms_sa" and event.get("event_type") != "school_term_marker":
             continue
         events_by_day.setdefault(day, []).append(event)
         if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
@@ -772,6 +785,8 @@ def month_view_route():
         days_with_events=set(events_by_day.keys()) | stat_days,
         holiday_days=holiday_days,
         holiday_colour=media_settings["holiday_colour"],
+        school_holiday_days=school_holiday_days,
+        school_holiday_colour=SCHOOL_HOLIDAY_COLOUR,
         birthday_days=birthday_days,
         birthday_background_colour=media_settings["birthday_background_colour"],
         birthday_text_colour=media_settings["birthday_text_colour"],
@@ -815,11 +830,17 @@ def week_view_route():
     events = _fetch_events(area=area, start_date=week_start, end_date=week_end, source_keys=source_keys)
     events_by_day = {}
     holiday_days = set()
+    school_holiday_days = set()
     birthday_days = set()
     for event in events:
         try:
             day = datetime.strptime(event.get("date", ""), "%Y-%m-%d").date()
         except (ValueError, TypeError):
+            continue
+        if event.get("event_type") == "school_holiday":
+            school_holiday_days.add(day)
+            continue
+        if event.get("source_key") == "school_terms_sa" and event.get("event_type") != "school_term_marker":
             continue
         events_by_day.setdefault(day, []).append(event)
         if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
@@ -863,6 +884,8 @@ def week_view_route():
         all_day_events=all_day_events,
         holiday_days=holiday_days,
         holiday_colour=media_settings["holiday_colour"],
+        school_holiday_days=school_holiday_days,
+        school_holiday_colour=SCHOOL_HOLIDAY_COLOUR,
         birthday_days=birthday_days,
         birthday_background_colour=media_settings["birthday_background_colour"],
         birthday_text_colour=media_settings["birthday_text_colour"],
@@ -905,6 +928,11 @@ def day_view_route():
     anchor = _parse_date_param(date_param) or today
     next_day = anchor + timedelta(days=1)
     events = _fetch_events(area=area, start_date=anchor, end_date=next_day, source_keys=source_keys)
+    events = [
+        event for event in events
+        if event.get("source_key") != "school_terms_sa"
+        or event.get("event_type") == "school_term_marker"
+    ]
     events = sorted(events, key=lambda e: (e.get("time", ""), e.get("title", "")))
     detail_files_enabled = bool({"files", "media", "audio"} & source_keys)
     day_files = _fetch_day_files(data.conn, anchor) if detail_files_enabled else []
@@ -921,11 +949,17 @@ def day_view_route():
     month_events = _fetch_events(area=area, start_date=month_start, end_date=month_end, source_keys=source_keys)
     events_by_day = {}
     holiday_days = set()
+    school_holiday_days = set()
     birthday_days = set()
     for event in month_events:
         try:
             day = int(event["date"].split("-")[2])
         except (IndexError, ValueError, AttributeError):
+            continue
+        if event.get("event_type") == "school_holiday":
+            school_holiday_days.add(day)
+            continue
+        if event.get("source_key") == "school_terms_sa" and event.get("event_type") != "school_term_marker":
             continue
         events_by_day.setdefault(day, []).append(event)
         if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
@@ -968,6 +1002,8 @@ def day_view_route():
         days_with_events=set(events_by_day.keys()) | days_with_images,
         holiday_days=holiday_days,
         holiday_colour=media_settings["holiday_colour"],
+        school_holiday_days=school_holiday_days,
+        school_holiday_colour=SCHOOL_HOLIDAY_COLOUR,
         birthday_days=birthday_days,
         birthday_background_colour=media_settings["birthday_background_colour"],
         birthday_text_colour=media_settings["birthday_text_colour"],
@@ -997,11 +1033,17 @@ def year_view_route():
     year_events = _fetch_events(area=area, start_date=year_start, end_date=year_end, source_keys=source_keys)
     event_days_by_month = {}
     holiday_days_by_month = {}
+    school_holiday_days_by_month = {}
     birthday_days_by_month = {}
     for event in year_events:
         try:
             event_day = datetime.strptime(event.get("date", ""), "%Y-%m-%d").date()
         except (ValueError, TypeError):
+            continue
+        if event.get("event_type") == "school_holiday":
+            school_holiday_days_by_month.setdefault(event_day.month, set()).add(event_day.day)
+            continue
+        if event.get("source_key") == "school_terms_sa" and event.get("event_type") != "school_term_marker":
             continue
         event_days_by_month.setdefault(event_day.month, set()).add(event_day.day)
         if event.get("source_key") in {"holidays_au", "holidays_sa"} or event.get("event_type") == "holiday":
@@ -1028,6 +1070,7 @@ def year_view_route():
                 "days_with_events": event_days | days_with_images,
                 "days_with_images": days_with_images,
                 "holiday_days": holiday_days_by_month.get(month, set()),
+                "school_holiday_days": school_holiday_days_by_month.get(month, set()),
                 "birthday_days": birthday_days_by_month.get(month, set()),
             }
         )
@@ -1056,6 +1099,7 @@ def year_view_route():
         col_bg_weekend=cfg.CAL_COL_BG_WEEKEND,
         col_bg_today=cfg.CAL_COL_BG_TODAY,
         holiday_colour=settings_mod.get_calendar_view_settings(data.conn)["holiday_colour"],
+        school_holiday_colour=SCHOOL_HOLIDAY_COLOUR,
         birthday_background_colour=settings_mod.get_calendar_view_settings(data.conn)["birthday_background_colour"],
         birthday_text_colour=settings_mod.get_calendar_view_settings(data.conn)["birthday_text_colour"],
         birthday_font_size=settings_mod.get_calendar_view_settings(data.conn)["birthday_font_size"],
@@ -1573,6 +1617,48 @@ def import_holidays_route(source_key):
         source_label=label,
         start_year=start_year,
         end_year=end_year,
+        preview_rows=preview_rows,
+        result=result,
+        error=error,
+    )
+
+
+@calendar_bp.route("/import/school-terms", methods=["GET", "POST"])
+def import_school_terms_route():
+    area = _request_area_form() or _request_area() or ""
+    current_year = date.today().year
+    start_year = request.form.get("start_year", current_year)
+    end_year = request.form.get("end_year", current_year)
+    preview_rows = None
+    available_years = []
+    result = None
+    error = ""
+    try:
+        fetched_rows, available_years = calendar_index.preview_school_term_import(start_year, end_year)
+        if request.method == "POST":
+            action = request.form.get("action", "preview")
+            preview_rows = fetched_rows
+            if action == "import":
+                if request.form.get("confirmed") != "1":
+                    raise ValueError("Preview the school terms before importing them.")
+                result = calendar_index.import_school_terms(
+                    start_year, end_year, data.conn, events=fetched_rows
+                )
+                preview_rows = None
+    except Exception as exc:
+        error = str(exc)
+    return render_template(
+        "calendar_import_school_terms.html",
+        active_tab="calendar",
+        tabs=get_tabs(),
+        side_tabs=get_side_tabs(),
+        content_title="Import School Terms",
+        content_html="",
+        area=area,
+        today=date.today(),
+        start_year=start_year,
+        end_year=end_year,
+        available_years=available_years,
         preview_rows=preview_rows,
         result=result,
         error=error,

@@ -238,7 +238,7 @@ activity counts rather than missing event rows.
 ### Explicit imports
 
 Calendar's Import menu supports CSV, Australian public holidays, South
-Australian public holidays, and external iCalendar (`.ics`) events. Every path
+Australian public holidays, SA school terms, and external iCalendar (`.ics`) events. Every path
 shows the rows before an OK/Cancel decision.
 
 Holiday imports are stored directly in `lp_calendar_items` under
@@ -246,6 +246,15 @@ Holiday imports are stored directly in `lp_calendar_items` under
 same `source_key` whose `start_date` is inside the selected inclusive year
 range, then inserts the previewed replacement rows in one transaction. Startup
 migration does not regenerate holiday rows.
+
+School-term imports download every complete year currently published on the SA
+Department for Education term-dates page, then let the user select an inclusive
+range. Confirming the preview replaces only `school_terms_sa` rows that start in
+the selected years. The source is visible by default in the External group.
+School-holiday weekdays are shaded light blue without event text; weekends and
+public holidays retain their higher-priority backgrounds. The only visible
+events are a start marker on each published term start and an end marker on each
+published term end.
 
 External iCalendar events use the `external_events` source. The calendar name
 is hashed into `source_sub_id`; re-importing the same name replaces only that

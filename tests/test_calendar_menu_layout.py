@@ -9,6 +9,9 @@ ROOT = os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + os.sep + "..
 CSS_PATH = os.path.join(ROOT, "src", "static", "lifepim.css")
 MENU_PATH = os.path.join(ROOT, "src", "templates", "widgets", "wid_calendar_import_menu.html")
 SOURCE_MENU_PATH = os.path.join(ROOT, "src", "templates", "widgets", "wid_calendar_source_box.html")
+MONTH_TEMPLATE_PATH = os.path.join(ROOT, "src", "modules", "calendar", "templates", "calendar_month.html")
+WEEK_TEMPLATE_PATH = os.path.join(ROOT, "src", "modules", "calendar", "templates", "calendar_week.html")
+MINI_MONTH_TEMPLATE_PATH = os.path.join(ROOT, "src", "templates", "widgets", "wid_calendar_mini_month.html")
 
 
 class TestCalendarMenuLayout(unittest.TestCase):
@@ -55,6 +58,7 @@ class TestCalendarMenuLayout(unittest.TestCase):
                 "usage",
                 "holidays_au",
                 "holidays_sa",
+                "school_terms_sa",
                 "external_events",
             )
         ]
@@ -72,8 +76,18 @@ class TestCalendarMenuLayout(unittest.TestCase):
         )
 
         submitted_sources = re.findall(r'<input\s+[^>]*name="source"[^>]*value="([^"]+)"', rendered)
-        self.assertEqual(len(submitted_sources), 11)
+        self.assertEqual(len(submitted_sources), 12)
         self.assertEqual(len(submitted_sources), len(set(submitted_sources)))
+
+    def test_calendar_background_priority_is_weekend_then_public_then_school_holiday(self):
+        priority_pattern = re.compile(
+            r"\{% elif is_weekend %\}.*?\{% elif is_holiday %\}.*?"
+            r"\{% elif is_school_holiday %\}",
+            re.DOTALL,
+        )
+        for path in (MONTH_TEMPLATE_PATH, WEEK_TEMPLATE_PATH, MINI_MONTH_TEMPLATE_PATH):
+            with self.subTest(path=path), open(path, encoding="utf-8") as handle:
+                self.assertRegex(handle.read(), priority_pattern)
 
 
 if __name__ == "__main__":

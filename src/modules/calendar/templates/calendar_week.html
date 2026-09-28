@@ -31,14 +31,17 @@
       {% set is_today = today == day %}
       {% set is_weekend = day.weekday() >= 5 %}
       {% set is_holiday = day in holiday_days %}
+      {% set is_school_holiday = day in school_holiday_days %}
       {% set is_birthday = day in birthday_days %}
       {% set cell_bg = col_bg_day %}
       {% if is_birthday %}
         {% set cell_bg = birthday_background_colour %}
-      {% elif is_holiday and not is_weekend %}
-        {% set cell_bg = holiday_colour %}
       {% elif is_weekend %}
         {% set cell_bg = col_bg_weekend %}
+      {% elif is_holiday %}
+        {% set cell_bg = holiday_colour %}
+      {% elif is_school_holiday %}
+        {% set cell_bg = school_holiday_colour %}
       {% elif is_today %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
@@ -55,14 +58,17 @@
       {% for day in week_days %}
       {% set is_weekend = day.weekday() >= 5 %}
       {% set is_holiday = day in holiday_days %}
+      {% set is_school_holiday = day in school_holiday_days %}
       {% set is_birthday = day in birthday_days %}
       {% set cell_bg = col_bg_day %}
       {% if is_birthday %}
         {% set cell_bg = birthday_background_colour %}
-      {% elif is_holiday and not is_weekend %}
-        {% set cell_bg = holiday_colour %}
       {% elif is_weekend %}
         {% set cell_bg = col_bg_weekend %}
+      {% elif is_holiday %}
+        {% set cell_bg = holiday_colour %}
+      {% elif is_school_holiday %}
+        {% set cell_bg = school_holiday_colour %}
       {% elif today == day %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
@@ -111,18 +117,21 @@
       {% for day in week_days %}
       {% set is_weekend = day.weekday() >= 5 %}
       {% set is_holiday = day in holiday_days %}
+      {% set is_school_holiday = day in school_holiday_days %}
       {% set is_birthday = day in birthday_days %}
       {% set cell_bg = col_bg_day %}
       {% if is_birthday %}
         {% set cell_bg = birthday_background_colour %}
-      {% elif is_holiday and not is_weekend %}
-        {% set cell_bg = holiday_colour %}
       {% elif is_weekend %}
         {% set cell_bg = col_bg_weekend %}
+      {% elif is_holiday %}
+        {% set cell_bg = holiday_colour %}
+      {% elif is_school_holiday %}
+        {% set cell_bg = school_holiday_colour %}
       {% elif today == day %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
-      <td class="calendar-cell" style="background: {{ cell_bg if is_birthday or is_holiday or is_weekend or today == day else slot_bg }};">
+      <td class="calendar-cell" style="background: {{ cell_bg if is_birthday or is_holiday or is_school_holiday or is_weekend or today == day else slot_bg }};">
         {% for ev in timed_events.get(day, {}).get(slot.minutes, []) %}
         <div class="calendar-event">
           {% include "widgets/wid_calendar_event_link.html" %}

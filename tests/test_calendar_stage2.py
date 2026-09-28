@@ -11,6 +11,7 @@ if root_folder not in os.sys.path:
 
 from modules.calendar.services import calendar_index
 from modules.calendar.services import external_events
+from modules.calendar.services import school_terms
 from modules.calendar import routes as calendar_routes
 
 
@@ -82,7 +83,22 @@ class CalendarStage2Tests(unittest.TestCase):
         self.assertEqual(groups["events"], ("manual", "recurring", "birthdays", "tasks"))
         self.assertEqual(groups["files"], ("audio", "media", "files"))
         self.assertEqual(groups["pc_usage"], ("usage",))
-        self.assertEqual(groups["external"], ("holidays_au", "holidays_sa", "external_events"))
+        self.assertEqual(
+            groups["external"],
+            ("holidays_au", "holidays_sa", "school_terms_sa", "external_events"),
+        )
+
+    def test_school_terms_are_visible_by_default(self):
+        conn = memory_conn()
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            source = conn.execute(
+                "SELECT enabled, visible_by_default FROM lp_calendar_sources "
+                "WHERE source_key = 'school_terms_sa'"
+            ).fetchone()
+            self.assertEqual((source["enabled"], source["visible_by_default"]), (1, 1))
+        finally:
+            conn.close()
 
     def test_explicit_empty_source_selection_returns_no_items_or_stats(self):
         conn = memory_conn()
@@ -362,6 +378,81 @@ class CalendarStage2Tests(unittest.TestCase):
             self.assertTrue(
                 conn.execute("SELECT 1 FROM lp_calendar_items WHERE source_key = 'holidays_sa' AND start_date LIKE '2026-%'").fetchone()
             )
+        finally:
+            conn.close()
+
+    def test_school_term_parser_reads_current_and_table_years(self):
+        html = """
+        <h2>Term dates for 2026</h2><ul>
+          <li>Term 1 &ndash; Tuesday 27 January to Friday 10 April</li>
+          <li>Term 2 &ndash; Monday 27 April to Friday 3 July</li>
+          <li>Term 3 &ndash; Monday 20 July to Friday 25 September</li>
+          <li>Term 4 &ndash; Monday 12 October to Friday 11 December</li>
+        </ul>
+        <h2>Future term dates</h2><table><tbody><tr>
+          <th>2027</th><td>27 January to 9 April</td><td>26 April to 2 July</td>
+          <td>19 July to 24 September</td><td>11 October to 10 December</td>
+        </tr></tbody></table>
+        """
+        rows = school_terms.parse_school_terms(html)
+        self.assertEqual(len(rows), 8)
+        self.assertEqual(rows[0]["start_date"], "2026-01-27")
+        self.assertEqual(rows[3]["end_date"], "2026-12-11")
+        self.assertEqual(rows[4]["start_date"], "2027-01-27")
+
+    def test_school_term_import_replaces_only_selected_years(self):
+        conn = memory_conn()
+        terms = [
+            {
+                "year": year,
+                "term": term,
+                "title": f"School Term {term}",
+                "start_date": f"{year}-{start}",
+                "end_date": f"{year}-{end}",
+                "all_day": 1,
+                "event_type": "school_term",
+                "category": "SA School Terms",
+                "area": "General",
+                "status": "active",
+                "source": "school_terms_sa",
+            }
+            for year in (2025, 2026)
+            for term, (start, end) in enumerate(
+                (("01-27", "04-10"), ("04-27", "07-03"), ("07-20", "09-25"), ("10-12", "12-11")),
+                start=1,
+            )
+        ]
+        events = calendar_index._school_calendar_events(terms)
+        try:
+            calendar_index.ensure_calendar_schema(conn)
+            calendar_index.import_school_terms(2025, 2026, conn, events=events)
+            replacement = [event for event in events if event["year"] == 2025]
+            result = calendar_index.import_school_terms(2025, 2025, conn, events=replacement)
+            self.assertEqual(result.rows_deleted, 13)
+            self.assertEqual(result.rows_inserted, 13)
+            self.assertEqual(
+                conn.execute(
+                    "SELECT COUNT(1) FROM lp_calendar_items "
+                    "WHERE source_key = 'school_terms_sa' AND start_date LIKE '2026-%'"
+                ).fetchone()[0],
+                13,
+            )
+            january_days = conn.execute(
+                "SELECT COUNT(1) FROM lp_calendar_item_days d "
+                "JOIN lp_calendar_items i ON i.id = d.calendar_item_id "
+                "WHERE i.source_key = 'school_terms_sa' AND i.event_type = 'school_holiday' "
+                "AND i.start_date = '2025-01-01'"
+            ).fetchone()[0]
+            self.assertEqual(january_days, 26)
+            visible_titles = {
+                row["title"]
+                for row in conn.execute(
+                    "SELECT title FROM lp_calendar_items WHERE source_key = 'school_terms_sa' "
+                    "AND event_type = 'school_term_marker'"
+                )
+            }
+            self.assertIn("Start of School Term 1", visible_titles)
+            self.assertIn("End of School Term 4", visible_titles)
         finally:
             conn.close()
 

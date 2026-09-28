@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block module_content %}
+  <div class="calendar-controls">
+    <a class="calendar-add-main" href="{{ url_for('calendar.month_view_route', area=area) }}">Back to Calendar</a>
+    {% include "widgets/wid_calendar_import_menu.html" %}
+  </div>
+
+  <h3>Import SA School Terms</h3>
+  <p>Dates are downloaded from the South Australian Department for Education.</p>
+  {% if available_years %}
+    <p>Available years: {{ available_years|first }}&ndash;{{ available_years|last }}.</p>
+  {% endif %}
+  {% if result %}
+    <p>Imported term start/end markers and school-holiday shading. Replaced {{ result.rows_deleted }} existing rows in {{ start_year }}&ndash;{{ end_year }}.</p>
+  {% elif preview_rows is not none %}
+    <p><strong>{{ preview_rows|length }} term markers and school-holiday ranges will be imported.</strong></p>
+    <p>Continuing will first remove only existing SA school-term rows dated from {{ start_year }}-01-01 through {{ end_year }}-12-31.</p>
+    <div class="calendar-import-preview">
+      <table>
+        <thead><tr><th>Year</th><th>Type</th><th>Label</th><th>Starts</th><th>Ends</th></tr></thead>
+        <tbody>
+        {% for row in preview_rows %}
+          <tr><td>{{ row.year }}</td><td>{{ row.preview_type }}</td><td>{{ row.title }}</td><td>{{ row.start_date }}</td><td>{{ row.end_date }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form method="post">
+      <input type="hidden" name="area" value="{{ area }}">
+      <input type="hidden" name="start_year" value="{{ start_year }}">
+      <input type="hidden" name="end_year" value="{{ end_year }}">
+      <input type="hidden" name="confirmed" value="1">
+      <button type="submit" name="action" value="import">OK &mdash; Replace and import</button>
+      <a class="calendar-nav" href="{{ url_for('calendar.month_view_route', area=area) }}">Cancel</a>
+    </form>
+  {% else %}
+    <form method="post" class="calendar-import-form">
+      <input type="hidden" name="area" value="{{ area }}">
+      <label>From year <input type="number" name="start_year" {% if available_years %}min="{{ available_years|first }}" max="{{ available_years|last }}"{% endif %} required value="{{ start_year }}"></label>
+      <label>To year <input type="number" name="end_year" {% if available_years %}min="{{ available_years|first }}" max="{{ available_years|last }}"{% endif %} required value="{{ end_year }}"></label>
+      <button type="submit" name="action" value="preview">Preview Import</button>
+    </form>
+  {% endif %}
+  {% if error %}<p class="calendar-import-error">{{ error }}</p>{% endif %}
+{% endblock %}

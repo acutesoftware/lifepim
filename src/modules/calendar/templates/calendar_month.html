@@ -41,14 +41,17 @@
       {% set is_today = today.year == year and today.month == month and today.day == day %}
       {% set is_weekend = loop.index >= 6 %}
       {% set is_holiday = day != 0 and day in holiday_days %}
+      {% set is_school_holiday = day != 0 and day in school_holiday_days %}
       {% set is_birthday = day != 0 and day in birthday_days %}
       {% set cell_bg = col_bg_day %}
       {% if is_birthday %}
         {% set cell_bg = birthday_background_colour %}
-      {% elif is_holiday and not is_weekend %}
-        {% set cell_bg = holiday_colour %}
       {% elif is_weekend %}
         {% set cell_bg = col_bg_weekend %}
+      {% elif is_holiday %}
+        {% set cell_bg = holiday_colour %}
+      {% elif is_school_holiday %}
+        {% set cell_bg = school_holiday_colour %}
       {% elif is_today %}
         {% set cell_bg = col_bg_today %}
       {% endif %}

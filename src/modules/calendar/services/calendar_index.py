@@ -8,6 +8,7 @@ import sqlite3
 from typing import Iterable
 
 from common import data as db
+from modules.calendar.services import school_terms
 
 
 EVENT_COLUMNS = {
@@ -48,6 +49,7 @@ SOURCE_SEEDS = [
     ("birthdays", "Birthdays", "generated", "rebuild", 7300, 7300, "#e377c2", "#ffffff", "cake", 30, 1, 1),
     ("holidays_au", "Australian Public Holidays", "imported", "rebuild", 1825, 3650, "#2ca02c", "#ffffff", "flag", 40, 1, 1),
     ("holidays_sa", "South Australian Public Holidays", "imported", "rebuild", 1825, 3650, "#17becf", "#ffffff", "flag", 41, 1, 1),
+    ("school_terms_sa", "SA School Terms", "imported", "manual", None, None, "#256f9c", "#ffffff", "school", 42, 1, 1),
     ("external_events", "External Events", "imported", "manual", None, None, "#0f766e", "#ffffff", "link", 45, 1, 1),
     ("tasks", "Task Deadlines", "linked", "incremental", None, None, "#d62728", "#ffffff", "deadline", 50, 1, 0),
     ("files", "File Activity", "metadata", "incremental", None, None, "#7f7f7f", "#ffffff", "file", 100, 0, 0),
@@ -1067,6 +1069,142 @@ def import_holidays(
     except Exception:
         conn.execute("ROLLBACK TO SAVEPOINT holiday_import")
         conn.execute("RELEASE SAVEPOINT holiday_import")
+        raise
+    result.completed_at = _now()
+    return result
+
+
+def preview_school_term_import(start_year: int, end_year: int) -> tuple[list[dict], list[int]]:
+    """Build term-boundary markers and school-holiday ranges for published years."""
+    start_year, end_year = _validated_year_range(start_year, end_year)
+    published = school_terms.fetch_school_terms()
+    available_years = sorted({int(event["year"]) for event in published})
+    missing = [year for year in range(start_year, end_year + 1) if year not in available_years]
+    if missing:
+        available = f"{available_years[0]}-{available_years[-1]}"
+        raise ValueError(
+            f"SA Education does not publish a complete term schedule for "
+            f"{', '.join(str(year) for year in missing)}. Available years: {available}."
+        )
+    selected_terms = [
+        event for event in published if start_year <= int(event["year"]) <= end_year
+    ]
+    return _school_calendar_events(selected_terms), available_years
+
+
+def _school_calendar_events(terms: list[dict]) -> list[dict]:
+    terms_by_year: dict[int, list[dict]] = {}
+    for term in terms:
+        terms_by_year.setdefault(int(term["year"]), []).append(term)
+
+    events = []
+    for year, year_terms in sorted(terms_by_year.items()):
+        year_terms.sort(key=lambda item: int(item["term"]))
+        for term in year_terms:
+            term_number = int(term["term"])
+            for boundary, title, boundary_date in (
+                ("start", f"Start of School Term {term_number}", term["start_date"]),
+                ("end", f"End of School Term {term_number}", term["end_date"]),
+            ):
+                events.append(
+                    {
+                        **term,
+                        "title": title,
+                        "start_date": boundary_date,
+                        "end_date": boundary_date,
+                        "event_type": "school_term_marker",
+                        "preview_type": "Term marker",
+                        "occurrence_key": f"school-term:SA:{year}:{term_number}:{boundary}",
+                    }
+                )
+
+        first_start = _parse_date(year_terms[0]["start_date"])
+        last_end = _parse_date(year_terms[-1]["end_date"])
+        holiday_ranges = [(date(year, 1, 1), first_start - timedelta(days=1), "Summer school holidays")]
+        for current_term, next_term in zip(year_terms, year_terms[1:]):
+            holiday_ranges.append(
+                (
+                    _parse_date(current_term["end_date"]) + timedelta(days=1),
+                    _parse_date(next_term["start_date"]) - timedelta(days=1),
+                    "School holidays",
+                )
+            )
+        holiday_ranges.append(
+            (last_end + timedelta(days=1), date(year, 12, 31), "Summer school holidays")
+        )
+        for holiday_number, (start, end, title) in enumerate(holiday_ranges, start=1):
+            if end < start:
+                continue
+            events.append(
+                {
+                    "year": year,
+                    "term": None,
+                    "title": title,
+                    "start_date": start.isoformat(),
+                    "end_date": end.isoformat(),
+                    "all_day": 1,
+                    "blocks_time": 0,
+                    "event_type": "school_holiday",
+                    "preview_type": "Shaded school holidays",
+                    "category": "SA School Holidays",
+                    "area": "General",
+                    "status": "active",
+                    "source": "school_terms_sa",
+                    "content": "South Australian state school holidays",
+                    "occurrence_key": f"school-holiday:SA:{year}:{holiday_number}",
+                }
+            )
+    return sorted(events, key=lambda event: (event["start_date"], event["event_type"], event["title"]))
+
+
+def import_school_terms(
+    start_year: int,
+    end_year: int,
+    conn: sqlite3.Connection | None = None,
+    events: list[dict] | None = None,
+) -> RefreshResult:
+    """Replace SA school terms for an exact inclusive year range."""
+    conn = db._get_conn() if conn is None else conn
+    ensure_calendar_schema(conn)
+    start_year, end_year = _validated_year_range(start_year, end_year)
+    if events is None:
+        events, available_years = preview_school_term_import(start_year, end_year)
+    else:
+        available_years = sorted({int(event["year"]) for event in events})
+    source_key = "school_terms_sa"
+    result = RefreshResult(source_key=source_key, started_at=_now())
+    source_id = _source_id(conn, source_key)
+    conn.execute("SAVEPOINT school_term_import")
+    try:
+        result.rows_deleted = delete_imported_calendar_items(
+            source_key,
+            from_date=f"{start_year:04d}-01-01",
+            to_date=f"{end_year:04d}-12-31",
+            conn=conn,
+        )
+        for event in events:
+            occurrence_key = event.get("occurrence_key") or (
+                f"school-calendar:SA:{event['start_date']}:{event['event_type']}:{event['title']}"
+            )
+            event = {**event, "id": occurrence_key}
+            _upsert_item(conn, source_id, source_key, event, occurrence_key, event["event_type"], None)
+        result.rows_inserted = len(events)
+        source = _source_row(conn, source_key)
+        config = _source_config(source)
+        ranges = list(config.get("imported_year_ranges") or [])
+        ranges.append([start_year, end_year])
+        config["imported_year_ranges"] = _merge_year_ranges(ranges)
+        config["available_years"] = available_years
+        config["source_url"] = school_terms.SCHOOL_TERMS_URL
+        _save_source_config(conn, source_key, config)
+        result.status = "current"
+        result.message = f"Imported school term markers and holiday ranges for {start_year}-{end_year}."
+        _touch_source(conn, source_key, result.status, result.rows_inserted, result.message)
+        conn.execute("RELEASE SAVEPOINT school_term_import")
+        conn.commit()
+    except Exception:
+        conn.execute("ROLLBACK TO SAVEPOINT school_term_import")
+        conn.execute("RELEASE SAVEPOINT school_term_import")
         raise
     result.completed_at = _now()
     return result
