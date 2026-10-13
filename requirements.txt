@@ -15,7 +15,7 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 six==1.17.0
 tzdata==2025.3
-Werkzeug==3.1.6
+Werkzeug==3.1.9
 argon2-cffi==23.1.0
 waitress==3.0.2
 xlrd==2.0.2
