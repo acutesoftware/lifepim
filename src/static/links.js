@@ -1219,6 +1219,8 @@
         selectedRecords().filter((record) => record.type === "note").map((record) => record.id);
       const placeIdsFromSelection = () =>
         selectedRecords().filter((record) => record.type === "place").map((record) => record.id);
+      const contactIdsFromSelection = () =>
+        selectedRecords().filter((record) => record.type === "person").map((record) => record.id);
       const moveSelectedNotes = () => {
         const noteIds = noteIdsFromSelection();
         if (!noteIds.length) {
@@ -1291,6 +1293,38 @@
           })
           .catch(() => showToast({ message: "Couldn't delete selected Places." }));
       };
+      const deleteSelectedContacts = () => {
+        const contactIds = contactIdsFromSelection();
+        if (!contactIds.length) {
+          showToast({ message: "Select one or more contacts first." });
+          return;
+        }
+        const noun = contactIds.length === 1 ? "contact" : "contacts";
+        if (!window.confirm(`Are you sure you want to delete ${contactIds.length} ${noun}?`)) {
+          return;
+        }
+        postJson("/contacts/api/delete-selected", { contact_ids: contactIds })
+          .then((data) => {
+            const deletedIds = new Set((data.deleted_ids || []).map((id) => String(id)));
+            qsa("input.link-select:checked", root).forEach((checkbox) => {
+              if (deletedIds.has(String(checkbox.dataset.recordId))) {
+                const row = checkbox.closest(".link-draggable") || checkbox.closest("tr");
+                if (row) {
+                  row.remove();
+                }
+              } else {
+                checkbox.checked = false;
+              }
+            });
+            const selectAll = qs("input.link-select-all", root);
+            if (selectAll) {
+              selectAll.checked = false;
+            }
+            updateCount();
+            showToast({ message: `Deleted ${data.deleted || 0} selected contact(s).` });
+          })
+          .catch(() => showToast({ message: "Couldn't delete selected contacts." }));
+      };
       const rescanSelectedPlaces = () => {
         const placeIds = placeIdsFromSelection();
         if (!placeIds.length) {
@@ -1323,6 +1357,8 @@
           } else if (action === "delete") {
             if (toolbar.dataset.listType === "place") {
               deleteSelectedPlaces();
+            } else if (toolbar.dataset.listType === "person") {
+              deleteSelectedContacts();
             } else {
               deleteSelectedNotes();
             }

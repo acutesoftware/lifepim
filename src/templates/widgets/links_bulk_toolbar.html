@@ -16,6 +16,9 @@
       <option value="link">Link selected records to ...</option>
       <option value="delete">Delete selected Places</option>
       <option value="rescan">Rescan selected Place details</option>
+    {% elif link_list_type == "person" %}
+      <option value="link">Link selected records to ...</option>
+      <option value="delete">Delete Selected contacts</option>
     {% else %}
       <option value="link">Link selected records to ...</option>
     {% endif %}

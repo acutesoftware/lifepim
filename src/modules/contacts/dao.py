@@ -111,6 +111,28 @@ def delete_contact(contact_id):
     conn.commit()
 
 
+def delete_contacts(contact_ids):
+    ids = list(dict.fromkeys(int(contact_id) for contact_id in contact_ids))
+    if not ids:
+        return []
+    conn = db._get_conn()
+    placeholders = ",".join(["?"] * len(ids))
+    rows = conn.execute(
+        f"SELECT contact_id FROM lp_contacts WHERE contact_id IN ({placeholders})",
+        ids,
+    ).fetchall()
+    existing_ids = {row["contact_id"] for row in rows}
+    deleted_ids = [contact_id for contact_id in ids if contact_id in existing_ids]
+    if deleted_ids:
+        delete_placeholders = ",".join(["?"] * len(deleted_ids))
+        conn.execute(
+            f"DELETE FROM lp_contacts WHERE contact_id IN ({delete_placeholders})",
+            deleted_ids,
+        )
+        conn.commit()
+    return deleted_ids
+
+
 def list_facts(contact_id):
     conn = db._get_conn()
     rows = conn.execute(

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for
 
 from common import config as cfg
 from common import projects as projects_mod
@@ -234,6 +234,20 @@ def edit_contact_route(contact_id):
 def delete_contact_route(contact_id):
     dao.delete_contact(contact_id)
     return redirect(url_for("contacts.list_contacts_table_route"))
+
+
+@contacts_bp.route("/api/delete-selected", methods=["POST"])
+def delete_selected_contacts_route():
+    payload = request.get_json(silent=True) or {}
+    contact_ids = []
+    for raw_id in payload.get("contact_ids") or []:
+        try:
+            contact_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    contact_ids = list(dict.fromkeys(contact_ids))
+    deleted_ids = dao.delete_contacts(contact_ids)
+    return jsonify({"deleted": len(deleted_ids), "deleted_ids": deleted_ids})
 
 
 @contacts_bp.route("/fact/add/<int:contact_id>", methods=["POST"])
