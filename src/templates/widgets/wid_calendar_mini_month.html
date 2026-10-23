@@ -32,6 +32,10 @@
       {% elif is_today %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
+      {% set has_calendar_background = is_birthday or is_weekend or is_holiday or is_school_holiday or is_today %}
+      {% if event_backgrounds is defined and day in event_backgrounds and not has_calendar_background %}
+        {% set cell_bg = event_backgrounds[day] %}
+      {% endif %}
       <td class="calendar-cell {% if day == 0 %}empty{% endif %}" {% if day != 0 %}style="background: {{ cell_bg }};"{% endif %}>
         {% if day != 0 %}
         {% if day_source_params is defined %}

@@ -23,6 +23,44 @@ def memory_conn():
 
 
 class CalendarStage2Tests(unittest.TestCase):
+    def test_event_editor_background_colour_is_collected_and_calendar_presets_come_first(self):
+        values = calendar_routes._form_event_values(
+            MultiDict(
+                {
+                    "title": "Recreation leave",
+                    "start_date": "2026-12-21",
+                    "end_date": "2026-12-24",
+                    "color": "#222222",
+                    "background_color": "#ead9c2",
+                }
+            )
+        )
+        self.assertEqual(values["color"], "#222222")
+        self.assertEqual(values["background_color"], "#ead9c2")
+        conn = memory_conn()
+        try:
+            standard_options = calendar_routes._event_colour_context(conn)["event_background_standard_options"]
+            self.assertEqual(
+                [label for _value, label in standard_options],
+                ["School holidays", "Public holidays", "Today", "Weekend"],
+            )
+        finally:
+            conn.close()
+
+    def test_event_backgrounds_are_mapped_to_whole_calendar_days(self):
+        backgrounds = calendar_routes._event_backgrounds_by_date(
+            [
+                {"date": "2026-12-21", "background_color": "#ead9c2"},
+                {"date": "2026-12-22", "background_color": "#ead9c2"},
+                {"date": "2026-12-22", "background_color": "#dbeafe"},
+                {"date": "2026-12-23", "background_color": ""},
+            ]
+        )
+        self.assertEqual(
+            backgrounds,
+            {"2026-12-21": "#ead9c2", "2026-12-22": "#ead9c2"},
+        )
+
     def test_explicit_source_list_is_not_overridden_by_legacy_event_flag(self):
         conn = memory_conn()
         original_conn = calendar_routes.data.conn
@@ -144,10 +182,20 @@ class CalendarStage2Tests(unittest.TestCase):
             indexes = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()}
             self.assertIn("idx_calendar_items_occurrence", indexes)
             event_id = calendar_index.create_calendar_event(
-                {"title": "Trip", "start_date": "2026-01-01", "end_date": "2026-01-05"},
+                {
+                    "title": "Trip",
+                    "start_date": "2026-01-01",
+                    "end_date": "2026-01-05",
+                    "color": "#222222",
+                    "background_color": "#ead9c2",
+                },
                 conn,
             )
-            item = conn.execute("SELECT id FROM lp_calendar_items WHERE source_record_id = ?", [str(event_id)]).fetchone()
+            event = conn.execute("SELECT * FROM lp_calendar_events WHERE id = ?", [event_id]).fetchone()
+            item = conn.execute("SELECT * FROM lp_calendar_items WHERE source_record_id = ?", [str(event_id)]).fetchone()
+            self.assertEqual(event["background_color"], "#ead9c2")
+            self.assertEqual(item["background_color"], "#ead9c2")
+            self.assertEqual(item["color"], "#222222")
             self.assertEqual(
                 conn.execute("SELECT COUNT(1) FROM lp_calendar_item_days WHERE calendar_item_id = ?", [item["id"]]).fetchone()[0],
                 5,

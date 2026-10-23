@@ -30,6 +30,7 @@
     <h5>Events</h5>
     {% if events %}
     <ul style="list-style:none; padding:0; margin:0;">
+      {% set event_background_conflicts = day_date.weekday() >= 5 or day_date.day in holiday_days or day_date.day in school_holiday_days or day_date.day in birthday_days or day_date == today %}
       {% for ev in events %}
       <li style="padding:6px 0;">
         {% if ev.time %}<strong>{{ ev.time }}</strong>{% endif %}

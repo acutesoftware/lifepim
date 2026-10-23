@@ -2522,6 +2522,17 @@ button.calendar-nav {
   text-decoration: none;
 }
 
+.calendar-event-link-highlight {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.calendar-colour-select {
+  min-width: 190px;
+}
+
 .calendar-event-link:hover,
 .calendar-event-link:focus {
   text-decoration: underline;

@@ -26,6 +26,7 @@ EVENT_COLUMNS = {
     "status": "TEXT NOT NULL DEFAULT 'active'",
     "color": "TEXT",
     "text_color": "TEXT",
+    "background_color": "TEXT",
     "icon": "TEXT",
     "location": "TEXT",
     "recurrence_rule": "TEXT",
@@ -87,7 +88,12 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
     conn = db._get_conn() if conn is None else conn
     if conn.row_factory is None:
         conn.row_factory = sqlite3.Row
-    if not force and _schema_ready(conn):
+    if (
+        not force
+        and _schema_ready(conn)
+        and _table_has_cols(conn, "lp_calendar_events", {"background_color"})
+        and _table_has_cols(conn, "lp_calendar_items", {"background_color"})
+    ):
         expected_sources = {seed[0] for seed in SOURCE_SEEDS}
         existing_sources = {
             row["source_key"] for row in conn.execute("SELECT source_key FROM lp_calendar_sources").fetchall()
@@ -162,6 +168,7 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
             status TEXT NOT NULL DEFAULT 'active',
             color TEXT,
             text_color TEXT,
+            background_color TEXT,
             icon TEXT,
             location TEXT,
             sort_priority INTEGER NOT NULL DEFAULT 100,
@@ -198,6 +205,7 @@ def ensure_calendar_schema(conn: sqlite3.Connection | None = None, force: bool =
     )
     for col, col_type in EVENT_COLUMNS.items():
         _add_column_if_missing(conn, "lp_calendar_events", col, col_type)
+    _add_column_if_missing(conn, "lp_calendar_items", "background_color", "TEXT")
     db.ensure_area_columns(conn, ["lp_calendar_events", "lp_calendar_items"])
     conn.executescript(
         """
@@ -712,6 +720,7 @@ def normalize_event_values(values: dict) -> dict:
         "status": values.get("status") or "active",
         "color": values.get("color") or None,
         "text_color": values.get("text_color") or None,
+        "background_color": values.get("background_color") or None,
         "icon": values.get("icon") or None,
         "location": values.get("location") or None,
         "recurrence_rule": recurrence_rule,
@@ -1337,6 +1346,7 @@ def _upsert_item(
         "status": event.get("status") or "active",
         "color": event.get("color"),
         "text_color": event.get("text_color"),
+        "background_color": event.get("background_color"),
         "icon": event.get("icon"),
         "location": event.get("location"),
         "sort_priority": _source_priority(conn, source_key),
@@ -1370,6 +1380,7 @@ def _upsert_item(
             status = excluded.status,
             color = excluded.color,
             text_color = excluded.text_color,
+            background_color = excluded.background_color,
             icon = excluded.icon,
             location = excluded.location,
             sort_priority = excluded.sort_priority,

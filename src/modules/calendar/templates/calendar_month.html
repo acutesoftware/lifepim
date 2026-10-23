@@ -55,6 +55,10 @@
       {% elif is_today %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
+      {% set has_calendar_background = is_birthday or is_weekend or is_holiday or is_school_holiday or is_today %}
+      {% if day in event_backgrounds and not has_calendar_background %}
+        {% set cell_bg = event_backgrounds[day] %}
+      {% endif %}
       <td class="calendar-cell {% if day == 0 %}empty{% endif %}" {% if day != 0 %}style="background: {{ cell_bg }};"{% endif %}>
         {% if day != 0 %}
         <div class="calendar-day">
@@ -67,6 +71,7 @@
             {% for ev in events_by_day.get(day, []) %}
             <div class="calendar-event">
               {% if ev.time %}<span class="calendar-time">{{ ev.time }}</span>{% endif %}
+              {% set event_background_conflicts = has_calendar_background %}
               {% include "widgets/wid_calendar_event_link.html" %}
             </div>
             {% endfor %}

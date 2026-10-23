@@ -30,6 +30,28 @@ EVENT_SOURCE_KEYS = {
 
 SCHOOL_HOLIDAY_COLOUR = "#dceeff"
 
+EVENT_COLOUR_OPTIONS = (
+    ("#222222", "Black"),
+    ("#174f86", "Blue"),
+    ("#b00020", "Red"),
+    ("#218739", "Green"),
+    ("#6f42c1", "Purple"),
+    ("#b45309", "Orange"),
+    ("#666666", "Grey"),
+    ("#ffffff", "White"),
+)
+
+EVENT_PASTEL_BACKGROUND_OPTIONS = (
+    ("#ead9c2", "Pastel tan"),
+    ("#fff3bf", "Pastel yellow"),
+    ("#d8f3dc", "Pastel green"),
+    ("#dbeafe", "Pastel blue"),
+    ("#fce1e4", "Pastel pink"),
+    ("#eadcf8", "Pastel lavender"),
+    ("#ffe5d0", "Pastel peach"),
+    ("#e5e7eb", "Pastel grey"),
+)
+
 CALENDAR_SOURCE_GROUPS = (
     ("events", "Events", ("manual", "recurring", "birthdays", "tasks")),
     ("files", "Files", ("audio", "media", "files")),
@@ -66,6 +88,30 @@ def _date_to_year_month(date_str):
         return parsed.year, parsed.month
     except (ValueError, TypeError):
         return None
+
+
+def _event_colour_context(conn):
+    calendar_settings = settings_mod.get_calendar_view_settings(conn)
+    return {
+        "event_colour_options": EVENT_COLOUR_OPTIONS,
+        "event_background_standard_options": (
+            (SCHOOL_HOLIDAY_COLOUR, "School holidays"),
+            (calendar_settings["holiday_colour"], "Public holidays"),
+            (cfg.CAL_COL_BG_TODAY, "Today"),
+            (cfg.CAL_COL_BG_WEEKEND, "Weekend"),
+        ),
+        "event_background_pastel_options": EVENT_PASTEL_BACKGROUND_OPTIONS,
+    }
+
+
+def _event_backgrounds_by_date(events):
+    backgrounds = {}
+    for event in events:
+        event_date = event.get("date")
+        background_color = event.get("background_color")
+        if event_date and background_color:
+            backgrounds.setdefault(event_date, background_color)
+    return backgrounds
 
 
 def _parse_date_param(date_str):
@@ -737,6 +783,7 @@ def month_view_route():
         next_year += 1
     end_day = date(next_year, next_month, 1)
     events = _fetch_events(area=area, start_date=first_day, end_date=end_day, source_keys=source_keys)
+    event_backgrounds_by_date = _event_backgrounds_by_date(events)
     events_by_day = {}
     holiday_days = set()
     school_holiday_days = set()
@@ -781,6 +828,7 @@ def month_view_route():
         year=year,
         month_name=cal.month_name[month],
         events_by_day=events_by_day,
+        event_backgrounds={int(event_date[-2:]): colour for event_date, colour in event_backgrounds_by_date.items()},
         media_by_day=media_by_day,
         days_with_events=set(events_by_day.keys()) | stat_days,
         holiday_days=holiday_days,
@@ -828,6 +876,7 @@ def week_view_route():
     week_start = anchor - timedelta(days=anchor.weekday())
     week_end = week_start + timedelta(days=7)
     events = _fetch_events(area=area, start_date=week_start, end_date=week_end, source_keys=source_keys)
+    event_backgrounds_by_date = _event_backgrounds_by_date(events)
     events_by_day = {}
     holiday_days = set()
     school_holiday_days = set()
@@ -879,6 +928,10 @@ def week_view_route():
         view_date=anchor,
         week_days=week_days,
         events_by_day=events_by_day,
+        event_backgrounds={
+            datetime.strptime(event_date, "%Y-%m-%d").date(): colour
+            for event_date, colour in event_backgrounds_by_date.items()
+        },
         timeslots=timeslots,
         timed_events=timed_events,
         all_day_events=all_day_events,
@@ -947,6 +1000,7 @@ def day_view_route():
         next_year += 1
     month_end = date(next_year, next_month, 1)
     month_events = _fetch_events(area=area, start_date=month_start, end_date=month_end, source_keys=source_keys)
+    event_backgrounds_by_date = _event_backgrounds_by_date(month_events)
     events_by_day = {}
     holiday_days = set()
     school_holiday_days = set()
@@ -1000,6 +1054,7 @@ def day_view_route():
         list_to=anchor,
         **_calendar_jump_context("day", anchor, area, day_source_params),
         days_with_events=set(events_by_day.keys()) | days_with_images,
+        event_backgrounds={int(event_date[-2:]): colour for event_date, colour in event_backgrounds_by_date.items()},
         holiday_days=holiday_days,
         holiday_colour=media_settings["holiday_colour"],
         school_holiday_days=school_holiday_days,
@@ -1031,6 +1086,7 @@ def year_view_route():
     _refresh_recent_day_stats(source_keys)
     year_stats = calendar_index.fetch_calendar_day_stats(year_start, year_end, sources=source_keys, conn=data.conn)
     year_events = _fetch_events(area=area, start_date=year_start, end_date=year_end, source_keys=source_keys)
+    event_backgrounds_by_date = _event_backgrounds_by_date(year_events)
     event_days_by_month = {}
     holiday_days_by_month = {}
     school_holiday_days_by_month = {}
@@ -1072,6 +1128,11 @@ def year_view_route():
                 "holiday_days": holiday_days_by_month.get(month, set()),
                 "school_holiday_days": school_holiday_days_by_month.get(month, set()),
                 "birthday_days": birthday_days_by_month.get(month, set()),
+                "event_backgrounds": {
+                    int(event_date[-2:]): colour
+                    for event_date, colour in event_backgrounds_by_date.items()
+                    if int(event_date[5:7]) == month
+                },
             }
         )
     return render_template(
@@ -1400,6 +1461,7 @@ def add_event_route():
         default_date=default_date,
         default_area=default_area,
         area_options=_area_options(data.conn),
+        **_event_colour_context(data.conn),
     )
 
 
@@ -1442,6 +1504,7 @@ def edit_event_route(event_id):
         area_options=_area_options(data.conn),
         project_options=projects_mod.project_list(statuses=("planned", "active")),
         record_projects=projects_mod.record_projects("event", event_id),
+        **_event_colour_context(data.conn),
     )
 
 
@@ -1755,6 +1818,7 @@ def _form_event_values(form):
         "area": form.get("area", "").strip(),
         "status": form.get("status") or "active",
         "color": form.get("color") or "",
+        "background_color": form.get("background_color") or "",
         "icon": form.get("icon") or "",
         "location": form.get("location") or "",
         "recurrence_rule": form.get("recurrence_rule") or "",

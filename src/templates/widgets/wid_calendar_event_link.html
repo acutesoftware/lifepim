@@ -5,9 +5,5 @@
 {% else %}
   {% set event_url = url_for('calendar.view_item_route', item_id=ev.calendar_item_id) %}
 {% endif %}
-<a class="calendar-event-link" href="{{ event_url }}"
-   {% if event_is_birthday %}style="color:{{ birthday_text_colour | default('#b00020') }};font-weight:bold;font-size:{{ birthday_font_size | default(11) }}px;"
-   {% elif event_is_weekend_holiday %}style="color:#218739;font-weight:600;"
-   {% elif ev.color %}style="color:{{ ev.color }};"
-   {% elif ev.default_color %}style="color:{{ ev.default_color }};"
-   {% endif %}>{{ ev.title }}</a>
+<a class="calendar-event-link{% if ev.background_color and event_background_conflicts | default(false) %} calendar-event-link-highlight{% endif %}" href="{{ event_url }}"
+   style="{% if ev.background_color and event_background_conflicts | default(false) %}background-color:{{ ev.background_color }};{% endif %}{% if event_is_birthday %}color:{{ birthday_text_colour | default('#b00020') }};font-weight:bold;font-size:{{ birthday_font_size | default(11) }}px;{% elif event_is_weekend_holiday %}color:#218739;font-weight:600;{% elif ev.color %}color:{{ ev.color }};{% elif ev.default_color %}color:{{ ev.default_color }};{% endif %}">{{ ev.title }}</a>

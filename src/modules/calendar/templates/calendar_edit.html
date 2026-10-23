@@ -110,8 +110,36 @@
   <label>Details:</label><br>
   <textarea name="detail" rows="6" cols="60" class="mention-enabled"
             {% if event %}data-record-type="event" data-record-id="{{ event.id }}"{% endif %}>{{ event.detail if event else '' }}</textarea><br><br>
-  <label>Colour:</label><br>
-  <input type="text" name="color" value="{{ event.color if event else '' }}"><br>
+  {% set selected_colour = event.color if event else '' %}
+  <label for="event-color">Colour:</label><br>
+  <select name="color" id="event-color" class="calendar-colour-select">
+    <option value="" {% if not selected_colour %}selected{% endif %}>Default</option>
+    {% if selected_colour and selected_colour not in event_colour_options|map(attribute=0)|list %}
+      <option value="{{ selected_colour }}" selected>Current ({{ selected_colour }})</option>
+    {% endif %}
+    {% for value, label in event_colour_options %}
+      <option value="{{ value }}" style="color:{{ value }};" {% if selected_colour == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select><br>
+  {% set selected_background = event.background_color if event else '' %}
+  <label for="event-background-color">Background colour:</label><br>
+  <select name="background_color" id="event-background-color" class="calendar-colour-select">
+    <option value="" {% if not selected_background %}selected{% endif %}>None</option>
+    {% set known_backgrounds = (event_background_standard_options + event_background_pastel_options)|map(attribute=0)|list %}
+    {% if selected_background and selected_background not in known_backgrounds %}
+      <option value="{{ selected_background }}" style="background-color:{{ selected_background }};" selected>Current ({{ selected_background }})</option>
+    {% endif %}
+    <optgroup label="Calendar backgrounds">
+      {% for value, label in event_background_standard_options %}
+        <option value="{{ value }}" style="background-color:{{ value }};" {% if selected_background == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </optgroup>
+    <optgroup label="Pastel colours">
+      {% for value, label in event_background_pastel_options %}
+        <option value="{{ value }}" style="background-color:{{ value }};" {% if selected_background == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </optgroup>
+  </select><br>
   <label>Icon:</label><br>
   <input type="text" name="icon" value="{{ event.icon if event else '' }}"><br>
   <label>Location:</label><br>

@@ -45,6 +45,10 @@
       {% elif is_today %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
+      {% set has_calendar_background = is_birthday or is_weekend or is_holiday or is_school_holiday or is_today %}
+      {% if day in event_backgrounds and not has_calendar_background %}
+        {% set cell_bg = event_backgrounds[day] %}
+      {% endif %}
       <th
         style="background: {{ cell_bg }};{% if highlight_day_today == 'Red' and is_today %}color:#b00020;font-weight:bold;{% elif highlight_day_data == 'Bold' and has_events %}font-weight:bold;{% endif %}">
         {{ day.strftime('%a %d') }}
@@ -72,9 +76,14 @@
       {% elif today == day %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
+      {% set has_calendar_background = is_birthday or is_weekend or is_holiday or is_school_holiday or today == day %}
+      {% if day in event_backgrounds and not has_calendar_background %}
+        {% set cell_bg = event_backgrounds[day] %}
+      {% endif %}
       <td class="calendar-cell" style="background: {{ cell_bg }};">
         {% for ev in all_day_events.get(day, []) %}
         <div class="calendar-event">
+          {% set event_background_conflicts = has_calendar_background %}
           {% include "widgets/wid_calendar_event_link.html" %}
         </div>
         {% endfor %}
@@ -131,9 +140,14 @@
       {% elif today == day %}
         {% set cell_bg = col_bg_today %}
       {% endif %}
-      <td class="calendar-cell" style="background: {{ cell_bg if is_birthday or is_holiday or is_school_holiday or is_weekend or today == day else slot_bg }};">
+      {% set has_calendar_background = is_birthday or is_weekend or is_holiday or is_school_holiday or today == day %}
+      {% if day in event_backgrounds and not has_calendar_background %}
+        {% set cell_bg = event_backgrounds[day] %}
+      {% endif %}
+      <td class="calendar-cell" style="background: {{ cell_bg if has_calendar_background or day in event_backgrounds else slot_bg }};">
         {% for ev in timed_events.get(day, {}).get(slot.minutes, []) %}
         <div class="calendar-event">
+          {% set event_background_conflicts = has_calendar_background %}
           {% include "widgets/wid_calendar_event_link.html" %}
         </div>
         {% endfor %}
