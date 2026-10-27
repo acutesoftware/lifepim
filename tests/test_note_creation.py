@@ -802,6 +802,25 @@ class TestNoteCreation(unittest.TestCase):
         self.assertIn(">42-4-misc/_HOWTO__SQL.md</a>", html)
         self.assertNotIn('class="wiki-link wiki-link-broken"', html)
 
+    def test_note_view_markdown_resolves_same_folder_filename_wiki_link(self):
+        note_dir = os.path.join(self.tmpdir.name, "DATA", "notes", "Retirement")
+        source_id, source = self._create_note_record("Retirement Overview", note_dir, area="")
+        target_id, _target = self._create_note_record(
+            "Retirement_Planning_Summary_2026-09-30",
+            note_dir,
+            area="",
+        )
+        with open(source["full_path"], "w", encoding="utf-8") as handle:
+            handle.write("[[Retirement_Planning_Summary_2026-09-30.md]]")
+
+        response = self._notes_test_app().test_client().get(f"/notes/view/{source_id}?format=markdown")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f'href="/notes/view/{target_id}"', html)
+        self.assertIn(">Retirement_Planning_Summary_2026-09-30.md</a>", html)
+        self.assertNotIn('class="wiki-link wiki-link-broken"', html)
+
     def test_note_view_markdown_resolves_parent_relative_path_wiki_link(self):
         notes_root = os.path.join(self.tmpdir.name, "DATA", "notes")
         source_dir = os.path.join(notes_root, "70-Make", "72-PC", "Linux")

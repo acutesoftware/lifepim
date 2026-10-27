@@ -1703,7 +1703,11 @@ def _normalize_wiki_note_path(value):
 
 def _wiki_path_candidates(title):
     normalized = _normalize_wiki_note_path(title)
-    if not normalized or "\\" not in normalized:
+    # A wiki link to a Markdown filename in the current folder is still a path,
+    # even though it has no directory separator.  Treating it as a title makes
+    # the literal ".md" suffix part of the title lookup and breaks links emitted
+    # by the editor popup, such as [[Retirement_Planning_Summary_2026-09-30.md]].
+    if not normalized or ("\\" not in normalized and not normalized.endswith(".md")):
         return []
     candidates = [normalized]
     if not normalized.endswith(".md"):
