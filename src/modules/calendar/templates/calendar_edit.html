@@ -26,6 +26,7 @@
 {% endif %}
 {% set day_codes = [('MO', 'Monday'), ('TU', 'Tuesday'), ('WE', 'Wednesday'), ('TH', 'Thursday'), ('FR', 'Friday'), ('SA', 'Saturday'), ('SU', 'Sunday')] %}
 <form method="POST" class="calendar-form" id="calendar-event-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>Event kind:</label><br>
   <select name="recurrence_type" id="recurrence_type">
     <option value="single" {% if initial_type == 'single' %}selected{% endif %}>Add Event</option>

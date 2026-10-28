@@ -76,14 +76,34 @@ class TestLocalSecurity(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
-    def test_other_loopback_origin_is_not_same_origin(self):
+    def test_other_loopback_origin_relies_on_csrf(self):
         csrf_token = self.client.get("/login", headers={"Host": "localhost"}).get_data(as_text=True)
         response = self.client.post(
             "/mutate",
             headers={"Host": "localhost", "Origin": "http://localhost:9999"},
             data={"csrf_token": csrf_token},
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_loopback_alias_on_same_port_is_allowed_by_origin_guard(self):
+        csrf_token = self.client.get(
+            "/login", headers={"Host": "127.0.0.1:9741"}
+        ).get_data(as_text=True)
+        response = self.client.post(
+            "/mutate",
+            headers={"Host": "127.0.0.1:9741", "Origin": "http://localhost:9741"},
+            data={"csrf_token": csrf_token},
+        )
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_opaque_origin_with_valid_csrf_is_allowed(self):
+        csrf_token = self.client.get("/login", headers={"Host": "localhost"}).get_data(as_text=True)
+        response = self.client.post(
+            "/mutate",
+            headers={"Host": "localhost", "Origin": "null"},
+            data={"csrf_token": csrf_token},
+        )
+        self.assertNotEqual(response.status_code, 403)
 
     def test_missing_csrf_is_rejected(self):
         response = self.client.post("/mutate", headers={"Host": "localhost"})

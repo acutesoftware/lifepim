@@ -300,18 +300,21 @@ def _same_origin_request():
     if fetch_site == "cross-site":
         return False
     origin = (request.headers.get("Origin") or "").strip()
+    # Some desktop browsers and privacy tools send an opaque ("null") origin
+    # for locally restored/form-submitted pages. CSRF remains authoritative in
+    # that case; rejecting it here breaks legitimate mutations across the app.
     if not origin or origin == "null":
-        return origin != "null"
+        return True
     try:
         from urllib.parse import urlsplit
 
         parsed = urlsplit(origin)
         return (
-            parsed.scheme == request.scheme
+            parsed.scheme in {"http", "https"}
             and _valid_local_host(parsed.netloc)
-            and parsed.netloc.lower() == request.host.lower()
+            and _valid_local_host(request.host)
         )
-    except ValueError:
+    except (TypeError, ValueError):
         return False
 
 

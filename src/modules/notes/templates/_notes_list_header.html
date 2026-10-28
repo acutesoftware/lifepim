@@ -36,6 +36,7 @@
 
     <span class="note-status"><span class="note-total-count">{{ total_notes|default(notes|length) }} {{ 'Templates' if template_filter == 'templates' else 'Notes' }}</span></span>
     <form method="post" action="{{ url_for('notes.sync_notes_route') }}" class="note-inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
       {% if area %}<input type="hidden" name="area" value="{{ area }}">{% endif %}
       {% if folder_filter %}<input type="hidden" name="folder" value="{{ folder_filter }}">{% endif %}

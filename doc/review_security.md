@@ -288,7 +288,7 @@ python -m compileall -q src tests                         PASS
 python -m pip check                                      PASS
 python -m pip_audit --local --progress-spinner off       PASS, no known vulnerabilities
 tests.test_local_security + test_caddy_lan_hosts +
-tests.test_auth_routes                                   11 passed
+tests.test_auth_routes                                   13 passed
 tasks/apps, data catalogue, importer and Markdown tests  26 passed
 test_notes_webclip with tests/src on PYTHONPATH           23 passed, 2 skipped
 git diff --check                                         PASS (line-ending notices only)
