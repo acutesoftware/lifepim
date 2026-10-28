@@ -345,7 +345,7 @@ def view_app_route(item_id):
     return _render_apps_index(area, item=item)
 
 
-@apps_bp.route("/launch/<int:item_id>")
+@apps_bp.route("/launch/<int:item_id>", methods=["POST"])
 def launch_app_route(item_id):
     area = _area()
     try:
@@ -360,7 +360,7 @@ def launch_app_route(item_id):
     return redirect(url_for("apps.view_app_route", item_id=item_id, **_args_with()))
 
 
-@apps_bp.route("/action/<int:action_id>/launch/<int:item_id>")
+@apps_bp.route("/action/<int:action_id>/launch/<int:item_id>", methods=["POST"])
 def launch_app_action_route(item_id, action_id):
     area = _area()
     try:
@@ -525,7 +525,7 @@ def edit_app_route(item_id):
     return _render_edit(item, area, error=error)
 
 
-@apps_bp.route("/delete/<int:item_id>", methods=["GET", "POST"])
+@apps_bp.route("/delete/<int:item_id>", methods=["POST"])
 def delete_app_route(item_id):
     try:
         apps_model.delete_app(item_id)

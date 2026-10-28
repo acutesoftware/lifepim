@@ -981,7 +981,7 @@ def edit_place_route(place_id):
     )
 
 
-@places_bp.route("/delete/<int:place_id>")
+@places_bp.route("/delete/<int:place_id>", methods=["POST"])
 def delete_place_route(place_id):
     area = _normalize_area(request_area_param())
     tbl = _get_tbl()

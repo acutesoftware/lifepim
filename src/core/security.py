@@ -200,10 +200,7 @@ def ensure_security_schema(conn=None):
 
 def configure_security(app):
     env_name = os.getenv("LIFEPIM_ENV", "development").strip().lower()
-    allow_insecure = (
-        os.getenv("LIFEPIM_ALLOW_INSECURE_COOKIES", "").strip().lower() in {"1", "true", "yes", "on"}
-        or env_name != "production"
-    )
+    secure_cookies = os.getenv("LIFEPIM_SECURE_COOKIES", "").strip().lower() in {"1", "true", "yes", "on"}
     secret_key = os.getenv("LIFEPIM_SECRET_KEY") or app.config.get("SECRET_KEY")
     if not secret_key:
         if env_name != "production":
@@ -214,13 +211,13 @@ def configure_security(app):
         SECRET_KEY=secret_key,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=not allow_insecure,
+        SESSION_COOKIE_SECURE=secure_cookies,
         REMEMBER_COOKIE_HTTPONLY=True,
         REMEMBER_COOKIE_SAMESITE="Lax",
-        REMEMBER_COOKIE_SECURE=not allow_insecure,
+        REMEMBER_COOKIE_SECURE=secure_cookies,
         PERMANENT_SESSION_LIFETIME=timedelta(days=7),
         WTF_CSRF_TIME_LIMIT=None,
-        LIFEPIM_SECURE_COOKIES=not allow_insecure,
+        LIFEPIM_SECURE_COOKIES=secure_cookies,
     )
     ensure_security_schema()
     login_manager.login_view = "auth.login"
@@ -234,6 +231,17 @@ def configure_security(app):
 
     @app.before_request
     def _security_before_request():
+        if not _valid_local_host(request.host):
+            abort(400)
+        if request.method not in {"GET", "HEAD", "OPTIONS", "TRACE"} and not _same_origin_request():
+            abort(403)
+        endpoint = request.endpoint or ""
+        if endpoint.startswith("public.") and not app.config.get("LIFEPIM_ENABLE_PUBLIC_NOTES", False):
+            abort(404)
+        if endpoint.startswith("pocket_api.") and not app.config.get("LIFEPIM_ENABLE_POCKET_API", False):
+            abort(404)
+        if endpoint.startswith("logger_api.") and not app.config.get("LIFEPIM_ENABLE_LOGGER_API", False):
+            abort(404)
         restore_login_from_trusted_device(request)
         if _route_is_public():
             return None
@@ -245,6 +253,17 @@ def configure_security(app):
     def _security_after_request(response):
         if getattr(g, "clear_trusted_device_cookie", False):
             _clear_trusted_cookie(response)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+            "form-action 'self'; connect-src 'self'; script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; "
+            "media-src 'self' blob:; font-src 'self' data:",
+        )
         return response
 
     @app.context_processor
@@ -265,6 +284,35 @@ def _route_is_public():
     if request.path.startswith("/static/") or request.path.startswith("/public/"):
         return True
     return False
+
+
+def _valid_local_host(host_value):
+    host = (host_value or "").strip().lower()
+    if host.startswith("["):
+        hostname = host.split("]", 1)[0] + "]"
+    else:
+        hostname = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+    return hostname in {"localhost", "127.0.0.1", "[::1]", "::1"}
+
+
+def _same_origin_request():
+    fetch_site = (request.headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if fetch_site == "cross-site":
+        return False
+    origin = (request.headers.get("Origin") or "").strip()
+    if not origin or origin == "null":
+        return origin != "null"
+    try:
+        from urllib.parse import urlsplit
+
+        parsed = urlsplit(origin)
+        return (
+            parsed.scheme == request.scheme
+            and _valid_local_host(parsed.netloc)
+            and parsed.netloc.lower() == request.host.lower()
+        )
+    except ValueError:
+        return False
 
 
 @login_manager.user_loader

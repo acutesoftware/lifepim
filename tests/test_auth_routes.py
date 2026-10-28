@@ -20,11 +20,10 @@ class TestAuthRoutes(unittest.TestCase):
         login_manager.init_app(app)
         self.client = app.test_client()
 
-    def test_logout_aliases_redirect_to_login(self):
+    def test_logout_aliases_reject_get(self):
         for path in ("/logout", "/auth/logout"):
             response = self.client.get(path)
-            self.assertEqual(response.status_code, 302)
-            self.assertEqual(response.headers["Location"], "/login")
+            self.assertEqual(response.status_code, 405)
 
 
 if __name__ == "__main__":

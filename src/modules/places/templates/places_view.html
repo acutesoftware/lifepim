@@ -61,7 +61,7 @@
 
   <p class="places-detail-actions">
     <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}">Edit</a>
-    <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
+    <form method="post" action="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" style="display:inline" onsubmit="return confirm('Delete item?');"><button type="submit" class="link-button">Del</button></form>
     {% if item.map_actions %}
       {% for action in item.map_actions %}
         <a href="{{ action.url }}" target="_blank" rel="noopener noreferrer">{{ action.label }}</a>

@@ -3,7 +3,7 @@
   <div>
     <a href="{{ url_for('contacts.list_contacts_table_route') }}">Back to list</a> |
     <a href="{{ url_for('contacts.edit_contact_route', contact_id=contact.contact_id) }}">Edit</a> |
-    <a href="{{ url_for('contacts.delete_contact_route', contact_id=contact.contact_id) }}" onclick="return confirm('Delete contact?');">Del</a>
+    <form method="post" action="{{ url_for('contacts.delete_contact_route', contact_id=contact.contact_id) }}" style="display:inline" onsubmit="return confirm('Delete contact?');"><button type="submit" class="link-button">Del</button></form>
   </div>
 
   <table border="1" cellpadding="5">
@@ -38,7 +38,7 @@
       <td>{{ fact.confidence }}</td>
       <td>{{ fact.created_utc }}</td>
       <td>
-        <a href="{{ url_for('contacts.delete_fact_route', fact_id=fact.fact_id, contact_id=contact.contact_id) }}" onclick="return confirm('Delete fact?');">Del</a>
+        <form method="post" action="{{ url_for('contacts.delete_fact_route', fact_id=fact.fact_id, contact_id=contact.contact_id) }}" style="display:inline" onsubmit="return confirm('Delete fact?');"><input type="hidden" name="contact_id" value="{{ contact.contact_id }}"><button type="submit" class="link-button">Del</button></form>
       </td>
     </tr>
     {% endfor %}

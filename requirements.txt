@@ -16,11 +16,16 @@ pytz==2025.2
 six==1.17.0
 tzdata==2025.3
 Werkzeug==3.1.9
-argon2-cffi==23.1.0
+argon2-cffi==25.1.0
 waitress==3.0.2
 xlrd==2.0.2
+bleach==6.4.0
+certifi==2026.10.23
+soupsieve>=2.9,<4
+urllib3>=2.8,<3
 
 # Webpage Notes (browser rendering and SingleFile remain optional)
 requests>=2.32,<3
 trafilatura>=2.2,<3
-Pillow>=11,<13
+Pillow>=13,<14
+playwright==1.62.0

@@ -198,7 +198,7 @@ def edit_task_route(task_id):
     return _render_edit(task, task.get("area") or "", error=error, selected_action_id=selected_action_id)
 
 
-@tasks_bp.route("/delete/<int:task_id>", methods=["POST", "GET"])
+@tasks_bp.route("/delete/<int:task_id>", methods=["POST"])
 def delete_task_route(task_id):
     tasks_model.delete_task(task_id)
     return redirect(url_for("tasks.list_tasks_route", **_args_with()))
@@ -226,7 +226,7 @@ def run_task_route(task_id):
         return redirect(url_for("tasks.edit_task_route", task_id=task_id, message=str(exc)))
 
 
-@tasks_bp.route("/template/<int:template_id>/create", methods=["POST", "GET"])
+@tasks_bp.route("/template/<int:template_id>/create", methods=["POST"])
 def create_from_template_route(template_id):
     try:
         task_id = tasks_model.create_task_from_template(template_id)

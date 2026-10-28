@@ -64,20 +64,12 @@ echo Compiling deployed Python files.
 "%PYTHON_EXE%" -m compileall -q "%PROD_SRC%"
 if errorlevel 1 exit /b %ERRORLEVEL%
 
-if exist "C:\apps\caddy\Caddyfile" (
-  findstr /C:"https://192.168.1.99" "C:\apps\caddy\Caddyfile" >nul
-  if errorlevel 1 (
-    echo WARNING: C:\apps\caddy\Caddyfile does not mention https://192.168.1.99.
-    echo          Pocket requires HTTPS through Caddy; update Caddy before pairing Android.
-  )
-)
-
 echo Starting production LifePIM.
 start "LifePIM Desktop" /MIN cmd /d /c call "%PROD_DIR%\RUN_DESKTOP.BAT" ^> "%PROD_START_LOG%" 2^>^&1
 
 echo Waiting for health check.
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$deadline = (Get-Date).AddSeconds(20); do { try { $r = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:%LIFEPIM_PORT%/api/pocket/v1/health' -TimeoutSec 2; if ($r.StatusCode -eq 200) { Write-Host 'Health check OK:' $r.Content; exit 0 } } catch { Start-Sleep -Seconds 1 } } while ((Get-Date) -lt $deadline); Write-Host 'ERROR: Health check failed on http://127.0.0.1:%LIFEPIM_PORT%/api/pocket/v1/health'; exit 1"
+  "$deadline = (Get-Date).AddSeconds(20); do { try { $r = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:%LIFEPIM_PORT%/login' -TimeoutSec 2; if ($r.StatusCode -eq 200) { Write-Host 'Local health check OK.'; exit 0 } } catch { Start-Sleep -Seconds 1 } } while ((Get-Date) -lt $deadline); Write-Host 'ERROR: Health check failed on http://127.0.0.1:%LIFEPIM_PORT%/login'; exit 1"
 if errorlevel 1 (
   echo.
   echo Startup log tail from %PROD_START_LOG%:

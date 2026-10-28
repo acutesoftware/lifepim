@@ -8,10 +8,9 @@ The current desktop app is a Flask web application that runs on your PC and
 uses a local SQLite database. The current entry point is `src/app.py`; on
 Windows the expected launcher is `src/RUN_DESKTOP.BAT`.
 
-LifePIM Desktop is a standalone tool. It does not require the mobile app,
-cloud sync, or LifePIM.com to run. When you want phone access, LifePIM Pocket
-can be paired as a mobile companion over the local network using the Pocket API
-served by Desktop through Caddy HTTPS.
+LifePIM Desktop is a standalone, single-owner tool. It does not require the
+mobile app, cloud sync, LifePIM.com, Caddy or any LAN service. The supported
+security model exposes the browser UI only on the same computer.
 
 ## Current Status
 
@@ -22,8 +21,8 @@ developer-oriented and machine-specific in places.
 Working at a high level:
 
 - Local Flask app served at `http://127.0.0.1:9741`
-- Optional LAN companion sync for LifePIM Pocket through
-  `https://192.168.1.99` via Caddy, with Waitress kept loopback-only
+- Loopback-only Waitress with LAN/public/mobile/logger endpoints disabled by
+  default
 - Overview dashboard with recent notes, tasks, and calendar context
 - Top-level modules for Calendar, Goals, Tasks, How, Notes, Data, Files, Media,
   Audio, 3D, Money, People, Places, Apps, Admin, Links, and Areas
@@ -65,7 +64,11 @@ python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python -m playwright install chromium
 ```
+
+The Chromium step is needed only for rendered web clipping and browser PDF
+features.
 
 The Windows launcher expects the virtual environment at:
 
@@ -117,10 +120,9 @@ file-backed content remain in their configured folders, while operational logs
 and temporary import files are written locally on the same computer.
 
 LifePIM Desktop does not upload or synchronize this information to
-LifePIM.com, or to any other external or cloud server. Optional Pocket sync is
-directly between your devices on your local network. Features you explicitly
-ask to retrieve public web content or prices may contact those public services,
-but they do not upload your LifePIM database or local personal metadata.
+LifePIM.com, or to any other external or cloud server. Features you explicitly
+ask to retrieve web pages, maps, geocoding, school terms or prices may contact
+those public services, but they do not upload your LifePIM database.
 
 ## Run
 
@@ -130,8 +132,8 @@ Recommended Windows launcher from the repository root:
 src\RUN_DESKTOP.BAT
 ```
 
-This starts `src/app.py` with `.venv\Scripts\python.exe`, waits briefly, and
-opens the browser at `http://127.0.0.1:9741`.
+This starts Waitress at `http://127.0.0.1:9741`. It rejects wildcard or LAN
+bind addresses and does not start Caddy.
 
 Manual run from the repository root:
 
@@ -165,45 +167,20 @@ to preserve.
 
 More operational detail is in [doc/deploy.md](doc/deploy.md).
 
-## Mobile Companion
+## Network and legacy companion code
 
-LifePIM Desktop remains the standalone desktop application and source of the
-local SQLite-backed data. LifePIM Pocket is optional and should be treated as a
-LAN companion, not as a required service or public cloud client.
+LifePIM is supported only at `http://127.0.0.1:9741`. Public-note,
+Pocket/mobile and logger API code remains for legacy compatibility but is
+disabled by default and is outside the reviewed security model. Do not enable
+those routes or place LifePIM behind a LAN reverse proxy. See
+[doc/network.md](doc/network.md) and
+[doc/review_security.md](doc/review_security.md).
 
-The companion setup requires:
+## Legacy per-user file roots
 
-- Desktop running Waitress on `127.0.0.1:9741`.
-- Caddy listening on the Desktop LAN IP, currently `192.168.1.99`, and reverse
-  proxying HTTPS traffic to Waitress.
-- Pocket configured with `https://192.168.1.99`; HTTP Pocket API access is not
-  supported for normal use.
-- Pocket built with the public Caddy local root certificate for this Desktop
-  installation. The private Caddy CA key stays on the Desktop machine and must
-  not be copied into the mobile area or committed.
-- A logged-in Desktop user creating a one-time Pocket pairing code under
-  Trusted devices. Pocket registration uses that code plus the device identity,
-  then sends `Authorization: Bearer <device_token>` and
-  `X-LifePIM-Device-ID: <device_id>` on API calls.
-
-Pocket currently syncs with Desktop through explicit directions:
-
-- `Sync Mobile to LAN Server` uploads local Pocket changes to Desktop through
-  `/api/pocket/v1/sync/push`.
-- `Sync from LAN Server` reads Desktop's manifest from
-  `/api/pocket/v1/sync/manifest` and downloads item content from
-  `/api/pocket/v1/items/<item_id>`.
-
-Desktop rejects unauthenticated or revoked devices, scopes manifest and item
-access to the paired user, limits sync payload size, and returns conflicts when
-Desktop and Pocket have both changed a note and Desktop cannot safely accept the
-mobile overwrite. More detail is in [doc/network.md](doc/network.md).
-
-## Per-User File Roots
-
-Notes are user-owned in the database and new note files are also separated by
-user on disk. Existing `duncan` note and area-folder settings are preserved
-so the production desktop login continues using the current folders.
+The database retains older per-user fields and path support for compatibility.
+They are not a reviewed hostile multi-user boundary; normal deployment uses one
+trusted owner. Existing `duncan` note and area-folder settings are preserved.
 
 New users get a default root under:
 

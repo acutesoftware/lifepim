@@ -230,7 +230,7 @@ def edit_contact_route(contact_id):
     )
 
 
-@contacts_bp.route("/delete/<int:contact_id>")
+@contacts_bp.route("/delete/<int:contact_id>", methods=["POST"])
 def delete_contact_route(contact_id):
     dao.delete_contact(contact_id)
     return redirect(url_for("contacts.list_contacts_table_route"))
@@ -267,9 +267,9 @@ def add_fact_route(contact_id):
     return redirect(url_for("contacts.view_contact_route", contact_id=contact_id))
 
 
-@contacts_bp.route("/fact/delete/<int:fact_id>")
+@contacts_bp.route("/fact/delete/<int:fact_id>", methods=["POST"])
 def delete_fact_route(fact_id):
-    contact_id = request.args.get("contact_id", type=int)
+    contact_id = request.form.get("contact_id", type=int) or request.args.get("contact_id", type=int)
     dao.delete_fact(fact_id)
     if contact_id:
         return redirect(url_for("contacts.view_contact_route", contact_id=contact_id))

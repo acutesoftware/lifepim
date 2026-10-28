@@ -81,7 +81,7 @@
             <dt>Database</dt>
             <dd><code>{{ db_file }}</code></dd>
             <dt>Tables</dt>
-            <dd><code>{{ area_tables|join('</code>, <code>')|safe }}</code></dd>
+            <dd>{% for table_name in area_tables %}<code>{{ table_name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</dd>
             <dt>Schema SQL</dt>
             <dd><code>{{ schema_sql_file }}</code></dd>
             <dt>Runtime schema source</dt>

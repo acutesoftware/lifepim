@@ -18,7 +18,7 @@
     <td>
       <a href="{{ url_for('goals.view_goal_route', item_id=item.id, area=area) }}">View</a> |
       <a href="{{ url_for('goals.edit_goal_route', item_id=item.id, area=area) }}">Edit</a> |
-      <a href="{{ url_for('goals.delete_goal_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
+      <form method="post" action="{{ url_for('goals.delete_goal_route', item_id=item.id, area=area) }}" style="display:inline" onsubmit="return confirm('Delete item?');"><button type="submit" class="link-button">Del</button></form>
     </td>
   </tr>
   {% endfor %}

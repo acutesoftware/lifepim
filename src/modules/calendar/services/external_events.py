@@ -10,6 +10,9 @@ from common import data as db
 from modules.calendar.services import calendar_index
 
 
+MAX_ICS_EVENTS = 100000
+
+
 def parse_ics_file(path: str, start_year: int | None = None, end_year: int | None = None) -> tuple[str, list[dict]]:
     with open(path, "r", encoding="utf-8-sig", errors="replace") as handle:
         return parse_ics(handle.read(), start_year, end_year)
@@ -28,6 +31,8 @@ def parse_ics(text: str, start_year: int | None = None, end_year: int | None = N
             if current is not None:
                 event = _normalise_event(current, len(events) + 1)
                 events.extend(_expand_event(event, current, start_year, end_year))
+                if len(events) > MAX_ICS_EVENTS:
+                    raise ValueError(f"Calendar import exceeds the {MAX_ICS_EVENTS} event limit.")
             current = None
             continue
         if ":" not in line:

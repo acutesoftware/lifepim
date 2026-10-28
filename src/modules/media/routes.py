@@ -1541,7 +1541,7 @@ def open_media_folder_route(media_id):
     return redirect(request.referrer or url_for("media.media_explorer_route", focus_id=media_id))
 
 
-@media_bp.route("/launch/<int:media_id>")
+@media_bp.route("/launch/<int:media_id>", methods=["POST"])
 def launch_media_file_route(media_id):
     if not security.can_view_media(media_id, current_user):
         abort(403)

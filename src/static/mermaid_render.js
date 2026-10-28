@@ -18,8 +18,13 @@
     });
   };
 
-  import("https://cdn.jsdelivr.net/npm/mermaid@12.0.0/dist/mermaid.esm.min.mjs")
-    .then(async ({ default: mermaid }) => {
+  const mermaid = window.mermaid;
+  if (!mermaid) {
+    showLoadError();
+    return;
+  }
+
+  (async () => {
       mermaid.initialize({
         startOnLoad: false,
         securityLevel: "strict",
@@ -51,6 +56,5 @@
           pre.before(message);
         }
       }
-    })
-    .catch(showLoadError);
+    })().catch(showLoadError);
 })();

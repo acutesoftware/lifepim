@@ -36,7 +36,7 @@
     <td>
       <a href="{{ url_for('files.view_file_route', item_id=item.id, area=area) }}">View</a> |
       <a href="{{ url_for('files.edit_file_route', item_id=item.id, area=area) }}">Edit</a> |
-      <a href="{{ url_for('files.delete_file_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
+      <form method="post" action="{{ url_for('files.delete_file_route', item_id=item.id, area=area) }}" style="display:inline" onsubmit="return confirm('Delete item?');"><button type="submit" class="link-button">Del</button></form>
     </td>
   </tr>
   {% endfor %}

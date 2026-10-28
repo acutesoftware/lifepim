@@ -11,16 +11,17 @@ from scripts.prod import update_caddy_lan_hosts
 
 
 class TestCaddyLanHosts(unittest.TestCase):
-    def test_build_caddyfile_includes_multiple_lan_hosts(self):
-        content = update_caddy_lan_hosts.build_caddyfile(["192.168.1.99", "10.181.130.24"], "127.0.0.1:9741")
+    def test_build_caddyfile_can_only_include_loopback(self):
+        content = update_caddy_lan_hosts.build_caddyfile(["127.0.0.1"], "127.0.0.1:9741")
 
-        self.assertIn("http://192.168.1.99, http://10.181.130.24", content)
-        self.assertIn("https://192.168.1.99, https://10.181.130.24", content)
+        self.assertIn("http://127.0.0.1", content)
+        self.assertIn("https://127.0.0.1", content)
+        self.assertNotIn("192.168.", content)
         self.assertIn("reverse_proxy 127.0.0.1:9741", content)
         self.assertIn("handle /api/pocket/v1/*", content)
         self.assertNotIn("max_size 10MB", content)
 
-    def test_collect_lan_hosts_keeps_private_addresses_only(self):
+    def test_collect_lan_hosts_ignores_all_network_addresses(self):
         original = update_caddy_lan_hosts._active_windows_ipv4_addresses
         try:
             update_caddy_lan_hosts._active_windows_ipv4_addresses = lambda: [
@@ -34,7 +35,7 @@ class TestCaddyLanHosts(unittest.TestCase):
         finally:
             update_caddy_lan_hosts._active_windows_ipv4_addresses = original
 
-        self.assertEqual(hosts, ["192.168.1.99", "172.16.2.3", "10.181.130.24"])
+        self.assertEqual(hosts, ["127.0.0.1"])
 
 
 if __name__ == "__main__":

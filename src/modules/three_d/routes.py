@@ -223,7 +223,7 @@ def edit_3d_route(item_id):
     )
 
 
-@three_d_bp.route("/delete/<int:item_id>")
+@three_d_bp.route("/delete/<int:item_id>", methods=["POST"])
 def delete_3d_route(item_id):
     area = request_area_param() or None
     tbl = _get_tbl()

@@ -339,7 +339,7 @@ def edit_file_route(item_id):
     )
 
 
-@files_bp.route("/delete/<int:item_id>")
+@files_bp.route("/delete/<int:item_id>", methods=["POST"])
 def delete_file_route(item_id):
     area = request_area_param() or None
     tbl = _get_tbl()

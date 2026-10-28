@@ -53,7 +53,7 @@
             <div class="places-card-actions">
               <a href="{{ url_for('places.view_place_route', place_id=item.id, area=area) }}">Details</a>
               <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}">Edit</a>
-              <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
+              <form method="post" action="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" style="display:inline" onsubmit="return confirm('Delete item?');"><button type="submit" class="link-button">Del</button></form>
             </div>
           </div>
         {% else %}
@@ -95,7 +95,7 @@
               <td>{{ item.location_summary }}</td>
               <td>
                 <a href="{{ url_for('places.edit_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation();">Edit</a> |
-                <a href="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" onclick="event.stopPropagation(); return confirm('Delete item?');">Del</a>
+                <form method="post" action="{{ url_for('places.delete_place_route', place_id=item.id, area=area) }}" style="display:inline" onclick="event.stopPropagation();" onsubmit="return confirm('Delete item?');"><button type="submit" class="link-button">Del</button></form>
                 {% if item.open_url %}
                   | <a href="{{ item.open_url }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">Open</a>
                 {% endif %}

@@ -2596,7 +2596,9 @@ def _render_notebook_pdf(html):
                 page.set_content(html, wait_until="networkidle")
                 mermaid_count = page.locator("pre > code.language-mermaid").count()
                 if mermaid_count:
+                    mermaid_library = os.path.join(current_app.static_folder, "mermaid.min.js")
                     mermaid_script = os.path.join(current_app.static_folder, "mermaid_render.js")
+                    page.add_script_tag(path=mermaid_library)
                     page.add_script_tag(path=mermaid_script)
                     page.wait_for_function(
                         """expected =>
@@ -3010,6 +3012,11 @@ def note_asset_route(note_id, asset_path):
         response = send_file(full_path)
         response.headers["Content-Security-Policy"] = "sandbox; default-src 'none'; img-src data: blob:; style-src 'unsafe-inline' data:; font-src data:"
         response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+    if full_path.lower().endswith(".svg"):
+        response = send_file(full_path, as_attachment=True, download_name=os.path.basename(full_path))
+        response.headers["Content-Security-Policy"] = "sandbox; default-src 'none'"
+        response.headers["X-Content-Type-Options"] = "nosniff"
         return response
     return send_file(full_path)
 
@@ -3953,7 +3960,7 @@ def wiki_preview_route(note_id):
     )
     return jsonify({"html": html_rendered})
 
-@notes_bp.route('/delete/<int:note_id>')
+@notes_bp.route('/delete/<int:note_id>', methods=["POST"])
 def delete_note_route(note_id):
     if not security.can_delete_note(note_id, current_user):
         abort(403)

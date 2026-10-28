@@ -78,7 +78,7 @@
                     <td>{{ item.last_used_date or '' }}</td>
                     <td>{{ 'Yes' if item.favorite else '' }}</td>
                     <td class="apps-row-actions">
-                      <a class="apps-open-action" href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Run</a>
+                      <form method="post" action="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}" style="display:inline"><button type="submit" class="apps-open-action">Run</button></form>
                       <a class="apps-icon-action" href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}" title="Edit" aria-label="Edit {{ item.title }}">&#9998;</a>
                       <form method="post"
                             action="{{ url_for('apps.delete_app_route', item_id=item.app_id) }}"
@@ -118,7 +118,7 @@
                 </a>
                 <div class="apps-card-actions">
                   {% if item.default_action %}
-                    <a href="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Run</a>
+                    <form method="post" action="{{ url_for('apps.launch_app_route', item_id=item.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}" style="display:inline"><button type="submit" class="link-button">Run</button></form>
                   {% endif %}
                   <a href="{{ url_for('apps.edit_app_route', item_id=item.app_id, area=area) }}">Edit</a>
                   <form method="post"
@@ -160,7 +160,7 @@
           </div>
           <div class="apps-inspector-actions">
             {% if selected_app.default_action %}
-              <a class="apps-primary-action" href="{{ url_for('apps.launch_app_route', item_id=selected_app.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">Run</a>
+              <form method="post" action="{{ url_for('apps.launch_app_route', item_id=selected_app.app_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}" style="display:inline"><button type="submit" class="apps-primary-action">Run</button></form>
             {% endif %}
             <a href="{{ url_for('apps.edit_app_route', item_id=selected_app.app_id, area=area) }}">Edit</a>
             <form method="post"
@@ -250,9 +250,9 @@
             <ul class="apps-action-list">
               {% for action in selected_app.actions %}
                 <li>
-                  <a href="{{ url_for('apps.launch_app_action_route', item_id=selected_app.app_id, action_id=action.app_action_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}">
-                    {{ action.action_name }}
-                  </a>
+                  <form method="post" action="{{ url_for('apps.launch_app_action_route', item_id=selected_app.app_id, action_id=action.app_action_id, area=area, saved_view=saved_view, mode=mode, q=query, sort=sort_col, dir=sort_dir) }}" style="display:inline">
+                    <button type="submit" class="link-button">{{ action.action_name }}</button>
+                  </form>
                   <span>{{ action.action_type }}</span>
                   {% if action.is_default %}<strong>Default</strong>{% endif %}
                   {% if action.parameter_schema_json %}<strong>Params</strong>{% endif %}

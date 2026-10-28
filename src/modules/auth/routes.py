@@ -41,8 +41,8 @@ def login():
     )
 
 
-@auth_bp.route("/logout", methods=["GET", "POST"])
-@auth_bp.route("/auth/logout", methods=["GET", "POST"])
+@auth_bp.route("/logout", methods=["POST"])
+@auth_bp.route("/auth/logout", methods=["POST"])
 def logout():
     response = make_response(redirect(url_for("auth.login")))
     forget_device = request.values.get("forget_device", "1") == "1"

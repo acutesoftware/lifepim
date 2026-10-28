@@ -13,7 +13,7 @@
       <a href="{{ url_for('three_d.view_3d_route', item_id=item.id, area=area) }}">{{ item.file_name }}</a>
       <span>
         <a href="{{ url_for('three_d.edit_3d_route', item_id=item.id, area=area) }}">Edit</a> |
-        <a href="{{ url_for('three_d.delete_3d_route', item_id=item.id, area=area) }}" onclick="return confirm('Delete item?');">Del</a>
+        <form method="post" action="{{ url_for('three_d.delete_3d_route', item_id=item.id, area=area) }}" style="display:inline" onsubmit="return confirm('Delete item?');"><button type="submit" class="link-button">Del</button></form>
       </span>
     </li>
     {% endfor %}

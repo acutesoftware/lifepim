@@ -6,6 +6,8 @@ import html
 import inspect
 import re
 
+import bleach
+
 try:
     import markdown as md_lib
 except Exception:
@@ -20,6 +22,24 @@ _MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)")
 _HTML_IMG_RE = re.compile(r"(?is)<img\b([^>]*?)\bsrc\s*=\s*(['\"]?)([^'\"\s>]+)\2([^>]*)>")
 _FENCE_RE = re.compile(r"^```[\w+-]*\s*$")
 _FENCE_CLOSE_RE = re.compile(r"^```\s*$")
+
+SAFE_HTML_TAGS = {
+    "a", "abbr", "b", "blockquote", "br", "caption", "code", "del", "details",
+    "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img",
+    "kbd", "li", "ol", "p", "pre", "s", "span", "strong", "sub", "summary",
+    "sup", "table", "tbody", "td", "th", "thead", "tr", "ul",
+}
+SAFE_HTML_ATTRIBUTES = {
+    "a": ["href", "title", "class"],
+    "img": ["src", "alt", "title", "class", "width", "height", "loading"],
+    "code": ["class"],
+    "div": ["class"],
+    "span": ["class", "title"],
+    "table": ["class"],
+    "th": ["align"],
+    "td": ["align"],
+}
+SAFE_HTML_PROTOCOLS = {"http", "https", "mailto", "tel"}
 
 
 def _is_absolute_asset(source):
@@ -342,5 +362,14 @@ def render_markdown(text, asset_resolver=None, allow_html=True, wiki_link_resolv
     text = _convert_obsidian_wiki_links(text, wiki_link_resolver)
     text = _convert_markdown_note_links(text, link_resolver)
     if md_lib:
-        return md_lib.markdown(text, extensions=["fenced_code", "nl2br", "sane_lists", "tables"])
-    return _render_fallback_markdown(text)
+        rendered = md_lib.markdown(text, extensions=["fenced_code", "nl2br", "sane_lists", "tables"])
+    else:
+        rendered = _render_fallback_markdown(text)
+    return bleach.clean(
+        rendered,
+        tags=SAFE_HTML_TAGS,
+        attributes=SAFE_HTML_ATTRIBUTES,
+        protocols=SAFE_HTML_PROTOCOLS,
+        strip=True,
+        strip_comments=True,
+    )

@@ -7,7 +7,6 @@ from datetime import date, datetime
 
 from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 from common.utils import (
     get_tabs,
@@ -155,7 +154,9 @@ _dbg("Creating Flask app")
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("LIFEPIM_MAX_CONTENT_LENGTH", str(100 * 1024 * 1024)))
 app.config["LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES"] = int(os.getenv("LIFEPIM_POCKET_MAX_SYNC_PAYLOAD_BYTES", str(100 * 1024 * 1024)))
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+app.config["LIFEPIM_ENABLE_PUBLIC_NOTES"] = os.getenv("LIFEPIM_ENABLE_PUBLIC_NOTES", "").strip().lower() in {"1", "true", "yes", "on"}
+app.config["LIFEPIM_ENABLE_POCKET_API"] = os.getenv("LIFEPIM_ENABLE_POCKET_API", "").strip().lower() in {"1", "true", "yes", "on"}
+app.config["LIFEPIM_ENABLE_LOGGER_API"] = os.getenv("LIFEPIM_ENABLE_LOGGER_API", "").strip().lower() in {"1", "true", "yes", "on"}
 app.jinja_env.filters["duration_friendly"] = format_duration_friendly
 app.jinja_env.filters["duration_label"] = format_duration_label
 app.jinja_env.filters["area_param"] = normalize_area_param
@@ -644,18 +645,16 @@ def help_route():
     )
 
 if __name__ == "__main__":
-    #app.run(debug=True)
-    auto_reload = bool(getattr(mod_cfg, "APP_AUTO_RELOAD", False))
-    is_reloader_child = os.environ.get("WERKZEUG_RUN_MAIN") == "true"
-    if not (auto_reload and is_reloader_child):
-        _exit_if_server_already_running(mod_cfg.base_url, mod_cfg.port_num)
+    host = str(getattr(mod_cfg, "base_url", "127.0.0.1")).strip().lower()
+    if host not in {"127.0.0.1", "::1", "localhost"}:
+        raise RuntimeError("LifePIM Desktop is local-only; configure base_url as a loopback host.")
+    _exit_if_server_already_running(host, mod_cfg.port_num)
 
     app.run(
-        host=mod_cfg.base_url,
+        host=host,
         port=mod_cfg.port_num,
         debug=False,
-        use_reloader=auto_reload,
-        extra_files=_python_source_files(),
+        use_reloader=False,
     )
 
 

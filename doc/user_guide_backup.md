@@ -1,5 +1,37 @@
 # LifePIM Data Locations and Backup
 
+> Current security baseline (2026-10-28): LifePIM is local-only. Caddy,
+> Pocket/mobile sync, LAN user roots, public routes and logger API are not part
+> of the supported deployment and are disabled by default. Older sections below
+> describe historical installations; they do not override this baseline.
+
+## Minimum recoverable backup
+
+Before copying SQLite files, stop LifePIM and confirm no Python/Waitress process
+is using the database. A stopped copy must include the main database and, if
+present, its matching `-wal` and `-shm` files. A safer online backup can use
+SQLite's backup API, but the output must still be restored and tested.
+
+Back up all of the following together:
+
+- the configured main SQLite database and logger database, if logger data is
+  still used locally;
+- every configured notes, areas, lists, attachments, audio and media root;
+- local imported/generated assets that are not reproducible;
+- the LifePIM source version, `requirements.txt`, path configuration, and a
+  private record of required environment settings such as
+  `LIFEPIM_SECRET_KEY` (never store the secret in Git).
+
+Do not treat a successful copy job as proof of recovery. On a separate offline
+directory or test machine, restore the set, point a test configuration at the
+restored paths, run `PRAGMA integrity_check`, sign in, open representative
+notes and attachments, and confirm that paths do not fall back to live data.
+Record the restore date and application revision tested. Never run automated
+tests against production data paths.
+
+The old Caddy CA directory is not required for the local HTTP deployment. Keep
+it only if another unrelated service still depends on it.
+
 LifePIM sits on top of your data. It stores metadata, indexes, links, settings,
 and launch information in SQLite, but most of your real files remain where they
 already live.
